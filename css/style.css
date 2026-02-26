@@ -14,14 +14,14 @@ html {
 }
 
 body {
-  font-family: 'Georgia', serif;
-  background-color: #faf9f6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+  background-color: #f5f1ed;
   color: #2c2c2c;
   line-height: 1.7;
 }
 
 a {
-  color: #c0783a;
+  color: #d4753a;
   text-decoration: none;
 }
 
@@ -36,25 +36,41 @@ img {
 
 /* ---------- Header & Navigation ---------- */
 header {
-  background-color: #1e3a3a;
+  background: linear-gradient(135deg, #1a3f3f 0%, #367a7a 100%);
   color: #f5f0e8;
   padding: 1.5rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+header .brand {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+header .brand .logo-img {
+  height: 70px;
+  width: auto;
+  object-fit: contain;
 }
 
 header .brand h1 {
-  font-size: 1.8rem;
-  letter-spacing: 0.05em;
+  font-size: 2.2rem;
+  letter-spacing: 0.08em;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 header .brand p {
-  font-size: 0.9rem;
-  color: #b0c4c4;
+  font-size: 0.85rem;
+  color: #e8a750;
   font-style: italic;
+  margin-top: 0.2rem;
 }
 
 nav {
@@ -66,34 +82,60 @@ nav {
 nav a {
   color: #f5f0e8;
   font-size: 1rem;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   transition: color 0.2s;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 nav a:hover,
 nav a.active {
-  color: #e8a96c;
+  color: #d4753a;
   text-decoration: none;
 }
 
 /* ---------- Hero Banner ---------- */
 .hero {
-  background: linear-gradient(135deg, #2e5d5d, #1e3a3a);
+  background: linear-gradient(135deg, #d4753a 0%, #367a7a 50%, #1a3f3f 100%);
   color: #f5f0e8;
   text-align: center;
-  padding: 5rem 2rem;
+  padding: 7rem 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(45deg, rgba(255,255,255,0.05) 0%, transparent 100%),
+    linear-gradient(-45deg, rgba(0,0,0,0.05) 0%, transparent 100%);
+  pointer-events: none;
 }
 
 .hero h2 {
-  font-size: 2.4rem;
-  margin-bottom: 0.75rem;
+  font-size: 3.2rem;
+  margin-bottom: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  position: relative;
+  z-index: 1;
+  text-transform: uppercase;
 }
 
 .hero p {
-  font-size: 1.1rem;
-  color: #b0c4c4;
-  max-width: 560px;
+  font-size: 1.3rem;
+  color: #e8d5c4;
+  max-width: 600px;
   margin: 0 auto;
+  font-weight: 500;
+  position: relative;
+  z-index: 1;
+  letter-spacing: 0.02em;
 }
 
 /* ---------- Main Content ---------- */
@@ -113,17 +155,18 @@ main {
 
 .card {
   background: #ffffff;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
   display: flex;
   flex-direction: column;
+  border-top: 4px solid #d4753a;
 }
 
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  transform: translateY(-6px);
+  box-shadow: 0 8px 24px rgba(212, 117, 58, 0.15);
 }
 
 .card-cover {
@@ -137,7 +180,7 @@ main {
 .card-cover-placeholder {
   width: 100%;
   height: 160px;
-  background: linear-gradient(135deg, #2e5d5d, #5a9090);
+  background: linear-gradient(135deg, #367a7a, #5a9fa0);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -152,17 +195,20 @@ main {
 }
 
 .card-meta {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: #888;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.6rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+  font-weight: 700;
 }
 
 .card-body h3 {
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   margin-bottom: 0.5rem;
-  color: #1e3a3a;
+  color: #1a3f3f;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .card-body p {
@@ -174,26 +220,34 @@ main {
 
 .card-body .btn {
   align-self: flex-start;
-  background-color: #c0783a;
+  background-color: #d4753a;
   color: #fff;
-  padding: 0.45rem 1rem;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  transition: background-color 0.2s;
+  padding: 0.7rem 1.4rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: background-color 0.2s, transform 0.2s;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .card-body .btn:hover {
-  background-color: #a0622e;
+  background-color: #b85e2a;
+  transform: translateY(-2px);
   text-decoration: none;
+  box-shadow: 0 4px 12px rgba(212, 117, 58, 0.3);
 }
 
 /* ---------- Section Headings ---------- */
 .section-heading {
-  font-size: 1.6rem;
-  color: #1e3a3a;
-  border-bottom: 3px solid #c0783a;
-  padding-bottom: 0.4rem;
-  margin-bottom: 1.5rem;
+  font-size: 2.2rem;
+  color: #1a3f3f;
+  border-bottom: 4px solid #d4753a;
+  padding-bottom: 0.8rem;
+  margin-bottom: 2.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
 }
 
 /* ---------- Blog Post Page ---------- */
@@ -202,9 +256,11 @@ main {
 }
 
 .post-header h1 {
-  font-size: 2rem;
-  color: #1e3a3a;
+  font-size: 2.4rem;
+  color: #1a3f3f;
   margin-bottom: 0.4rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 
 .post-meta {
@@ -227,7 +283,7 @@ main {
   width: 100%;
   height: 280px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #2e5d5d, #5a9090);
+  background: linear-gradient(135deg, #367a7a, #5a9fa0);
   margin-bottom: 2rem;
   display: flex;
   align-items: center;
@@ -236,9 +292,11 @@ main {
 }
 
 article .post-content h2 {
-  font-size: 1.4rem;
-  color: #1e3a3a;
-  margin: 2rem 0 0.75rem;
+  font-size: 1.6rem;
+  color: #1a3f3f;
+  margin: 2.5rem 0 1rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
 }
 
 article .post-content p {
@@ -256,7 +314,7 @@ article .post-content li {
 }
 
 article .post-content blockquote {
-  border-left: 4px solid #c0783a;
+  border-left: 4px solid #d4753a;
   padding: 0.75rem 1.25rem;
   margin: 1.5rem 0;
   background-color: #fff8f2;
@@ -276,6 +334,54 @@ article .post-content blockquote {
 }
 
 /* ---------- About Me Page ---------- */
+.mission-section {
+  background: linear-gradient(135deg, #f8f4f0 0%, #f0e8e0 100%);
+  border-left: 6px solid #d4753a;
+  padding: 2.5rem;
+  border-radius: 8px;
+  max-width: 800px;
+  margin: 0 auto 3rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.mission-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(212, 117, 58, 0.05) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.mission-section h2 {
+  font-size: 2rem;
+  color: #1a3f3f;
+  margin-bottom: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  position: relative;
+  z-index: 1;
+}
+
+.mission-section p {
+  position: relative;
+  z-index: 1;
+}
+
+.mission-section p {
+  margin-bottom: 1.2rem;
+  line-height: 1.8;
+  color: #333;
+}
+
+.mission-section p:last-child {
+  margin-bottom: 0;
+}
+
 .about-grid {
   display: grid;
   grid-template-columns: 200px 1fr;
@@ -289,15 +395,15 @@ article .post-content blockquote {
   height: 180px;
   border-radius: 50%;
   object-fit: cover;
-  border: 4px solid #c0783a;
+  border: 4px solid #d4753a;
 }
 
 .about-avatar-placeholder {
   width: 180px;
   height: 180px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2e5d5d, #5a9090);
-  border: 4px solid #c0783a;
+  background: linear-gradient(135deg, #367a7a, #5a9fa0);
+  border: 4px solid #d4753a;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -306,19 +412,38 @@ article .post-content blockquote {
 }
 
 .about-bio h2 {
-  font-size: 1.8rem;
-  color: #1e3a3a;
-  margin-bottom: 0.25rem;
+  font-size: 2.4rem;
+  color: #1a3f3f;
+  margin-bottom: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.about-bio {
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .about-bio .tagline {
   color: #888;
   font-style: italic;
   margin-bottom: 1rem;
+  font-size: 1.05rem;
 }
 
 .about-bio p {
-  margin-bottom: 1rem;
+  margin-bottom: 1.2rem;
+  line-height: 1.8;
+}
+
+.about-bio ul {
+  margin: 1rem 0 1.2rem 2rem;
+  line-height: 1.8;
+}
+
+.about-bio ul li {
+  margin-bottom: 0.6rem;
 }
 
 .stats-row {
@@ -331,24 +456,34 @@ article .post-content blockquote {
 .stat-box {
   background: #ffffff;
   border-radius: 8px;
-  padding: 1.25rem 1.75rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  padding: 1.5rem 2rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
   text-align: center;
   flex: 1;
   min-width: 120px;
+  border-top: 4px solid #d4753a;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.stat-box:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(212, 117, 58, 0.15);
 }
 
 .stat-box .stat-number {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #c0783a;
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: #d4753a;
+  letter-spacing: -0.02em;
 }
 
 .stat-box .stat-label {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: #888;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  margin-top: 0.5rem;
 }
 
 .destinations-list {
@@ -359,25 +494,41 @@ article .post-content blockquote {
 }
 
 .tag {
-  background-color: #e8f0f0;
-  color: #1e3a3a;
-  padding: 0.3rem 0.75rem;
+  background: linear-gradient(135deg, #e8f4f4 0%, #d0e8e8 100%);
+  color: #1a3f3f;
+  padding: 0.45rem 0.9rem;
   border-radius: 20px;
   font-size: 0.85rem;
+  font-weight: 700;
+  transition: all 0.2s;
+  border: 1px solid rgba(212, 117, 58, 0.2);
+}
+
+.tag:hover {
+  border-color: #d4753a;
+  background: linear-gradient(135deg, #d9ecec 0%, #c0dfe0 100%);
 }
 
 /* ---------- Footer ---------- */
 footer {
-  background-color: #1e3a3a;
-  color: #b0c4c4;
+  background: linear-gradient(135deg, #1a3f3f 0%, #2e6969 100%);
+  color: #a0c4c4;
   text-align: center;
-  padding: 1.5rem 2rem;
+  padding: 2rem 2rem;
   margin-top: 4rem;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 footer a {
-  color: #e8a96c;
+  color: #d4753a;
+  font-weight: 700;
+  transition: color 0.2s;
+}
+
+footer a:hover {
+  color: #f0964a;
 }
 
 /* ---------- Responsive ---------- */
@@ -387,8 +538,17 @@ footer a {
     text-align: center;
   }
 
+  header .brand {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  header .brand .logo-img {
+    height: 60px;
+  }
+
   .hero h2 {
-    font-size: 1.7rem;
+    font-size: 2rem;
   }
 
   .about-grid {
