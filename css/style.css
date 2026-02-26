@@ -203,9 +203,10 @@ main {
 
 .card-cover {
   width: 100%;
-  height: 160px;
-  object-fit: cover;
-  background-color: #d0e0e0;
+  height: 200px;
+  object-fit: contain;
+  background-color: #f5f1ed;
+  object-position: center;
 }
 
 /* Placeholder cover when no image */
@@ -336,11 +337,12 @@ main {
 
 .post-cover {
   width: 100%;
-  max-height: 400px;
-  object-fit: cover;
+  max-height: 450px;
+  object-fit: contain;
   border-radius: 8px;
   margin-bottom: 2rem;
-  background: linear-gradient(135deg, #2e5d5d, #5a9090);
+  background: #f5f1ed;
+  object-position: center;
 }
 
 .post-cover-placeholder {
