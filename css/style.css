@@ -15,13 +15,14 @@ html {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-  background-color: #f5f1ed;
-  color: #2c2c2c;
-  line-height: 1.7;
+  background: linear-gradient(135deg, #ede7e0 0%, #e4dcd3 100%);
+  background-attachment: fixed;
+  color: #1f1f1f;
+  line-height: 1.8;
 }
 
 a {
-  color: #d4753a;
+  color: #c56a2c;
   text-decoration: none;
 }
 
@@ -36,7 +37,7 @@ img {
 
 /* ---------- Header & Navigation ---------- */
 header {
-  background: linear-gradient(135deg, #1a3f3f 0%, #367a7a 100%);
+  background: linear-gradient(135deg, #0f2d2d 0%, #1f5555 100%);
   color: #f5f0e8;
   padding: 1.5rem 2rem;
   display: flex;
@@ -44,7 +45,20 @@ header {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border-bottom: 3px solid #c56a2c;
+  position: relative;
+}
+
+header::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #c56a2c, #d4753a, transparent);
+  opacity: 0.6;
 }
 
 header .brand {
@@ -61,14 +75,18 @@ header .brand .logo-img {
 
 header .brand h1 {
   font-size: 2.2rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   font-weight: 900;
   text-transform: uppercase;
+  background: linear-gradient(90deg, #f5f0e8 0%, #d4a756 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 header .brand p {
   font-size: 0.85rem;
-  color: #e8a750;
+  color: #d4a756;
   font-style: italic;
   margin-top: 0.2rem;
 }
@@ -90,16 +108,16 @@ nav a {
 
 nav a:hover,
 nav a.active {
-  color: #d4753a;
+  color: #c56a2c;
   text-decoration: none;
 }
 
 /* ---------- Hero Banner ---------- */
 .hero {
-  background: linear-gradient(135deg, #d4753a 0%, #367a7a 50%, #1a3f3f 100%);
+  background: linear-gradient(135deg, #c56a2c 0%, #1f5555 50%, #0f2d2d 100%);
   color: #f5f0e8;
   text-align: center;
-  padding: 7rem 2rem;
+  padding: 8rem 2rem;
   position: relative;
   overflow: hidden;
 }
@@ -111,20 +129,32 @@ nav a.active {
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: 
-    linear-gradient(45deg, rgba(255,255,255,0.05) 0%, transparent 100%),
-    linear-gradient(-45deg, rgba(0,0,0,0.05) 0%, transparent 100%);
+  background: 
+    linear-gradient(45deg, rgba(255,255,255,0.03) 0%, transparent 100%),
+    linear-gradient(-45deg, rgba(0,0,0,0.08) 0%, transparent 100%);
   pointer-events: none;
 }
 
+.hero::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, #d4753a, #c56a2c, transparent);
+  opacity: 0.8;
+}
+
 .hero h2 {
-  font-size: 3.2rem;
-  margin-bottom: 1rem;
+  font-size: 3.4rem;
+  margin-bottom: 1.2rem;
   font-weight: 900;
   letter-spacing: -0.03em;
   position: relative;
   z-index: 1;
   text-transform: uppercase;
+  line-height: 1.2;
 }
 
 .hero p {
@@ -148,25 +178,27 @@ main {
 /* ---------- Blog Post Cards (index) ---------- */
 .posts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 2rem;
-  margin-top: 2rem;
+  margin-top: 3rem;
 }
 
 .card {
   background: #ffffff;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s, border-color 0.3s;
   display: flex;
   flex-direction: column;
-  border-top: 4px solid #d4753a;
+  border-top: 5px solid #c56a2c;
+  border-left: 2px solid rgba(197, 106, 44, 0.3);
 }
 
 .card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 8px 24px rgba(212, 117, 58, 0.15);
+  transform: translateY(-8px);
+  box-shadow: 0 12px 32px rgba(197, 106, 44, 0.25);
+  border-top-color: #d4753a;
 }
 
 .card-cover {
@@ -180,7 +212,7 @@ main {
 .card-cover-placeholder {
   width: 100%;
   height: 160px;
-  background: linear-gradient(135deg, #367a7a, #5a9fa0);
+  background: linear-gradient(135deg, #1f5555, #2e7a7b);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -204,11 +236,12 @@ main {
 }
 
 .card-body h3 {
-  font-size: 1.3rem;
-  margin-bottom: 0.5rem;
-  color: #1a3f3f;
-  font-weight: 700;
+  font-size: 1.35rem;
+  margin-bottom: 0.6rem;
+  color: #0f2d2d;
+  font-weight: 900;
   letter-spacing: -0.01em;
+  line-height: 1.3;
 }
 
 .card-body p {
@@ -220,34 +253,65 @@ main {
 
 .card-body .btn {
   align-self: flex-start;
-  background-color: #d4753a;
+  background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%);
   color: #fff;
-  padding: 0.7rem 1.4rem;
+  padding: 0.8rem 1.6rem;
   border-radius: 6px;
   font-size: 0.9rem;
-  transition: background-color 0.2s, transform 0.2s;
-  font-weight: 700;
+  transition: all 0.3s;
+  font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  border: 2px solid #c56a2c;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-body .btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: rgba(255,255,255,0.15);
+  transition: left 0.3s;
 }
 
 .card-body .btn:hover {
-  background-color: #b85e2a;
-  transform: translateY(-2px);
+  background: linear-gradient(135deg, #a05620 0%, #8a4618 100%);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(197, 106, 44, 0.5);
   text-decoration: none;
-  box-shadow: 0 4px 12px rgba(212, 117, 58, 0.3);
+}
+
+.card-body .btn:hover::before {
+  left: 100%;
 }
 
 /* ---------- Section Headings ---------- */
 .section-heading {
-  font-size: 2.2rem;
-  color: #1a3f3f;
-  border-bottom: 4px solid #d4753a;
-  padding-bottom: 0.8rem;
-  margin-bottom: 2.5rem;
+  font-size: 2.3rem;
+  color: #0f2d2d;
+  border-bottom: 5px solid #c56a2c;
+  padding-bottom: 1rem;
+  margin-bottom: 3rem;
   font-weight: 900;
   letter-spacing: -0.02em;
   text-transform: uppercase;
+  position: relative;
+  display: inline-block;
+}
+
+.section-heading::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #c56a2c, transparent);
+  opacity: 0.5;
 }
 
 /* ---------- Blog Post Page ---------- */
@@ -257,7 +321,7 @@ main {
 
 .post-header h1 {
   font-size: 2.4rem;
-  color: #1a3f3f;
+  color: #0f2d2d;
   margin-bottom: 0.4rem;
   font-weight: 900;
   letter-spacing: -0.02em;
@@ -283,7 +347,7 @@ main {
   width: 100%;
   height: 280px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #367a7a, #5a9fa0);
+  background: linear-gradient(135deg, #1f5555, #2e7a7b);
   margin-bottom: 2rem;
   display: flex;
   align-items: center;
@@ -293,7 +357,7 @@ main {
 
 article .post-content h2 {
   font-size: 1.6rem;
-  color: #1a3f3f;
+  color: #0f2d2d;
   margin: 2.5rem 0 1rem;
   font-weight: 900;
   letter-spacing: -0.01em;
@@ -314,12 +378,12 @@ article .post-content li {
 }
 
 article .post-content blockquote {
-  border-left: 4px solid #d4753a;
+  border-left: 4px solid #c56a2c;
   padding: 0.75rem 1.25rem;
   margin: 1.5rem 0;
   background-color: #fff8f2;
   font-style: italic;
-  color: #555;
+  color: #444;
 }
 
 .back-link {
@@ -335,15 +399,26 @@ article .post-content blockquote {
 
 /* ---------- About Me Page ---------- */
 .mission-section {
-  background: linear-gradient(135deg, #f8f4f0 0%, #f0e8e0 100%);
-  border-left: 6px solid #d4753a;
-  padding: 2.5rem;
+  background: linear-gradient(135deg, #f0e8e0 0%, #e8dcd2 100%);
+  border-left: 6px solid #c56a2c;
+  border-bottom: 3px solid #1f5555;
+  padding: 2.8rem;
   border-radius: 8px;
   max-width: 800px;
   margin: 0 auto 3rem;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   position: relative;
   overflow: hidden;
+}
+
+.mission-section::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #1f5555, transparent);
 }
 
 .mission-section::before {
@@ -353,13 +428,13 @@ article .post-content blockquote {
   right: 0;
   width: 200px;
   height: 200px;
-  background: radial-gradient(circle, rgba(212, 117, 58, 0.05) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(197, 106, 44, 0.08) 0%, transparent 70%);
   border-radius: 50%;
 }
 
 .mission-section h2 {
   font-size: 2rem;
-  color: #1a3f3f;
+  color: #0f2d2d;
   margin-bottom: 1.5rem;
   font-weight: 900;
   letter-spacing: -0.02em;
@@ -395,15 +470,15 @@ article .post-content blockquote {
   height: 180px;
   border-radius: 50%;
   object-fit: cover;
-  border: 4px solid #d4753a;
+  border: 4px solid #c56a2c;
 }
 
 .about-avatar-placeholder {
   width: 180px;
   height: 180px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #367a7a, #5a9fa0);
-  border: 4px solid #d4753a;
+  background: linear-gradient(135deg, #1f5555, #2e7a7b);
+  border: 4px solid #c56a2c;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -412,12 +487,24 @@ article .post-content blockquote {
 }
 
 .about-bio h2 {
-  font-size: 2.4rem;
-  color: #1a3f3f;
-  margin-bottom: 1rem;
+  font-size: 2.5rem;
+  color: #0f2d2d;
+  margin-bottom: 1.5rem;
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   text-transform: uppercase;
+  position: relative;
+  padding-bottom: 0.8rem;
+}
+
+.about-bio h2::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 4px;
+  background: linear-gradient(90deg, #c56a2c, #1f5555);
 }
 
 .about-bio {
@@ -454,27 +541,42 @@ article .post-content blockquote {
 }
 
 .stat-box {
-  background: #ffffff;
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
   border-radius: 8px;
-  padding: 1.5rem 2rem;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  padding: 1.8rem 2rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
   text-align: center;
   flex: 1;
-  min-width: 120px;
-  border-top: 4px solid #d4753a;
-  transition: transform 0.3s, box-shadow 0.3s;
+  min-width: 140px;
+  border-top: 5px solid #c56a2c;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -50px;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(197, 106, 44, 0.1) 0%, transparent 70%);
+  border-radius: 50%;
 }
 
 .stat-box:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(212, 117, 58, 0.15);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 28px rgba(197, 106, 44, 0.18);
 }
 
 .stat-box .stat-number {
-  font-size: 2.4rem;
+  font-size: 2.6rem;
   font-weight: 900;
-  color: #d4753a;
-  letter-spacing: -0.02em;
+  color: #c56a2c;
+  letter-spacing: -0.03em;
+  position: relative;
+  z-index: 1;
 }
 
 .stat-box .stat-label {
@@ -494,41 +596,53 @@ article .post-content blockquote {
 }
 
 .tag {
-  background: linear-gradient(135deg, #e8f4f4 0%, #d0e8e8 100%);
-  color: #1a3f3f;
+  background: linear-gradient(135deg, #dceaea 0%, #c5dfe0 100%);
+  color: #0f2d2d;
   padding: 0.45rem 0.9rem;
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 700;
   transition: all 0.2s;
-  border: 1px solid rgba(212, 117, 58, 0.2);
+  border: 1px solid rgba(197, 106, 44, 0.25);
 }
 
 .tag:hover {
-  border-color: #d4753a;
-  background: linear-gradient(135deg, #d9ecec 0%, #c0dfe0 100%);
+  border-color: #c56a2c;
+  background: linear-gradient(135deg, #cde2e2 0%, #b5d8da 100%);
 }
 
 /* ---------- Footer ---------- */
 footer {
-  background: linear-gradient(135deg, #1a3f3f 0%, #2e6969 100%);
-  color: #a0c4c4;
+  background: linear-gradient(135deg, #0f2d2d 0%, #1d4e4e 100%);
+  color: #8bb0b0;
   text-align: center;
-  padding: 2rem 2rem;
-  margin-top: 4rem;
-  font-size: 0.9rem;
+  padding: 2.5rem 2rem;
+  margin-top: 5rem;
+  font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.04em;
+  border-top: 3px solid #c56a2c;
+  position: relative;
+}
+
+footer::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #c56a2c, transparent);
 }
 
 footer a {
-  color: #d4753a;
-  font-weight: 700;
+  color: #c56a2c;
+  font-weight: 900;
   transition: color 0.2s;
 }
 
 footer a:hover {
-  color: #f0964a;
+  color: #d4753a;
 }
 
 /* ---------- Responsive ---------- */
