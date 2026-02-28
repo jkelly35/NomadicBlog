@@ -175,6 +175,147 @@ main {
   padding: 0 1.5rem;
 }
 
+/* ---------- Newsletter ---------- */
+.newsletter {
+  margin: 4rem auto 0;
+  padding: 0 1.5rem;
+}
+
+.newsletter-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  background: linear-gradient(135deg, #0f2d2d 0%, #1f5555 100%);
+  color: #f5f0e8;
+  border-radius: 16px;
+  padding: 2.5rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  border: 2px solid rgba(197, 106, 44, 0.35);
+  text-align: center;
+}
+
+.newsletter-inner h2 {
+  font-size: 2rem;
+  margin-bottom: 0.6rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
+
+.newsletter-inner p {
+  color: #e8d5c4;
+  margin-bottom: 1.6rem;
+  font-weight: 500;
+}
+
+.newsletter-form {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.newsletter-form input {
+  flex: 1 1 260px;
+  max-width: 360px;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: #f5f1ed;
+  font-size: 1rem;
+  color: #1f1f1f;
+}
+
+.newsletter-form input:focus {
+  outline: none;
+  border-color: #d4753a;
+  box-shadow: 0 0 0 3px rgba(197, 106, 44, 0.25);
+}
+
+.kit-container {
+  margin: 1.5rem 0;
+}
+
+.kit-container form {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.kit-container input {
+  flex: 1 1 260px;
+  max-width: 360px;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: #f5f1ed;
+  font-size: 1rem;
+  color: #1f1f1f;
+}
+
+.kit-container input:focus {
+  outline: none;
+  border-color: #d4753a;
+  box-shadow: 0 0 0 3px rgba(197, 106, 44, 0.25);
+}
+
+.kit-container button {
+  background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%);
+  color: #fff;
+  padding: 0.9rem 1.8rem;
+  border-radius: 8px;
+  border: 2px solid #c56a2c;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.kit-container button:hover {
+  background: linear-gradient(135deg, #a05620 0%, #8a4618 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(197, 106, 44, 0.4);
+}
+
+.newsletter-form button {
+  background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%);
+  color: #fff;
+  padding: 0.9rem 1.8rem;
+  border-radius: 8px;
+  border: 2px solid #c56a2c;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.newsletter-form button:hover {
+  background: linear-gradient(135deg, #a05620 0%, #8a4618 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(197, 106, 44, 0.4);
+}
+
+.newsletter-inner small {
+  display: block;
+  margin-top: 1rem;
+  color: #d4a756;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 /* ---------- Blog Post Cards (index) ---------- */
 .posts-grid {
   display: grid;
