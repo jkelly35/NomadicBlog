@@ -74,7 +74,7 @@
     <div class="newsletter-inner">
       <h2>Never Miss a New Blog Post</h2>
       <p>Get concise, athlete-focused insights delivered to your inbox.</p>
-      <form id="newsletter-form" class="newsletter-form" action="https://nomadic-performance.kit.com/e5495b8201/subscribe" method="POST">
+      <form id="newsletter-form" class="newsletter-form">
         <label class="sr-only" for="newsletter-email">Email address</label>
         <input
           type="email"
@@ -86,8 +86,38 @@
         />
         <button type="submit">Subscribe</button>
       </form>
+      <div id="newsletter-message" class="newsletter-message"></div>
       <small>Short emails. No spam. Unsubscribe anytime.</small>
       <script async data-uid="e5495b8201" src="https://nomadic-performance.kit.com/e5495b8201/index.js"></script>
+      <script>
+        document.getElementById('newsletter-form').addEventListener('submit', async function(e) {
+          e.preventDefault();
+          const email = document.getElementById('newsletter-email').value;
+          const button = this.querySelector('button');
+          const messageEl = document.getElementById('newsletter-message');
+          
+          button.disabled = true;
+          button.textContent = 'Subscribing...';
+          messageEl.innerHTML = '';
+          
+          try {
+            const response = await fetch('https://nomadic-performance.kit.com/e5495b8201/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: 'email_address=' + encodeURIComponent(email)
+            });
+            
+            button.textContent = 'Subscribe';
+            button.disabled = false;
+            document.getElementById('newsletter-email').value = '';
+            messageEl.innerHTML = '<p class="success-message">✓ Welcome! Check your email for a welcome message.</p>';
+          } catch (error) {
+            button.textContent = 'Subscribe';
+            button.disabled = false;
+            messageEl.innerHTML = '<p class="error-message">Something went wrong. Please try again.</p>';
+          }
+        });
+      </script>
     </div>
   </section>
 
