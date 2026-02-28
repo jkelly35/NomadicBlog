@@ -231,53 +231,6 @@ main {
   box-shadow: 0 0 0 3px rgba(197, 106, 44, 0.25);
 }
 
-.kit-container {
-  margin: 1.5rem 0;
-}
-
-.kit-container form {
-  display: flex;
-  gap: 0.8rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.kit-container input {
-  flex: 1 1 260px;
-  max-width: 360px;
-  padding: 0.85rem 1rem;
-  border-radius: 8px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  background: #f5f1ed;
-  font-size: 1rem;
-  color: #1f1f1f;
-}
-
-.kit-container input:focus {
-  outline: none;
-  border-color: #d4753a;
-  box-shadow: 0 0 0 3px rgba(197, 106, 44, 0.25);
-}
-
-.kit-container button {
-  background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%);
-  color: #fff;
-  padding: 0.9rem 1.8rem;
-  border-radius: 8px;
-  border: 2px solid #c56a2c;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.kit-container button:hover {
-  background: linear-gradient(135deg, #a05620 0%, #8a4618 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 18px rgba(197, 106, 44, 0.4);
-}
-
 .newsletter-form button {
   background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%);
   color: #fff;

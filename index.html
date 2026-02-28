@@ -74,7 +74,19 @@
     <div class="newsletter-inner">
       <h2>Never Miss a New Blog Post</h2>
       <p>Get concise, athlete-focused insights delivered to your inbox.</p>
-      <div class="kit-container"></div>
+      <form id="newsletter-form" class="newsletter-form" action="https://nomadic-performance.kit.com/e5495b8201/subscribe" method="POST">
+        <label class="sr-only" for="newsletter-email">Email address</label>
+        <input
+          type="email"
+          id="newsletter-email"
+          name="email_address"
+          placeholder="you@example.com"
+          autocomplete="email"
+          required
+        />
+        <button type="submit">Subscribe</button>
+      </form>
+      <small>Short emails. No spam. Unsubscribe anytime.</small>
       <script async data-uid="e5495b8201" src="https://nomadic-performance.kit.com/e5495b8201/index.js"></script>
     </div>
   </section>
