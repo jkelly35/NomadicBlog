@@ -245,6 +245,16 @@
         html += `<p><strong>Anterior Reach Y Balance:</strong> Left: ${yBalanceLeft} cm, Right: ${yBalanceRight} cm`;
         html += ` (Norm: ${norms.yBalance} cm)`;
         html += `<br><span class=\"symmetry\">Symmetry Difference: ${yBalanceSym}%</span></p>`;
+        // Y-Balance Test interpretation
+        html += `<div style='background:#fff8e6;border-left:4px solid #c56a2c;padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
+        html += `<strong>Y-Balance Test Info:</strong><br/>`;
+        html += `• Used to assess <b>asymmetry</b> and <b>injury risk screening</b>.<br/>`;
+        html += `• <b>4 cm asymmetry</b> is linked to increased injury risk.<br/>`;
+        html += `<span style='color:#888;font-size:0.97em;'>Reference: American Journal of Sports Medicine, Plisky et al., 2006</span>`;
+        html += `</div>`;
+        if (Math.abs(yBalanceLeft - yBalanceRight) >= 4) {
+          html += `<p style='color:#c56a2c;font-weight:700;'>⚠️ Your Y-Balance asymmetry is 4 cm or greater, which may indicate increased injury risk.</p>`;
+        }
         html += `<p style='color:#888;font-size:0.95rem;'>*Norms are for demonstration. For personalized norms, consult your provider.</p>`;
         document.getElementById('reportOutput').innerHTML = html;
         document.getElementById('reportOutput').style.display = 'block';
