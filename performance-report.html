@@ -259,9 +259,32 @@
         html += `<b>≥100%:</b> High Performance Range<br/>`;
         html += `<span style='color:#888;font-size:0.97em;'>Benchmarks: Brumitt et al., Davies et al. (see clinical RTS/return-to-play literature)</span>`;
         html += `</div>`;
+        // Triple Hop Norms
+        const tripleHopNorms = [
+          { label: 'Male collegiate', value: '248.8 ± 28.3 in' },
+          { label: 'Female collegiate', value: '185.0 ± 20.9 in' },
+          { label: 'Male high school', value: '229.5 ± 28.3 in' },
+          { label: 'Female high school', value: '168.5 ± 21.3 in' }
+        ];
+        // Height-normalized triple hop
+        let tripleHopNormLeft = height > 0 ? (tripleHopLeft / height) * 100 : 0;
+        let tripleHopNormRight = height > 0 ? (tripleHopRight / height) * 100 : 0;
+        // LSI (Limb Symmetry Index)
+        let lsi = tripleHopLeft > tripleHopRight ? (tripleHopRight / tripleHopLeft) * 100 : (tripleHopLeft / tripleHopRight) * 100;
+        lsi = lsi.toFixed(1);
         html += `<p><strong>Single Leg Triple Hop:</strong> Left: ${tripleHopLeft} in, Right: ${tripleHopRight} in`;
         html += ` (Norm: ${norms.tripleHop} in)`;
-        html += `<br><span class=\"symmetry\">Symmetry Difference: ${tripleHopSym}%</span></p>`;
+        html += `<br><strong>Height-Normalized:</strong> Left: ${tripleHopNormLeft.toFixed(1)}%, Right: ${tripleHopNormRight.toFixed(1)}% of height`;
+        html += `<br><span class=\"symmetry\">Symmetry (LSI): ${lsi}%</span></p>`;
+        html += `<div style='background:#eaf6ff;border-left:4px solid #1f5555;padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
+        html += `<strong>Triple Hop Test Info:</strong><br/>`;
+        html += `• Raw distance: total distance over 3 consecutive hops.<br/>`;
+        html += `• <b>Symmetry (LSI):</b> (shorter ÷ longer) × 100.<br/>`;
+        html += `• <b>Height-normalized:</b> (distance ÷ height) × 100.<br/>`;
+        html += `<br/><strong>Performance Norms (Myers et al.):</strong><br/>`;
+        html += tripleHopNorms.map(n => `${n.label}: ${n.value}`).join('<br/>');
+        html += `<br/><span style='color:#888;font-size:0.97em;'>Reference: Myers et al., 2014</span>`;
+        html += `</div>`;
         html += `<p><strong>30s Lateral Step Down:</strong> Left: ${stepDownLeft} reps, Right: ${stepDownRight} reps`;
         html += ` (Norm: ${norms.stepDown} reps)`;
         html += `<br><span class=\"symmetry\">Symmetry Difference: ${stepDownSym}%</span></p>`;
