@@ -6,39 +6,78 @@
   <title>Performance Report – Nomadic Performance</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
+    .report-hero {
+      background: linear-gradient(135deg, #c56a2c 0%, #1f5555 100%);
+      color: #f5f0e8;
+      text-align: center;
+      padding: 3.5rem 2rem 2.2rem 2rem;
+      border-radius: 0 0 18px 18px;
+      margin-bottom: 2.5rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+    }
+    .report-hero h1 {
+      font-size: 2.5rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.7rem;
+    }
+    .report-hero p {
+      font-size: 1.15rem;
+      color: #e8d5c4;
+      max-width: 600px;
+      margin: 0 auto;
+    }
     .report-form {
       background: #fff;
-      border-radius: 14px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.10);
-      padding: 2.5rem 2rem 2rem 2rem;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+      padding: 2.7rem 2.2rem 2.2rem 2.2rem;
       max-width: 540px;
       margin: 2.5rem auto 2rem auto;
+      border-top: 6px solid #c56a2c;
+      border-left: 2px solid rgba(197, 106, 44, 0.13);
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
     }
     .report-form h2 {
-      font-size: 1.5rem;
+      font-size: 1.45rem;
       font-weight: 900;
       margin-bottom: 1.2rem;
       color: #0f2d2d;
+      letter-spacing: -0.01em;
+      text-align: center;
     }
     .report-form label {
       font-weight: 700;
-      margin-top: 1.2rem;
+      margin-top: 1.1rem;
       display: block;
       color: #1f5555;
+      font-size: 1.01rem;
+      letter-spacing: 0.01em;
     }
-    .report-form input {
+    .report-form input, .report-form select {
       width: 100%;
-      padding: 0.7rem;
-      border-radius: 7px;
+      padding: 0.8rem;
+      border-radius: 8px;
       border: 1.5px solid #c56a2c;
       margin-top: 0.3rem;
       margin-bottom: 1.1rem;
-      font-size: 1rem;
+      font-size: 1.05rem;
+      background: #f5f1ed;
+      color: #1f1f1f;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .report-form input:focus, .report-form select:focus {
+      outline: none;
+      border-color: #1f5555;
+      box-shadow: 0 0 0 2px #c56a2c33;
     }
     .report-form button {
       background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%);
       color: #fff;
-      padding: 0.9rem 1.8rem;
+      padding: 1rem 2.1rem;
       border-radius: 8px;
       border: 2px solid #c56a2c;
       font-weight: 900;
@@ -46,34 +85,49 @@
       letter-spacing: 0.06em;
       cursor: pointer;
       transition: all 0.3s;
-      margin-top: 1rem;
+      margin-top: 1.2rem;
+      font-size: 1.08rem;
+      align-self: center;
+      box-shadow: 0 4px 16px rgba(197, 106, 44, 0.10);
     }
     .report-form button:hover {
       background: linear-gradient(135deg, #a05620 0%, #8a4618 100%);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 18px rgba(197, 106, 44, 0.4);
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 8px 18px rgba(197, 106, 44, 0.18);
     }
     .report-output {
       background: #f5f1ed;
-      border-radius: 12px;
-      padding: 2rem;
-      margin: 2rem auto;
+      border-radius: 14px;
+      padding: 2.2rem 2rem 2rem 2rem;
+      margin: 2.5rem auto 2rem auto;
       max-width: 700px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+      border-top: 5px solid #c56a2c;
+      border-left: 2px solid rgba(197, 106, 44, 0.13);
     }
     .report-output h3 {
       color: #0f2d2d;
-      font-size: 1.2rem;
+      font-size: 1.25rem;
       font-weight: 900;
       margin-bottom: 0.7rem;
+      letter-spacing: -0.01em;
     }
     .report-output p {
       color: #333;
       margin-bottom: 0.7rem;
+      font-size: 1.04rem;
     }
     .symmetry {
       color: #c56a2c;
       font-weight: 700;
+    }
+    @media (max-width: 700px) {
+      .report-form, .report-output {
+        padding: 1.2rem 0.5rem 1.2rem 0.5rem;
+      }
+      .report-hero {
+        padding: 2.2rem 0.5rem 1.2rem 0.5rem;
+      }
     }
   </style>
 </head>
@@ -92,37 +146,41 @@
     </nav>
   </header>
   <main>
-      <div class="report-form" id="reportTypeSelector">
-        <h2>Performance Report Generator</h2>
-        <label for="reportType">Choose Report Type:</label>
-        <select id="reportType" name="reportType">
-          <option value="ski">Ski & Snowboard Preseason Testing</option>
-          <option value="runner" disabled>Runner's Readiness Assessment (Coming Soon)</option>
-        </select>
+    <section class="report-hero">
+      <h1>Performance Report Generator</h1>
+      <p>Enter your test results to generate a personalized performance report. Compare your numbers to evidence-based norms and track your progress over time.</p>
+    </section>
+    <div class="report-form" id="reportTypeSelector">
+      <h2>Choose Report Type</h2>
+      <label for="reportType">Assessment:</label>
+      <select id="reportType" name="reportType">
+        <option value="ski">Ski & Snowboard Preseason Testing</option>
+        <option value="runner" disabled>Runner's Readiness Assessment (Coming Soon)</option>
+      </select>
+    </div>
+    <form class="report-form" id="reportForm">
+      <div id="skiFormFields">
+        <label for="broadJump">Broad Jump <span style="color:#888;font-weight:400;font-size:0.97em;">(inches)</span></label>
+        <input type="number" id="broadJump" name="broadJump" min="0" step="0.1" required />
+        <label for="tripleHopLeft">Single Leg Triple Hop – Left <span style="color:#888;font-weight:400;font-size:0.97em;">(inches)</span></label>
+        <input type="number" id="tripleHopLeft" name="tripleHopLeft" min="0" step="0.1" required />
+        <label for="tripleHopRight">Single Leg Triple Hop – Right <span style="color:#888;font-weight:400;font-size:0.97em;">(inches)</span></label>
+        <input type="number" id="tripleHopRight" name="tripleHopRight" min="0" step="0.1" required />
+        <label for="stepDownLeft">30s Lateral Step Down – Left <span style="color:#888;font-weight:400;font-size:0.97em;">(reps)</span></label>
+        <input type="number" id="stepDownLeft" name="stepDownLeft" min="0" step="1" required />
+        <label for="stepDownRight">30s Lateral Step Down – Right <span style="color:#888;font-weight:400;font-size:0.97em;">(reps)</span></label>
+        <input type="number" id="stepDownRight" name="stepDownRight" min="0" step="1" required />
+        <label for="sidePlankLeft">30s Side Plank Hip Abduction – Left <span style="color:#888;font-weight:400;font-size:0.97em;">(reps)</span></label>
+        <input type="number" id="sidePlankLeft" name="sidePlankLeft" min="0" step="1" required />
+        <label for="sidePlankRight">30s Side Plank Hip Abduction – Right <span style="color:#888;font-weight:400;font-size:0.97em;">(reps)</span></label>
+        <input type="number" id="sidePlankRight" name="sidePlankRight" min="0" step="1" required />
+        <label for="yBalanceLeft">Anterior Reach Y Balance – Left <span style="color:#888;font-weight:400;font-size:0.97em;">(cm)</span></label>
+        <input type="number" id="yBalanceLeft" name="yBalanceLeft" min="0" step="0.1" required />
+        <label for="yBalanceRight">Anterior Reach Y Balance – Right <span style="color:#888;font-weight:400;font-size:0.97em;">(cm)</span></label>
+        <input type="number" id="yBalanceRight" name="yBalanceRight" min="0" step="0.1" required />
       </div>
-      <form class="report-form" id="reportForm">
-        <div id="skiFormFields">
-          <label for="broadJump">Broad Jump (inches)</label>
-          <input type="number" id="broadJump" name="broadJump" min="0" step="0.1" required />
-          <label for="tripleHopLeft">Single Leg Triple Hop – Left (inches)</label>
-          <input type="number" id="tripleHopLeft" name="tripleHopLeft" min="0" step="0.1" required />
-          <label for="tripleHopRight">Single Leg Triple Hop – Right (inches)</label>
-          <input type="number" id="tripleHopRight" name="tripleHopRight" min="0" step="0.1" required />
-          <label for="stepDownLeft">30s Lateral Step Down – Left (reps)</label>
-          <input type="number" id="stepDownLeft" name="stepDownLeft" min="0" step="1" required />
-          <label for="stepDownRight">30s Lateral Step Down – Right (reps)</label>
-          <input type="number" id="stepDownRight" name="stepDownRight" min="0" step="1" required />
-          <label for="sidePlankLeft">30s Side Plank Hip Abduction – Left (reps)</label>
-          <input type="number" id="sidePlankLeft" name="sidePlankLeft" min="0" step="1" required />
-          <label for="sidePlankRight">30s Side Plank Hip Abduction – Right (reps)</label>
-          <input type="number" id="sidePlankRight" name="sidePlankRight" min="0" step="1" required />
-          <label for="yBalanceLeft">Anterior Reach Y Balance – Left (cm)</label>
-          <input type="number" id="yBalanceLeft" name="yBalanceLeft" min="0" step="0.1" required />
-          <label for="yBalanceRight">Anterior Reach Y Balance – Right (cm)</label>
-          <input type="number" id="yBalanceRight" name="yBalanceRight" min="0" step="0.1" required />
-        </div>
-        <button type="submit">Generate Report</button>
-      </form>
+      <button type="submit">Generate Report</button>
+    </form>
     <div id="reportOutput" class="report-output" style="display:none;"></div>
   </main>
   <footer>
