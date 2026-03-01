@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Performance Report – Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .report-form {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+      padding: 2.5rem 2rem 2rem 2rem;
+      max-width: 540px;
+      margin: 2.5rem auto 2rem auto;
+    }
+    .report-form h2 {
+      font-size: 1.5rem;
+      font-weight: 900;
+      margin-bottom: 1.2rem;
+      color: #0f2d2d;
+    }
+    .report-form label {
+      font-weight: 700;
+      margin-top: 1.2rem;
+      display: block;
+      color: #1f5555;
+    }
+    .report-form input {
+      width: 100%;
+      padding: 0.7rem;
+      border-radius: 7px;
+      border: 1.5px solid #c56a2c;
+      margin-top: 0.3rem;
+      margin-bottom: 1.1rem;
+      font-size: 1rem;
+    }
+    .report-form button {
+      background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%);
+      color: #fff;
+      padding: 0.9rem 1.8rem;
+      border-radius: 8px;
+      border: 2px solid #c56a2c;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 1rem;
+    }
+    .report-form button:hover {
+      background: linear-gradient(135deg, #a05620 0%, #8a4618 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 18px rgba(197, 106, 44, 0.4);
+    }
+    .report-output {
+      background: #f5f1ed;
+      border-radius: 12px;
+      padding: 2rem;
+      margin: 2rem auto;
+      max-width: 700px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+    }
+    .report-output h3 {
+      color: #0f2d2d;
+      font-size: 1.2rem;
+      font-weight: 900;
+      margin-bottom: 0.7rem;
+    }
+    .report-output p {
+      color: #333;
+      margin-bottom: 0.7rem;
+    }
+    .symmetry {
+      color: #c56a2c;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="performance-report.html" class="active">Performance Report</a>
+    </nav>
+  </header>
+  <main>
+    <form class="report-form" id="reportForm">
+      <h2>Performance Report Generator</h2>
+      <label for="broadJump">Broad Jump (inches)</label>
+      <input type="number" id="broadJump" name="broadJump" min="0" step="0.1" required />
+      <label for="tripleHopLeft">Single Leg Triple Hop – Left (inches)</label>
+      <input type="number" id="tripleHopLeft" name="tripleHopLeft" min="0" step="0.1" required />
+      <label for="tripleHopRight">Single Leg Triple Hop – Right (inches)</label>
+      <input type="number" id="tripleHopRight" name="tripleHopRight" min="0" step="0.1" required />
+      <label for="stepDownLeft">30s Lateral Step Down – Left (reps)</label>
+      <input type="number" id="stepDownLeft" name="stepDownLeft" min="0" step="1" required />
+      <label for="stepDownRight">30s Lateral Step Down – Right (reps)</label>
+      <input type="number" id="stepDownRight" name="stepDownRight" min="0" step="1" required />
+      <label for="sidePlankLeft">30s Side Plank Hip Abduction – Left (reps)</label>
+      <input type="number" id="sidePlankLeft" name="sidePlankLeft" min="0" step="1" required />
+      <label for="sidePlankRight">30s Side Plank Hip Abduction – Right (reps)</label>
+      <input type="number" id="sidePlankRight" name="sidePlankRight" min="0" step="1" required />
+      <label for="yBalanceLeft">Anterior Reach Y Balance – Left (cm)</label>
+      <input type="number" id="yBalanceLeft" name="yBalanceLeft" min="0" step="0.1" required />
+      <label for="yBalanceRight">Anterior Reach Y Balance – Right (cm)</label>
+      <input type="number" id="yBalanceRight" name="yBalanceRight" min="0" step="0.1" required />
+      <button type="submit">Generate Report</button>
+    </form>
+    <div id="reportOutput" class="report-output" style="display:none;"></div>
+  </main>
+  <footer>
+    <p>&copy; 2026 Nomadic Performance &bull; <a href="about.html">About</a></p>
+  </footer>
+  <script>
+    function percentDiff(a, b) {
+      if (a === 0 && b === 0) return 0;
+      return Math.abs(a - b) / ((a + b) / 2) * 100;
+    }
+    document.getElementById('reportForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      // Get values
+      const broadJump = parseFloat(document.getElementById('broadJump').value);
+      const tripleHopLeft = parseFloat(document.getElementById('tripleHopLeft').value);
+      const tripleHopRight = parseFloat(document.getElementById('tripleHopRight').value);
+      const stepDownLeft = parseFloat(document.getElementById('stepDownLeft').value);
+      const stepDownRight = parseFloat(document.getElementById('stepDownRight').value);
+      const sidePlankLeft = parseFloat(document.getElementById('sidePlankLeft').value);
+      const sidePlankRight = parseFloat(document.getElementById('sidePlankRight').value);
+      const yBalanceLeft = parseFloat(document.getElementById('yBalanceLeft').value);
+      const yBalanceRight = parseFloat(document.getElementById('yBalanceRight').value);
+
+      // Norms (example values, replace with real data as needed)
+      const norms = {
+        broadJump: 80, // inches
+        tripleHop: 180, // inches
+        stepDown: 22, // reps
+        sidePlank: 18, // reps
+        yBalance: 80 // cm
+      };
+
+      // Calculate symmetry
+      const tripleHopSym = percentDiff(tripleHopLeft, tripleHopRight).toFixed(1);
+      const stepDownSym = percentDiff(stepDownLeft, stepDownRight).toFixed(1);
+      const sidePlankSym = percentDiff(sidePlankLeft, sidePlankRight).toFixed(1);
+      const yBalanceSym = percentDiff(yBalanceLeft, yBalanceRight).toFixed(1);
+
+      // Output
+      let html = `<h3>Performance Report</h3>`;
+      html += `<p><strong>Broad Jump:</strong> ${broadJump} in`;
+      html += ` (Norm: ${norms.broadJump} in)`;
+      html += `</p>`;
+      html += `<p><strong>Single Leg Triple Hop:</strong> Left: ${tripleHopLeft} in, Right: ${tripleHopRight} in`;
+      html += ` (Norm: ${norms.tripleHop} in)`;
+      html += `<br><span class="symmetry">Symmetry Difference: ${tripleHopSym}%</span></p>`;
+      html += `<p><strong>30s Lateral Step Down:</strong> Left: ${stepDownLeft} reps, Right: ${stepDownRight} reps`;
+      html += ` (Norm: ${norms.stepDown} reps)`;
+      html += `<br><span class="symmetry">Symmetry Difference: ${stepDownSym}%</span></p>`;
+      html += `<p><strong>30s Side Plank Hip Abduction:</strong> Left: ${sidePlankLeft} reps, Right: ${sidePlankRight} reps`;
+      html += ` (Norm: ${norms.sidePlank} reps)`;
+      html += `<br><span class="symmetry">Symmetry Difference: ${sidePlankSym}%</span></p>`;
+      html += `<p><strong>Anterior Reach Y Balance:</strong> Left: ${yBalanceLeft} cm, Right: ${yBalanceRight} cm`;
+      html += ` (Norm: ${norms.yBalance} cm)`;
+      html += `<br><span class="symmetry">Symmetry Difference: ${yBalanceSym}%</span></p>`;
+      html += `<p style='color:#888;font-size:0.95rem;'>*Norms are for demonstration. For personalized norms, consult your provider.</p>`;
+      document.getElementById('reportOutput').innerHTML = html;
+      document.getElementById('reportOutput').style.display = 'block';
+      window.scrollTo({ top: document.getElementById('reportOutput').offsetTop - 40, behavior: 'smooth' });
+    });
+  </script>
+</body>
+</html>
