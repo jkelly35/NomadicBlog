@@ -92,88 +92,106 @@
     </nav>
   </header>
   <main>
-    <form class="report-form" id="reportForm">
-      <h2>Performance Report Generator</h2>
-      <label for="broadJump">Broad Jump (inches)</label>
-      <input type="number" id="broadJump" name="broadJump" min="0" step="0.1" required />
-      <label for="tripleHopLeft">Single Leg Triple Hop – Left (inches)</label>
-      <input type="number" id="tripleHopLeft" name="tripleHopLeft" min="0" step="0.1" required />
-      <label for="tripleHopRight">Single Leg Triple Hop – Right (inches)</label>
-      <input type="number" id="tripleHopRight" name="tripleHopRight" min="0" step="0.1" required />
-      <label for="stepDownLeft">30s Lateral Step Down – Left (reps)</label>
-      <input type="number" id="stepDownLeft" name="stepDownLeft" min="0" step="1" required />
-      <label for="stepDownRight">30s Lateral Step Down – Right (reps)</label>
-      <input type="number" id="stepDownRight" name="stepDownRight" min="0" step="1" required />
-      <label for="sidePlankLeft">30s Side Plank Hip Abduction – Left (reps)</label>
-      <input type="number" id="sidePlankLeft" name="sidePlankLeft" min="0" step="1" required />
-      <label for="sidePlankRight">30s Side Plank Hip Abduction – Right (reps)</label>
-      <input type="number" id="sidePlankRight" name="sidePlankRight" min="0" step="1" required />
-      <label for="yBalanceLeft">Anterior Reach Y Balance – Left (cm)</label>
-      <input type="number" id="yBalanceLeft" name="yBalanceLeft" min="0" step="0.1" required />
-      <label for="yBalanceRight">Anterior Reach Y Balance – Right (cm)</label>
-      <input type="number" id="yBalanceRight" name="yBalanceRight" min="0" step="0.1" required />
-      <button type="submit">Generate Report</button>
-    </form>
+      <div class="report-form" id="reportTypeSelector">
+        <h2>Performance Report Generator</h2>
+        <label for="reportType">Choose Report Type:</label>
+        <select id="reportType" name="reportType">
+          <option value="ski">Ski & Snowboard Preseason Testing</option>
+          <option value="runner" disabled>Runner's Readiness Assessment (Coming Soon)</option>
+        </select>
+      </div>
+      <form class="report-form" id="reportForm">
+        <div id="skiFormFields">
+          <label for="broadJump">Broad Jump (inches)</label>
+          <input type="number" id="broadJump" name="broadJump" min="0" step="0.1" required />
+          <label for="tripleHopLeft">Single Leg Triple Hop – Left (inches)</label>
+          <input type="number" id="tripleHopLeft" name="tripleHopLeft" min="0" step="0.1" required />
+          <label for="tripleHopRight">Single Leg Triple Hop – Right (inches)</label>
+          <input type="number" id="tripleHopRight" name="tripleHopRight" min="0" step="0.1" required />
+          <label for="stepDownLeft">30s Lateral Step Down – Left (reps)</label>
+          <input type="number" id="stepDownLeft" name="stepDownLeft" min="0" step="1" required />
+          <label for="stepDownRight">30s Lateral Step Down – Right (reps)</label>
+          <input type="number" id="stepDownRight" name="stepDownRight" min="0" step="1" required />
+          <label for="sidePlankLeft">30s Side Plank Hip Abduction – Left (reps)</label>
+          <input type="number" id="sidePlankLeft" name="sidePlankLeft" min="0" step="1" required />
+          <label for="sidePlankRight">30s Side Plank Hip Abduction – Right (reps)</label>
+          <input type="number" id="sidePlankRight" name="sidePlankRight" min="0" step="1" required />
+          <label for="yBalanceLeft">Anterior Reach Y Balance – Left (cm)</label>
+          <input type="number" id="yBalanceLeft" name="yBalanceLeft" min="0" step="0.1" required />
+          <label for="yBalanceRight">Anterior Reach Y Balance – Right (cm)</label>
+          <input type="number" id="yBalanceRight" name="yBalanceRight" min="0" step="0.1" required />
+        </div>
+        <button type="submit">Generate Report</button>
+      </form>
     <div id="reportOutput" class="report-output" style="display:none;"></div>
   </main>
   <footer>
     <p>&copy; 2026 Nomadic Performance &bull; <a href="about.html">About</a></p>
   </footer>
   <script>
-    function percentDiff(a, b) {
-      if (a === 0 && b === 0) return 0;
-      return Math.abs(a - b) / ((a + b) / 2) * 100;
-    }
-    document.getElementById('reportForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      // Get values
-      const broadJump = parseFloat(document.getElementById('broadJump').value);
-      const tripleHopLeft = parseFloat(document.getElementById('tripleHopLeft').value);
-      const tripleHopRight = parseFloat(document.getElementById('tripleHopRight').value);
-      const stepDownLeft = parseFloat(document.getElementById('stepDownLeft').value);
-      const stepDownRight = parseFloat(document.getElementById('stepDownRight').value);
-      const sidePlankLeft = parseFloat(document.getElementById('sidePlankLeft').value);
-      const sidePlankRight = parseFloat(document.getElementById('sidePlankRight').value);
-      const yBalanceLeft = parseFloat(document.getElementById('yBalanceLeft').value);
-      const yBalanceRight = parseFloat(document.getElementById('yBalanceRight').value);
+      function percentDiff(a, b) {
+        if (a === 0 && b === 0) return 0;
+        return Math.abs(a - b) / ((a + b) / 2) * 100;
+      }
 
-      // Norms (example values, replace with real data as needed)
-      const norms = {
-        broadJump: 80, // inches
-        tripleHop: 180, // inches
-        stepDown: 22, // reps
-        sidePlank: 18, // reps
-        yBalance: 80 // cm
-      };
+      // Show/hide forms based on report type
+      const reportTypeSelect = document.getElementById('reportType');
+      const skiFormFields = document.getElementById('skiFormFields');
+      // Only ski form for now
+      reportTypeSelect.addEventListener('change', function() {
+        // In future, show/hide forms here
+      });
 
-      // Calculate symmetry
-      const tripleHopSym = percentDiff(tripleHopLeft, tripleHopRight).toFixed(1);
-      const stepDownSym = percentDiff(stepDownLeft, stepDownRight).toFixed(1);
-      const sidePlankSym = percentDiff(sidePlankLeft, sidePlankRight).toFixed(1);
-      const yBalanceSym = percentDiff(yBalanceLeft, yBalanceRight).toFixed(1);
+      document.getElementById('reportForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        // Only Ski/Snowboard implemented
+        const broadJump = parseFloat(document.getElementById('broadJump').value);
+        const tripleHopLeft = parseFloat(document.getElementById('tripleHopLeft').value);
+        const tripleHopRight = parseFloat(document.getElementById('tripleHopRight').value);
+        const stepDownLeft = parseFloat(document.getElementById('stepDownLeft').value);
+        const stepDownRight = parseFloat(document.getElementById('stepDownRight').value);
+        const sidePlankLeft = parseFloat(document.getElementById('sidePlankLeft').value);
+        const sidePlankRight = parseFloat(document.getElementById('sidePlankRight').value);
+        const yBalanceLeft = parseFloat(document.getElementById('yBalanceLeft').value);
+        const yBalanceRight = parseFloat(document.getElementById('yBalanceRight').value);
 
-      // Output
-      let html = `<h3>Performance Report</h3>`;
-      html += `<p><strong>Broad Jump:</strong> ${broadJump} in`;
-      html += ` (Norm: ${norms.broadJump} in)`;
-      html += `</p>`;
-      html += `<p><strong>Single Leg Triple Hop:</strong> Left: ${tripleHopLeft} in, Right: ${tripleHopRight} in`;
-      html += ` (Norm: ${norms.tripleHop} in)`;
-      html += `<br><span class="symmetry">Symmetry Difference: ${tripleHopSym}%</span></p>`;
-      html += `<p><strong>30s Lateral Step Down:</strong> Left: ${stepDownLeft} reps, Right: ${stepDownRight} reps`;
-      html += ` (Norm: ${norms.stepDown} reps)`;
-      html += `<br><span class="symmetry">Symmetry Difference: ${stepDownSym}%</span></p>`;
-      html += `<p><strong>30s Side Plank Hip Abduction:</strong> Left: ${sidePlankLeft} reps, Right: ${sidePlankRight} reps`;
-      html += ` (Norm: ${norms.sidePlank} reps)`;
-      html += `<br><span class="symmetry">Symmetry Difference: ${sidePlankSym}%</span></p>`;
-      html += `<p><strong>Anterior Reach Y Balance:</strong> Left: ${yBalanceLeft} cm, Right: ${yBalanceRight} cm`;
-      html += ` (Norm: ${norms.yBalance} cm)`;
-      html += `<br><span class="symmetry">Symmetry Difference: ${yBalanceSym}%</span></p>`;
-      html += `<p style='color:#888;font-size:0.95rem;'>*Norms are for demonstration. For personalized norms, consult your provider.</p>`;
-      document.getElementById('reportOutput').innerHTML = html;
-      document.getElementById('reportOutput').style.display = 'block';
-      window.scrollTo({ top: document.getElementById('reportOutput').offsetTop - 40, behavior: 'smooth' });
-    });
+        // Norms (example values, replace with real data as needed)
+        const norms = {
+          broadJump: 80, // inches
+          tripleHop: 180, // inches
+          stepDown: 22, // reps
+          sidePlank: 18, // reps
+          yBalance: 80 // cm
+        };
+
+        // Calculate symmetry
+        const tripleHopSym = percentDiff(tripleHopLeft, tripleHopRight).toFixed(1);
+        const stepDownSym = percentDiff(stepDownLeft, stepDownRight).toFixed(1);
+        const sidePlankSym = percentDiff(sidePlankLeft, sidePlankRight).toFixed(1);
+        const yBalanceSym = percentDiff(yBalanceLeft, yBalanceRight).toFixed(1);
+
+        // Output
+        let html = `<h3>Ski & Snowboard Preseason Testing Report</h3>`;
+        html += `<p><strong>Broad Jump:</strong> ${broadJump} in`;
+        html += ` (Norm: ${norms.broadJump} in)`;
+        html += `</p>`;
+        html += `<p><strong>Single Leg Triple Hop:</strong> Left: ${tripleHopLeft} in, Right: ${tripleHopRight} in`;
+        html += ` (Norm: ${norms.tripleHop} in)`;
+        html += `<br><span class=\"symmetry\">Symmetry Difference: ${tripleHopSym}%</span></p>`;
+        html += `<p><strong>30s Lateral Step Down:</strong> Left: ${stepDownLeft} reps, Right: ${stepDownRight} reps`;
+        html += ` (Norm: ${norms.stepDown} reps)`;
+        html += `<br><span class=\"symmetry\">Symmetry Difference: ${stepDownSym}%</span></p>`;
+        html += `<p><strong>30s Side Plank Hip Abduction:</strong> Left: ${sidePlankLeft} reps, Right: ${sidePlankRight} reps`;
+        html += ` (Norm: ${norms.sidePlank} reps)`;
+        html += `<br><span class=\"symmetry\">Symmetry Difference: ${sidePlankSym}%</span></p>`;
+        html += `<p><strong>Anterior Reach Y Balance:</strong> Left: ${yBalanceLeft} cm, Right: ${yBalanceRight} cm`;
+        html += ` (Norm: ${norms.yBalance} cm)`;
+        html += `<br><span class=\"symmetry\">Symmetry Difference: ${yBalanceSym}%</span></p>`;
+        html += `<p style='color:#888;font-size:0.95rem;'>*Norms are for demonstration. For personalized norms, consult your provider.</p>`;
+        document.getElementById('reportOutput').innerHTML = html;
+        document.getElementById('reportOutput').style.display = 'block';
+        window.scrollTo({ top: document.getElementById('reportOutput').offsetTop - 40, behavior: 'smooth' });
+      });
   </script>
 </body>
 </html>
