@@ -275,7 +275,16 @@
         html += `<p><strong>Single Leg Triple Hop:</strong> Left: ${tripleHopLeft} in, Right: ${tripleHopRight} in`;
         html += ` (Norm: ${norms.tripleHop} in)`;
         html += `<br><strong>Height-Normalized:</strong> Left: ${tripleHopNormLeft.toFixed(1)}%, Right: ${tripleHopNormRight.toFixed(1)}% of height`;
-        html += `<br><span class=\"symmetry\">Symmetry (LSI): ${lsi}%</span></p>`;
+        // LSI bands
+        let lsiBand = '';
+        if (lsi < 90) {
+          lsiBand = '<span style="color:#b94a48;font-weight:700;">Red flag: meaningful asymmetry (&lt;90%)</span>';
+        } else if (lsi < 95) {
+          lsiBand = '<span style="color:#c56a2c;font-weight:700;">Monitor: 90–94%</span>';
+        } else {
+          lsiBand = '<span style="color:#228b22;font-weight:700;">Strong symmetry target (≥95%)</span>';
+        }
+        html += `<br><span class=\"symmetry\">Symmetry (LSI): ${lsi}%</span> ${lsiBand}</p>`;
         html += `<div style='background:#eaf6ff;border-left:4px solid #1f5555;padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
         html += `<strong>Triple Hop Test Info:</strong><br/>`;
         html += `• Raw distance: total distance over 3 consecutive hops.<br/>`;
@@ -283,7 +292,11 @@
         html += `• <b>Height-normalized:</b> (distance ÷ height) × 100.<br/>`;
         html += `<br/><strong>Performance Norms (Myers et al.):</strong><br/>`;
         html += tripleHopNorms.map(n => `${n.label}: ${n.value}`).join('<br/>');
-        html += `<br/><span style='color:#888;font-size:0.97em;'>Reference: Myers et al., 2014</span>`;
+        html += `<br/><strong>Symmetry Bands (Nomadic Performance):</strong><br/>`;
+        html += `<b>&lt;90%:</b> Red flag (meaningful asymmetry)<br/>`;
+        html += `<b>90–94%:</b> Monitor<br/>`;
+        html += `<b>≥95%:</b> Strong symmetry target<br/>`;
+        html += `<span style='color:#888;font-size:0.97em;'>References: Myers et al., 2014; Munro & Herrington, 2011</span>`;
         html += `</div>`;
         html += `<p><strong>30s Lateral Step Down:</strong> Left: ${stepDownLeft} reps, Right: ${stepDownRight} reps`;
         html += ` (Norm: ${norms.stepDown} reps)`;
