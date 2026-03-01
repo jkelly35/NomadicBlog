@@ -160,6 +160,8 @@
     </div>
     <form class="report-form" id="reportForm">
       <div id="skiFormFields">
+        <label for="height">Your Height <span style="color:#888;font-weight:400;font-size:0.97em;">(inches)</span></label>
+        <input type="number" id="height" name="height" min="36" max="90" step="0.1" required />
         <label for="broadJump">Broad Jump <span style="color:#888;font-weight:400;font-size:0.97em;">(inches)</span></label>
         <input type="number" id="broadJump" name="broadJump" min="0" step="0.1" required />
         <label for="tripleHopLeft">Single Leg Triple Hop – Left <span style="color:#888;font-weight:400;font-size:0.97em;">(inches)</span></label>
@@ -203,6 +205,7 @@
       document.getElementById('reportForm').addEventListener('submit', function(e) {
         e.preventDefault();
         // Only Ski/Snowboard implemented
+        const height = parseFloat(document.getElementById('height').value);
         const broadJump = parseFloat(document.getElementById('broadJump').value);
         const tripleHopLeft = parseFloat(document.getElementById('tripleHopLeft').value);
         const tripleHopRight = parseFloat(document.getElementById('tripleHopRight').value);
@@ -228,11 +231,34 @@
         const sidePlankSym = percentDiff(sidePlankLeft, sidePlankRight).toFixed(1);
         const yBalanceSym = percentDiff(yBalanceLeft, yBalanceRight).toFixed(1);
 
-        // Output
+        // Broad Jump Normalized
+        let broadJumpNorm = height > 0 ? (broadJump / height) * 100 : 0;
+        let broadJumpBand = '';
+        if (broadJumpNorm < 80) {
+          broadJumpBand = '<span style="color:#b94a48;font-weight:700;">Foundation (power/coordination deficit)</span>';
+        } else if (broadJumpNorm < 90) {
+          broadJumpBand = '<span style="color:#c56a2c;font-weight:700;">Developing</span>';
+        } else if (broadJumpNorm < 100) {
+          broadJumpBand = '<span style="color:#1f5555;font-weight:700;">Mountain Ready Baseline</span>';
+        } else {
+          broadJumpBand = '<span style="color:#228b22;font-weight:700;">High Performance Range</span>';
+        }
+
         let html = `<h3>Ski & Snowboard Preseason Testing Report</h3>`;
         html += `<p><strong>Broad Jump:</strong> ${broadJump} in`;
         html += ` (Norm: ${norms.broadJump} in)`;
+        html += `<br><strong>Height:</strong> ${height} in`;
+        html += `<br><strong>Broad Jump Normalized:</strong> ${broadJumpNorm.toFixed(1)}% of height`;
+        html += `<br>${broadJumpBand}`;
         html += `</p>`;
+        html += `<div style='background:#fff8e6;border-left:4px solid #c56a2c;padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
+        html += `<strong>How to interpret:</strong><br/>`;
+        html += `<b>&lt;80%:</b> Foundation (power / coordination deficit)<br/>`;
+        html += `<b>80–89%:</b> Developing<br/>`;
+        html += `<b>90–99%:</b> “Mountain Ready” Baseline<br/>`;
+        html += `<b>≥100%:</b> High Performance Range<br/>`;
+        html += `<span style='color:#888;font-size:0.97em;'>Benchmarks: Brumitt et al., Davies et al. (see clinical RTS/return-to-play literature)</span>`;
+        html += `</div>`;
         html += `<p><strong>Single Leg Triple Hop:</strong> Left: ${tripleHopLeft} in, Right: ${tripleHopRight} in`;
         html += ` (Norm: ${norms.tripleHop} in)`;
         html += `<br><span class=\"symmetry\">Symmetry Difference: ${tripleHopSym}%</span></p>`;
