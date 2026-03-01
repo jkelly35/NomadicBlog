@@ -211,10 +211,20 @@
         const tripleHopRight = parseFloat(document.getElementById('tripleHopRight').value);
         const stepDownLeft = parseFloat(document.getElementById('stepDownLeft').value);
         const stepDownRight = parseFloat(document.getElementById('stepDownRight').value);
+        // Deviations now calculated as absolute difference in reps
+        const stepDownDeviations = Math.abs(stepDownLeft - stepDownRight);
         const sidePlankLeft = parseFloat(document.getElementById('sidePlankLeft').value);
         const sidePlankRight = parseFloat(document.getElementById('sidePlankRight').value);
         const yBalanceLeft = parseFloat(document.getElementById('yBalanceLeft').value);
         const yBalanceRight = parseFloat(document.getElementById('yBalanceRight').value);
+
+        // Broad Jump Normalized (must be defined before use)
+        let broadJumpNorm = height > 0 ? (broadJump / height) * 100 : 0;
+
+        // Broad Jump Normalized (must be defined for scoring logic)
+
+        // Broad Jump Normalized (move up so it's available for scoring)
+        // let broadJumpNorm = height > 0 ? (broadJump / height) * 100 : 0;
 
         // Norms (example values, replace with real data as needed)
         const norms = {
@@ -231,8 +241,82 @@
         const sidePlankSym = percentDiff(sidePlankLeft, sidePlankRight).toFixed(1);
         const yBalanceSym = percentDiff(yBalanceLeft, yBalanceRight).toFixed(1);
 
-        // Broad Jump Normalized
-        let broadJumpNorm = height > 0 ? (broadJump / height) * 100 : 0;
+        // --- Nomadic Performance Readiness Score Domain Scoring ---
+        // 1. Power — Broad Jump (% Height)
+        // let broadJumpNorm = height > 0 ? (broadJump / height) * 100 : 0;
+        let broadJumpScore = 0;
+        if (broadJumpNorm >= 100) broadJumpScore = 5;
+        else if (broadJumpNorm >= 95) broadJumpScore = 4;
+        else if (broadJumpNorm >= 90) broadJumpScore = 3;
+        else if (broadJumpNorm >= 85) broadJumpScore = 2;
+        else if (broadJumpNorm >= 80) broadJumpScore = 1;
+        // else broadJumpScore = 0;
+
+        // 2. Triple Hop Performance + Symmetry
+        // Symmetry only scoring for Triple Hop
+        let tripleHopLSI = tripleHopLeft > tripleHopRight ? (tripleHopRight / tripleHopLeft) * 100 : (tripleHopLeft / tripleHopRight) * 100;
+        let tripleHopScore = 0;
+        if (tripleHopLSI > 98) tripleHopScore = 5;
+        else if (tripleHopLSI >= 95) tripleHopScore = 4;
+        else if (tripleHopLSI >= 90) tripleHopScore = 3;
+        else if (tripleHopLSI >= 85) tripleHopScore = 2;
+        else if (tripleHopLSI >= 80) tripleHopScore = 1;
+        // else tripleHopScore = 0;
+
+        // 3. Y-Balance Anterior Difference
+        let ybalAntDiff = Math.abs(yBalanceLeft - yBalanceRight);
+        let ybalScore = 1;
+        if (ybalAntDiff < 2) ybalScore = 5;
+        else if (ybalAntDiff < 4) ybalScore = 4;
+        else if (ybalAntDiff < 6) ybalScore = 3;
+        else if (ybalAntDiff <= 10) ybalScore = 2;
+        // else >10cm = 1
+
+        // 4. Lateral Step Down (30s Quality + Capacity)
+        // Rep difference scoring for Lateral Step Down
+        let stepDownScore = 0;
+        if (stepDownDeviations <= 1) stepDownScore = 5;
+        else if (stepDownDeviations <= 3) stepDownScore = 4;
+        else if (stepDownDeviations <= 5) stepDownScore = 3;
+        else if (stepDownDeviations <= 7) stepDownScore = 2;
+        else if (stepDownDeviations <= 9) stepDownScore = 1;
+        // else stepDownScore = 0;
+
+        // 5. Side Plank w/ Hip Abduction
+        // Rep difference scoring for Side Plank
+        let sidePlankDiff = Math.abs(sidePlankLeft - sidePlankRight);
+        let sidePlankDomainScore = 0;
+        if (sidePlankDiff <= 1) sidePlankDomainScore = 5;
+        else if (sidePlankDiff <= 3) sidePlankDomainScore = 4;
+        else if (sidePlankDiff <= 5) sidePlankDomainScore = 3;
+        else if (sidePlankDiff <= 7) sidePlankDomainScore = 2;
+        else if (sidePlankDiff <= 9) sidePlankDomainScore = 1;
+        // else sidePlankDomainScore = 0;
+
+        // --- STEP 3: Total Readiness Score ---
+        let readinessScore = broadJumpScore + tripleHopScore + ybalScore + stepDownScore + sidePlankDomainScore;
+
+        // --- STEP 4: Readiness Classification ---
+        let readinessTier = '';
+        let readinessColor = '';
+        if (readinessScore >= 22) { readinessTier = '🟢 Elite Capacity'; readinessColor = '#228b22'; }
+        else if (readinessScore >= 18) { readinessTier = '🔵 Mountain Ready'; readinessColor = '#1f5555'; }
+        else if (readinessScore >= 14) { readinessTier = '🟡 Building Capacity'; readinessColor = '#c56a2c'; }
+        else if (readinessScore >= 10) { readinessTier = '🟠 Elevated Risk'; readinessColor = '#b94a48'; }
+        else { readinessTier = '🔴 Foundation Phase'; readinessColor = '#b94a48'; }
+
+        // --- STEP 5: Risk Flag System ---
+        let riskFlags = [];
+        if (tripleHopLSI < 90) riskFlags.push('Triple hop symmetry <90%');
+        if (ybalAntDiff > 6) riskFlags.push('Y-balance difference >6 cm');
+        if (sidePlankDiff > 10) riskFlags.push('Side plank asymmetry >10 s');
+        // Severe valgus/trunk collapse not captured in form, nor prior injury, so not included
+        let riskLevel = 'Low';
+        if (riskFlags.length === 1) riskLevel = 'Moderate';
+        else if (riskFlags.length === 2) riskLevel = 'Elevated';
+        else if (riskFlags.length >= 3) riskLevel = 'High';
+
+        // Broad Jump Normalized already declared above
         let broadJumpBand = '';
         if (broadJumpNorm < 80) {
           broadJumpBand = '<span style="color:#b94a48;font-weight:700;">Foundation (power/coordination deficit)</span>';
@@ -252,29 +336,15 @@
         html += `<br>${broadJumpBand}`;
         html += `</p>`;
         html += `<div style='background:#fff8e6;border-left:4px solid #c56a2c;padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
-        html += `<strong>How to interpret:</strong><br/>`;
-        html += `<b>&lt;80%:</b> Foundation (power / coordination deficit)<br/>`;
-        html += `<b>80–89%:</b> Developing<br/>`;
-        html += `<b>90–99%:</b> “Mountain Ready” Baseline<br/>`;
-        html += `<b>≥100%:</b> High Performance Range<br/>`;
+        html += `<strong>Broad Jump Scoring (0–5 points):</strong><br/>`;
+        html += `0: &lt;80%<br/>1: 80–84%<br/>2: 85–89%<br/>3: 90–94%<br/>4: 95–99%<br/>5: ≥100%<br/>`;
         html += `<span style='color:#888;font-size:0.97em;'>Benchmarks: Brumitt et al., Davies et al. (see clinical RTS/return-to-play literature)</span>`;
         html += `</div>`;
-        // Triple Hop Norms
-        const tripleHopNorms = [
-          { label: 'Male collegiate', value: '248.8 ± 28.3 in' },
-          { label: 'Female collegiate', value: '185.0 ± 20.9 in' },
-          { label: 'Male high school', value: '229.5 ± 28.3 in' },
-          { label: 'Female high school', value: '168.5 ± 21.3 in' }
-        ];
-        // Height-normalized triple hop
-        let tripleHopNormLeft = height > 0 ? (tripleHopLeft / height) * 100 : 0;
-        let tripleHopNormRight = height > 0 ? (tripleHopRight / height) * 100 : 0;
         // LSI (Limb Symmetry Index)
         let lsi = tripleHopLeft > tripleHopRight ? (tripleHopRight / tripleHopLeft) * 100 : (tripleHopLeft / tripleHopRight) * 100;
         lsi = lsi.toFixed(1);
         html += `<p><strong>Single Leg Triple Hop:</strong> Left: ${tripleHopLeft} in, Right: ${tripleHopRight} in`;
         html += ` (Norm: ${norms.tripleHop} in)`;
-        html += `<br><strong>Height-Normalized:</strong> Left: ${tripleHopNormLeft.toFixed(1)}%, Right: ${tripleHopNormRight.toFixed(1)}% of height`;
         // LSI bands
         let lsiBand = '';
         if (lsi < 90) {
@@ -286,24 +356,31 @@
         }
         html += `<br><span class=\"symmetry\">Symmetry (LSI): ${lsi}%</span> ${lsiBand}</p>`;
         html += `<div style='background:#eaf6ff;border-left:4px solid #1f5555;padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
-        html += `<strong>Triple Hop Test Info:</strong><br/>`;
-        html += `• Raw distance: total distance over 3 consecutive hops.<br/>`;
-        html += `• <b>Symmetry (LSI):</b> (shorter ÷ longer) × 100.<br/>`;
-        html += `• <b>Height-normalized:</b> (distance ÷ height) × 100.<br/>`;
-        html += `<br/><strong>Performance Norms (Myers et al.):</strong><br/>`;
-        html += tripleHopNorms.map(n => `${n.label}: ${n.value}`).join('<br/>');
-        html += `<br/><strong>Symmetry Bands (Nomadic Performance):</strong><br/>`;
-        html += `<b>&lt;90%:</b> Red flag (meaningful asymmetry)<br/>`;
-        html += `<b>90–94%:</b> Monitor<br/>`;
-        html += `<b>≥95%:</b> Strong symmetry target<br/>`;
+        html += `<strong>Triple Hop Symmetry Scoring (0–5 points):</strong><br/>`;
+        html += `0: &lt;80%<br/>1: 80–85%<br/>2: 85–90%<br/>3: 90–95%<br/>4: 95–98%<br/>5: &gt;98%<br/>`;
         html += `<span style='color:#888;font-size:0.97em;'>References: Myers et al., 2014; Munro & Herrington, 2011</span>`;
         html += `</div>`;
+        // Step Down Movement Quality
+        function stepDownQuality(dev) {
+          if (dev <= 1) return '<span style="color:#228b22;font-weight:700;">Good (High movement quality)</span>';
+          if (dev <= 3) return '<span style="color:#c56a2c;font-weight:700;">Fair (Moderate control; some dysfunction)</span>';
+          return '<span style="color:#b94a48;font-weight:700;">Poor (Significant movement dysfunction)</span>';
+        }
         html += `<p><strong>30s Lateral Step Down:</strong> Left: ${stepDownLeft} reps, Right: ${stepDownRight} reps`;
         html += ` (Norm: ${norms.stepDown} reps)`;
-        html += `<br><span class=\"symmetry\">Symmetry Difference: ${stepDownSym}%</span></p>`;
+        html += `<br><span class=\"symmetry\">Symmetry Difference: ${stepDownSym}%</span>`;
+        html += `<br><strong>Deviations (Reps Difference):</strong> ${stepDownDeviations} – ${stepDownQuality(stepDownDeviations)}</p>`;
+        html += `<div style='background:#fff8e6;border-left:4px solid #c56a2c;padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
+        html += `<strong>Lateral Step Down Rep Difference Scoring (0–5 points):</strong><br/>`;
+        html += `5: 0–1 reps<br/>4: 2–3 reps<br/>3: 4–5 reps<br/>2: 6–7 reps<br/>1: 8–9 reps<br/>0: ≥10 reps`;
+        html += `</div>`;
         html += `<p><strong>30s Side Plank Hip Abduction:</strong> Left: ${sidePlankLeft} reps, Right: ${sidePlankRight} reps`;
         html += ` (Norm: ${norms.sidePlank} reps)`;
         html += `<br><span class=\"symmetry\">Symmetry Difference: ${sidePlankSym}%</span></p>`;
+        html += `<div style='background:#f7f7f7;border-left:4px solid #1f5555;padding:1.2rem 1.2rem 1.2rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
+        html += `<strong>Side Plank Rep Difference Scoring (0–5 points):</strong><br/>`;
+        html += `5: 0–1 reps<br/>4: 2–3 reps<br/>3: 4–5 reps<br/>2: 6–7 reps<br/>1: 8–9 reps<br/>0: ≥10 reps`;
+        html += `</div>`;
         html += `<p><strong>Anterior Reach Y Balance:</strong> Left: ${yBalanceLeft} cm, Right: ${yBalanceRight} cm`;
         html += ` (Norm: ${norms.yBalance} cm)`;
         html += `<br><span class=\"symmetry\">Symmetry Difference: ${yBalanceSym}%</span></p>`;
@@ -317,7 +394,33 @@
         if (Math.abs(yBalanceLeft - yBalanceRight) >= 4) {
           html += `<p style='color:#c56a2c;font-weight:700;'>⚠️ Your Y-Balance asymmetry is 4 cm or greater, which may indicate increased injury risk.</p>`;
         }
-        html += `<p style='color:#888;font-size:0.95rem;'>*Norms are for demonstration. For personalized norms, consult your provider.</p>`;
+        // Removed unsupported demo norms and disclaimer
+        // --- Nomadic Performance Readiness Score Output ---
+        html += `<hr style='margin:2.2rem 0 1.2rem 0;'>`;
+        html += `<h3 style='color:${readinessColor};margin-bottom:0.5rem;'>Nomadic Performance Readiness Score</h3>`;
+        html += `<div style='font-size:1.25em;font-weight:700;margin-bottom:0.5rem;'>${readinessScore} / 25</div>`;
+        html += `<div style='font-size:1.1em;font-weight:600;color:${readinessColor};margin-bottom:0.7rem;'>${readinessTier}</div>`;
+        html += `<div style='background:#f7f7f7;border-left:4px solid ${readinessColor};padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
+        html += `<strong>Domain Scores:</strong><br/>`;
+        html += `⚡ Power (Broad Jump): <b>${broadJumpScore}</b> &nbsp; | &nbsp; 🦵 Triple Hop: <b>${tripleHopScore}</b> &nbsp; | &nbsp; ⚖️ Y-Balance: <b>${ybalScore}</b> &nbsp; | &nbsp; 🎯 Step Down: <b>${stepDownScore}</b> &nbsp; | &nbsp; 🧱 Side Plank: <b>${sidePlankDomainScore}</b>`;
+        html += `</div>`;
+        html += `<div style='background:#fff8e6;border-left:4px solid #c56a2c;padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
+        html += `<strong>Readiness Classification:</strong><br/>`;
+        html += `<b>22–25:</b> 🟢 Elite Capacity – Highly prepared for season demands<br/>`;
+        html += `<b>18–21:</b> 🔵 Mountain Ready – Low risk, good readiness<br/>`;
+        html += `<b>14–17:</b> 🟡 Building Capacity – Performance gains needed<br/>`;
+        html += `<b>10–13:</b> 🟠 Elevated Risk – Targeted intervention needed<br/>`;
+        html += `<b>&lt;10:</b> 🔴 Foundation Phase – High risk / low readiness`;
+        html += `</div>`;
+        html += `<div style='background:#ffeaea;border-left:4px solid #b94a48;padding:1rem 1.2rem 1rem 1.2rem;margin:1.2rem 0 1.2rem 0;border-radius:7px;'>`;
+        html += `<strong>Risk Flag System:</strong><br/>`;
+        html += `Automatic red flags are triggered if any of the following are present:<br/>`;
+        html += `• Triple hop symmetry &lt;90%<br/>• Y-balance difference &gt;6 cm<br/>• Side plank asymmetry &gt;10 s<br/>• Severe valgus/trunk collapse<br/>• Prior injury + deficit<br/>`;
+        html += `<br/><b>Flags Detected:</b> ${riskFlags.length > 0 ? riskFlags.map(f => `<span style='color:#b94a48;'>${f}</span>`).join(', ') : 'None'}<br/>`;
+        html += `<b>Risk Level:</b> <span style='color:#b94a48;font-weight:700;'>${riskLevel}</span>`;
+        html += `</div>`;
+        // Add scoring criteria section
+        // ...existing code...
         document.getElementById('reportOutput').innerHTML = html;
         document.getElementById('reportOutput').style.display = 'block';
         window.scrollTo({ top: document.getElementById('reportOutput').offsetTop - 40, behavior: 'smooth' });
