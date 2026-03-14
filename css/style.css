@@ -907,3 +907,82 @@ footer a:hover {
     justify-content: center;
   }
 }
+
+/* ---------- Services Page Styles ---------- */
+.services-hero {
+  background: linear-gradient(135deg, #c56a2c 0%, #1f5555 50%, #0f2d2d 100%);
+  color: #f5f0e8;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  border-radius: 12px;
+  margin: 1.5rem 0 2rem 0;
+}
+
+.services-hero h1 {
+  font-size: 2.2rem;
+  margin-bottom: 0.6rem;
+  font-weight: 900;
+  text-transform: none;
+}
+
+.services-hero p.lead {
+  font-size: 1.05rem;
+  color: #e8d5c4;
+  max-width: 760px;
+  margin: 0.5rem auto 0 auto;
+}
+
+.services-grid {
+  display: flex;
+  gap: 1.6rem;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: 2.5rem;
+}
+
+.service-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15,45,45,0.06);
+  border-top: 4px solid #1f5555;
+  padding: 1.6rem;
+  flex: 1 1 280px;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.service-card h3 {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #0f2d2d;
+  margin-bottom: 0.2rem;
+}
+
+.service-card p {
+  color: #444;
+  font-size: 0.98rem;
+}
+
+.service-card ul {
+  margin-left: 1rem;
+}
+
+.service-card .btn {
+  margin-top: auto;
+  align-self: flex-start;
+  background: linear-gradient(135deg, #1f5555 0%, #0f2d2d 100%);
+  color: #fff;
+  padding: 0.6rem 1.1rem;
+  border-radius: 6px;
+  font-weight: 800;
+  border: 2px solid rgba(31,85,85,0.12);
+}
+
+@media (max-width: 900px) {
+  .services-grid {
+    gap: 1rem;
+  }
+  .services-hero { padding: 2rem 1rem; }
+}
