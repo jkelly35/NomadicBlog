@@ -328,22 +328,7 @@
           broadJumpBand = '<span style="color:#228b22;font-weight:700;">High Performance Range</span>';
         }
 
-        // Summary Card
-        let html = `<div class='report-summary-card' style='background:#fff;border-radius:14px;box-shadow:0 4px 18px rgba(31,85,85,0.10);padding:1.5rem 1.2rem 1.2rem 1.2rem;margin-bottom:2.2rem;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1.2rem;'>`;
-        html += `<div style='flex:1 1 220px;text-align:left;'>
-          <div style='font-size:1.1em;font-weight:700;color:#888;margin-bottom:0.2em;'>Nomadic Performance Readiness Score</div>
-          <div style='font-size:2.2em;font-weight:900;color:${readinessColor};margin-bottom:0.1em;'>${readinessScore} / 25</div>
-          <div style='font-size:1.1em;font-weight:700;color:${readinessColor};margin-bottom:0.2em;'>${readinessTier}</div>
-          <div style='font-size:1em;font-weight:600;color:#b94a48;'>Risk Level: ${riskLevel}</div>
-        </div>`;
-        html += `<div style='flex:1 1 180px;text-align:center;'>
-          <span style='display:inline-block;background:${readinessColor};color:#fff;padding:0.7em 1.3em;border-radius:2em;font-size:1.1em;font-weight:700;box-shadow:0 2px 8px rgba(31,85,85,0.10);'>${readinessTier}</span>
-        </div>`;
-        html += `</div>`;
-        html += `<h3>Ski & Snowboard Preseason Testing Report</h3>`;
-        html += `<details class='report-section' open style='margin-bottom:1.5rem;'>`;
-        html += `<summary style='font-size:1.2em;font-weight:700;color:#c56a2c;cursor:pointer;padding:0.5em 0;'>Broad Jump</summary>`;
-        html += `<div style='padding:0.5em 0 0.5em 0;'>`;
+        let html = `<h3>Ski & Snowboard Preseason Testing Report</h3>`;
         html += `<p><strong>Broad Jump:</strong> ${broadJump} in`;
         html += ` (Norm: ${norms.broadJump} in)`;
         html += `<br><strong>Height:</strong> ${height} in`;
@@ -355,13 +340,9 @@
         html += `0: &lt;80%<br/>1: 80–84%<br/>2: 85–89%<br/>3: 90–94%<br/>4: 95–99%<br/>5: ≥100%<br/>`;
         html += `<span style='color:#888;font-size:0.97em;'>Benchmarks: Brumitt et al., Davies et al. (see clinical RTS/return-to-play literature)</span>`;
         html += `</div>`;
-        html += `</div></details>`;
         // LSI (Limb Symmetry Index)
         let lsi = tripleHopLeft > tripleHopRight ? (tripleHopRight / tripleHopLeft) * 100 : (tripleHopLeft / tripleHopRight) * 100;
         lsi = lsi.toFixed(1);
-        html += `<details class='report-section' open style='margin-bottom:1.5rem;'>`;
-        html += `<summary style='font-size:1.2em;font-weight:700;color:#1f5555;cursor:pointer;padding:0.5em 0;'>Single Leg Triple Hop</summary>`;
-        html += `<div style='padding:0.5em 0 0.5em 0;'>`;
         html += `<p><strong>Single Leg Triple Hop:</strong> Left: ${tripleHopLeft} in, Right: ${tripleHopRight} in`;
         html += ` (Norm: ${norms.tripleHop} in)`;
         // LSI bands
@@ -379,16 +360,12 @@
         html += `0: &lt;80%<br/>1: 80–85%<br/>2: 85–90%<br/>3: 90–95%<br/>4: 95–98%<br/>5: &gt;98%<br/>`;
         html += `<span style='color:#888;font-size:0.97em;'>References: Myers et al., 2014; Munro & Herrington, 2011</span>`;
         html += `</div>`;
-        html += `</div></details>`;
         // Step Down Movement Quality
         function stepDownQuality(dev) {
           if (dev <= 1) return '<span style="color:#228b22;font-weight:700;">Good (High movement quality)</span>';
           if (dev <= 3) return '<span style="color:#c56a2c;font-weight:700;">Fair (Moderate control; some dysfunction)</span>';
           return '<span style="color:#b94a48;font-weight:700;">Poor (Significant movement dysfunction)</span>';
         }
-        html += `<details class='report-section' open style='margin-bottom:1.5rem;'>`;
-        html += `<summary style='font-size:1.2em;font-weight:700;color:#c56a2c;cursor:pointer;padding:0.5em 0;'>30s Lateral Step Down</summary>`;
-        html += `<div style='padding:0.5em 0 0.5em 0;'>`;
         html += `<p><strong>30s Lateral Step Down:</strong> Left: ${stepDownLeft} reps, Right: ${stepDownRight} reps`;
         html += ` (Norm: ${norms.stepDown} reps)`;
         html += `<br><span class=\"symmetry\">Symmetry Difference: ${stepDownSym}%</span>`;
@@ -397,10 +374,6 @@
         html += `<strong>Lateral Step Down Rep Difference Scoring (0–5 points):</strong><br/>`;
         html += `5: 0–1 reps<br/>4: 2–3 reps<br/>3: 4–5 reps<br/>2: 6–7 reps<br/>1: 8–9 reps<br/>0: ≥10 reps`;
         html += `</div>`;
-        html += `</div></details>`;
-        html += `<details class='report-section' open style='margin-bottom:1.5rem;'>`;
-        html += `<summary style='font-size:1.2em;font-weight:700;color:#1f5555;cursor:pointer;padding:0.5em 0;'>30s Side Plank Hip Abduction</summary>`;
-        html += `<div style='padding:0.5em 0 0.5em 0;'>`;
         html += `<p><strong>30s Side Plank Hip Abduction:</strong> Left: ${sidePlankLeft} reps, Right: ${sidePlankRight} reps`;
         html += ` (Norm: ${norms.sidePlank} reps)`;
         html += `<br><span class=\"symmetry\">Symmetry Difference: ${sidePlankSym}%</span></p>`;
@@ -408,10 +381,6 @@
         html += `<strong>Side Plank Rep Difference Scoring (0–5 points):</strong><br/>`;
         html += `5: 0–1 reps<br/>4: 2–3 reps<br/>3: 4–5 reps<br/>2: 6–7 reps<br/>1: 8–9 reps<br/>0: ≥10 reps`;
         html += `</div>`;
-        html += `</div></details>`;
-        html += `<details class='report-section' open style='margin-bottom:1.5rem;'>`;
-        html += `<summary style='font-size:1.2em;font-weight:700;color:#c56a2c;cursor:pointer;padding:0.5em 0;'>Anterior Reach Y Balance</summary>`;
-        html += `<div style='padding:0.5em 0 0.5em 0;'>`;
         html += `<p><strong>Anterior Reach Y Balance:</strong> Left: ${yBalanceLeft} cm, Right: ${yBalanceRight} cm`;
         html += ` (Norm: ${norms.yBalance} cm)`;
         html += `<br><span class=\"symmetry\">Symmetry Difference: ${yBalanceSym}%</span></p>`;
@@ -425,7 +394,6 @@
         if (Math.abs(yBalanceLeft - yBalanceRight) >= 4) {
           html += `<p style='color:#c56a2c;font-weight:700;'>⚠️ Your Y-Balance asymmetry is 4 cm or greater, which may indicate increased injury risk.</p>`;
         }
-        html += `</div></details>`;
         // Removed unsupported demo norms and disclaimer
         // --- Nomadic Performance Readiness Score Output ---
         html += `<hr style='margin:2.2rem 0 1.2rem 0;'>`;
