@@ -3,17 +3,33 @@
   background: linear-gradient(135deg, #f8faf9 60%, #ede7e0 100%);
   border-radius: 32px;
   box-shadow: 0 8px 32px rgba(31,85,85,0.07);
-  padding: 3.5rem 2.5rem 3.5rem 2.5rem;
+  padding: 4rem 3rem;
   margin-bottom: 4rem;
   margin-top: 2.5rem;
   position: relative;
   z-index: 1;
+  border: 2px solid rgba(197, 106, 44, 0.08);
+}
+
+@media (max-width: 768px) {
+  .posts-grid .card:first-child {
+    grid-column: span 1;
+  }
+  
+  .posts-grid .card:first-child .card-cover {
+    height: 240px;
+  }
 }
 
 @media (max-width: 700px) {
   .posts-section-accent {
     padding: 1.2rem 0.2rem 2.2rem 0.2rem;
     border-radius: 18px;
+  }
+  
+  .posts-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
   }
 }
 /* =============================================
@@ -404,35 +420,67 @@ main {
 /* ---------- Blog Post Cards (index) ---------- */
 .posts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 2.5rem;
   margin-top: 3rem;
+}
+
+/* Featured post (first card) - larger on desktop */
+@media (min-width: 768px) {
+  .posts-grid .card:first-child {
+    grid-column: span 2;
+    grid-row: span 1;
+  }
+  
+  .posts-grid .card:first-child .card-cover {
+    height: 280px;
+  }
 }
 
 .card {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s, border-color 0.3s;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s, border-top-color 0.3s, filter 0.3s;
   display: flex;
   flex-direction: column;
-  border-top: 5px solid #c56a2c;
-  border-left: 2px solid rgba(197, 106, 44, 0.3);
+  border-top: 6px solid #c56a2c;
+  border-left: 2px solid rgba(197, 106, 44, 0.2);
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(197, 106, 44, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 .card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 32px rgba(197, 106, 44, 0.25);
+  transform: translateY(-12px);
+  box-shadow: 0 16px 40px rgba(197, 106, 44, 0.3);
   border-top-color: #d4753a;
+  filter: brightness(1.02);
 }
 
 .card-cover {
   width: 100%;
-  height: 200px;
-  object-fit: contain;
-  background-color: #f5f1ed;
+  height: 240px;
+  object-fit: cover;
+  background: linear-gradient(135deg, #f5f1ed 0%, #ede7e0 100%);
   object-position: center;
+  transition: transform 0.5s ease, filter 0.3s;
+}
+
+.card:hover .card-cover {
+  transform: scale(1.05);
+  filter: brightness(1.08);
 }
 
 /* Placeholder cover when no image */
@@ -447,7 +495,7 @@ main {
 }
 
 .card-body {
-  padding: 1.25rem;
+  padding: 1.5rem;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -456,42 +504,56 @@ main {
 .card-meta {
   font-size: 0.75rem;
   color: #888;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 700;
+  letter-spacing: 0.09em;
+  font-weight: 800;
+  display: inline-block;
+  background: #f0ebe5;
+  padding: 0.35rem 0.7rem;
+  border-radius: 4px;
+  width: fit-content;
 }
 
 .card-body h3 {
-  font-size: 1.35rem;
-  margin-bottom: 0.6rem;
+  font-size: 1.45rem;
+  margin-bottom: 0.8rem;
   color: #0f2d2d;
   font-weight: 900;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  transition: color 0.3s;
+}
+
+.card:hover .card-body h3 {
+  color: #c56a2c;
 }
 
 .card-body p {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: #555;
   flex: 1;
-  margin-bottom: 1rem;
+  margin-bottom: 1.2rem;
+  line-height: 1.6;
 }
 
 .card-body .btn {
   align-self: flex-start;
   background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%);
   color: #fff;
-  padding: 0.8rem 1.6rem;
-  border-radius: 6px;
+  padding: 0.85rem 1.8rem;
+  border-radius: 8px;
   font-size: 0.9rem;
-  transition: all 0.3s;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   border: 2px solid #c56a2c;
   position: relative;
   overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .card-body .btn::before {
@@ -501,15 +563,16 @@ main {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: rgba(255,255,255,0.15);
-  transition: left 0.3s;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  transition: left 0.4s ease;
 }
 
 .card-body .btn:hover {
   background: linear-gradient(135deg, #a05620 0%, #8a4618 100%);
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(197, 106, 44, 0.5);
+  transform: translateY(-4px) translateX(2px);
+  box-shadow: 0 8px 20px rgba(197, 106, 44, 0.6);
   text-decoration: none;
+  letter-spacing: 0.08em;
 }
 
 .card-body .btn:hover::before {
