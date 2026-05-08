@@ -1,0 +1,3 @@
+window.NOMADIC_SUPABASE_URL = "https://jdaeyyjaikysngmypwnk.supabase.co";
+window.NOMADIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpkYWV5eWphaWt5c25nbXlwd25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzMxODYsImV4cCI6MjA5Mzg0OTE4Nn0.6DJRU8JyTLeh7Ob2UffVdx83BjB2JhLPW_olAWGo8qo";
+window.NOMADIC_SUPABASE_OAUTH_REDIRECT = "https://nomadicperformance.com/";
