@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Athlete Dashboard – Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/athlete-profile.js"></script>
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="services.html">Services</a>
+    </nav>
+  </header>
+
+  <!-- ===== Main Content ===== -->
+  <main class="profile-main">
+    <div class="profile-container">
+      <!-- Auth Guard (redirects if not logged in) -->
+      <div data-profile-guard>
+        <p class="profile-loading">Loading your profile...</p>
+      </div>
+
+      <!-- Profile Content (shown when logged in) -->
+      <div class="profile-content" hidden data-profile-content>
+        <h1 class="section-heading">Athlete Dashboard</h1>
+        <div class="profile-dashboard-heading-row">
+          <p class="profile-dashboard-subtitle">Your training, testing, and progress hub.</p>
+          <button type="button" class="btn profile-btn-edit-profile" data-profile-edit-toggle aria-expanded="false" aria-controls="profile-editor-section">Edit Athlete Profile</button>
+        </div>
+
+        <div class="profile-section">
+          <h2>Athlete Overview</h2>
+          <div class="profile-hero-stats">
+            <div class="profile-hero-chip">
+              <span class="profile-hero-label">Primary Sport</span>
+              <strong data-hero-sport>—</strong>
+            </div>
+            <div class="profile-hero-chip">
+              <span class="profile-hero-label">Experience Level</span>
+              <strong data-hero-level>—</strong>
+            </div>
+            <div class="profile-hero-chip">
+              <span class="profile-hero-label">Training Base</span>
+              <strong data-hero-location>—</strong>
+            </div>
+          </div>
+          <div class="profile-info-grid">
+            <div class="profile-info-item">
+              <label>Email</label>
+              <p class="profile-info-value" data-profile-email>—</p>
+            </div>
+            <div class="profile-info-item">
+              <label>Account Created</label>
+              <p class="profile-info-value" data-profile-created>—</p>
+            </div>
+            <div class="profile-info-item">
+              <label>Last Sign In</label>
+              <p class="profile-info-value" data-profile-last-signin>—</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-section" id="profile-editor-section" hidden data-profile-editor>
+          <h2>Edit Athlete Information</h2>
+          <form class="profile-form" data-profile-form>
+            <div class="form-group">
+              <label for="profile-email">Email</label>
+              <input id="profile-email" name="email" type="email" placeholder="Enter your email" />
+            </div>
+
+            <div class="form-group">
+              <label for="profile-name">Full Name</label>
+              <input id="profile-name" name="name" type="text" placeholder="Enter your full name" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="profile-sport">Primary Sport</label>
+                <select id="profile-sport" name="sport">
+                  <option value="">Select primary sport</option>
+                  <option value="skiing">Skiing</option>
+                  <option value="snowboarding">Snowboarding</option>
+                  <option value="climbing">Climbing</option>
+                  <option value="mountainbiking">Mountain Biking</option>
+                  <option value="trail-running">Trail Running</option>
+                  <option value="mixed">Mixed / Multi-Sport</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="profile-level">Experience Level</label>
+                <select id="profile-level" name="level">
+                  <option value="">Select level</option>
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                  <option value="professional">Professional</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="profile-bio">Bio</label>
+              <textarea id="profile-bio" name="bio" placeholder="Tell us about your athletic goals and background" rows="4"></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="profile-age">Age</label>
+                <input id="profile-age" name="age" type="number" placeholder="Your age" min="1" max="120" />
+              </div>
+
+              <div class="form-group">
+                <label for="profile-location">Location</label>
+                <input id="profile-location" name="location" type="text" placeholder="City, State / Country" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="profile-height">Height (cm)</label>
+                <input id="profile-height" name="height_cm" type="number" placeholder="e.g. 178" min="1" max="300" />
+              </div>
+
+              <div class="form-group">
+                <label for="profile-weight">Weight (kg)</label>
+                <input id="profile-weight" name="weight_kg" type="number" placeholder="e.g. 72" min="1" max="400" step="0.1" />
+              </div>
+            </div>
+
+            <div class="profile-form-actions">
+              <button type="submit" class="btn profile-btn-save">Save Profile</button>
+              <button type="button" class="btn profile-btn-cancel" data-profile-cancel>Cancel</button>
+            </div>
+
+            <p class="profile-status" role="status" aria-live="polite" data-profile-status></p>
+          </form>
+        </div>
+
+        <div class="profile-section">
+          <div class="profile-section-header">
+            <div>
+              <h2>Athlete Metrics</h2>
+              <p class="profile-section-copy">Track your baseline and performance testing metrics. Coaches can tailor these to your sport.</p>
+            </div>
+            <button type="button" class="btn profile-btn-cancel" data-metric-add>+ Add Metric</button>
+          </div>
+
+          <div class="metrics-list" data-metrics-list>
+            <p class="profile-loading">Loading metrics...</p>
+          </div>
+
+          <form class="metrics-form" data-metrics-form>
+            <div class="metrics-rows" data-metric-rows></div>
+            <div class="profile-form-actions">
+              <button type="submit" class="btn profile-btn-save">Save Metrics</button>
+            </div>
+            <p class="profile-status" role="status" aria-live="polite" data-metrics-status></p>
+          </form>
+        </div>
+
+        <!-- Current Training Program Section -->
+        <div class="profile-section" id="profile-training-program-section">
+          <h2>Current Active Training Program</h2>
+          <div id="profile-training-program-content">
+            <p class="profile-training-loading">Loading your training program...</p>
+          </div>
+        </div>
+
+        <div class="profile-section profile-section-danger">
+          <h2>Danger Zone</h2>
+          <p style="margin-bottom: 1rem; color: #555;">Permanently delete your account and all associated data.</p>
+          <button type="button" class="btn profile-btn-delete" data-profile-delete>Delete Account</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer style="background: #0e4749; color: #fff; padding: 32px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 16px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">
+        <span style="vertical-align: middle;">
+          <svg width="24" height="24" fill="currentColor" style="vertical-align: middle;"><path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5A4.25 4.25 0 0 0 7.75 20.5h8.5A4.25 4.25 0 0 0 20.5 16.25v-8.5A4.25 4.25 0 0 0 16.25 3.5h-8.5zm4.25 3.25a5.25 5.25 0 1 1 0 10.5a5.25 5.25 0 0 1 0-10.5zm0 1.5a3.75 3.75 0 1 0 0 7.5a3.75 3.75 0 0 0 0-7.5zm6.25.75a1 1 0 1 1-2 0a1 1 0 0 1 2 0z"/></svg>
+        </span>
+        <span style="font-size: 1rem; margin-left: 4px;">Instagram</span>
+      </a>
+      <a href="https://x.com/NomadPerformCo" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">
+        <span style="vertical-align: middle;">
+          <svg width="24" height="24" fill="currentColor" style="vertical-align: middle;"><path d="M17.53 3H21l-7.19 8.21L22 21h-6.5l-5.18-6.01L3 21H0l7.78-8.89L2 3h6.5l4.7 5.45L17.53 3zm-2.1 15h2.3l-6.29-7.29l-2.3-2.66L2.47 5h2.3l6.29 7.29l2.3 2.66L19.53 19z"/></svg>
+        </span>
+        <span style="font-size: 1rem; margin-left: 4px;">X</span>
+      </a>
+      <a href="https://strava.app.link/XGMKMXacL1b" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">
+        <span style="vertical-align: middle;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M10.6 3.1l4.1 8.1h-2.8l-1.3-2.6l-1.3 2.6H6.5l4.1-8.1zm5.2 10.5l2.8 5.5h-2.8l-1.4-2.8l-1.4 2.8h-2.8l2.8-5.5h2.8z"/></svg>
+        </span>
+        <span style="font-size: 1rem; margin-left: 4px;">Strava</span>
+      </a>
+    </div>
+    <p style="font-size: 1rem; opacity: 0.8;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
+    <p style="font-size: 0.82rem; opacity: 0.9; max-width: 920px; margin: 8px auto 0 auto; line-height: 1.45;">Medical Disclaimer: Content on this site is for educational purposes only and is not medical advice. Always consult a qualified healthcare professional before starting any exercise, rehabilitation, or nutrition program.</p>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coaching Dashboard – Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/admin.js"></script>
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="services.html">Services</a>
+    </nav>
+  </header>
+
+  <!-- ===== Main Content ===== -->
+  <main class="admin-main">
+    <div class="admin-container">
+      <!-- Auth Guard -->
+      <div data-admin-guard>
+        <p class="admin-loading">Verifying admin access...</p>
+      </div>
+
+      <!-- Admin Dashboard -->
+      <div class="admin-content" hidden data-admin-content>
+        <div class="admin-header">
+          <h1>Coaching Dashboard</h1>
+          <p class="admin-subtitle">Manage all athletes, profiles, and account settings</p>
+        </div>
+
+        <!-- Dashboard Stats -->
+        <div class="admin-stats">
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-total-athletes>0</div>
+            <div class="admin-stat-label">Total Athletes</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-profiles>0</div>
+            <div class="admin-stat-label">Profiles Created</div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="admin-controls">
+          <input 
+            type="text" 
+            class="admin-search" 
+            placeholder="Search athletes by email or name..." 
+            data-admin-search 
+          />
+          <button class="btn admin-btn-refresh" data-admin-refresh>Refresh</button>
+        </div>
+
+        <!-- Athletes Table -->
+        <div class="admin-table-wrapper">
+          <table class="admin-table" data-admin-table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Sport</th>
+                <th>Level</th>
+                <th>Joined</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody data-admin-table-body>
+              <tr class="admin-table-loading">
+                <td colspan="6" style="text-align: center; padding: 2rem;">Loading athletes...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="admin-pagination" data-admin-pagination></div>
+
+        <!-- Status Message -->
+        <p class="admin-status" role="status" aria-live="polite" data-admin-status></p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Athlete Detail Modal -->
+  <div class="admin-modal" data-admin-modal hidden>
+    <div class="admin-modal-backdrop" data-admin-modal-close></div>
+    <div class="admin-modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+      <button type="button" class="admin-modal-close" data-admin-modal-close aria-label="Close">&times;</button>
+      <h2 id="admin-modal-title" data-admin-modal-title>Athlete Details</h2>
+      
+      <div class="admin-modal-content">
+        <div class="admin-modal-section">
+          <h3>Account Information</h3>
+          <div class="admin-modal-info-row">
+            <label>Email</label>
+            <p data-admin-modal-email></p>
+          </div>
+          <div class="admin-modal-info-row">
+            <label>Created</label>
+            <p data-admin-modal-created></p>
+          </div>
+          <div class="admin-modal-info-row">
+            <label>Last Sign In</label>
+            <p data-admin-modal-last-signin></p>
+          </div>
+        </div>
+
+        <div class="admin-modal-section">
+          <h3>Profile Information</h3>
+          <div class="admin-modal-info-row">
+            <label>Full Name</label>
+            <input type="text" data-admin-modal-input="name" />
+          </div>
+          <div class="admin-modal-info-row">
+            <label>Sport</label>
+            <select data-admin-modal-input="sport">
+              <option value="">Select sport</option>
+              <option value="skiing">Skiing</option>
+              <option value="snowboarding">Snowboarding</option>
+              <option value="climbing">Climbing</option>
+              <option value="mountainbiking">Mountain Biking</option>
+              <option value="trail-running">Trail Running</option>
+              <option value="mixed">Mixed / Multi-Sport</option>
+            </select>
+          </div>
+          <div class="admin-modal-info-row">
+            <label>Experience Level</label>
+            <select data-admin-modal-input="level">
+              <option value="">Select level</option>
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+              <option value="professional">Professional</option>
+            </select>
+          </div>
+          <div class="admin-modal-info-row">
+            <label>Bio</label>
+            <textarea data-admin-modal-input="bio" rows="3"></textarea>
+          </div>
+          <div class="admin-modal-info-row">
+            <label>Age</label>
+            <input type="number" data-admin-modal-input="age" min="1" max="120" />
+          </div>
+          <div class="admin-modal-info-row">
+            <label>Location</label>
+            <input type="text" data-admin-modal-input="location" />
+          </div>
+        </div>
+
+        <div class="admin-modal-section">
+          <div class="admin-metrics-header">
+            <h3>Athlete Metrics</h3>
+            <button type="button" class="btn admin-btn-metric-add" data-admin-metric-add>+ Add Metric</button>
+          </div>
+          <p class="admin-metrics-copy">Add sport-specific metrics such as Max HR, 20mm Edge Pull, Vertical Jump, and more.</p>
+          <div class="admin-metric-rows" data-admin-metric-rows>
+            <p class="admin-loading">Loading metrics...</p>
+          </div>
+        </div>
+
+        <div class="admin-modal-section">
+          <h3>Account Actions</h3>
+          <div class="admin-modal-actions">
+            <button class="btn admin-btn-primary" data-admin-modal-save>Save Changes</button>
+            <button class="btn admin-btn-reset-password" data-admin-modal-reset>Reset Password</button>
+            <button class="btn admin-btn-delete" data-admin-modal-delete>Delete Account</button>
+          </div>
+        </div>
+
+        <p class="admin-modal-status" role="status" aria-live="polite" data-admin-modal-status></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Footer ===== -->
+  <footer style="background: #0e4749; color: #fff; padding: 32px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 16px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">
+        <span style="vertical-align: middle;">
+          <svg width="24" height="24" fill="currentColor" style="vertical-align: middle;"><path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5A4.25 4.25 0 0 0 7.75 20.5h8.5A4.25 4.25 0 0 0 20.5 16.25v-8.5A4.25 4.25 0 0 0 16.25 3.5h-8.5zm4.25 3.25a5.25 5.25 0 1 1 0 10.5a5.25 5.25 0 0 1 0-10.5zm0 1.5a3.75 3.75 0 1 0 0 7.5a3.75 3.75 0 0 0 0-7.5zm6.25.75a1 1 0 1 1-2 0a1 1 0 0 1 2 0z"/></svg>
+        </span>
+        <span style="font-size: 1rem; margin-left: 4px;">Instagram</span>
+      </a>
+      <a href="https://x.com/NomadPerformCo" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">
+        <span style="vertical-align: middle;">
+          <svg width="24" height="24" fill="currentColor" style="vertical-align: middle;"><path d="M17.53 3H21l-7.19 8.21L22 21h-6.5l-5.18-6.01L3 21H0l7.78-8.89L2 3h6.5l4.7 5.45L17.53 3zm-2.1 15h2.3l-6.29-7.29l-2.3-2.66L2.47 5h2.3l6.29 7.29l2.3 2.66L19.53 19z"/></svg>
+        </span>
+        <span style="font-size: 1rem; margin-left: 4px;">X</span>
+      </a>
+    </div>
+    <p style="font-size: 1rem; opacity: 0.8;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>
