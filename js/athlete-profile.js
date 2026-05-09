@@ -624,8 +624,17 @@
 
   function renderTrainingProgram(contentElement, program) {
     if (!program) {
-      contentElement.innerHTML = '<p class="profile-training-none">You have no active training program assigned yet.</p>';
-      return;
+      // Demo preview for the coach account when no assignment exists yet.
+      if (state.user && state.user.email === "joe@nomadicperformance.com") {
+        program = {
+          program_name: "8-Week Mountain Performance Block",
+          assigned_at: new Date().toISOString(),
+          is_demo: true
+        };
+      } else {
+        contentElement.innerHTML = '<p class="profile-training-none">You have no active training program assigned yet.</p>';
+        return;
+      }
     }
 
     var programName =
@@ -634,16 +643,27 @@
       (program.program_id ? "Program " + String(program.program_id).slice(0, 8) : "Assigned Program");
 
     var startDate = program.assigned_at ? formatDate(program.assigned_at) : "—";
+    var programUrl =
+      "training-program-example.html?program=" + encodeURIComponent(programName);
 
     contentElement.innerHTML =
       '<div class="profile-training-details">' +
-      '<div class="training-row"><span>Program</span><strong>' +
+      '<div class="training-row"><span>Program</span><strong><a class="training-program-link" href="' +
+      programUrl +
+      '">' +
       escapeHtml(programName) +
-      "</strong></div>" +
+      "</a></strong></div>" +
       '<div class="training-row"><span>Start Date</span><strong>' +
       escapeHtml(startDate) +
       "</strong></div>" +
-      '<p class="training-note">Your coach assigns and updates this program from the Coaching Dashboard.</p>' +
+      '<p class="training-note">' +
+      (program.is_demo
+        ? "Preview mode: this is a sample program shown for the coach account."
+        : "Your coach assigns and updates this program from the Coaching Dashboard.") +
+      "</p>" +
+      '<a class="btn training-open-btn" href="' +
+      programUrl +
+      '">Open Program + Log Workout</a>' +
       "</div>";
   }
 

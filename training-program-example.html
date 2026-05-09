@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Training Program Example - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/training-program-demo.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="services.html">Services</a>
+      <a href="profile.html">Athlete Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="program-demo-main">
+    <section class="program-demo-container">
+      <div class="program-demo-header">
+        <div>
+          <p class="program-demo-kicker">Mock Training Program</p>
+          <h1 data-program-title>8-Week Mountain Performance Block</h1>
+          <p class="program-demo-subtitle">Example workout logger. Enter sets, reps, load, and notes to simulate athlete progress tracking.</p>
+        </div>
+        <a class="btn profile-btn-cancel" href="profile.html">Back to Athlete Dashboard</a>
+      </div>
+
+      <div class="program-demo-toolbar">
+        <label for="workout-day-select">Workout Day</label>
+        <select id="workout-day-select" data-workout-day>
+          <option value="day-1">Day 1 - Lower Body Power</option>
+          <option value="day-2">Day 2 - Upper Pull + Core</option>
+          <option value="day-3">Day 3 - Conditioning</option>
+        </select>
+        <button type="button" class="btn profile-btn-cancel" data-add-set-row>+ Add Set Row</button>
+      </div>
+
+      <div class="program-demo-progress" data-completion-summary>
+        Completion: 0 / 0 sets marked done
+      </div>
+
+      <div class="program-demo-table-wrap">
+        <table class="program-demo-table">
+          <thead>
+            <tr>
+              <th>Exercise</th>
+              <th>Set</th>
+              <th>Reps</th>
+              <th>Weight</th>
+              <th>RPE</th>
+              <th>Notes</th>
+              <th>Done</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody data-workout-rows></tbody>
+        </table>
+      </div>
+
+      <div class="program-demo-actions">
+        <button type="button" class="btn profile-btn-save" data-save-workout>Save Workout Log</button>
+        <button type="button" class="btn profile-btn-delete" data-clear-workout>Clear Day Log</button>
+      </div>
+
+      <p class="profile-status" role="status" aria-live="polite" data-workout-status></p>
+    </section>
+  </main>
+
+  <footer style="background: #0e4749; color: #fff; padding: 32px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 16px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">Instagram</a>
+      <a href="https://x.com/NomadPerformCo" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">X</a>
+    </div>
+    <p style="font-size: 1rem; opacity: 0.8;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
+  </footer>
+</body>
+</html>
