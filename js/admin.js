@@ -1,5 +1,10 @@
 (function () {
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
+  var TEMPLATE_LIBRARY_KEY = "nomadic_training_program_templates_v1";
+  var HIDDEN_ATHLETES_KEY = "nomadic_hidden_athletes_v1";
+  var EXERCISE_LIBRARY_KEY = "nomadic_exercise_library_v1";
+  var EXERCISE_LIBRARY_TABLE = "exercise_library";
+  var TEMPLATE_MARKER = "__NOMADIC_TEMPLATE__";
   var state = {
     client: null,
     user: null,
@@ -8,6 +13,10 @@
     athletes: [],
     currentAthlete: null,
     currentMetrics: [],
+    templates: [],
+    exerciseLibrary: [],
+    assignmentTemplateId: null,
+    templateFilter: "active",
     currentPage: 1,
     pageSize: 10,
     searchTerm: ""
@@ -85,6 +94,12 @@
       });
     }
 
+    var addAthleteBtn = document.querySelector("[data-admin-add-athlete]");
+    if (addAthleteBtn) {
+      addAthleteBtn.addEventListener("click", onAddAthleteAccount);
+    }
+
+
     var modalBackdrop = document.querySelector("[data-admin-modal-close]");
     if (modalBackdrop) {
       modalBackdrop.addEventListener("click", closeModal);
@@ -95,9 +110,9 @@
       modalCloseBtn.addEventListener("click", closeModal);
     }
 
-    var saveBtn = document.querySelector("[data-admin-modal-save]");
-    if (saveBtn) {
-      saveBtn.addEventListener("click", onSaveChanges);
+    var editBtn = document.querySelector("[data-admin-edit-athlete]");
+    if (editBtn) {
+      editBtn.addEventListener("click", onEditAthlete);
     }
 
     var resetBtn = document.querySelector("[data-admin-modal-reset]");
@@ -110,35 +125,853 @@
       deleteBtn.addEventListener("click", onDeleteAthlete);
     }
 
+    var customizeMetricsBtn = document.querySelector("[data-admin-customize-metrics]");
+    if (customizeMetricsBtn) {
+      customizeMetricsBtn.addEventListener("click", function () {
+        if (!state.currentAthlete) {
+          setModalStatus("No athlete selected.", "error");
+          return;
+        }
+        var url = "metrics-editor.html?athleteId=" + encodeURIComponent(state.currentAthlete.user_id || "") +
+                  "&athleteName=" + encodeURIComponent(state.currentAthlete.name || state.currentAthlete.email || "Athlete");
+        window.location.href = url;
+      });
+    }
+
+    var presetMetricSelect = document.querySelector('[data-admin-metric-preset]');
+    if (presetMetricSelect) {
+      // Preset metric picker is now handled in metrics-editor.html
+    }
+
     var addMetricBtn = document.querySelector("[data-admin-metric-add]");
     if (addMetricBtn) {
-      addMetricBtn.addEventListener("click", function () {
-        appendMetricRow({
-          metric_name: "",
-          metric_value: "",
-          metric_unit: "",
-          metric_category: "Performance"
-        });
-      });
+      // Metric adding is now handled in metrics-editor.html
     }
 
     var metricRows = document.querySelector("[data-admin-metric-rows]");
     if (metricRows) {
-      metricRows.addEventListener("click", function (event) {
-        if (event.target && event.target.matches("[data-admin-metric-remove]")) {
-          var row = event.target.closest(".admin-metric-row");
-          if (row) {
-            row.remove();
-          }
+      // Metric rows are no longer rendered in admin modal
+    }
+
+    var tableBody = document.querySelector("[data-admin-table-body]");
+    if (tableBody) {
+      tableBody.addEventListener("click", function (event) {
+        var deleteBtn = event.target && event.target.closest("[data-admin-delete-athlete]");
+        if (!deleteBtn) {
+          return;
         }
+
+        var athleteId = String(deleteBtn.getAttribute("data-athlete-id") || "").trim();
+        if (!athleteId) {
+          setStatus("Could not find athlete id.", "error");
+          return;
+        }
+
+        var athlete = state.athletes.find(function (item) {
+          return item.user_id === athleteId;
+        });
+
+        if (!athlete) {
+          setStatus("Athlete not found.", "error");
+          return;
+        }
+
+        executeAthleteDelete(athlete, false);
       });
     }
 
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
         closeModal();
+        closeAssignModal();
+        closeExerciseLibraryModal();
       }
     });
+  }
+
+  function loadExerciseLibrary() {
+    if (!state.client) {
+      state.exerciseLibrary = readExerciseLibrary();
+      renderExerciseLibrary();
+      return;
+    }
+
+    state.client
+      .from(EXERCISE_LIBRARY_TABLE)
+      .select("id,name,movement_pattern,equipment,primary_muscle,training_goal,sport_tags,custom_tags,description,coaching_cues,created_at,updated_at")
+      .order("updated_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingTableError(result.error)) {
+            state.exerciseLibrary = readExerciseLibrary();
+            renderExerciseLibrary();
+            setStatus("Using local exercise library until Supabase exercise_library table is available.", "info");
+            return;
+          }
+
+          state.exerciseLibrary = readExerciseLibrary();
+          renderExerciseLibrary();
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        state.exerciseLibrary = (result.data || []).map(mapExerciseLibraryRow);
+
+        if (!state.exerciseLibrary.length) {
+          var localItems = readExerciseLibrary();
+          if (localItems.length) {
+            state.exerciseLibrary = localItems;
+            renderExerciseLibrary();
+            syncLocalExerciseLibraryToSupabase(localItems);
+            return;
+          }
+        }
+
+        renderExerciseLibrary();
+      })
+      .catch(function () {
+        state.exerciseLibrary = readExerciseLibrary();
+        renderExerciseLibrary();
+      });
+  }
+
+  function showExerciseLibraryModal() {
+    var modal = document.querySelector("[data-admin-library-modal]");
+    if (!modal) {
+      return;
+    }
+
+    modal.hidden = false;
+    syncModalBodyState();
+    clearExerciseLibraryForm();
+    renderExerciseLibrary();
+    setExerciseLibraryStatus("", "info");
+  }
+
+  function closeExerciseLibraryModal() {
+    var modal = document.querySelector("[data-admin-library-modal]");
+    if (!modal) {
+      return;
+    }
+
+    modal.hidden = true;
+    syncModalBodyState();
+    setExerciseLibraryStatus("", "info");
+  }
+
+  function renderExerciseLibrary() {
+    var list = document.querySelector("[data-admin-library-list]");
+    if (!list) {
+      return;
+    }
+
+    var query = String((document.querySelector("[data-admin-library-search]") || {}).value || "").trim().toLowerCase();
+    var patternFilter = String((document.querySelector("[data-admin-library-filter-pattern]") || {}).value || "").trim().toLowerCase();
+    var sportFilter = String((document.querySelector("[data-admin-library-filter-sport]") || {}).value || "").trim().toLowerCase();
+
+    var filtered = state.exerciseLibrary
+      .filter(function (item) {
+        if (patternFilter && String(item.movement_pattern || "").toLowerCase() !== patternFilter) {
+          return false;
+        }
+
+        if (sportFilter) {
+          var sports = Array.isArray(item.sport_tags) ? item.sport_tags : [];
+          if (sports.indexOf(sportFilter) === -1) {
+            return false;
+          }
+        }
+
+        if (!query) {
+          return true;
+        }
+
+        var haystack = [
+          item.name,
+          item.movement_pattern,
+          item.equipment,
+          item.primary_muscle,
+          item.training_goal,
+          item.description,
+          item.coaching_cues,
+          (item.custom_tags || []).join(" "),
+          (item.sport_tags || []).join(" ")
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return haystack.indexOf(query) > -1;
+      })
+      .sort(function (a, b) {
+        return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+      });
+
+    if (!filtered.length) {
+      list.innerHTML = '<p class="admin-loading">No exercises match this view yet.</p>';
+      return;
+    }
+
+    list.innerHTML = filtered
+      .map(function (item) {
+        var tags = [
+          item.movement_pattern,
+          item.equipment,
+          item.primary_muscle,
+          item.training_goal
+        ]
+          .concat(Array.isArray(item.sport_tags) ? item.sport_tags : [])
+          .concat(Array.isArray(item.custom_tags) ? item.custom_tags : [])
+          .filter(function (tag) {
+            return !!tag;
+          });
+
+        return (
+          '<article class="admin-library-item">' +
+          '<div class="admin-library-item-head">' +
+          '<h4>' + escapeHtml(item.name || "Exercise") + '</h4>' +
+          '<div class="admin-program-item-actions">' +
+          '<button type="button" class="btn admin-btn-small" data-exercise-library-action="edit" data-exercise-id="' + escapeAttribute(item.id) + '">Edit</button>' +
+          '<button type="button" class="btn admin-btn-delete-mini" data-exercise-library-action="delete" data-exercise-id="' + escapeAttribute(item.id) + '">Delete</button>' +
+          '</div>' +
+          '</div>' +
+          '<p>' + escapeHtml(item.description || "No description yet.") + '</p>' +
+          '<div class="admin-library-tags">' +
+          tags
+            .map(function (tag) {
+              return '<span class="admin-library-tag">' + escapeHtml(tag) + '</span>';
+            })
+            .join("") +
+          '</div>' +
+          '</article>'
+        );
+      })
+      .join("");
+  }
+
+  function onExerciseLibrarySave(event) {
+    event.preventDefault();
+
+    var id = String((document.querySelector("[data-admin-library-id]") || {}).value || "").trim();
+    var name = String((document.querySelector("[data-admin-library-name]") || {}).value || "").trim();
+
+    if (!name) {
+      setExerciseLibraryStatus("Exercise name is required.", "error");
+      return;
+    }
+
+    var now = new Date().toISOString();
+    var existing = id
+      ? state.exerciseLibrary.find(function (item) {
+          return item.id === id;
+        })
+      : null;
+
+    var item = {
+      id: existing ? existing.id : "ex_" + String(Date.now()) + "_" + String(Math.floor(Math.random() * 10000)),
+      name: name,
+      movement_pattern: String((document.querySelector("[data-admin-library-pattern]") || {}).value || "").trim().toLowerCase(),
+      equipment: String((document.querySelector("[data-admin-library-equipment]") || {}).value || "").trim().toLowerCase(),
+      primary_muscle: String((document.querySelector("[data-admin-library-muscle]") || {}).value || "").trim().toLowerCase(),
+      training_goal: String((document.querySelector("[data-admin-library-goal]") || {}).value || "").trim().toLowerCase(),
+      sport_tags: Array.prototype.slice
+        .call(document.querySelectorAll("[data-admin-library-sport]:checked"))
+        .map(function (checkbox) {
+          return String(checkbox.value || "").trim().toLowerCase();
+        })
+        .filter(function (value) {
+          return !!value;
+        }),
+      custom_tags: String((document.querySelector("[data-admin-library-custom-tags]") || {}).value || "")
+        .split(",")
+        .map(function (part) {
+          return String(part || "").trim().toLowerCase();
+        })
+        .filter(function (value) {
+          return !!value;
+        }),
+      description: String((document.querySelector("[data-admin-library-description]") || {}).value || "").trim(),
+      coaching_cues: String((document.querySelector("[data-admin-library-cues]") || {}).value || "").trim(),
+      created_at: existing ? existing.created_at : now,
+      updated_at: now
+    };
+
+    if (existing) {
+      state.exerciseLibrary = state.exerciseLibrary.map(function (entry) {
+        return entry.id === item.id ? item : entry;
+      });
+    } else {
+      state.exerciseLibrary.push(item);
+    }
+
+    // Keep local cache current as fallback, regardless of cloud outcome.
+    writeExerciseLibrary(state.exerciseLibrary);
+
+    if (!state.client) {
+      renderExerciseLibrary();
+      clearExerciseLibraryForm();
+      setExerciseLibraryStatus(existing ? "Exercise updated." : "Exercise added to library.", "success");
+      return;
+    }
+
+    state.client
+      .from(EXERCISE_LIBRARY_TABLE)
+      .upsert(item)
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingTableError(result.error)) {
+            renderExerciseLibrary();
+            clearExerciseLibraryForm();
+            setExerciseLibraryStatus(
+              "Saved locally. Run sql/create-exercise-library-table.sql to enable cloud sync.",
+              "info"
+            );
+            return;
+          }
+
+          setExerciseLibraryStatus(result.error.message, "error");
+          return;
+        }
+
+        clearExerciseLibraryForm();
+        setExerciseLibraryStatus(existing ? "Exercise updated." : "Exercise added to library.", "success");
+        loadExerciseLibrary();
+      })
+      .catch(function (error) {
+        setExerciseLibraryStatus(
+          error && error.message ? error.message : "Saved locally, but cloud sync failed.",
+          "info"
+        );
+      });
+  }
+
+  function clearExerciseLibraryForm() {
+    var form = document.querySelector("[data-admin-library-form]");
+    if (form) {
+      form.reset();
+    }
+
+    var idField = document.querySelector("[data-admin-library-id]");
+    if (idField) {
+      idField.value = "";
+    }
+
+    var formTitle = document.querySelector("[data-admin-library-form-title]");
+    if (formTitle) {
+      formTitle.textContent = "Add Exercise";
+    }
+  }
+
+  function populateExerciseLibraryForm(exerciseId) {
+    var item = state.exerciseLibrary.find(function (entry) {
+      return entry.id === exerciseId;
+    });
+
+    if (!item) {
+      setExerciseLibraryStatus("Exercise not found.", "error");
+      return;
+    }
+
+    var idField = document.querySelector("[data-admin-library-id]");
+    var nameField = document.querySelector("[data-admin-library-name]");
+    var patternField = document.querySelector("[data-admin-library-pattern]");
+    var equipmentField = document.querySelector("[data-admin-library-equipment]");
+    var muscleField = document.querySelector("[data-admin-library-muscle]");
+    var goalField = document.querySelector("[data-admin-library-goal]");
+    var tagsField = document.querySelector("[data-admin-library-custom-tags]");
+    var descriptionField = document.querySelector("[data-admin-library-description]");
+    var cuesField = document.querySelector("[data-admin-library-cues]");
+    var formTitle = document.querySelector("[data-admin-library-form-title]");
+
+    if (idField) idField.value = item.id || "";
+    if (nameField) nameField.value = item.name || "";
+    if (patternField) patternField.value = item.movement_pattern || "";
+    if (equipmentField) equipmentField.value = item.equipment || "";
+    if (muscleField) muscleField.value = item.primary_muscle || "";
+    if (goalField) goalField.value = item.training_goal || "";
+    if (tagsField) tagsField.value = Array.isArray(item.custom_tags) ? item.custom_tags.join(", ") : "";
+    if (descriptionField) descriptionField.value = item.description || "";
+    if (cuesField) cuesField.value = item.coaching_cues || "";
+    if (formTitle) formTitle.textContent = "Edit Exercise";
+
+    var selectedSports = Array.isArray(item.sport_tags) ? item.sport_tags : [];
+    document.querySelectorAll("[data-admin-library-sport]").forEach(function (checkbox) {
+      checkbox.checked = selectedSports.indexOf(String(checkbox.value || "").trim().toLowerCase()) > -1;
+    });
+  }
+
+  function onDeleteExerciseLibraryItem(exerciseId) {
+    var item = state.exerciseLibrary.find(function (entry) {
+      return entry.id === exerciseId;
+    });
+    if (!item) {
+      return;
+    }
+
+    if (!confirm("Delete exercise '" + (item.name || "Exercise") + "'?")) {
+      return;
+    }
+
+    state.exerciseLibrary = state.exerciseLibrary.filter(function (entry) {
+      return entry.id !== exerciseId;
+    });
+    writeExerciseLibrary(state.exerciseLibrary);
+
+    if (!state.client) {
+      renderExerciseLibrary();
+      clearExerciseLibraryForm();
+      setExerciseLibraryStatus("Exercise deleted.", "info");
+      return;
+    }
+
+    state.client
+      .from(EXERCISE_LIBRARY_TABLE)
+      .delete()
+      .eq("id", exerciseId)
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingTableError(result.error)) {
+            renderExerciseLibrary();
+            clearExerciseLibraryForm();
+            setExerciseLibraryStatus("Exercise deleted locally.", "info");
+            return;
+          }
+
+          setExerciseLibraryStatus(result.error.message, "error");
+          return;
+        }
+
+        renderExerciseLibrary();
+        clearExerciseLibraryForm();
+        setExerciseLibraryStatus("Exercise deleted.", "info");
+      })
+      .catch(function (error) {
+        setExerciseLibraryStatus(
+          error && error.message ? error.message : "Exercise deleted locally, but cloud delete failed.",
+          "info"
+        );
+      });
+  }
+
+  function setExerciseLibraryStatus(message, variant) {
+    var statusEl = document.querySelector("[data-admin-library-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
+  }
+
+  function loadProgramTemplates() {
+    if (!state.client) {
+      state.templates = [];
+      renderProgramTemplates();
+      return;
+    }
+
+    state.client
+      .from("training_programs")
+      .select("id,name,description,created_at,updated_at")
+      .order("updated_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingTableError(result.error)) {
+            state.templates = readTemplateLibrary();
+            renderProgramTemplates();
+            setStatus("Using local templates until Supabase training_programs is available.", "info");
+            return;
+          }
+
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        state.templates = (result.data || [])
+          .map(parseTemplateRow)
+          .filter(function (template) {
+            return !!template;
+          })
+          .sort(function (a, b) {
+            var aDate = new Date(a.updated_at || a.created_at || 0).getTime();
+            var bDate = new Date(b.updated_at || b.created_at || 0).getTime();
+            return bDate - aDate;
+          });
+
+        renderProgramTemplates();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to load templates.", "error");
+      });
+  }
+
+  function renderProgramTemplates() {
+    var list = document.querySelector("[data-admin-template-list]");
+    if (!list) {
+      return;
+    }
+
+    var visibleTemplates = state.templates.filter(function (template) {
+      if (state.templateFilter === "all") {
+        return true;
+      }
+      if (state.templateFilter === "archived") {
+        return !!template.archived;
+      }
+      return !template.archived;
+    });
+
+    if (!visibleTemplates.length) {
+      list.innerHTML =
+        '<p class="admin-loading">No templates in this view yet.</p>';
+      return;
+    }
+
+    list.innerHTML = visibleTemplates
+      .map(function (template) {
+        var archiveLabel = template.archived ? "Unarchive" : "Archive";
+        return (
+          '<article class="admin-program-item">' +
+          '<div class="admin-program-item-main">' +
+          '<h3>' + escapeHtml(template.name || "Untitled Template") + '</h3>' +
+          '<p>Last updated: ' + escapeHtml(formatDate(template.updated_at || template.created_at)) + (template.archived ? " · Archived" : "") + '</p>' +
+          '</div>' +
+          '<div class="admin-program-item-actions">' +
+          '<button type="button" class="btn admin-btn-small" data-template-action="edit" data-template-id="' + escapeAttribute(template.id) + '">Edit</button>' +
+          '<button type="button" class="btn admin-btn-small" data-template-action="assign" data-template-id="' + escapeAttribute(template.id) + '">Assign</button>' +
+          '<button type="button" class="btn admin-btn-small" data-template-action="duplicate" data-template-id="' + escapeAttribute(template.id) + '">Duplicate</button>' +
+          '<button type="button" class="btn admin-btn-archive-mini" data-template-action="archive" data-template-id="' + escapeAttribute(template.id) + '">' + archiveLabel + '</button>' +
+          '<button type="button" class="btn admin-btn-delete-mini" data-template-action="delete" data-template-id="' + escapeAttribute(template.id) + '">Delete</button>' +
+          '</div>' +
+          '</article>'
+        );
+      })
+      .join("");
+  }
+
+  function onAssignTemplate(templateId) {
+    if (!templateId) {
+      return;
+    }
+
+    var template = getTemplateById(templateId);
+    if (!template || !state.client) {
+      setStatus("Template not found.", "error");
+      return;
+    }
+
+    if (!state.athletes.length) {
+      setStatus("Load athletes before assigning templates.", "error");
+      return;
+    }
+
+    state.assignmentTemplateId = templateId;
+    var titleEl = document.querySelector("[data-admin-assign-template-name]");
+    if (titleEl) {
+      titleEl.textContent = "Assign: " + (template.name || "Template");
+    }
+
+    var searchInput = document.querySelector("[data-admin-assign-search]");
+    if (searchInput) {
+      searchInput.value = "";
+    }
+
+    setAssignStatus("", "info");
+    renderAssignAthleteList("");
+    showAssignModal();
+  }
+
+  function renderAssignAthleteList(searchTerm) {
+    var list = document.querySelector("[data-admin-assign-list]");
+    if (!list) {
+      return;
+    }
+
+    var query = String(searchTerm || "").trim().toLowerCase();
+    var filtered = state.athletes.filter(function (athlete) {
+      if (!query) {
+        return true;
+      }
+
+      var email = String(athlete.email || "").toLowerCase();
+      var name = String(athlete.name || "").toLowerCase();
+      var sport = String(athlete.sport || "").toLowerCase();
+      return email.indexOf(query) > -1 || name.indexOf(query) > -1 || sport.indexOf(query) > -1;
+    });
+
+    if (!filtered.length) {
+      list.innerHTML = '<p class="admin-loading">No athletes match this search.</p>';
+      return;
+    }
+
+    list.innerHTML = filtered
+      .map(function (athlete) {
+        return (
+          '<label class="admin-assign-item">' +
+          '<input type="checkbox" data-admin-assign-athlete data-athlete-id="' + escapeAttribute(athlete.user_id || "") + '" />' +
+          '<span class="admin-assign-item-main">' +
+          '<strong>' + escapeHtml(athlete.name || athlete.email || "Athlete") + '</strong>' +
+          '<small>' + escapeHtml(athlete.email || "") + (athlete.sport ? " • " + escapeHtml(athlete.sport) : "") + '</small>' +
+          '</span>' +
+          '</label>'
+        );
+      })
+      .join("");
+  }
+
+  function onConfirmAssignTemplate() {
+    var template = getTemplateById(state.assignmentTemplateId);
+    if (!template || !state.client) {
+      setAssignStatus("Template not found.", "error");
+      return;
+    }
+
+    var list = document.querySelector("[data-admin-assign-list]");
+    if (!list) {
+      return;
+    }
+
+    var selectedIds = Array.prototype.slice
+      .call(list.querySelectorAll("[data-admin-assign-athlete]:checked"))
+      .map(function (checkbox) {
+        return String(checkbox.getAttribute("data-athlete-id") || "").trim();
+      })
+      .filter(function (id) {
+        return !!id;
+      });
+
+    if (!selectedIds.length) {
+      setAssignStatus("Select at least one athlete.", "error");
+      return;
+    }
+
+    var now = new Date().toISOString();
+    var rows = selectedIds.map(function (userId) {
+      return {
+        user_id: userId,
+        program_id: template.id,
+        program_name: template.name,
+        is_active: true,
+        assigned_at: now,
+        assigned_by: state.user ? state.user.id : null
+      };
+    });
+
+    setAssignStatus("Assigning template to " + selectedIds.length + " athlete(s)...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .update({ is_active: false })
+      .in("user_id", selectedIds)
+      .eq("is_active", true)
+      .then(function (deactivateResult) {
+        if (deactivateResult.error) {
+          setAssignStatus(deactivateResult.error.message, "error");
+          return;
+        }
+
+        state.client
+          .from("user_training_programs")
+          .insert(rows)
+          .then(function (insertResult) {
+            if (insertResult.error) {
+              setAssignStatus(insertResult.error.message, "error");
+              return;
+            }
+
+            setAssignStatus("Assigned template to " + selectedIds.length + " athlete(s).", "success");
+            setStatus("Assigned '" + (template.name || "Template") + "' to " + selectedIds.length + " athlete(s).", "success");
+            setTimeout(function () {
+              closeAssignModal();
+            }, 700);
+          })
+          .catch(function (error) {
+            setAssignStatus(error && error.message ? error.message : "Failed to assign template.", "error");
+          });
+      })
+      .catch(function (error) {
+        setAssignStatus(error && error.message ? error.message : "Failed to assign template.", "error");
+      });
+  }
+
+  function onDuplicateTemplate(templateId) {
+    var template = getTemplateById(templateId);
+    if (!template || !state.client) {
+      setStatus("Template not found.", "error");
+      return;
+    }
+
+    var payload = {
+      archived: false,
+      structure: template.structure || { weeks: 1, workoutsPerWeek: 3 },
+      days: template.days || { "day-1": [], "day-2": [], "day-3": [] }
+    };
+
+    state.client
+      .from("training_programs")
+      .insert({
+        name: (template.name || "Template") + " (Copy)",
+        description: serializeTemplatePayload(payload)
+      })
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        setStatus("Template duplicated.", "success");
+        loadProgramTemplates();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to duplicate template.", "error");
+      });
+  }
+
+  function onToggleArchiveTemplate(templateId) {
+    var template = getTemplateById(templateId);
+    if (!template || !state.client) {
+      setStatus("Template not found.", "error");
+      return;
+    }
+
+    var payload = {
+      archived: !template.archived,
+      structure: template.structure || { weeks: 1, workoutsPerWeek: 3 },
+      days: template.days || { "day-1": [], "day-2": [], "day-3": [] }
+    };
+
+    state.client
+      .from("training_programs")
+      .update({ description: serializeTemplatePayload(payload) })
+      .eq("id", template.id)
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        setStatus(template.archived ? "Template unarchived." : "Template archived.", "info");
+        loadProgramTemplates();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to update template.", "error");
+      });
+  }
+
+  function onDeleteTemplate(templateId) {
+    if (!templateId) {
+      return;
+    }
+
+    var template = state.templates.find(function (item) {
+      return item.id === templateId;
+    });
+    var templateName = template && template.name ? template.name : "this template";
+
+    if (!confirm("Delete " + templateName + "?")) {
+      return;
+    }
+
+    if (!state.client) {
+      var nextTemplates = state.templates.filter(function (item) {
+        return item.id !== templateId;
+      });
+
+      writeTemplateLibrary(nextTemplates);
+      state.templates = nextTemplates;
+      renderProgramTemplates();
+      setStatus("Template deleted.", "info");
+      return;
+    }
+
+    setStatus("Removing template from active athlete programs...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .update({ is_active: false })
+      .eq("program_id", templateId)
+      .eq("is_active", true)
+      .then(function (deactivateResult) {
+        if (deactivateResult.error) {
+          setStatus(deactivateResult.error.message, "error");
+          return;
+        }
+
+        state.client
+      .from("training_programs")
+      .delete()
+      .eq("id", templateId)
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        setStatus("Template deleted and removed from active athlete programs.", "success");
+        loadProgramTemplates();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to delete template.", "error");
+      });
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to remove template from athletes.", "error");
+      });
+  }
+
+  function getTemplateById(templateId) {
+    return state.templates.find(function (item) {
+      return item.id === templateId;
+    });
+  }
+
+  function parseTemplateRow(row) {
+    if (!row || !row.id) {
+      return null;
+    }
+
+    var payload = parseTemplatePayload(row.description);
+    if (!payload) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      name: row.name || "Untitled Template",
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      archived: !!payload.archived,
+      structure: payload.structure || { weeks: 1, workoutsPerWeek: 3 },
+      days: payload.days || { "day-1": [], "day-2": [], "day-3": [] }
+    };
+  }
+
+  function parseTemplatePayload(description) {
+    var value = String(description || "");
+    if (value.indexOf(TEMPLATE_MARKER) !== 0) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(value.slice(TEMPLATE_MARKER.length));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function serializeTemplatePayload(payload) {
+    var safePayload = {
+      archived: !!(payload && payload.archived),
+      structure: payload && payload.structure ? payload.structure : { weeks: 1, workoutsPerWeek: 3 },
+      days: payload && payload.days ? payload.days : { "day-1": [], "day-2": [], "day-3": [] }
+    };
+    return TEMPLATE_MARKER + JSON.stringify(safePayload);
   }
 
   function loadAthletes() {
@@ -154,7 +987,10 @@
           return;
         }
 
-        state.athletes = result.data || [];
+        var hiddenAthleteIds = readHiddenAthleteIds();
+        state.athletes = (result.data || []).filter(function (athlete) {
+          return !hiddenAthleteIds[athlete.user_id];
+        });
         state.currentPage = 1;
         renderAthletesTable();
         updateStats();
@@ -192,6 +1028,9 @@
 
     tbody.innerHTML = paginated
       .map(function (athlete) {
+        var viewUrl =
+          "profile.html?coachView=1&athleteId=" +
+          encodeURIComponent(athlete.user_id || "");
         return (
           "<tr>" +
           "<td>" + escapeHtml(athlete.email || "N/A") + "</td>" +
@@ -199,20 +1038,15 @@
           "<td>" + (athlete.sport ? escapeHtml(athlete.sport) : "—") + "</td>" +
           "<td>" + (athlete.level ? escapeHtml(athlete.level) : "—") + "</td>" +
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
-          "<td><button class='btn admin-btn-small' data-athlete-id='" +
-          escapeHtml(athlete.user_id) +
-          "'>Edit</button></td>" +
+          "<td><div class='admin-program-item-actions'><a class='btn admin-btn-small' href='" +
+          viewUrl +
+          "'>View</a><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
+          escapeAttribute(athlete.user_id || "") +
+          "'>Delete</button></div></td>" +
           "</tr>"
         );
       })
       .join("");
-
-    document.querySelectorAll("[data-athlete-id]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var userId = btn.getAttribute("data-athlete-id");
-        openAthleteModal(userId);
-      });
-    });
 
     renderPagination(filtered.length);
   }
@@ -280,18 +1114,18 @@
     document.querySelector("[data-admin-modal-last-signin]").textContent =
       athlete.last_sign_in_at ? formatDate(athlete.last_sign_in_at) : "N/A";
 
-    document.querySelector("[data-admin-modal-input='name']").value =
-      athlete.name || "";
-    document.querySelector("[data-admin-modal-input='sport']").value =
-      athlete.sport || "";
-    document.querySelector("[data-admin-modal-input='level']").value =
-      athlete.level || "";
-    document.querySelector("[data-admin-modal-input='bio']").value =
-      athlete.bio || "";
-    document.querySelector("[data-admin-modal-input='age']").value =
-      athlete.age || "";
-    document.querySelector("[data-admin-modal-input='location']").value =
-      athlete.location || "";
+    document.querySelector("[data-admin-modal-info-name]").textContent =
+      athlete.name || "—";
+    document.querySelector("[data-admin-modal-info-sport]").textContent =
+      athlete.sport || "—";
+    document.querySelector("[data-admin-modal-info-level]").textContent =
+      athlete.level || "—";
+    document.querySelector("[data-admin-modal-info-bio]").textContent =
+      athlete.bio || "—";
+    document.querySelector("[data-admin-modal-info-age]").textContent =
+      athlete.age ? athlete.age.toString() : "—";
+    document.querySelector("[data-admin-modal-info-location]").textContent =
+      athlete.location || "—";
 
     var metricRows = document.querySelector("[data-admin-metric-rows]");
     if (metricRows) {
@@ -349,19 +1183,18 @@
 
     metricRows.innerHTML = "";
 
+
     if (!metrics || !metrics.length) {
-      appendMetricRow({
-        metric_name: "Max HR",
-        metric_value: "",
-        metric_unit: "bpm",
-        metric_category: "Cardio"
-      });
-      appendMetricRow({
-        metric_name: "Resting HR",
-        metric_value: "",
-        metric_unit: "bpm",
-        metric_category: "Cardio"
-      });
+      // Add default metrics for every account
+      [
+        { metric_name: "Resting HR", metric_value: "", metric_unit: "bpm", metric_category: "Cardio" },
+        { metric_name: "Max HR", metric_value: "", metric_unit: "bpm", metric_category: "Cardio" },
+        { metric_name: "Height", metric_value: "", metric_unit: "cm", metric_category: "Performance" },
+        { metric_name: "Weight", metric_value: "", metric_unit: "kg", metric_category: "Performance" },
+        { metric_name: "BMI", metric_value: "", metric_unit: "", metric_category: "Performance" },
+        { metric_name: "Blood Pressure", metric_value: "", metric_unit: "mmHg", metric_category: "Cardio" },
+        { metric_name: "VO2 Max", metric_value: "", metric_unit: "ml/kg/min", metric_category: "Cardio" }
+      ].forEach(appendMetricRow);
       return;
     }
 
@@ -372,28 +1205,76 @@
 
   function appendMetricRow(metric) {
     var metricRows = document.querySelector("[data-admin-metric-rows]");
-    if (!metricRows) {
-      return;
-    }
+    if (!metricRows) return;
+
+    // List of preset metric names
+    var presetNames = [
+      "Power Push Up",
+      "Shoulder Tap Test",
+      "20mm Edge Pull Strength",
+      "Max Pull Ups",
+      "Max Hang Time",
+      "90 Degree Bent Leg Hang",
+      "Adapted Grant Foot Raise",
+      "Ape Index",
+      "Vertical Jump Height",
+      "Single Leg Squat Test",
+      "Single Leg Heel Raise Test",
+      "Side Plank with Hip Abduction Hold (Max Time)",
+      "Knee to Wall (Ankle DF Test)",
+      "Y Balance (Anterior Reach)",
+      "Broad Jump",
+      "Tripple Hop",
+      "Resting HR",
+      "Max HR",
+      "Height",
+      "Weight",
+      "BMI",
+      "Blood Pressure",
+      "VO2 Max"
+    ];
+    var isPreset = presetNames.includes(metric.metric_name);
 
     var row = document.createElement("div");
-    row.className = "admin-metric-row";
-    row.innerHTML =
-      '<input type="text" data-admin-metric-name placeholder="Metric name" value="' +
-      escapeAttribute(metric.metric_name || "") +
-      '" />' +
-      '<input type="text" data-admin-metric-value placeholder="Value" value="' +
-      escapeAttribute(metric.metric_value || "") +
-      '" />' +
-      '<input type="text" data-admin-metric-unit placeholder="Unit" value="' +
-      escapeAttribute(metric.metric_unit || "") +
-      '" />' +
-      '<input type="text" data-admin-metric-category placeholder="Category" value="' +
-      escapeAttribute(metric.metric_category || "Performance") +
-      '" />' +
-      '<button type="button" class="admin-metric-remove" data-admin-metric-remove>Remove</button>';
-
+    row.className = "admin-metric-row metric-card-ui";
+    row.innerHTML = `
+      <div class="metric-card-fields">
+        <div class="metric-field metric-name-field">
+          <span class="metric-icon" title="Metric Name">🏷️</span>
+          ${isPreset
+            ? `<span class="metric-preset-label" title="Preset metric">${escapeHtml(metric.metric_name)}</span><input type="hidden" data-admin-metric-name value="${escapeAttribute(metric.metric_name || "")}" />`
+            : `<input type="text" data-admin-metric-name placeholder="Metric name (e.g. Max HR)" value="${escapeAttribute(metric.metric_name || "")}" />`
+          }
+        </div>
+        <div class="metric-field metric-value-field">
+          <span class="metric-icon" title="Value">🔢</span>
+          <input type="text" data-admin-metric-value placeholder="Value" value="${escapeAttribute(metric.metric_value || "")}" />
+        </div>
+        <div class="metric-field metric-unit-field">
+          <span class="metric-icon" title="Unit">📏</span>
+          <input type="text" data-admin-metric-unit placeholder="Unit (e.g. bpm, cm)" value="${escapeAttribute(metric.metric_unit || "")}" />
+        </div>
+        <div class="metric-field metric-category-field">
+          <span class="metric-icon" title="Category">📂</span>
+          <select data-admin-metric-category>
+            <option value="Performance" ${metric.metric_category==="Performance"?"selected":""}>Performance</option>
+            <option value="Cardio" ${metric.metric_category==="Cardio"?"selected":""}>Cardio</option>
+            <option value="Strength" ${metric.metric_category==="Strength"?"selected":""}>Strength</option>
+            <option value="Mobility" ${metric.metric_category==="Mobility"?"selected":""}>Mobility</option>
+            <option value="Other" ${metric.metric_category==="Other"?"selected":""}>Other</option>
+          </select>
+        </div>
+      </div>
+      <button type="button" class="admin-metric-remove metric-row-remove" data-admin-metric-remove title="Remove metric">✖</button>
+    `;
     metricRows.appendChild(row);
+  }
+
+  // Helper for HTML escaping
+  function escapeHtml(str) {
+    return String(str || "").replace(/[&<>"']/g, function (c) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'})[c];
+    });
   }
 
   function collectMetricsFromModal() {
@@ -523,6 +1404,16 @@
       });
   }
 
+  function onEditAthlete() {
+    if (!state.currentAthlete) {
+      setModalStatus("No athlete selected.", "error");
+      return;
+    }
+    var url = "athlete-editor.html?athleteId=" + encodeURIComponent(state.currentAthlete.user_id || "") +
+              "&athleteName=" + encodeURIComponent(state.currentAthlete.name || state.currentAthlete.email || "Athlete");
+    window.location.href = url;
+  }
+
   function onResetPassword() {
     if (!state.currentAthlete || !confirm("Send password reset email?")) {
       return;
@@ -531,7 +1422,9 @@
     setModalStatus("Sending password reset email...", "info");
 
     state.client.auth
-      .resetPasswordForEmail(state.currentAthlete.email)
+      .resetPasswordForEmail(state.currentAthlete.email, {
+        redirectTo: getPasswordResetRedirectUrl()
+      })
       .then(function (result) {
         if (result.error) {
           setModalStatus(result.error.message, "error");
@@ -540,7 +1433,7 @@
 
         setModalStatus(
           "Password reset email sent to " +
-            state.currentAthlete.user_id,
+            state.currentAthlete.email,
           "success"
         );
       })
@@ -555,10 +1448,21 @@
   }
 
   function onDeleteAthlete() {
-    if (
-      !state.currentAthlete ||
-      !confirm("Permanently delete this athlete account?")
-    ) {
+    if (!state.currentAthlete) {
+      setModalStatus("No athlete selected.", "error");
+      return;
+    }
+
+    executeAthleteDelete(state.currentAthlete, true);
+  }
+
+  function executeAthleteDelete(athlete, fromModal) {
+    if (!athlete) {
+      return;
+    }
+
+    var athleteLabel = athlete.email || athlete.name || "this athlete";
+    if (!confirm("Permanently delete " + athleteLabel + " account?")) {
       return;
     }
 
@@ -566,37 +1470,216 @@
       return;
     }
 
-    setModalStatus("Deleting account...", "info");
+    setDeleteStatus("Deleting account...", "info", fromModal);
 
+    // Preferred path: server-side RPC that deletes profile/metrics/assignments and auth user.
     state.client
-      .from("athlete_profiles")
-      .delete()
-      .eq("user_id", state.currentAthlete.user_id)
-      .then(function (result) {
-        if (result.error) {
-          setModalStatus(result.error.message, "error");
+      .rpc("admin_delete_athlete_account", {
+        target_user_id: athlete.user_id
+      })
+      .then(function (rpcResult) {
+        if (rpcResult.error) {
+          handleLegacyAthleteDelete(athlete, rpcResult.error, fromModal);
           return;
         }
 
-        setModalStatus("Account deleted successfully.", "success");
+        state.athletes = state.athletes.filter(function (item) {
+          return item.user_id !== athlete.user_id;
+        });
+        renderAthletesTable();
+        updateStats();
+
+        setDeleteStatus("Athlete account deleted.", "success", fromModal);
         setTimeout(function () {
-          closeModal();
-          loadAthletes();
+          if (fromModal) {
+            closeModal();
+          }
+          setStatus("Athlete account deleted.", "success");
+        }, 700);
+      })
+      .catch(function (error) {
+        handleLegacyAthleteDelete(athlete, error, fromModal);
+      });
+  }
+
+  function handleLegacyAthleteDelete(athlete, deleteError, fromModal) {
+    state.client
+      .from("athlete_profiles")
+      .delete()
+      .eq("user_id", athlete.user_id)
+      .then(function (result) {
+        if (result.error) {
+          setDeleteStatus(result.error.message, "error", fromModal);
+          return;
+        }
+
+        hideAthleteFromDashboard(athlete.user_id);
+        state.athletes = state.athletes.filter(function (item) {
+          return item.user_id !== athlete.user_id;
+        });
+        renderAthletesTable();
+        updateStats();
+
+        setDeleteStatus(
+          "Profile removed from dashboard, but full auth-account delete is not configured yet.",
+          "info",
+          fromModal
+        );
+        setTimeout(function () {
+          if (fromModal) {
+            closeModal();
+          }
+          setStatus(
+            "Profile removed. To fully delete athlete logins, run sql/admin-delete-athlete-account-rpc.sql in Supabase.",
+            "info"
+          );
         }, 1000);
       })
       .catch(function (error) {
-        setModalStatus(
-          error && error.message ? error.message : "Failed to delete account.",
-          "error"
+        var baseMessage = error && error.message ? error.message : "Failed to delete account.";
+        var priorMessage = deleteError && deleteError.message ? " " + deleteError.message : "";
+        setDeleteStatus(
+          baseMessage + priorMessage,
+          "error",
+          fromModal
         );
       });
+  }
+
+  function setDeleteStatus(message, variant, fromModal) {
+    if (fromModal) {
+      setModalStatus(message, variant);
+      return;
+    }
+    setStatus(message, variant);
+  }
+
+  function onAddAthleteAccount() {
+    if (!state.client || !state.user) {
+      setStatus("You must be logged in as coach to add athletes.", "error");
+      return;
+    }
+
+    var email = String(prompt("Athlete email:", "") || "").trim().toLowerCase();
+    if (!email) {
+      return;
+    }
+
+    if (email.indexOf("@") < 1 || email.indexOf(".") < 3) {
+      setStatus("Please enter a valid athlete email.", "error");
+      return;
+    }
+
+    var name = String(prompt("Athlete full name (optional):", "") || "").trim();
+    var sport = String(prompt("Primary sport (optional):", "") || "").trim();
+    var level = String(prompt("Experience level (optional):", "") || "").trim();
+
+    var defaultPassword = "password";
+    var isolatedAuthClient = createIsolatedAuthClient();
+
+    if (!isolatedAuthClient) {
+      setStatus("Could not create signup client.", "error");
+      return;
+    }
+
+    setStatus("Creating athlete account...", "info");
+
+    isolatedAuthClient.auth
+      .signUp({
+        email: email,
+        password: defaultPassword,
+        options: {
+          data: {
+            role: "athlete",
+            full_name: name || null,
+            must_change_password: true
+          }
+        }
+      })
+      .then(function (result) {
+        if (result.error) {
+          var errorMessage = String(result.error.message || "");
+          if (errorMessage.toLowerCase().indexOf("already") > -1) {
+            setStatus("Athlete already exists. No email was sent.", "info");
+            return;
+          }
+
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        var createdUserId = result.data && result.data.user && result.data.user.id;
+        if (createdUserId) {
+          upsertAthleteProfile(createdUserId, {
+            name: name,
+            sport: sport,
+            level: level
+          });
+        }
+
+        setStatus(
+          "Athlete account created. Default password is 'password'. Ask athlete to change it after first login.",
+          "success"
+        );
+
+        setTimeout(function () {
+          loadAthletes();
+        }, 600);
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to create athlete account.", "error");
+      });
+  }
+
+  function upsertAthleteProfile(userId, profile) {
+    if (!state.client || !userId) {
+      return;
+    }
+
+    var payload = {
+      user_id: userId,
+      name: profile && profile.name ? profile.name : null,
+      sport: profile && profile.sport ? profile.sport : null,
+      level: profile && profile.level ? profile.level : null,
+      updated_at: new Date().toISOString()
+    };
+
+    state.client
+      .from("athlete_profiles")
+      .upsert(payload)
+      .then(function () {
+        // Ignore profile upsert errors here so account creation flow stays simple.
+      })
+      .catch(function () {
+        // Intentionally noop.
+      });
+  }
+
+  function createIsolatedAuthClient() {
+    if (!window.supabase || !window.supabase.createClient) {
+      return null;
+    }
+
+    var url = window.NOMADIC_SUPABASE_URL;
+    var key = window.NOMADIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      return null;
+    }
+
+    return window.supabase.createClient(url, key, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    });
   }
 
   function showModal() {
     var modal = document.querySelector("[data-admin-modal]");
     if (modal) {
       modal.hidden = false;
-      document.body.classList.add("admin-modal-open");
+      syncModalBodyState();
     }
   }
 
@@ -604,11 +1687,58 @@
     var modal = document.querySelector("[data-admin-modal]");
     if (modal) {
       modal.hidden = true;
-      document.body.classList.remove("admin-modal-open");
+      syncModalBodyState();
     }
 
     state.currentAthlete = null;
     state.currentMetrics = [];
+  }
+
+  function showAssignModal() {
+    var modal = document.querySelector("[data-admin-assign-modal]");
+    if (modal) {
+      modal.hidden = false;
+      syncModalBodyState();
+    }
+  }
+
+  function closeAssignModal() {
+    var modal = document.querySelector("[data-admin-assign-modal]");
+    if (modal) {
+      modal.hidden = true;
+      syncModalBodyState();
+    }
+    state.assignmentTemplateId = null;
+    setAssignStatus("", "info");
+  }
+
+  function syncModalBodyState() {
+    var athleteModal = document.querySelector("[data-admin-modal]");
+    var assignModal = document.querySelector("[data-admin-assign-modal]");
+    var libraryModal = document.querySelector("[data-admin-library-modal]");
+    var anyOpen = (athleteModal && !athleteModal.hidden) || (assignModal && !assignModal.hidden) || (libraryModal && !libraryModal.hidden);
+    if (anyOpen) {
+      document.body.classList.add("admin-modal-open");
+    } else {
+      document.body.classList.remove("admin-modal-open");
+    }
+  }
+
+  function setAssignStatus(message, variant) {
+    var statusEl = document.querySelector("[data-admin-assign-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
   }
 
   function updateStats() {
@@ -625,6 +1755,154 @@
 
     if (profilesEl) {
       profilesEl.textContent = withProfiles;
+    }
+  }
+
+  function readTemplateLibrary() {
+    try {
+      var raw = window.localStorage.getItem(TEMPLATE_LIBRARY_KEY);
+      if (!raw) {
+        return [];
+      }
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.map(function (item) {
+        return {
+          id: item.id,
+          name: item.name || "Untitled Template",
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          archived: !!item.archived,
+          structure: item.structure || { weeks: 1, workoutsPerWeek: 3 },
+          days: item.days || {}
+        };
+      });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function readHiddenAthleteIds() {
+    try {
+      var raw = window.localStorage.getItem(HIDDEN_ATHLETES_KEY);
+      if (!raw) {
+        return {};
+      }
+
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        return {};
+      }
+
+      return parsed;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function readExerciseLibrary() {
+    try {
+      var raw = window.localStorage.getItem(EXERCISE_LIBRARY_KEY);
+      if (!raw) {
+        return [];
+      }
+
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.map(function (item) {
+        return {
+          id: item.id,
+          name: item.name || "",
+          movement_pattern: item.movement_pattern || "",
+          equipment: item.equipment || "",
+          primary_muscle: item.primary_muscle || "",
+          training_goal: item.training_goal || "",
+          sport_tags: Array.isArray(item.sport_tags) ? item.sport_tags : [],
+          custom_tags: Array.isArray(item.custom_tags) ? item.custom_tags : [],
+          description: item.description || "",
+          coaching_cues: item.coaching_cues || "",
+          created_at: item.created_at,
+          updated_at: item.updated_at
+        };
+      });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function mapExerciseLibraryRow(item) {
+    return {
+      id: item && item.id,
+      name: item && item.name ? item.name : "",
+      movement_pattern: item && item.movement_pattern ? item.movement_pattern : "",
+      equipment: item && item.equipment ? item.equipment : "",
+      primary_muscle: item && item.primary_muscle ? item.primary_muscle : "",
+      training_goal: item && item.training_goal ? item.training_goal : "",
+      sport_tags: item && Array.isArray(item.sport_tags) ? item.sport_tags : [],
+      custom_tags: item && Array.isArray(item.custom_tags) ? item.custom_tags : [],
+      description: item && item.description ? item.description : "",
+      coaching_cues: item && item.coaching_cues ? item.coaching_cues : "",
+      created_at: item && item.created_at,
+      updated_at: item && item.updated_at
+    };
+  }
+
+  function syncLocalExerciseLibraryToSupabase(localItems) {
+    if (!state.client || !localItems || !localItems.length) {
+      return;
+    }
+
+    state.client
+      .from(EXERCISE_LIBRARY_TABLE)
+      .upsert(localItems)
+      .then(function (result) {
+        if (result.error) {
+          return;
+        }
+
+        setStatus("Exercise library synced from local cache to Supabase.", "success");
+        setTimeout(function () {
+          clearStatus();
+        }, 1800);
+      })
+      .catch(function () {
+        // Keep local fallback if sync fails.
+      });
+  }
+
+  function writeExerciseLibrary(items) {
+    try {
+      window.localStorage.setItem(EXERCISE_LIBRARY_KEY, JSON.stringify(items || []));
+    } catch (e) {
+      setExerciseLibraryStatus("Could not save exercise library in this browser.", "error");
+    }
+  }
+
+  function hideAthleteFromDashboard(userId) {
+    if (!userId) {
+      return;
+    }
+
+    try {
+      var hiddenIds = readHiddenAthleteIds();
+      hiddenIds[userId] = true;
+      window.localStorage.setItem(HIDDEN_ATHLETES_KEY, JSON.stringify(hiddenIds));
+    } catch (e) {
+      setStatus("Account deleted, but could not persist dashboard hide list.", "info");
+    }
+  }
+
+  function writeTemplateLibrary(templates) {
+    try {
+      window.localStorage.setItem(TEMPLATE_LIBRARY_KEY, JSON.stringify(templates || []));
+    } catch (e) {
+      setStatus("Could not update template library in this browser.", "error");
     }
   }
 
@@ -742,5 +2020,9 @@
   function isMissingTableError(error) {
     var msg = error && error.message ? error.message.toLowerCase() : "";
     return error && error.code === "42P01" || msg.indexOf("does not exist") > -1;
+  }
+
+  function getPasswordResetRedirectUrl() {
+    return window.location.origin + "/update-password.html";
   }
 })();

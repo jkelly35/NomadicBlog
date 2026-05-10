@@ -1,9 +1,14 @@
 (function () {
+  var ADMIN_EMAIL = "joe@nomadicperformance.com";
   var state = {
     client: null,
     user: null,
+    viewUser: null,
+    isCoachView: false,
+    viewedAthleteId: null,
     profile: null,
     metrics: [],
+    metricsLatest: [],
     guardElement: null,
     contentElement: null,
     form: null,
@@ -12,8 +17,13 @@
     metricsRows: null,
     metricsList: null,
     metricsStatus: null,
+    metricsEditor: null,
+    metricsEditorToggle: null,
+    passwordStatus: null,
     editToggleButton: null,
     editorSection: null,
+    sportOverviewEditor: null,
+    sportOverviewSummary: null,
     metricTemplatesBySport: {
       climbing: ["20mm Edge Pull", "Max Pull Ups", "Weighted Pull Up", "Core Hold Time"],
       "trail-running": ["Resting HR", "Max HR", "Vertical Jump", "Anterior Reach", "5k Time"],
@@ -21,7 +31,35 @@
       snowboarding: ["Resting HR", "Max HR", "Countermovement Jump", "Lateral Bound"],
       mountainbiking: ["Resting HR", "Max HR", "FTP", "Grip Endurance"],
       mixed: ["Resting HR", "Max HR", "Vertical Jump", "Anaerobic Capacity"]
-    }
+    },
+    sportOverviewTemplates: {
+      climbing: [
+        { key: "climbing_type", label: "Climbing Type", placeholder: "Bouldering, Sport, Trad, Ice", type: "text" },
+        { key: "climbing_grade", label: "Current Climbing Level", placeholder: "5.11a, V4", type: "text" },
+        { key: "climbing_focus", label: "Current Focus", placeholder: "Power endurance, technique, projecting", type: "text" }
+      ],
+      skiing: [
+        { key: "ski_discipline", label: "Ski Discipline", placeholder: "Alpine, Touring, Freeride, Nordic", type: "text" },
+        { key: "ski_terrain", label: "Preferred Terrain", placeholder: "Groomers, steeps, park, backcountry", type: "text" }
+      ],
+      snowboarding: [
+        { key: "snowboard_discipline", label: "Snowboard Discipline", placeholder: "Freeride, park, splitboarding", type: "text" },
+        { key: "snowboard_stance", label: "Stance", placeholder: "Regular or Goofy", type: "text" }
+      ],
+      mountainbiking: [
+        { key: "mtb_discipline", label: "MTB Discipline", placeholder: "XC, Enduro, DH, Trail", type: "text" },
+        { key: "mtb_weekly_volume", label: "Weekly Ride Volume", placeholder: "e.g. 6 hrs", type: "text" }
+      ],
+      "trail-running": [
+        { key: "run_primary_distance", label: "Primary Distance", placeholder: "10k, half marathon, ultra", type: "text" },
+        { key: "run_elevation_goal", label: "Elevation Focus", placeholder: "e.g. 3000 ft/week", type: "text" }
+      ],
+      mixed: [
+        { key: "mixed_split", label: "Training Split", placeholder: "e.g. Climb 2x, Run 2x, Strength 2x", type: "text" }
+      ]
+    },
+    trainingTemplates: [],
+    selectedTrainingTemplateId: ""
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -37,8 +75,13 @@
     state.metricsRows = document.querySelector("[data-metric-rows]");
     state.metricsList = document.querySelector("[data-metrics-list]");
     state.metricsStatus = document.querySelector("[data-metrics-status]");
+    state.metricsEditor = document.querySelector("[data-metrics-editor]");
+    state.metricsEditorToggle = null;
+    state.passwordStatus = document.querySelector("[data-password-status]");
     state.editToggleButton = document.querySelector("[data-profile-edit-toggle]");
     state.editorSection = document.querySelector("[data-profile-editor]");
+    state.sportOverviewEditor = document.querySelector("[data-sport-overview-editor]");
+    state.sportOverviewSummary = document.querySelector("[data-sport-overview-summary]");
 
     if (!window.supabase || !window.supabase.createClient) {
       showError("Supabase client library failed to load.");
@@ -62,8 +105,19 @@
       }
 
       state.user = session.user;
-      loadDashboard();
-      setupFormHandlers();
+
+      configureCoachView()
+        .then(function (ok) {
+          if (ok === false) {
+            return;
+          }
+
+          loadDashboard();
+          setupFormHandlers();
+        })
+        .catch(function (error) {
+          showError(error && error.message ? error.message : "Could not load athlete view.");
+        });
     });
 
     state.client.auth.onAuthStateChange(function (_event, session) {
@@ -73,21 +127,116 @@
     });
   }
 
-  function loadDashboard() {
+  function configureCoachView() {
     if (!state.user) {
+      return Promise.resolve(false);
+    }
+
+    state.viewUser = state.user;
+
+    var params;
+    try {
+      params = new URLSearchParams(window.location.search || "");
+    } catch (e) {
+      return Promise.resolve(true);
+    }
+
+    var wantsCoachView = params.get("coachView") === "1";
+    var athleteId = String(params.get("athleteId") || "").trim();
+    var isAdminUser =
+      !!state.user.email && String(state.user.email).toLowerCase() === ADMIN_EMAIL;
+
+    if (!wantsCoachView || !athleteId) {
+      return Promise.resolve(true);
+    }
+
+    if (!isAdminUser) {
+      return Promise.reject(new Error("Coach view is only available to admin accounts."));
+    }
+
+    state.isCoachView = true;
+    state.viewedAthleteId = athleteId;
+
+    return state.client
+      .from("admin_all_users")
+      .select("user_id,email,user_created_at,last_sign_in_at")
+      .eq("user_id", athleteId)
+      .single()
+      .then(function (result) {
+        if (result.error || !result.data) {
+          throw new Error("Athlete was not found for this coach view link.");
+        }
+
+        state.viewUser = {
+          id: result.data.user_id,
+          email: result.data.email,
+          created_at: result.data.user_created_at,
+          last_sign_in_at: result.data.last_sign_in_at
+        };
+
+        return true;
+      });
+  }
+
+  function loadDashboard() {
+    if (!state.viewUser) {
       return;
     }
 
     hideGuard();
     showContent();
+    applyCoachViewUi();
     populateUserInfo();
     loadProfileData();
     loadMetricsData();
     loadCurrentTrainingProgram();
   }
 
+  function applyCoachViewUi() {
+    if (!state.isCoachView) {
+      return;
+    }
+
+    var heading = document.querySelector(".section-heading");
+    var subtitle = document.querySelector(".profile-dashboard-subtitle");
+    var headingRow = document.querySelector(".profile-dashboard-heading-row");
+    var resetBtn = document.querySelector("[data-profile-reset-password]");
+    var deleteSection = document.querySelector(".profile-section-danger");
+    var emailField = state.form ? state.form.querySelector("[name='email']") : null;
+
+    if (heading) {
+      heading.textContent = "Athlete Profile";
+    }
+
+    if (subtitle) {
+      subtitle.textContent = "Coach view: review and edit this athlete's profile and metrics.";
+    }
+
+    if (headingRow && !headingRow.querySelector("[data-coach-back-link]")) {
+      var backLink = document.createElement("a");
+      backLink.className = "btn profile-btn-cancel";
+      backLink.href = "admin.html";
+      backLink.textContent = "Back to Coaching Dashboard";
+      backLink.setAttribute("data-coach-back-link", "1");
+      headingRow.appendChild(backLink);
+    }
+
+    if (resetBtn) {
+      resetBtn.style.display = "none";
+    }
+
+    if (deleteSection) {
+      deleteSection.style.display = "none";
+    }
+
+    if (emailField) {
+      emailField.disabled = true;
+      emailField.title = "Email changes are disabled in coach view.";
+    }
+  }
+
   function populateUserInfo() {
-    if (!state.user) {
+    if (!state.viewUser) {
       return;
     }
 
@@ -96,20 +245,21 @@
     var lastSigninEl = document.querySelector("[data-profile-last-signin]");
 
     if (emailEl) {
-      emailEl.textContent = state.user.email || "—";
+      emailEl.textContent = state.viewUser.email || "—";
     }
 
-    if (createdEl && state.user.created_at) {
-      createdEl.textContent = formatDate(state.user.created_at);
+    if (createdEl && state.viewUser.created_at) {
+      createdEl.textContent = formatDate(state.viewUser.created_at);
     }
 
-    if (lastSigninEl && state.user.last_sign_in_at) {
-      lastSigninEl.textContent = formatDate(state.user.last_sign_in_at);
+    if (lastSigninEl && state.viewUser.last_sign_in_at) {
+      lastSigninEl.textContent = formatDate(state.viewUser.last_sign_in_at);
     }
   }
 
   function loadProfileData() {
-    if (!state.user) {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId) {
       return;
     }
 
@@ -118,7 +268,7 @@
     state.client
       .from("athlete_profiles")
       .select("*")
-      .eq("user_id", state.user.id)
+      .eq("user_id", viewedUserId)
       .single()
       .then(function (result) {
         if (result.error && result.error.code !== "PGRST116") {
@@ -127,11 +277,15 @@
         }
 
         if (result.data) {
-          state.profile = result.data;
-          populateForm(result.data);
+          state.profile = mergeLocalSportProfile(result.data);
+          populateForm(state.profile);
         } else {
-          state.profile = null;
-          updateHero(null);
+          state.profile = mergeLocalSportProfile(null);
+          if (state.profile) {
+            populateForm(state.profile);
+          } else {
+            updateHero(null);
+          }
         }
 
         clearStatus();
@@ -148,39 +302,129 @@
 
     var nameField = state.form.querySelector("[name='name']");
     var emailField = state.form.querySelector("[name='email']");
-    var sportField = state.form.querySelector("[name='sport']");
-    var levelField = state.form.querySelector("[name='level']");
     var bioField = state.form.querySelector("[name='bio']");
     var ageField = state.form.querySelector("[name='age']");
     var locationField = state.form.querySelector("[name='location']");
     var heightField = state.form.querySelector("[name='height_cm']");
     var weightField = state.form.querySelector("[name='weight_kg']");
 
-    if (emailField) emailField.value = (state.user && state.user.email) || "";
+    if (emailField) emailField.value = (state.viewUser && state.viewUser.email) || "";
     if (nameField) nameField.value = profile && profile.name ? profile.name : "";
-    if (sportField) sportField.value = profile && profile.sport ? profile.sport : "";
-    if (levelField) levelField.value = profile && profile.level ? profile.level : "";
     if (bioField) bioField.value = profile && profile.bio ? profile.bio : "";
     if (ageField) ageField.value = profile && profile.age ? profile.age : "";
     if (locationField) locationField.value = profile && profile.location ? profile.location : "";
     if (heightField) heightField.value = profile && profile.height_cm ? profile.height_cm : "";
     if (weightField) weightField.value = profile && profile.weight_kg ? profile.weight_kg : "";
 
+    var sports = getProfileSports(profile);
+    setSelectedSportsInForm(sports);
+    renderSportOverviewEditor(sports, getProfileSportOverview(profile));
+
     updateHero(profile);
   }
 
   function updateHero(profile) {
     var sportEl = document.querySelector("[data-hero-sport]");
-    var levelEl = document.querySelector("[data-hero-level]");
     var locationEl = document.querySelector("[data-hero-location]");
+    var dobAgeEl = document.querySelector("[data-profile-dob-age]");
 
-    if (sportEl) sportEl.textContent = normalizeDisplayValue(profile && profile.sport);
-    if (levelEl) levelEl.textContent = normalizeDisplayValue(profile && profile.level);
+    var sports = getProfileSports(profile);
+    if (sportEl) sportEl.textContent = formatSportsDisplay(sports);
     if (locationEl) locationEl.textContent = normalizeDisplayValue(profile && profile.location);
+    if (dobAgeEl) dobAgeEl.textContent = formatDobAgeDisplay(profile);
+
+    renderSportOverviewSummary(profile);
+  }
+
+  function formatDobAgeDisplay(profile) {
+    if (!profile) {
+      return "—";
+    }
+
+    var dob = getProfileDobValue(profile);
+    var age = calculateAgeFromDob(dob);
+    if (age == null) {
+      age = parseInt(profile.age || 0, 10) || null;
+    }
+
+    if (dob && age != null) {
+      return "DOB: " + dob + " | Age: " + age;
+    }
+
+    if (dob) {
+      return "DOB: " + dob;
+    }
+
+    if (age != null) {
+      return "Age: " + age;
+    }
+
+    return "—";
+  }
+
+  function getProfileDobValue(profile) {
+    var overview = getProfileSportOverview(profile);
+    var general = overview && overview.general && typeof overview.general === "object"
+      ? overview.general
+      : {};
+    var raw = profile && (
+      profile.dob ||
+      profile.date_of_birth ||
+      profile.birth_date ||
+      general.date_of_birth ||
+      general.dob
+    );
+    if (!raw) {
+      return "";
+    }
+
+    var value = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+
+    var parsed = new Date(value);
+    if (isNaN(parsed.getTime())) {
+      return "";
+    }
+
+    var yyyy = parsed.getFullYear();
+    var mm = String(parsed.getMonth() + 1).padStart(2, "0");
+    var dd = String(parsed.getDate()).padStart(2, "0");
+    return yyyy + "-" + mm + "-" + dd;
+  }
+
+  function calculateAgeFromDob(dobText) {
+    var dob = String(dobText || "").trim();
+    if (!dob || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+      return null;
+    }
+
+    var birth = new Date(dob + "T00:00:00");
+    if (isNaN(birth.getTime())) {
+      return null;
+    }
+
+    var today = new Date();
+    var age = today.getFullYear() - birth.getFullYear();
+    var hasBirthdayPassed =
+      today.getMonth() > birth.getMonth() ||
+      (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+
+    if (!hasBirthdayPassed) {
+      age -= 1;
+    }
+
+    if (age < 0 || age > 120) {
+      return null;
+    }
+
+    return age;
   }
 
   function loadMetricsData() {
-    if (!state.user || !state.client || !state.metricsList) {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId || !state.client || !state.metricsList) {
       return;
     }
 
@@ -189,12 +433,13 @@
     state.client
       .from("athlete_metrics")
       .select("*")
-      .eq("user_id", state.user.id)
+      .eq("user_id", viewedUserId)
       .order("updated_at", { ascending: false })
       .then(function (result) {
         if (result.error) {
           if (isMissingRelationError(result.error)) {
             state.metrics = [];
+            state.metricsLatest = [];
             renderMetricsCards();
             seedMetricRowsFromSport();
             setMetricsStatus(
@@ -209,8 +454,9 @@
         }
 
         state.metrics = Array.isArray(result.data) ? result.data : [];
+        state.metricsLatest = getLatestMetrics(state.metrics);
         renderMetricsCards();
-        renderMetricRowsFromData(state.metrics);
+        renderMetricRowsFromData(state.metricsLatest);
       })
       .catch(function (error) {
         setMetricsStatus(error && error.message ? error.message : "Failed to load metrics.", "error");
@@ -222,7 +468,7 @@
       return;
     }
 
-    if (!state.metrics.length) {
+    if (!state.metricsLatest.length) {
       state.metricsList.innerHTML =
         '<div class="metrics-empty">' +
         '<p>No metrics recorded yet.</p>' +
@@ -231,20 +477,69 @@
       return;
     }
 
-    var cards = state.metrics
+    var cards = state.metricsLatest
       .map(function (metric) {
+        var metricKey = getMetricKey(metric);
         var name = escapeHtml(metric.metric_name || "Metric");
         var value = escapeHtml(metric.metric_value || "—");
         var unit = escapeHtml(metric.metric_unit || "");
         var category = escapeHtml(metric.metric_category || "Performance");
         var updated = metric.updated_at ? formatDate(metric.updated_at) : "—";
+        var trend = getMetricTrend(metric);
+        var trendClass = trend && trend.delta > 0 ? "is-up" : trend && trend.delta < 0 ? "is-down" : "is-neutral";
+        var trendText = trend
+          ? (trend.delta > 0 ? "Up " : trend.delta < 0 ? "Down " : "No change ") +
+            trend.deltaLabel +
+            " vs last test"
+          : "Baseline recorded";
+        var historyPoints = (metric._history || [])
+          .slice(0, 4)
+          .reverse()
+          .map(function (entry) {
+            var entryValue = escapeHtml(entry.metric_value || "—");
+            var entryDate = escapeAttribute(formatDate(entry.updated_at || ""));
+            return '<span class="metric-history-point" title="' + entryDate + '">' + entryValue + "</span>";
+          })
+          .join("");
 
         return (
-          '<article class="metric-card">' +
+          '<article class="metric-card" data-metric-key="' + escapeAttribute(metricKey) + '">' +
+          '<div class="metric-card-inner">' +
+          '<div class="metric-card-face metric-card-front">' +
           '<span class="metric-category">' + category + "</span>" +
           '<h3 class="metric-name">' + name + "</h3>" +
           '<p class="metric-value">' + value + (unit ? '<span class="metric-unit"> ' + unit + "</span>" : "") + "</p>" +
+          '<p class="metric-trend ' + trendClass + '">' + trendText + "</p>" +
+          (historyPoints ? '<div class="metric-history-row">' + historyPoints + "</div>" : "") +
+          '<div class="metric-card-actions">' +
+          '<button type="button" class="metric-card-btn" data-metric-action="edit" data-metric-name="' +
+          escapeAttribute(metric.metric_name || "") +
+          '" data-metric-unit="' +
+          escapeAttribute(metric.metric_unit || "") +
+          '">Edit</button>' +
+          '<button type="button" class="metric-card-btn" data-metric-action="test" data-metric-name="' +
+          escapeAttribute(metric.metric_name || "") +
+          '" data-metric-unit="' +
+          escapeAttribute(metric.metric_unit || "") +
+          '">+ Test</button>' +
+          "</div>" +
           '<p class="metric-updated">Updated ' + updated + "</p>" +
+          "</div>" +
+          '<div class="metric-card-face metric-card-back">' +
+          '<div class="metric-flip-label" data-metric-flip-label>Edit Metric</div>' +
+          '<div class="metric-flip-grid">' +
+          '<input type="text" data-metric-edit="name" placeholder="Metric name" value="' + escapeAttribute(metric.metric_name || "") + '" />' +
+          '<input type="text" data-metric-edit="value" placeholder="Test value" value="' + escapeAttribute(metric.metric_value || "") + '" />' +
+          '<input type="text" data-metric-edit="unit" placeholder="Unit" value="' + escapeAttribute(metric.metric_unit || "") + '" />' +
+          '<input type="text" data-metric-edit="category" placeholder="Category" value="' + escapeAttribute(metric.metric_category || "Performance") + '" />' +
+          "</div>" +
+          '<div class="metric-card-actions metric-card-actions-back">' +
+          '<button type="button" class="metric-card-btn metric-card-btn-danger" data-metric-flip-delete>Delete Metric</button>' +
+          '<button type="button" class="metric-card-btn" data-metric-flip-cancel>Cancel</button>' +
+          '<button type="button" class="metric-card-btn metric-card-btn-primary" data-metric-flip-save>Save</button>' +
+          "</div>" +
+          "</div>" +
+          "</div>" +
           "</article>"
         );
       })
@@ -276,7 +571,12 @@
   }
 
   function seedMetricRowsFromSport() {
-    var sport = state.profile && state.profile.sport;
+    var sports = getSelectedSportsFromForm();
+    if (!sports.length) {
+      sports = getProfileSports(state.profile);
+    }
+
+    var sport = sports[0] || (state.profile && state.profile.sport);
     var templates = state.metricTemplatesBySport[sport] || ["Resting HR", "Max HR", "Vertical Jump"];
 
     templates.slice(0, 3).forEach(function (name) {
@@ -312,7 +612,7 @@
 
   function setupFormHandlers() {
     if (state.editToggleButton) {
-      state.editToggleButton.addEventListener("click", toggleEditorSection);
+      state.editToggleButton.addEventListener("click", onEditProfileClick);
     }
 
     if (state.form) {
@@ -332,10 +632,40 @@
       state.metricsForm.addEventListener("submit", onMetricsSubmit);
     }
 
-    var addMetricBtn = document.querySelector("[data-metric-add]");
-    if (addMetricBtn) {
-      addMetricBtn.addEventListener("click", function () {
-        appendMetricRow({ name: "", value: "", unit: "", category: "Performance" });
+    var manageMetricsBtn = document.querySelector("[data-metric-manage]");
+    if (manageMetricsBtn) {
+      manageMetricsBtn.addEventListener("click", function () {
+        var viewedUserId = getViewedUserId();
+        if (!viewedUserId) {
+          alert("No athlete selected.");
+          return;
+        }
+
+        var athleteName =
+          (state.profile && state.profile.name) ||
+          (state.viewUser && state.viewUser.email) ||
+          "Athlete";
+
+        var url = "metrics-editor.html?athleteId=" + encodeURIComponent(viewedUserId) +
+                  "&athleteName=" + encodeURIComponent(athleteName);
+
+        if (!state.isCoachView) {
+          url += "&personal=true";
+        }
+
+        window.location.href = url;
+      });
+    }
+
+    var cancelMetricsBtn = document.querySelector("[data-metrics-cancel]");
+    if (cancelMetricsBtn) {
+      cancelMetricsBtn.addEventListener("click", function (event) {
+        event.preventDefault();
+        renderMetricRowsFromData(state.metricsLatest);
+        setMetricsStatus("", "info");
+        if (state.metricsEditor && !state.metricsEditor.hidden) {
+          toggleMetricsEditor();
+        }
       });
     }
 
@@ -350,9 +680,70 @@
       });
     }
 
-    var sportField = state.form ? state.form.querySelector("[name='sport']") : null;
-    if (sportField) {
-      sportField.addEventListener("change", function () {
+    if (state.metricsList) {
+      state.metricsList.addEventListener("click", function (event) {
+        var deleteFlipBtn = event.target && event.target.closest("[data-metric-flip-delete]");
+        if (deleteFlipBtn) {
+          var deleteCard = deleteFlipBtn.closest(".metric-card");
+          if (deleteCard) {
+            deleteMetricFromFlippedCard(deleteCard);
+          }
+          return;
+        }
+
+        var cancelFlipBtn = event.target && event.target.closest("[data-metric-flip-cancel]");
+        if (cancelFlipBtn) {
+          var cancelCard = cancelFlipBtn.closest(".metric-card");
+          if (cancelCard) {
+            closeMetricCardEditor(cancelCard);
+          }
+          return;
+        }
+
+        var saveFlipBtn = event.target && event.target.closest("[data-metric-flip-save]");
+        if (saveFlipBtn) {
+          var saveCard = saveFlipBtn.closest(".metric-card");
+          if (saveCard) {
+            saveMetricFromFlippedCard(saveCard);
+          }
+          return;
+        }
+
+        var actionBtn = event.target && event.target.closest("[data-metric-action]");
+        if (!actionBtn) {
+          return;
+        }
+
+        var action = actionBtn.getAttribute("data-metric-action");
+        var metricName = String(actionBtn.getAttribute("data-metric-name") || "");
+        var metricUnit = String(actionBtn.getAttribute("data-metric-unit") || "");
+        var metric = findLatestMetricByNameUnit(metricName, metricUnit);
+        if (!metric) {
+          return;
+        }
+
+        if (action === "edit") {
+          openMetricCardEditor(actionBtn.closest(".metric-card"), metric, "edit");
+          return;
+        }
+
+        if (action === "test") {
+          openMetricCardEditor(actionBtn.closest(".metric-card"), metric, "test");
+        }
+      });
+    }
+
+    if (state.form) {
+      state.form.addEventListener("change", function (event) {
+        var target = event && event.target;
+        if (!target || target.name !== "sports[]") {
+          return;
+        }
+
+        var selectedSports = getSelectedSportsFromForm();
+        var currentOverview = collectSportOverviewFromForm();
+        renderSportOverviewEditor(selectedSports, currentOverview);
+
         if (!state.metrics.length && state.metricsRows && !state.metricsRows.children.length) {
           seedMetricRowsFromSport();
         }
@@ -363,25 +754,122 @@
     if (deleteBtn) {
       deleteBtn.addEventListener("click", onDeleteAccount);
     }
+
+    var resetPasswordBtn = document.querySelector("[data-profile-reset-password]");
+    if (resetPasswordBtn) {
+      resetPasswordBtn.addEventListener("click", onResetMyPassword);
+    }
+
+    var logoutBtn = document.querySelector("[data-profile-logout]");
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", onLogout);
+    }
+
+    var trainingProgramContent = document.getElementById("profile-training-program-content");
+    if (trainingProgramContent) {
+      trainingProgramContent.addEventListener("click", function (event) {
+        var removeBtn = event.target && event.target.closest("[data-remove-active-program]");
+        var changeBtn = event.target && event.target.closest("[data-change-active-program]");
+        var assignBtn = event.target && event.target.closest("[data-assign-active-program]");
+
+        if (changeBtn) {
+          onCustomizeProgramForAthlete();
+          return;
+        }
+
+        if (assignBtn) {
+          openCoachProgramModal();
+          return;
+        }
+
+        if (!removeBtn) {
+          return;
+        }
+
+        onRemoveActiveProgram();
+      });
+    }
+
+    var coachProgramCloseButtons = document.querySelectorAll("[data-coach-program-close]");
+    coachProgramCloseButtons.forEach(function (btn) {
+      btn.addEventListener("click", closeCoachProgramModal);
+    });
+
+    var coachProgramSearch = document.querySelector("[data-coach-program-search]");
+    if (coachProgramSearch) {
+      coachProgramSearch.addEventListener("input", function () {
+        renderCoachProgramTemplateList(String(coachProgramSearch.value || ""));
+      });
+    }
+
+    var coachProgramAssignBtn = document.querySelector("[data-coach-program-assign]");
+    if (coachProgramAssignBtn) {
+      coachProgramAssignBtn.addEventListener("click", onAssignTemplateToCurrentAthlete);
+    }
+
+    document.addEventListener("keydown", function (event) {
+      if (event && event.key === "Escape") {
+        closeCoachProgramModal();
+      }
+    });
+  }
+
+  function onEditProfileClick(event) {
+    if (event) {
+      event.preventDefault();
+    }
+
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId) {
+      setStatus("No athlete selected.", "error");
+      return;
+    }
+
+    var athleteName =
+      (state.profile && state.profile.name) ||
+      (state.viewUser && state.viewUser.email) ||
+      (state.user && state.user.email) ||
+      "Athlete";
+
+    var url =
+      "athlete-editor.html?athleteId=" +
+      encodeURIComponent(viewedUserId) +
+      "&athleteName=" +
+      encodeURIComponent(athleteName);
+
+    if (!state.isCoachView) {
+      url += "&personal=true";
+    }
+
+    window.location.href = url;
   }
 
   function onProfileSubmit(event) {
     event.preventDefault();
 
-    if (!state.user || !state.client || !state.form) {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId || !state.client || !state.form) {
       setStatus("Not authenticated.", "error");
       return;
     }
 
     var formData = new FormData(state.form);
+    var selectedSports = getSelectedSportsFromForm();
+    if (!selectedSports.length) {
+      setStatus("Select at least one sport.", "error");
+      return;
+    }
+
+    var sportOverview = collectSportOverviewFromForm();
     var desiredEmail = String(formData.get("email") || "").trim();
     var desiredHeight = parseFloat(formData.get("height_cm") || "") || null;
     var desiredWeight = parseFloat(formData.get("weight_kg") || "") || null;
     var profileData = {
-      user_id: state.user.id,
+      user_id: viewedUserId,
       name: String(formData.get("name") || "").trim(),
-      sport: String(formData.get("sport") || "").trim(),
-      level: String(formData.get("level") || "").trim(),
+      sport: selectedSports[0],
+      sports: selectedSports,
+      sport_overview: sportOverview,
       bio: String(formData.get("bio") || "").trim(),
       age: parseInt(formData.get("age") || 0, 10) || null,
       location: String(formData.get("location") || "").trim(),
@@ -399,8 +887,9 @@
           return;
         }
 
-        state.profile = result.data || profileData;
+        state.profile = Object.assign({}, state.profile || {}, result.data || profileData);
         updateHero(state.profile);
+        persistLocalSportProfile(profileData);
 
         maybeUpdateEmail(desiredEmail)
           .then(function (emailMessage) {
@@ -424,43 +913,66 @@
 
   function saveProfileWithFallback(profileData) {
     var payload = Object.assign({}, profileData);
-    var operation;
+    var viewedUserId = getViewedUserId();
+    var droppedColumns = {};
+    var optionalColumnsFallbackOrder = [
+      "sport_overview",
+      "sports",
+      "height_cm",
+      "weight_kg",
+      "bio",
+      "age",
+      "location",
+      "level",
+      "sport",
+      "name"
+    ];
 
-    if (state.profile && state.profile.id) {
-      operation = state.client
-        .from("athlete_profiles")
-        .update(payload)
-        .eq("user_id", state.user.id)
-        .select()
-        .single();
-    } else {
-      operation = state.client.from("athlete_profiles").insert([payload]).select().single();
-    }
-
-    return operation.then(function (result) {
-      if (!result.error || !isMissingColumnError(result.error)) {
-        return result;
-      }
-
-      var fallbackPayload = Object.assign({}, profileData);
-      delete fallbackPayload.height_cm;
-      delete fallbackPayload.weight_kg;
-
+    function runSave(nextPayload, attemptsRemaining) {
+      var operation;
       if (state.profile && state.profile.id) {
-        return state.client
+        operation = state.client
           .from("athlete_profiles")
-          .update(fallbackPayload)
-          .eq("user_id", state.user.id)
+          .update(nextPayload)
+          .eq("user_id", viewedUserId)
           .select()
           .single();
+      } else {
+        operation = state.client.from("athlete_profiles").insert([nextPayload]).select().single();
       }
 
-      return state.client.from("athlete_profiles").insert([fallbackPayload]).select().single();
-    });
+      return operation.then(function (result) {
+        if (!result.error || !isMissingColumnError(result.error) || attemptsRemaining <= 0) {
+          return result;
+        }
+
+        var missingColumn = getMissingColumnName(result.error);
+        if (!missingColumn) {
+          missingColumn = optionalColumnsFallbackOrder.find(function (column) {
+            return Object.prototype.hasOwnProperty.call(nextPayload, column) && !droppedColumns[column];
+          }) || null;
+        }
+
+        if (!missingColumn || droppedColumns[missingColumn]) {
+          return result;
+        }
+
+        droppedColumns[missingColumn] = true;
+        var retryPayload = Object.assign({}, nextPayload);
+        delete retryPayload[missingColumn];
+        return runSave(retryPayload, attemptsRemaining - 1);
+      });
+    }
+
+    return runSave(payload, 6);
   }
 
   function maybeUpdateEmail(desiredEmail) {
-    var existingEmail = (state.user && state.user.email) || "";
+    var existingEmail = (state.viewUser && state.viewUser.email) || "";
+
+    if (state.isCoachView) {
+      return Promise.resolve("");
+    }
 
     if (!desiredEmail || desiredEmail.toLowerCase() === existingEmail.toLowerCase()) {
       return Promise.resolve("");
@@ -489,7 +1001,8 @@
   function onMetricsSubmit(event) {
     event.preventDefault();
 
-    if (!state.user || !state.client || !state.metricsRows) {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId || !state.client || !state.metricsRows) {
       setMetricsStatus("Not authenticated.", "error");
       return;
     }
@@ -503,7 +1016,7 @@
         var category = String((row.querySelector("[data-metric-category]") || {}).value || "").trim();
 
         return {
-          user_id: state.user.id,
+          user_id: viewedUserId,
           metric_name: name,
           metric_value: value,
           metric_unit: unit,
@@ -515,15 +1028,35 @@
         return metric.metric_name && metric.metric_value;
       });
 
-    setMetricsStatus("Saving metrics...", "info");
+    var latestLookup = buildLatestMetricsLookup(state.metrics || []);
+    var metricsToInsert = metricsToSave.filter(function (metric) {
+      var key = getMetricKey(metric);
+      var latest = latestLookup[key];
+      if (!latest) {
+        return true;
+      }
+
+      return (
+        normalizeMetricValue(metric.metric_value) !== normalizeMetricValue(latest.metric_value) ||
+        normalizeMetricValue(metric.metric_unit) !== normalizeMetricValue(latest.metric_unit) ||
+        normalizeMetricValue(metric.metric_category) !== normalizeMetricValue(latest.metric_category)
+      );
+    });
+
+    if (!metricsToInsert.length) {
+      setMetricsStatus("No metric changes detected. Update a value to log a new test.", "info");
+      return;
+    }
+
+    setMetricsStatus("Saving new metric test entries...", "info");
 
     state.client
       .from("athlete_metrics")
-      .delete()
-      .eq("user_id", state.user.id)
-      .then(function (deleteResult) {
-        if (deleteResult.error) {
-          if (isMissingRelationError(deleteResult.error)) {
+      .insert(metricsToInsert)
+      .select("*")
+      .then(function (insertResult) {
+        if (insertResult.error) {
+          if (isMissingRelationError(insertResult.error)) {
             setMetricsStatus(
               "Metrics table not found. Create athlete_metrics in Supabase before saving metrics.",
               "error"
@@ -531,78 +1064,129 @@
             return;
           }
 
-          setMetricsStatus(deleteResult.error.message, "error");
+          if (isRlsError(insertResult.error)) {
+            setMetricsStatus(
+              "Permission denied by database policy while saving metrics. Ask admin to update athlete_metrics RLS policy for coach edits.",
+              "error"
+            );
+            return;
+          }
+
+          setMetricsStatus(insertResult.error.message, "error");
           return;
         }
 
-        if (!metricsToSave.length) {
-          state.metrics = [];
-          renderMetricsCards();
-          setMetricsStatus("Metrics cleared.", "success");
-          return;
+        var insertedRows = Array.isArray(insertResult.data) ? insertResult.data : metricsToInsert;
+        state.metrics = insertedRows.concat(state.metrics || []);
+        state.metricsLatest = getLatestMetrics(state.metrics);
+        renderMetricsCards();
+        renderMetricRowsFromData(state.metricsLatest);
+        setMetricsStatus("Metrics saved as new test entries.", "success");
+
+        if (state.metricsEditor && !state.metricsEditor.hidden) {
+          toggleMetricsEditor();
         }
-
-        state.client
-          .from("athlete_metrics")
-          .insert(metricsToSave)
-          .select("*")
-          .then(function (insertResult) {
-            if (insertResult.error) {
-              setMetricsStatus(insertResult.error.message, "error");
-              return;
-            }
-
-            state.metrics = insertResult.data || [];
-            renderMetricsCards();
-            setMetricsStatus("Metrics saved.", "success");
-          })
-          .catch(function (error) {
-            setMetricsStatus(error && error.message ? error.message : "Failed to save metrics.", "error");
-          });
       })
       .catch(function (error) {
         setMetricsStatus(error && error.message ? error.message : "Failed to save metrics.", "error");
       });
   }
 
+  function getMetricKey(metric) {
+    var name = normalizeMetricValue(metric && metric.metric_name);
+    var unit = normalizeMetricValue(metric && metric.metric_unit);
+    return name + "|" + unit;
+  }
+
+  function normalizeMetricValue(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function buildLatestMetricsLookup(metrics) {
+    var map = {};
+    (metrics || []).forEach(function (metric) {
+      var key = getMetricKey(metric);
+      if (!key || map[key]) {
+        return;
+      }
+      map[key] = metric;
+    });
+    return map;
+  }
+
+  function getLatestMetrics(metrics) {
+    var groups = {};
+
+    (metrics || []).forEach(function (metric) {
+      var key = getMetricKey(metric);
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(metric);
+    });
+
+    return Object.keys(groups)
+      .map(function (key) {
+        var history = groups[key]
+          .slice()
+          .sort(function (a, b) {
+            return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+          });
+
+        var latest = Object.assign({}, history[0]);
+        latest._history = history;
+        latest._previous = history.length > 1 ? history[1] : null;
+        return latest;
+      })
+      .sort(function (a, b) {
+        return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+      });
+  }
+
+  function getMetricTrend(metric) {
+    if (!metric || !metric._previous) {
+      return null;
+    }
+
+    var current = parseFloat(metric.metric_value);
+    var previous = parseFloat(metric._previous.metric_value);
+    if (isNaN(current) || isNaN(previous)) {
+      return null;
+    }
+
+    var delta = current - previous;
+    return {
+      delta: delta,
+      deltaLabel: formatMetricDelta(delta)
+    };
+  }
+
+  function formatMetricDelta(delta) {
+    var rounded = Math.round(delta * 100) / 100;
+    if (rounded > 0) {
+      return "+" + String(rounded);
+    }
+    return String(rounded);
+  }
+
   function loadCurrentTrainingProgram() {
     var section = document.getElementById("profile-training-program-section");
     var content = document.getElementById("profile-training-program-content");
-    if (!section || !content || !state.user || !state.client) {
+    if (!section || !content || !getViewedUserId() || !state.client) {
       return;
     }
 
     content.innerHTML = '<p class="profile-training-loading">Loading your training program...</p>';
 
-    state.client
-      .from("user_training_programs")
-      .select("*, training_program:program_id(name, description)")
-      .eq("user_id", state.user.id)
-      .eq("is_active", true)
-      .order("assigned_at", { ascending: false })
-      .limit(1)
-      .then(function (result) {
-        if (result.error) {
-          if (isMissingRelationshipError(result.error)) {
-            return loadCurrentTrainingProgramWithoutJoin(content);
-          }
-
-          content.innerHTML = '<p class="profile-training-error">' + escapeHtml(result.error.message) + "</p>";
-          return;
-        }
-
-        renderTrainingProgram(content, result.data && result.data[0]);
-      })
-      .catch(function () {
-        loadCurrentTrainingProgramWithoutJoin(content);
-      });
+    // Always use the non-join version to avoid ambiguous relationship embeds.
+    loadCurrentTrainingProgramWithoutJoin(content);
   }
 
   function loadCurrentTrainingProgramWithoutJoin(contentElement) {
     state.client
       .from("user_training_programs")
       .select("*")
-      .eq("user_id", state.user.id)
+      .eq("user_id", getViewedUserId())
       .eq("is_active", true)
       .order("assigned_at", { ascending: false })
       .limit(1)
@@ -612,7 +1196,35 @@
           return;
         }
 
-        renderTrainingProgram(contentElement, result.data && result.data[0]);
+        var program = result.data && result.data[0];
+        if (!program) {
+          renderTrainingProgram(contentElement, null);
+          return;
+        }
+
+        if (program.program_name || !program.program_id) {
+          renderTrainingProgram(contentElement, program);
+          return;
+        }
+
+        state.client
+          .from("training_programs")
+          .select("name,description")
+          .eq("id", program.program_id)
+          .single()
+          .then(function (programResult) {
+            if (!programResult.error && programResult.data) {
+              program.training_program = {
+                name: programResult.data.name,
+                description: programResult.data.description
+              };
+            }
+
+            renderTrainingProgram(contentElement, program);
+          })
+          .catch(function () {
+            renderTrainingProgram(contentElement, program);
+          });
       })
       .catch(function (error) {
         contentElement.innerHTML =
@@ -624,17 +1236,13 @@
 
   function renderTrainingProgram(contentElement, program) {
     if (!program) {
-      // Demo preview for the coach account when no assignment exists yet.
-      if (state.user && state.user.email === "joe@nomadicperformance.com") {
-        program = {
-          program_name: "8-Week Mountain Performance Block",
-          assigned_at: new Date().toISOString(),
-          is_demo: true
-        };
-      } else {
-        contentElement.innerHTML = '<p class="profile-training-none">You have no active training program assigned yet.</p>';
-        return;
-      }
+      contentElement.innerHTML =
+        '<p class="profile-training-none">You have no active training program assigned yet.</p>' +
+        (state.isCoachView
+          ? '<div class="training-coach-actions"><button type="button" class="btn profile-btn-edit-profile training-change-btn" data-assign-active-program>Assign Program to Athlete</button></div>' +
+            '<p class="profile-status training-program-status" role="status" aria-live="polite" data-training-program-status></p>'
+          : "");
+      return;
     }
 
     var programName =
@@ -644,7 +1252,8 @@
 
     var startDate = program.assigned_at ? formatDate(program.assigned_at) : "—";
     var programUrl =
-      "training-program-example.html?program=" + encodeURIComponent(programName);
+      "training-program-example.html?program=" + encodeURIComponent(programName) +
+      (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "");
 
     contentElement.innerHTML =
       '<div class="profile-training-details">' +
@@ -656,18 +1265,507 @@
       '<div class="training-row"><span>Start Date</span><strong>' +
       escapeHtml(startDate) +
       "</strong></div>" +
-      '<p class="training-note">' +
-      (program.is_demo
-        ? "Preview mode: this is a sample program shown for the coach account."
-        : "Your coach assigns and updates this program from the Coaching Dashboard.") +
-      "</p>" +
+      '<p class="training-note">Your coach assigns and updates this program from the Coaching Dashboard.</p>' +
       '<a class="btn training-open-btn" href="' +
       programUrl +
       '">Open Program + Log Workout</a>' +
+      (state.isCoachView
+        ? '<div class="training-coach-actions">' +
+          '<button type="button" class="btn profile-btn-edit-profile training-change-btn" data-change-active-program>Edit Program for Athlete</button>' +
+          '<button type="button" class="btn profile-btn-edit-profile training-change-btn" data-assign-active-program>Assign Different Template</button>' +
+          '<button type="button" class="btn profile-btn-delete training-remove-btn" data-remove-active-program>Remove Program from Athlete</button>' +
+          "</div>"
+        : "") +
+      '<p class="profile-status training-program-status" role="status" aria-live="polite" data-training-program-status></p>' +
       "</div>";
   }
 
+  function onCustomizeProgramForAthlete() {
+    var viewedUserId = getViewedUserId();
+    if (!state.isCoachView || !viewedUserId || !state.client) {
+      setTrainingProgramStatus("Unable to edit athlete program right now.", "error");
+      return;
+    }
+
+    setTrainingProgramStatus("Preparing athlete-specific editable program...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .select("*")
+      .eq("user_id", viewedUserId)
+      .eq("is_active", true)
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .then(function (assignmentResult) {
+        if (assignmentResult.error) {
+          setTrainingProgramStatus(assignmentResult.error.message, "error");
+          return;
+        }
+
+        var activeAssignment = assignmentResult.data && assignmentResult.data[0];
+        if (!activeAssignment || !activeAssignment.program_id) {
+          setTrainingProgramStatus("Assign a template first, then you can customize it for this athlete.", "info");
+          return;
+        }
+
+        state.client
+          .from("training_programs")
+          .select("id,name,description")
+          .eq("id", activeAssignment.program_id)
+          .single()
+          .then(function (programResult) {
+            if (programResult.error || !programResult.data) {
+              setTrainingProgramStatus(
+                programResult.error ? programResult.error.message : "Program could not be loaded.",
+                "error"
+              );
+              return;
+            }
+
+            var sourceProgram = programResult.data;
+            var sourcePayload = parseTemplatePayload(sourceProgram.description);
+            if (!sourcePayload) {
+              setTrainingProgramStatus("This program cannot be customized because its template data is invalid.", "error");
+              return;
+            }
+
+            var athleteLabel =
+              (state.profile && state.profile.name) ||
+              (state.viewUser && state.viewUser.email) ||
+              "Athlete";
+
+            var customPayload = {
+              archived: true,
+              structure: normalizeTemplateStructure(sourcePayload.structure),
+              days: sourcePayload.days || {}
+            };
+
+            var customProgramName =
+              (sourceProgram.name || activeAssignment.program_name || "Training Program") +
+              " - " +
+              athleteLabel +
+              " (Custom)";
+
+            state.client
+              .from("training_programs")
+              .insert({
+                name: customProgramName,
+                description: serializeTemplatePayload(customPayload)
+              })
+              .select("id,name")
+              .single()
+              .then(function (insertProgramResult) {
+                if (insertProgramResult.error || !insertProgramResult.data) {
+                  setTrainingProgramStatus(
+                    insertProgramResult.error ? insertProgramResult.error.message : "Failed to create custom program.",
+                    "error"
+                  );
+                  return;
+                }
+
+                var customProgram = insertProgramResult.data;
+                var now = new Date().toISOString();
+
+                state.client
+                  .from("user_training_programs")
+                  .update({ is_active: false })
+                  .eq("user_id", viewedUserId)
+                  .eq("is_active", true)
+                  .then(function (deactivateResult) {
+                    if (deactivateResult.error) {
+                      setTrainingProgramStatus(deactivateResult.error.message, "error");
+                      return;
+                    }
+
+                    state.client
+                      .from("user_training_programs")
+                      .insert({
+                        user_id: viewedUserId,
+                        program_id: customProgram.id,
+                        program_name: customProgram.name,
+                        is_active: true,
+                        assigned_at: now,
+                        assigned_by: state.user ? state.user.id : null
+                      })
+                      .then(function (assignResult) {
+                        if (assignResult.error) {
+                          setTrainingProgramStatus(assignResult.error.message, "error");
+                          return;
+                        }
+
+                        setTrainingProgramStatus("Opened athlete-specific program editor.", "success");
+                        window.location.href =
+                          "training-program-example.html?builder=1&templateId=" +
+                          encodeURIComponent(customProgram.id);
+                      })
+                      .catch(function (error) {
+                        setTrainingProgramStatus(
+                          error && error.message ? error.message : "Failed to assign custom program.",
+                          "error"
+                        );
+                      });
+                  })
+                  .catch(function (error) {
+                    setTrainingProgramStatus(
+                      error && error.message ? error.message : "Failed to update active assignment.",
+                      "error"
+                    );
+                  });
+              })
+              .catch(function (error) {
+                setTrainingProgramStatus(
+                  error && error.message ? error.message : "Failed to create custom program.",
+                  "error"
+                );
+              });
+          })
+          .catch(function (error) {
+            setTrainingProgramStatus(
+              error && error.message ? error.message : "Failed to load source program.",
+              "error"
+            );
+          });
+      })
+      .catch(function (error) {
+        setTrainingProgramStatus(
+          error && error.message ? error.message : "Failed to prepare athlete program editor.",
+          "error"
+        );
+      });
+  }
+
+  function openCoachProgramModal() {
+    if (!state.isCoachView) {
+      return;
+    }
+
+    if (!state.client || !getViewedUserId()) {
+      setTrainingProgramStatus("Unable to manage athlete program right now.", "error");
+      return;
+    }
+
+    var modal = document.querySelector("[data-coach-program-modal]");
+    if (!modal) {
+      return;
+    }
+
+    var athleteLabel = document.querySelector("[data-coach-program-athlete-label]");
+    if (athleteLabel) {
+      athleteLabel.textContent =
+        "Athlete: " +
+        ((state.profile && state.profile.name) || (state.viewUser && state.viewUser.email) || "Selected athlete");
+    }
+
+    var searchInput = document.querySelector("[data-coach-program-search]");
+    if (searchInput) {
+      searchInput.value = "";
+    }
+
+    state.selectedTrainingTemplateId = "";
+    setCoachProgramStatus("", "info");
+    modal.hidden = false;
+    document.body.classList.add("admin-modal-open");
+    loadCoachProgramTemplates();
+  }
+
+  function closeCoachProgramModal() {
+    var modal = document.querySelector("[data-coach-program-modal]");
+    if (!modal || modal.hidden) {
+      return;
+    }
+
+    modal.hidden = true;
+    document.body.classList.remove("admin-modal-open");
+    state.selectedTrainingTemplateId = "";
+    setCoachProgramStatus("", "info");
+  }
+
+  function loadCoachProgramTemplates() {
+    if (!state.client) {
+      return;
+    }
+
+    var list = document.querySelector("[data-coach-program-list]");
+    if (list) {
+      list.innerHTML = '<p class="admin-loading">Loading templates...</p>';
+    }
+
+    state.client
+      .from("training_programs")
+      .select("id,name,description,updated_at,created_at")
+      .order("updated_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) {
+          setCoachProgramStatus(result.error.message, "error");
+          return;
+        }
+
+        state.trainingTemplates = (result.data || [])
+          .map(function (row) {
+            var payload = parseTemplatePayload(String(row.description || ""));
+            if (!payload || payload.archived) {
+              return null;
+            }
+            return {
+              id: row.id,
+              name: row.name || "Untitled Template",
+              updated_at: row.updated_at || row.created_at || ""
+            };
+          })
+          .filter(function (item) {
+            return !!item;
+          });
+
+        renderCoachProgramTemplateList("");
+      })
+      .catch(function (error) {
+        setCoachProgramStatus(
+          error && error.message ? error.message : "Failed to load templates.",
+          "error"
+        );
+      });
+  }
+
+  function renderCoachProgramTemplateList(searchTerm) {
+    var list = document.querySelector("[data-coach-program-list]");
+    if (!list) {
+      return;
+    }
+
+    var query = String(searchTerm || "").trim().toLowerCase();
+    var filtered = state.trainingTemplates.filter(function (template) {
+      if (!query) {
+        return true;
+      }
+      return String(template.name || "").toLowerCase().indexOf(query) > -1;
+    });
+
+    if (!filtered.length) {
+      list.innerHTML = '<p class="admin-loading">No templates match this search.</p>';
+      return;
+    }
+
+    list.innerHTML = filtered
+      .map(function (template) {
+        var checked = state.selectedTrainingTemplateId === template.id ? " checked" : "";
+        return (
+          '<label class="admin-assign-item">' +
+          '<input type="radio" name="coach-program-template" data-coach-program-template value="' +
+          escapeAttribute(template.id) +
+          '"' +
+          checked +
+          ' />' +
+          '<span class="admin-assign-item-main">' +
+          '<strong>' +
+          escapeHtml(template.name) +
+          "</strong>" +
+          '<small>Updated ' +
+          escapeHtml(formatDate(template.updated_at)) +
+          "</small>" +
+          "</span>" +
+          "</label>"
+        );
+      })
+      .join("");
+
+    list.querySelectorAll("[data-coach-program-template]").forEach(function (radio) {
+      radio.addEventListener("change", function () {
+        state.selectedTrainingTemplateId = String(radio.value || "");
+      });
+    });
+  }
+
+  function onAssignTemplateToCurrentAthlete() {
+    var viewedUserId = getViewedUserId();
+    if (!state.isCoachView || !viewedUserId || !state.client) {
+      setCoachProgramStatus("Unable to assign template right now.", "error");
+      return;
+    }
+
+    if (!state.selectedTrainingTemplateId) {
+      setCoachProgramStatus("Select a template to assign.", "error");
+      return;
+    }
+
+    var template = state.trainingTemplates.find(function (item) {
+      return item.id === state.selectedTrainingTemplateId;
+    });
+
+    if (!template) {
+      setCoachProgramStatus("Template not found.", "error");
+      return;
+    }
+
+    var now = new Date().toISOString();
+    setCoachProgramStatus("Assigning template to athlete...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .update({ is_active: false })
+      .eq("user_id", viewedUserId)
+      .eq("is_active", true)
+      .then(function (deactivateResult) {
+        if (deactivateResult.error) {
+          setCoachProgramStatus(deactivateResult.error.message, "error");
+          return;
+        }
+
+        state.client
+          .from("user_training_programs")
+          .insert({
+            user_id: viewedUserId,
+            program_id: template.id,
+            program_name: template.name,
+            is_active: true,
+            assigned_at: now,
+            assigned_by: state.user ? state.user.id : null
+          })
+          .then(function (insertResult) {
+            if (insertResult.error) {
+              setCoachProgramStatus(insertResult.error.message, "error");
+              return;
+            }
+
+            setCoachProgramStatus("Template assigned to this athlete.", "success");
+            setTrainingProgramStatus("Program updated for this athlete only.", "success");
+            setTimeout(function () {
+              closeCoachProgramModal();
+              loadCurrentTrainingProgram();
+            }, 500);
+          })
+          .catch(function (error) {
+            setCoachProgramStatus(error && error.message ? error.message : "Failed to assign template.", "error");
+          });
+      })
+      .catch(function (error) {
+        setCoachProgramStatus(error && error.message ? error.message : "Failed to assign template.", "error");
+      });
+  }
+
+  function parseTemplatePayload(description) {
+    var marker = "__NOMADIC_TEMPLATE__";
+    var value = String(description || "");
+    if (value.indexOf(marker) !== 0) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(value.slice(marker.length));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function serializeTemplatePayload(payload) {
+    var marker = "__NOMADIC_TEMPLATE__";
+    var safePayload = {
+      archived: !!(payload && payload.archived),
+      structure: normalizeTemplateStructure(payload && payload.structure),
+      days: payload && payload.days ? payload.days : {}
+    };
+    return marker + JSON.stringify(safePayload);
+  }
+
+  function normalizeTemplateStructure(structure) {
+    var weeks = parseInt((structure && structure.weeks) || 1, 10);
+    var workoutsPerWeek = parseInt((structure && structure.workoutsPerWeek) || 3, 10);
+    return {
+      weeks: Math.max(1, Math.min(24, isNaN(weeks) ? 1 : weeks)),
+      workoutsPerWeek: Math.max(1, Math.min(14, isNaN(workoutsPerWeek) ? 3 : workoutsPerWeek))
+    };
+  }
+
+  function setCoachProgramStatus(message, variant) {
+    var statusEl = document.querySelector("[data-coach-program-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
+  }
+
+  function onRemoveActiveProgram() {
+    var viewedUserId = getViewedUserId();
+    if (!state.isCoachView) {
+      return;
+    }
+
+    if (!viewedUserId || !state.client) {
+      setTrainingProgramStatus("Unable to remove program right now.", "error");
+      return;
+    }
+
+    if (!confirm("Remove the active training program from this athlete?")) {
+      return;
+    }
+
+    setTrainingProgramStatus("Removing active program...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .update({ is_active: false })
+      .eq("user_id", viewedUserId)
+      .eq("is_active", true)
+      .then(function (result) {
+        if (result.error) {
+          setTrainingProgramStatus(result.error.message, "error");
+          return;
+        }
+
+        setTrainingProgramStatus("Program removed from athlete.", "success");
+        setTimeout(function () {
+          loadCurrentTrainingProgram();
+        }, 350);
+      })
+      .catch(function (error) {
+        setTrainingProgramStatus(
+          error && error.message ? error.message : "Failed to remove active program.",
+          "error"
+        );
+      });
+  }
+
+  function setTrainingProgramStatus(message, variant) {
+    var statusEl = document.querySelector("[data-training-program-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
+  }
+
   function onDeleteAccount() {
+    if (state.isCoachView) {
+      setStatus("Delete athletes from the Coaching Dashboard.", "info");
+      return;
+    }
+
     if (!confirm("Are you sure you want to delete your account? This cannot be undone.")) {
       return;
     }
@@ -699,6 +1797,135 @@
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Failed to delete account.", "error");
       });
+  }
+
+  function onResetMyPassword() {
+    if (state.isCoachView) {
+      setPasswordStatus("Password reset is disabled in coach view.", "info");
+      return;
+    }
+
+    if (!state.client || !state.user || !state.user.email) {
+      setPasswordStatus("Not authenticated.", "error");
+      return;
+    }
+
+    var cooldownMs = getResetCooldownRemainingMs();
+    if (cooldownMs > 0) {
+      var seconds = Math.ceil(cooldownMs / 1000);
+      setPasswordStatus(
+        "Please wait " + seconds + " seconds before requesting another reset email.",
+        "info"
+      );
+      return;
+    }
+
+    setPasswordStatus("Sending password reset email...", "info");
+
+    state.client.auth
+      .resetPasswordForEmail(state.user.email, {
+        redirectTo: getPasswordResetRedirectUrl()
+      })
+      .then(function (result) {
+        if (result.error) {
+          if (isRateLimitError(result.error)) {
+            markResetCooldown();
+            setPasswordStatus(
+              "Email rate limit reached. Please wait about a minute, then try again.",
+              "error"
+            );
+            return;
+          }
+
+          setPasswordStatus(result.error.message, "error");
+          return;
+        }
+
+        markResetCooldown();
+
+        setPasswordStatus(
+          "Password reset email sent. Check your inbox.",
+          "success"
+        );
+      })
+      .catch(function (error) {
+        setPasswordStatus(
+          error && error.message
+            ? error.message
+            : "Failed to send password reset email.",
+          "error"
+        );
+      });
+  }
+
+  function onLogout() {
+    if (!state.client) {
+      setPasswordStatus("Not authenticated.", "error");
+      return;
+    }
+
+    setPasswordStatus("Logging out...", "info");
+
+    state.client.auth
+      .signOut()
+      .then(function (result) {
+        if (result.error) {
+          setPasswordStatus(result.error.message, "error");
+          return;
+        }
+
+        window.location.href = "index.html";
+      })
+      .catch(function (error) {
+        setPasswordStatus(
+          error && error.message ? error.message : "Failed to log out.",
+          "error"
+        );
+      });
+  }
+
+  function getResetCooldownRemainingMs() {
+    try {
+      var key = getResetCooldownKey();
+      var expiresAt = parseInt(window.localStorage.getItem(key) || "0", 10);
+      if (!expiresAt) {
+        return 0;
+      }
+
+      var remaining = expiresAt - Date.now();
+      return remaining > 0 ? remaining : 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function markResetCooldown() {
+    try {
+      var key = getResetCooldownKey();
+      // 60-second client cooldown helps avoid repeated Supabase throttle hits.
+      var expiresAt = Date.now() + 60 * 1000;
+      window.localStorage.setItem(key, String(expiresAt));
+    } catch (e) {
+      // Ignore storage errors.
+    }
+  }
+
+  function getResetCooldownKey() {
+    var email = state.user && state.user.email ? state.user.email.toLowerCase() : "unknown";
+    return "nomadic_reset_password_cooldown_" + email;
+  }
+
+  function getPasswordResetRedirectUrl() {
+    return window.location.origin + "/update-password.html";
+  }
+
+  function getViewedUserId() {
+    return state.viewUser && state.viewUser.id ? state.viewUser.id : null;
+  }
+
+  function isRateLimitError(error) {
+    var message = error && error.message ? error.message.toLowerCase() : "";
+    return message.indexOf("rate limit") > -1 || message.indexOf("too many") > -1;
   }
 
   function hideGuard() {
@@ -772,6 +1999,653 @@
     }
   }
 
+  function toggleMetricsEditor() {
+    if (!state.metricsEditor) {
+      return;
+    }
+
+    var isHidden = !!state.metricsEditor.hidden;
+    state.metricsEditor.hidden = !isHidden;
+  }
+
+  function openMetricsEditorWithRows(rows) {
+    if (!state.metricsEditor || !state.metricsRows) {
+      return;
+    }
+
+    if (state.metricsEditor.hidden) {
+      toggleMetricsEditor();
+    }
+
+    state.metricsRows.innerHTML = "";
+    (rows || []).forEach(function (row) {
+      appendMetricRow(row || {});
+    });
+  }
+
+  function findLatestMetricByNameUnit(name, unit) {
+    var targetName = normalizeMetricValue(name);
+    var targetUnit = normalizeMetricValue(unit);
+
+    return (state.metricsLatest || []).find(function (metric) {
+      return (
+        normalizeMetricValue(metric.metric_name) === targetName &&
+        normalizeMetricValue(metric.metric_unit) === targetUnit
+      );
+    }) || null;
+  }
+
+  function findLatestMetricByKey(key) {
+    var metricKey = String(key || "");
+    return (state.metricsLatest || []).find(function (metric) {
+      return getMetricKey(metric) === metricKey;
+    }) || null;
+  }
+
+  function openMetricCardEditor(card, metric, mode) {
+    if (!card || !metric) {
+      return;
+    }
+
+    closeAllMetricCardEditors();
+
+    var modeValue = mode === "test" ? "test" : "edit";
+    card.classList.add("is-flipped");
+    card.setAttribute("data-metric-mode", modeValue);
+
+    var label = card.querySelector("[data-metric-flip-label]");
+    var nameInput = card.querySelector('[data-metric-edit="name"]');
+    var valueInput = card.querySelector('[data-metric-edit="value"]');
+    var unitInput = card.querySelector('[data-metric-edit="unit"]');
+    var categoryInput = card.querySelector('[data-metric-edit="category"]');
+
+    if (label) {
+      label.textContent = modeValue === "test" ? "Log New Test" : "Edit Metric";
+    }
+
+    if (nameInput) {
+      nameInput.value = metric.metric_name || "";
+    }
+    if (unitInput) {
+      unitInput.value = metric.metric_unit || "";
+    }
+    if (categoryInput) {
+      categoryInput.value = metric.metric_category || "Performance";
+    }
+    if (valueInput) {
+      valueInput.value = modeValue === "test" ? "" : (metric.metric_value || "");
+      valueInput.focus();
+    }
+  }
+
+  function closeMetricCardEditor(card) {
+    if (!card) {
+      return;
+    }
+    card.classList.remove("is-flipped");
+    card.removeAttribute("data-metric-mode");
+  }
+
+  function closeAllMetricCardEditors() {
+    if (!state.metricsList) {
+      return;
+    }
+
+    state.metricsList.querySelectorAll(".metric-card.is-flipped").forEach(function (card) {
+      closeMetricCardEditor(card);
+    });
+  }
+
+  function deleteMetricFromFlippedCard(card) {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId || !state.client || !card) {
+      setMetricsStatus("Not authenticated.", "error");
+      return;
+    }
+
+    var metricKey = String(card.getAttribute("data-metric-key") || "");
+    var metric = findLatestMetricByKey(metricKey);
+    if (!metric) {
+      setMetricsStatus("Could not find this metric to delete.", "error");
+      return;
+    }
+
+    if (!confirm("Delete this metric and all of its test history?")) {
+      return;
+    }
+
+    setMetricsStatus("Deleting metric...", "info");
+
+    var name = String(metric.metric_name || "");
+    var unit = String(metric.metric_unit || "").trim();
+
+    if (unit) {
+      state.client
+        .from("athlete_metrics")
+        .delete()
+        .eq("user_id", viewedUserId)
+        .eq("metric_name", name)
+        .eq("metric_unit", unit)
+        .then(function (result) {
+          if (result.error) {
+            setMetricsStatus(result.error.message, "error");
+            return;
+          }
+
+          loadMetricsData();
+          setMetricsStatus("Metric deleted.", "success");
+        })
+        .catch(function (error) {
+          setMetricsStatus(error && error.message ? error.message : "Failed to delete metric.", "error");
+        });
+      return;
+    }
+
+    state.client
+      .from("athlete_metrics")
+      .delete()
+      .eq("user_id", viewedUserId)
+      .eq("metric_name", name)
+      .eq("metric_unit", "")
+      .then(function (resultEmptyUnit) {
+        if (resultEmptyUnit.error) {
+          setMetricsStatus(resultEmptyUnit.error.message, "error");
+          return;
+        }
+
+        state.client
+          .from("athlete_metrics")
+          .delete()
+          .eq("user_id", viewedUserId)
+          .eq("metric_name", name)
+          .is("metric_unit", null)
+          .then(function (resultNullUnit) {
+            if (resultNullUnit.error) {
+              setMetricsStatus(resultNullUnit.error.message, "error");
+              return;
+            }
+
+            loadMetricsData();
+            setMetricsStatus("Metric deleted.", "success");
+          })
+          .catch(function (error) {
+            setMetricsStatus(error && error.message ? error.message : "Failed to delete metric.", "error");
+          });
+      })
+      .catch(function (error) {
+        setMetricsStatus(error && error.message ? error.message : "Failed to delete metric.", "error");
+      });
+  }
+
+  function saveMetricFromFlippedCard(card) {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId || !state.client || !card) {
+      setMetricsStatus("Not authenticated.", "error");
+      return;
+    }
+
+    var mode = card.getAttribute("data-metric-mode") || "edit";
+    var name = String((card.querySelector('[data-metric-edit="name"]') || {}).value || "").trim();
+    var value = String((card.querySelector('[data-metric-edit="value"]') || {}).value || "").trim();
+    var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
+    var category = String((card.querySelector('[data-metric-edit="category"]') || {}).value || "").trim() || "Performance";
+
+    if (!name || !value) {
+      setMetricsStatus("Metric name and value are required.", "error");
+      return;
+    }
+
+    var payload = {
+      user_id: viewedUserId,
+      metric_name: name,
+      metric_value: value,
+      metric_unit: unit,
+      metric_category: category,
+      updated_at: new Date().toISOString()
+    };
+
+    var latestLookup = buildLatestMetricsLookup(state.metrics || []);
+    var latest = latestLookup[getMetricKey(payload)];
+    var isSameAsLatest = latest &&
+      normalizeMetricValue(payload.metric_value) === normalizeMetricValue(latest.metric_value) &&
+      normalizeMetricValue(payload.metric_unit) === normalizeMetricValue(latest.metric_unit) &&
+      normalizeMetricValue(payload.metric_category) === normalizeMetricValue(latest.metric_category);
+
+    if (isSameAsLatest && mode !== "test") {
+      setMetricsStatus(
+        "No metric changes detected.",
+        "info"
+      );
+      closeMetricCardEditor(card);
+      return;
+    }
+
+    setMetricsStatus(mode === "test" ? "Logging new test score..." : "Saving metric update...", "info");
+
+    state.client
+      .from("athlete_metrics")
+      .insert([payload])
+      .select("*")
+      .then(function (insertResult) {
+        if (insertResult.error) {
+          if (isMissingRelationError(insertResult.error)) {
+            setMetricsStatus("Metrics table not found. Create athlete_metrics in Supabase before saving metrics.", "error");
+            return;
+          }
+
+          if (isRlsError(insertResult.error)) {
+            setMetricsStatus("Permission denied by database policy while saving metrics. Ask admin to update athlete_metrics RLS policy for coach edits.", "error");
+            return;
+          }
+
+          setMetricsStatus(insertResult.error.message, "error");
+          return;
+        }
+
+        var inserted = Array.isArray(insertResult.data) ? insertResult.data : [payload];
+        state.metrics = inserted.concat(state.metrics || []);
+        state.metricsLatest = getLatestMetrics(state.metrics);
+        renderMetricsCards();
+        renderMetricRowsFromData(state.metricsLatest);
+        setMetricsStatus(mode === "test" ? "New test score logged." : "Metric updated.", "success");
+      })
+      .catch(function (error) {
+        setMetricsStatus(error && error.message ? error.message : "Failed to save metric.", "error");
+      });
+  }
+
+  function setPasswordStatus(message, variant) {
+    if (!state.passwordStatus) {
+      return;
+    }
+
+    state.passwordStatus.textContent = message || "";
+    state.passwordStatus.classList.remove("is-error", "is-success", "is-info");
+
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      state.passwordStatus.classList.add("is-error");
+    } else if (variant === "success") {
+      state.passwordStatus.classList.add("is-success");
+    } else {
+      state.passwordStatus.classList.add("is-info");
+    }
+  }
+
+  function getSelectedSportsFromForm() {
+    if (!state.form) {
+      return [];
+    }
+
+    var nodes = Array.prototype.slice.call(state.form.querySelectorAll('input[name="sports[]"]:checked'));
+    var sports = nodes
+      .map(function (node) {
+        return String(node.value || "").trim();
+      })
+      .filter(function (value) {
+        return !!value;
+      });
+
+    return Array.from(new Set(sports));
+  }
+
+  function setSelectedSportsInForm(sports) {
+    if (!state.form) {
+      return;
+    }
+
+    var selectedLookup = {};
+    (sports || []).forEach(function (sport) {
+      selectedLookup[String(sport)] = true;
+    });
+
+    state.form.querySelectorAll('input[name="sports[]"]').forEach(function (node) {
+      node.checked = !!selectedLookup[String(node.value || "")];
+    });
+  }
+
+  function getProfileSports(profile) {
+    var local = loadLocalSportProfile();
+    var sportsFromProfile = [];
+
+    if (profile && Array.isArray(profile.sports)) {
+      sportsFromProfile = profile.sports;
+    } else if (profile && profile.sports) {
+      sportsFromProfile = parseSportsValue(profile.sports);
+    } else if (profile && profile.sport) {
+      sportsFromProfile = parseSportsValue(profile.sport);
+    }
+
+    if (!sportsFromProfile.length && local && Array.isArray(local.sports)) {
+      sportsFromProfile = local.sports;
+    }
+
+    return Array.from(new Set(
+      (sportsFromProfile || [])
+        .map(function (sport) {
+          return String(sport || "").trim();
+        })
+        .filter(function (sport) {
+          return !!sport;
+        })
+    ));
+  }
+
+  function parseSportsValue(value) {
+    if (!value) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value;
+    }
+
+    var text = String(value).trim();
+    if (!text) {
+      return [];
+    }
+
+    if (text[0] === "[") {
+      var parsedArray = safeJsonParse(text);
+      if (Array.isArray(parsedArray)) {
+        return parsedArray;
+      }
+    }
+
+    return text
+      .split(",")
+      .map(function (part) {
+        return String(part || "").trim();
+      })
+      .filter(function (part) {
+        return !!part;
+      });
+  }
+
+  function getProfileSportOverview(profile) {
+    var local = loadLocalSportProfile();
+    var baseOverview = {};
+
+    if (profile && profile.sport_overview && typeof profile.sport_overview === "object") {
+      baseOverview = profile.sport_overview;
+    } else if (profile && profile.sport_overview) {
+      baseOverview = safeJsonParse(profile.sport_overview) || {};
+    }
+
+    if (local && local.sport_overview && typeof local.sport_overview === "object") {
+      return Object.assign({}, local.sport_overview, baseOverview);
+    }
+
+    return baseOverview;
+  }
+
+  function renderSportOverviewEditor(selectedSports, existingOverview) {
+    if (!state.sportOverviewEditor) {
+      return;
+    }
+
+    var sports = (selectedSports || []).slice();
+    var overview = existingOverview || {};
+    if (!sports.length) {
+      state.sportOverviewEditor.innerHTML =
+        '<p class="sport-overview-empty">Select one or more sports to customize your overview details.</p>';
+      return;
+    }
+
+    var cards = sports.map(function (sport) {
+      var sportLabel = getSportLabel(sport);
+      var fields = state.sportOverviewTemplates[sport] || [
+        { key: "notes", label: "Sport Notes", placeholder: "Add sport-specific context", type: "text" }
+      ];
+      var sportValues = overview && overview[sport] && typeof overview[sport] === "object"
+        ? overview[sport]
+        : {};
+
+      var fieldMarkup = fields.map(function (field) {
+        var fieldValue = sportValues[field.key] == null ? "" : String(sportValues[field.key]);
+        return (
+          '<div class="sport-overview-field">' +
+          '<label>' + escapeHtml(field.label) + "</label>" +
+          '<input type="text" data-sport-overview-field data-overview-key="' +
+          escapeAttribute(field.key) +
+          '" value="' +
+          escapeAttribute(fieldValue) +
+          '" placeholder="' +
+          escapeAttribute(field.placeholder || "") +
+          '" />' +
+          "</div>"
+        );
+      }).join("");
+
+      return (
+        '<section class="sport-overview-card" data-sport-overview-card data-sport-key="' +
+        escapeAttribute(sport) +
+        '">' +
+        '<h4>' +
+        escapeHtml(sportLabel) +
+        " Overview</h4>" +
+        '<div class="sport-overview-fields">' + fieldMarkup + "</div>" +
+        "</section>"
+      );
+    });
+
+    state.sportOverviewEditor.innerHTML = cards.join("");
+  }
+
+  function collectSportOverviewFromForm() {
+    if (!state.sportOverviewEditor) {
+      return {};
+    }
+
+    var overview = {};
+    state.sportOverviewEditor.querySelectorAll("[data-sport-overview-card]").forEach(function (card) {
+      var sport = String(card.getAttribute("data-sport-key") || "").trim();
+      if (!sport) {
+        return;
+      }
+
+      var sportValues = {};
+      card.querySelectorAll("[data-sport-overview-field]").forEach(function (input) {
+        var key = String(input.getAttribute("data-overview-key") || "").trim();
+        if (!key) {
+          return;
+        }
+
+        var value = String(input.value || "").trim();
+        if (value) {
+          sportValues[key] = value;
+        }
+      });
+
+      if (Object.keys(sportValues).length) {
+        overview[sport] = sportValues;
+      }
+    });
+
+    return overview;
+  }
+
+  function formatSportsDisplay(sports) {
+    if (!sports || !sports.length) {
+      return "—";
+    }
+
+    return sports
+      .slice(0, 3)
+      .map(getSportLabel)
+      .join(", ");
+  }
+
+  function renderSportOverviewSummary(profile) {
+    if (!state.sportOverviewSummary) {
+      return;
+    }
+
+    var sports = getProfileSports(profile);
+    var overview = getProfileSportOverview(profile);
+    if (!sports.length) {
+      state.sportOverviewSummary.hidden = true;
+      state.sportOverviewSummary.innerHTML = "";
+      return;
+    }
+
+    var summaryCards = sports.map(function (sport) {
+      var details = overview && overview[sport] && typeof overview[sport] === "object"
+        ? overview[sport]
+        : {};
+      var detailEntries = Object.keys(details || {}).map(function (key) {
+        return '<li><strong>' + escapeHtml(prettifyOverviewKey(key)) + ':</strong> ' + escapeHtml(details[key]) + "</li>";
+      }).join("");
+
+      return (
+        '<article class="profile-sport-summary-card">' +
+        '<h3>' + escapeHtml(getSportLabel(sport)) + "</h3>" +
+        (detailEntries
+          ? '<ul class="profile-sport-summary-list">' + detailEntries + "</ul>"
+          : '<p class="profile-sport-summary-empty">No sport-specific details added yet.</p>') +
+        "</article>"
+      );
+    }).join("");
+
+    state.sportOverviewSummary.hidden = false;
+    state.sportOverviewSummary.innerHTML = '<div class="profile-sport-summary-grid">' + summaryCards + "</div>";
+  }
+
+  function prettifyOverviewKey(key) {
+    return String(key || "")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, function (char) {
+        return char.toUpperCase();
+      });
+  }
+
+  function getSportLabel(sport) {
+    var value = String(sport || "").trim();
+    if (!value) {
+      return "";
+    }
+    return normalizeDisplayValue(value);
+  }
+
+  function getSportProfileStorageKey(userId) {
+    return "nomadic_sport_profile_" + String(userId || "unknown");
+  }
+
+  function persistLocalSportProfile(profileData) {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        getSportProfileStorageKey(viewedUserId),
+        JSON.stringify({
+          sports: Array.isArray(profileData.sports) ? profileData.sports : [],
+          sport_overview: profileData.sport_overview && typeof profileData.sport_overview === "object"
+            ? profileData.sport_overview
+            : {}
+        })
+      );
+    } catch (e) {
+      // Ignore storage errors.
+    }
+  }
+
+  function mergeLocalSportProfile(profile) {
+    var localData = loadLocalSportProfile();
+
+    if (!profile && !localData) {
+      return null;
+    }
+
+    var merged = Object.assign({}, profile || {});
+    var localSports = localData && Array.isArray(localData.sports) ? localData.sports : [];
+    var profileSports = [];
+    if (profile && Array.isArray(profile.sports)) {
+      profileSports = profile.sports;
+    } else if (profile && profile.sports) {
+      profileSports = parseSportsValue(profile.sports);
+    } else if (profile && profile.sport) {
+      profileSports = parseSportsValue(profile.sport);
+    }
+
+    profileSports = Array.from(new Set(profileSports.map(function (sport) {
+      return String(sport || "").trim();
+    }).filter(function (sport) {
+      return !!sport;
+    })));
+
+    var finalSports = profileSports.length ? profileSports : localSports;
+    if (finalSports.length) {
+      merged.sports = finalSports;
+      merged.sport = merged.sport || finalSports[0];
+    }
+
+    var profileOverview = {};
+    if (profile && profile.sport_overview && typeof profile.sport_overview === "object") {
+      profileOverview = profile.sport_overview;
+    } else if (profile && profile.sport_overview) {
+      profileOverview = safeJsonParse(profile.sport_overview) || {};
+    }
+
+    var localOverview = localData && localData.sport_overview && typeof localData.sport_overview === "object"
+      ? localData.sport_overview
+      : {};
+    merged.sport_overview = Object.assign({}, localOverview, profileOverview);
+    return merged;
+  }
+
+  function loadLocalSportProfile() {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId) {
+      return null;
+    }
+
+    try {
+      return safeJsonParse(window.localStorage.getItem(getSportProfileStorageKey(viewedUserId)) || "") || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function safeJsonParse(value) {
+    try {
+      return JSON.parse(String(value || ""));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function getMissingColumnName(error) {
+    var message = String((error && error.message) || "");
+    var details = String((error && error.details) || "");
+    var text = message + " " + details;
+
+    // Pattern: "... the 'sport_overview' column of 'athlete_profiles' in the schema cache"
+    var quotedBeforeColumn = text.match(/['\"]([a-zA-Z0-9_]+)['\"]\s+column/i);
+    if (quotedBeforeColumn && quotedBeforeColumn[1]) {
+      return quotedBeforeColumn[1];
+    }
+
+    // Pattern: "column 'height_cm' does not exist"
+    var columnThenName = text.match(/column\s+['\"]?([a-zA-Z0-9_]+)['\"]?/i);
+    if (columnThenName && columnThenName[1]) {
+      return columnThenName[1];
+    }
+
+    // Pattern: "Could not find the sport_overview column"
+    var findColumn = text.match(/find\s+the\s+['\"]?([a-zA-Z0-9_]+)['\"]?\s+column/i);
+    if (findColumn && findColumn[1]) {
+      return findColumn[1];
+    }
+
+    return null;
+  }
+
   function normalizeDisplayValue(value) {
     if (!value) {
       return "—";
@@ -798,7 +2672,16 @@
 
   function isMissingColumnError(error) {
     var msg = error && error.message ? error.message.toLowerCase() : "";
-    return error && error.code === "42703" || msg.indexOf("column") > -1 && msg.indexOf("does not exist") > -1;
+    var code = error && error.code ? String(error.code) : "";
+    return code === "42703" ||
+      code === "PGRST204" ||
+      msg.indexOf("column") > -1 && msg.indexOf("does not exist") > -1 ||
+      msg.indexOf("schema cache") > -1 && msg.indexOf("column") > -1;
+  }
+
+  function isRlsError(error) {
+    var msg = error && error.message ? error.message.toLowerCase() : "";
+    return error && error.code === "42501" || msg.indexOf("row-level security") > -1 || msg.indexOf("violates row-level security") > -1;
   }
 
   function escapeHtml(value) {

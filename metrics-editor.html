@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customize Athlete Metrics – Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/metrics-editor.js"></script>
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="services.html">Services</a>
+    </nav>
+  </header>
+
+  <!-- ===== Main Content ===== -->
+  <main class="metrics-editor-main">
+    <div class="metrics-editor-container">
+      <!-- Auth Guard -->
+      <div data-metrics-editor-guard>
+        <p class="admin-loading">Verifying access...</p>
+      </div>
+
+      <!-- Metrics Editor Content -->
+      <div class="metrics-editor-content" hidden data-metrics-editor-content>
+        <div class="metrics-editor-header">
+          <button class="metrics-editor-back-btn" data-metrics-editor-back>← Back to Coaching Dashboard</button>
+          <h1>Customize Athlete Metrics</h1>
+          <p class="metrics-editor-subtitle" data-metrics-editor-athlete-name>Loading...</p>
+        </div>
+
+        <!-- Metrics List -->
+        <div class="metrics-editor-section">
+          <div class="metrics-editor-section-header">
+            <h2>Current Metrics</h2>
+            <div class="metrics-editor-actions">
+              <select class="metrics-editor-preset-select" data-metrics-editor-assessment>
+                <option value="">+ Add Assessment…</option>
+                <option value="climbing">Climbing Performance Assessment</option>
+                <option value="running">Running Performance Assessment</option>
+              </select>
+              <select class="metrics-editor-preset-select" data-metrics-editor-preset>
+                <option value="">+ Add Preset Metric…</option>
+                <option value="Power Push Up">Power Push Up</option>
+                <option value="Shoulder Tap Test">Shoulder Tap Test</option>
+                <option value="20mm Edge Pull Strength">20mm Edge Pull Strength</option>
+                <option value="Max Pull Ups">Max Pull Ups</option>
+                <option value="Max Hang Time">Max Hang Time</option>
+                <option value="90 Degree Bent Leg Hang">90 Degree Bent Leg Hang</option>
+                <option value="Adapted Grant Foot Raise">Adapted Grant Foot Raise</option>
+                <option value="Ape Index">Ape Index</option>
+                <option value="Vertical Jump Height">Vertical Jump Height</option>
+                <option value="Single Leg Squat Test">Single Leg Squat Test</option>
+                <option value="Single Leg Heel Raise Test">Single Leg Heel Raise Test</option>
+                <option value="Side Plank with Hip Abduction Hold (Max Time)">Side Plank with Hip Abduction Hold (Max Time)</option>
+                <option value="Knee to Wall (Ankle DF Test)">Knee to Wall (Ankle DF Test)</option>
+                <option value="Y Balance (Anterior Reach)">Y Balance (Anterior Reach)</option>
+                <option value="Broad Jump">Broad Jump</option>
+                <option value="Tripple Hop">Tripple Hop</option>
+              </select>
+              <button type="button" class="btn admin-btn-metric-add" data-metrics-editor-add-custom>+ Add Custom Metric</button>
+            </div>
+          </div>
+
+          <div class="metrics-editor-list" data-metrics-editor-list>
+            <p class="admin-loading">Loading metrics...</p>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="metrics-editor-footer">
+          <button type="button" class="btn admin-btn-primary" data-metrics-editor-save>Save Changes</button>
+          <button type="button" class="btn admin-btn-reset-password" data-metrics-editor-back>Cancel</button>
+        </div>
+
+        <!-- Status Message -->
+        <p class="admin-modal-status" role="status" aria-live="polite" data-metrics-editor-status></p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer style="background: #0e4749; color: #fff; padding: 32px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 16px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">
+        <span style="vertical-align: middle;">
+          <svg width="24" height="24" fill="currentColor" style="vertical-align: middle;"><path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5A4.25 4.25 0 0 0 7.75 20.5h8.5A4.25 4.25 0 0 0 20.5 16.25v-8.5A4.25 4.25 0 0 0 16.25 3.5h-8.5zm4.25 3.25a5.25 5.25 0 1 1 0 10.5a5.25 5.25 0 0 1 0-10.5zm0 1.5a3.75 3.75 0 1 0 0 7.5a3.75 3.75 0 0 0 0-7.5zm6.25.75a1 1 0 1 1-2 0a1 1 0 0 1 2 0z"/></svg>
+        </span>
+      </a>
+    </div>
+    <p>&copy; 2024 Nomadic Performance. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>

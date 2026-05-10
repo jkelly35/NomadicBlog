@@ -55,40 +55,45 @@
           </div>
         </div>
 
-        <!-- Controls -->
-        <div class="admin-controls">
-          <input 
-            type="text" 
-            class="admin-search" 
-            placeholder="Search athletes by email or name..." 
-            data-admin-search 
-          />
-          <button class="btn admin-btn-refresh" data-admin-refresh>Refresh</button>
-        </div>
+        <section class="admin-athletes-panel" aria-label="Athletes">
+          <!-- Controls -->
+          <div class="admin-controls">
+            <input 
+              type="text" 
+              class="admin-search" 
+              placeholder="Search athletes by email or name..." 
+              data-admin-search 
+            />
+            <button class="btn admin-btn-refresh" data-admin-add-athlete>Add Athlete Account</button>
+            <button class="btn admin-btn-refresh" data-admin-refresh>Refresh</button>
+            <a class="btn admin-btn-refresh" href="exercise-library.html">Exercise Library</a>
+            <a class="btn admin-btn-refresh" href="coach-training-programs.html">Training Programs</a>
+          </div>
 
-        <!-- Athletes Table -->
-        <div class="admin-table-wrapper">
-          <table class="admin-table" data-admin-table>
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Sport</th>
-                <th>Level</th>
-                <th>Joined</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody data-admin-table-body>
-              <tr class="admin-table-loading">
-                <td colspan="6" style="text-align: center; padding: 2rem;">Loading athletes...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <!-- Athletes Table -->
+          <div class="admin-table-wrapper">
+            <table class="admin-table" data-admin-table>
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Name</th>
+                  <th>Sport</th>
+                  <th>Level</th>
+                  <th>Joined</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody data-admin-table-body>
+                <tr class="admin-table-loading">
+                  <td colspan="6" style="text-align: center; padding: 2rem;">Loading athletes...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <!-- Pagination -->
-        <div class="admin-pagination" data-admin-pagination></div>
+          <!-- Pagination -->
+          <div class="admin-pagination" data-admin-pagination></div>
+        </section>
 
         <!-- Status Message -->
         <p class="admin-status" role="status" aria-live="polite" data-admin-status></p>
@@ -124,65 +129,234 @@
           <h3>Profile Information</h3>
           <div class="admin-modal-info-row">
             <label>Full Name</label>
-            <input type="text" data-admin-modal-input="name" />
+            <p data-admin-modal-info-name></p>
           </div>
           <div class="admin-modal-info-row">
             <label>Sport</label>
-            <select data-admin-modal-input="sport">
-              <option value="">Select sport</option>
-              <option value="skiing">Skiing</option>
-              <option value="snowboarding">Snowboarding</option>
-              <option value="climbing">Climbing</option>
-              <option value="mountainbiking">Mountain Biking</option>
-              <option value="trail-running">Trail Running</option>
-              <option value="mixed">Mixed / Multi-Sport</option>
-            </select>
+            <p data-admin-modal-info-sport></p>
           </div>
           <div class="admin-modal-info-row">
             <label>Experience Level</label>
-            <select data-admin-modal-input="level">
-              <option value="">Select level</option>
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-              <option value="professional">Professional</option>
-            </select>
+            <p data-admin-modal-info-level></p>
           </div>
           <div class="admin-modal-info-row">
             <label>Bio</label>
-            <textarea data-admin-modal-input="bio" rows="3"></textarea>
+            <p data-admin-modal-info-bio></p>
           </div>
           <div class="admin-modal-info-row">
             <label>Age</label>
-            <input type="number" data-admin-modal-input="age" min="1" max="120" />
+            <p data-admin-modal-info-age></p>
           </div>
           <div class="admin-modal-info-row">
             <label>Location</label>
-            <input type="text" data-admin-modal-input="location" />
+            <p data-admin-modal-info-location></p>
           </div>
         </div>
 
         <div class="admin-modal-section">
-          <div class="admin-metrics-header">
-            <h3>Athlete Metrics</h3>
-            <button type="button" class="btn admin-btn-metric-add" data-admin-metric-add>+ Add Metric</button>
-          </div>
-          <p class="admin-metrics-copy">Add sport-specific metrics such as Max HR, 20mm Edge Pull, Vertical Jump, and more.</p>
-          <div class="admin-metric-rows" data-admin-metric-rows>
-            <p class="admin-loading">Loading metrics...</p>
-          </div>
+          <button type="button" class="btn admin-btn-primary" data-admin-customize-metrics style="width: 100%; margin-top: 0.5rem;">⚙️ Customize Metrics</button>
         </div>
 
         <div class="admin-modal-section">
           <h3>Account Actions</h3>
           <div class="admin-modal-actions">
-            <button class="btn admin-btn-primary" data-admin-modal-save>Save Changes</button>
+            <button type="button" class="btn admin-btn-primary" data-admin-edit-athlete>📝 Edit Profile</button>
             <button class="btn admin-btn-reset-password" data-admin-modal-reset>Reset Password</button>
             <button class="btn admin-btn-delete" data-admin-modal-delete>Delete Account</button>
           </div>
         </div>
 
         <p class="admin-modal-status" role="status" aria-live="polite" data-admin-modal-status></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Template Assignment Modal -->
+  <div class="admin-modal" data-admin-assign-modal hidden>
+    <div class="admin-modal-backdrop" data-admin-assign-close></div>
+    <div class="admin-modal-panel admin-assign-modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-assign-title">
+      <button type="button" class="admin-modal-close" data-admin-assign-close aria-label="Close">&times;</button>
+      <h2 id="admin-assign-title">Assign Training Program</h2>
+
+      <div class="admin-modal-content">
+        <div class="admin-modal-section">
+          <h3 data-admin-assign-template-name>Template</h3>
+          <div class="admin-assign-controls">
+            <input
+              type="text"
+              class="admin-search"
+              placeholder="Search athletes by name, email, or sport..."
+              data-admin-assign-search
+            />
+            <div class="admin-assign-actions">
+              <button type="button" class="btn admin-btn-small" data-admin-assign-select-all>Select All</button>
+              <button type="button" class="btn admin-btn-small" data-admin-assign-clear-all>Clear</button>
+            </div>
+          </div>
+          <div class="admin-assign-list" data-admin-assign-list>
+            <p class="admin-loading">Loading athletes...</p>
+          </div>
+        </div>
+
+        <div class="admin-modal-section">
+          <div class="admin-modal-actions">
+            <button type="button" class="btn admin-btn-primary" data-admin-assign-submit>Assign to Selected Athletes</button>
+            <button type="button" class="btn admin-btn-reset-password" data-admin-assign-close>Cancel</button>
+          </div>
+        </div>
+
+        <p class="admin-modal-status" role="status" aria-live="polite" data-admin-assign-status></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-modal" data-admin-library-modal hidden>
+    <div class="admin-modal-backdrop" data-admin-library-close></div>
+    <div class="admin-modal-panel admin-library-modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-library-title">
+      <button type="button" class="admin-modal-close" data-admin-library-close aria-label="Close">&times;</button>
+      <h2 id="admin-library-title">Exercise Library</h2>
+
+      <div class="admin-modal-content">
+        <div class="admin-modal-section">
+          <div class="admin-library-controls">
+            <input
+              type="text"
+              class="admin-search"
+              placeholder="Search by name, tags, sport, or equipment..."
+              data-admin-library-search
+            />
+            <select class="admin-search" data-admin-library-filter-pattern>
+              <option value="">All Movement Patterns</option>
+              <option value="squat">Squat</option>
+              <option value="hinge">Hinge</option>
+              <option value="push">Push</option>
+              <option value="pull">Pull</option>
+              <option value="carry">Carry</option>
+              <option value="rotation">Rotation</option>
+              <option value="core">Core</option>
+              <option value="plyometric">Plyometric</option>
+              <option value="locomotion">Locomotion</option>
+            </select>
+            <select class="admin-search" data-admin-library-filter-sport>
+              <option value="">All Sports</option>
+              <option value="climbing">Climbing</option>
+              <option value="skiing">Skiing</option>
+              <option value="snowboarding">Snowboarding</option>
+              <option value="mountainbiking">Mountain Biking</option>
+              <option value="trail-running">Trail Running</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </div>
+          <div class="admin-library-list" data-admin-library-list>
+            <p class="admin-loading">No exercises in library yet.</p>
+          </div>
+        </div>
+
+        <div class="admin-modal-section">
+          <h3 data-admin-library-form-title>Add Exercise</h3>
+          <form class="admin-library-form" data-admin-library-form>
+            <input type="hidden" data-admin-library-id />
+            <div class="admin-modal-info-row">
+              <label>Exercise Name</label>
+              <input type="text" required data-admin-library-name placeholder="e.g., Back Squat" />
+            </div>
+            <div class="admin-library-grid">
+              <div class="admin-modal-info-row">
+                <label>Movement Pattern</label>
+                <select data-admin-library-pattern>
+                  <option value="">Select</option>
+                  <option value="squat">Squat</option>
+                  <option value="hinge">Hinge</option>
+                  <option value="push">Push</option>
+                  <option value="pull">Pull</option>
+                  <option value="carry">Carry</option>
+                  <option value="rotation">Rotation</option>
+                  <option value="core">Core</option>
+                  <option value="plyometric">Plyometric</option>
+                  <option value="locomotion">Locomotion</option>
+                </select>
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Equipment</label>
+                <select data-admin-library-equipment>
+                  <option value="">Select</option>
+                  <option value="bodyweight">Bodyweight</option>
+                  <option value="barbell">Barbell</option>
+                  <option value="dumbbell">Dumbbell</option>
+                  <option value="kettlebell">Kettlebell</option>
+                  <option value="cable">Cable</option>
+                  <option value="machine">Machine</option>
+                  <option value="band">Band</option>
+                  <option value="sled">Sled</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Primary Muscle</label>
+                <select data-admin-library-muscle>
+                  <option value="">Select</option>
+                  <option value="quads">Quads</option>
+                  <option value="glutes">Glutes</option>
+                  <option value="hamstrings">Hamstrings</option>
+                  <option value="calves">Calves</option>
+                  <option value="core">Core</option>
+                  <option value="back">Back</option>
+                  <option value="chest">Chest</option>
+                  <option value="shoulders">Shoulders</option>
+                  <option value="arms">Arms</option>
+                  <option value="full-body">Full Body</option>
+                </select>
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Training Goal</label>
+                <select data-admin-library-goal>
+                  <option value="">Select</option>
+                  <option value="strength">Strength</option>
+                  <option value="power">Power</option>
+                  <option value="hypertrophy">Hypertrophy</option>
+                  <option value="endurance">Endurance</option>
+                  <option value="mobility">Mobility</option>
+                  <option value="stability">Stability</option>
+                  <option value="rehab">Rehab</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label>Sport Tags</label>
+              <div class="admin-library-sports" data-admin-library-sports>
+                <label><input type="checkbox" value="climbing" data-admin-library-sport /> Climbing</label>
+                <label><input type="checkbox" value="skiing" data-admin-library-sport /> Skiing</label>
+                <label><input type="checkbox" value="snowboarding" data-admin-library-sport /> Snowboarding</label>
+                <label><input type="checkbox" value="mountainbiking" data-admin-library-sport /> Mountain Biking</label>
+                <label><input type="checkbox" value="trail-running" data-admin-library-sport /> Trail Running</label>
+                <label><input type="checkbox" value="mixed" data-admin-library-sport /> Mixed</label>
+              </div>
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label>Custom Tags (comma separated)</label>
+              <input type="text" data-admin-library-custom-tags placeholder="e.g., unilateral, low-impact, post-injury" />
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label>Description</label>
+              <textarea rows="2" data-admin-library-description placeholder="What this exercise trains and why it is used."></textarea>
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label>Coaching Cues</label>
+              <textarea rows="2" data-admin-library-cues placeholder="Key technical cues to coach this movement."></textarea>
+            </div>
+
+            <div class="admin-modal-actions">
+              <button type="submit" class="btn admin-btn-primary" data-admin-library-save>Save Exercise</button>
+              <button type="button" class="btn admin-btn-reset-password" data-admin-library-clear>New Exercise</button>
+            </div>
+          </form>
+        </div>
+
+        <p class="admin-modal-status" role="status" aria-live="polite" data-admin-library-status></p>
       </div>
     </div>
   </div>

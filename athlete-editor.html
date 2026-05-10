@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Edit Athlete Profile – Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/athlete-editor.js"></script>
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+    </div>
+    <nav id="main-nav"></nav>
+  </header>
+
+  <!-- ===== Main Content ===== -->
+  <main class="metrics-editor-main">
+    <div class="metrics-editor-container">
+      <!-- Guard for auth -->
+      <div data-athlete-editor-guard>
+        <p style="color: #9f2d20; font-weight: 700;">Loading...</p>
+      </div>
+
+      <!-- Athlete Editor Content -->
+      <div class="metrics-editor-content" hidden data-athlete-editor-content>
+        <div class="metrics-editor-header">
+          <button class="metrics-editor-back-btn" data-athlete-editor-back>← Back to Coaching Dashboard</button>
+          <h1>Edit Athlete Profile</h1>
+          <p class="metrics-editor-subtitle" data-athlete-editor-athlete-name>Loading...</p>
+        </div>
+
+        <form class="athlete-editor-form profile-form" data-athlete-editor-form>
+          <div class="metrics-editor-section">
+            <div class="metrics-editor-section-header">
+              <h2>Account Information</h2>
+            </div>
+
+            <div class="athlete-editor-grid">
+              <div class="athlete-editor-info-row athlete-editor-readonly">
+                <label>Email</label>
+                <p data-athlete-editor-email>—</p>
+              </div>
+
+              <div class="athlete-editor-info-row athlete-editor-readonly">
+                <label>Account Created</label>
+                <p data-athlete-editor-created>—</p>
+              </div>
+
+              <div class="athlete-editor-info-row athlete-editor-readonly">
+                <label>Last Sign In</label>
+                <p data-athlete-editor-last-signin>—</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="metrics-editor-section">
+            <div class="metrics-editor-section-header">
+              <h2>Core Profile</h2>
+            </div>
+
+            <div class="athlete-editor-grid">
+              <div class="athlete-editor-info-row">
+                <label for="athlete-name">Name *</label>
+                <input type="text" id="athlete-name" name="name" data-athlete-editor-input="name" placeholder="Athlete name" required />
+              </div>
+
+              <div class="athlete-editor-info-row">
+                <label for="athlete-dob">Date of Birth</label>
+                <input type="date" id="athlete-dob" name="dob" data-athlete-editor-input="dob" />
+              </div>
+
+              <div class="athlete-editor-info-row">
+                <label>Calculated Age</label>
+                <p data-athlete-editor-calculated-age>—</p>
+              </div>
+
+              <div class="athlete-editor-info-row">
+                <label for="athlete-location">Location</label>
+                <input type="text" id="athlete-location" name="location" data-athlete-editor-input="location" placeholder="City, Region" />
+              </div>
+
+              <div class="athlete-editor-info-row">
+                <label for="athlete-height">Height (cm)</label>
+                <input type="number" id="athlete-height" name="height_cm" data-athlete-editor-input="height_cm" min="1" max="300" />
+              </div>
+
+              <div class="athlete-editor-info-row">
+                <label for="athlete-weight">Weight (kg)</label>
+                <input type="number" id="athlete-weight" name="weight_kg" data-athlete-editor-input="weight_kg" min="1" max="400" step="0.1" />
+              </div>
+            </div>
+
+            <div class="athlete-editor-info-row">
+              <label for="athlete-bio">Bio</label>
+              <textarea id="athlete-bio" name="bio" data-athlete-editor-input="bio" placeholder="Athletic background and current goals" rows="4"></textarea>
+            </div>
+          </div>
+
+          <div class="metrics-editor-section">
+            <div class="metrics-editor-section-header">
+              <h2>Sports</h2>
+            </div>
+
+            <p class="athlete-editor-help">Select one or more sports to personalize sport-specific fields.</p>
+            <div class="sport-checkbox-grid">
+              <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="skiing" /> Skiing</label>
+              <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="snowboarding" /> Snowboarding</label>
+              <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="climbing" /> Climbing</label>
+              <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="mountainbiking" /> Mountain Biking</label>
+              <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="trail-running" /> Trail Running</label>
+              <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="mixed" /> Mixed / Multi-Sport</label>
+            </div>
+          </div>
+
+          <div class="metrics-editor-section">
+            <div class="metrics-editor-section-header">
+              <h2>Performance Profile</h2>
+            </div>
+
+            <div class="athlete-editor-grid">
+              <div class="athlete-editor-info-row">
+                <label for="athlete-training-age">Training Age (years)</label>
+                <input type="text" id="athlete-training-age" data-general-profile-key="training_age_years" placeholder="e.g., 3" />
+              </div>
+              <div class="athlete-editor-info-row">
+                <label for="athlete-weekly-sessions">Weekly Sessions</label>
+                <input type="text" id="athlete-weekly-sessions" data-general-profile-key="weekly_sessions" placeholder="e.g., 4-5" />
+              </div>
+            </div>
+
+            <div class="athlete-editor-info-row">
+              <label for="athlete-primary-goal">Primary Goal</label>
+              <input type="text" id="athlete-primary-goal" data-general-profile-key="primary_goal" placeholder="e.g., send V6 by August, improve uphill endurance" />
+            </div>
+
+            <div class="athlete-editor-info-row">
+              <label for="athlete-notes">Injury / Movement Notes</label>
+              <textarea id="athlete-notes" data-general-profile-key="injury_notes" rows="3" placeholder="Any pain history, movement restrictions, or caution flags"></textarea>
+            </div>
+          </div>
+
+          <div class="metrics-editor-section">
+            <div class="metrics-editor-section-header">
+              <h2>Sport-Specific Details</h2>
+            </div>
+            <div class="sport-overview-editor" data-athlete-editor-sport-overview>
+              <p class="sport-overview-empty">Select one or more sports to customize your overview details.</p>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="metrics-editor-footer">
+            <button type="submit" class="btn admin-btn-primary" data-athlete-editor-save>Save Changes</button>
+            <button type="button" class="btn admin-btn-reset-password" data-athlete-editor-back>Cancel</button>
+          </div>
+
+          <!-- Status message -->
+          <p class="admin-modal-status" role="status" aria-live="polite" data-athlete-editor-status></p>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer style="background: #0e4749; color: #fff; padding: 32px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 16px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">
+        <span style="vertical-align: middle;">
+          <svg width="24" height="24" fill="currentColor" style="vertical-align: middle;"><path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5A4.25 4.25 0 0 0 7.75 20.5h8.5A4.25 4.25 0 0 0 20.5 16.25v-8.5A4.25 4.25 0 0 0 16.25 3.5h-8.5zm4.25 3.25a5.25 5.25 0 1 1 0 10.5a5.25 5.25 0 0 1 0-10.5zm0 1.5a3.75 3.75 0 1 0 0 7.5a3.75 3.75 0 0 0 0-7.5zm6.25.75a1 1 0 1 1-2 0a1 1 0 0 1 2 0z"/></svg>
+        </span>
+        <span style="font-size: 1rem; margin-left: 4px;">Instagram</span>
+      </a>
+      <a href="https://x.com/NomadPerformCo" target="_blank" rel="noopener" style="margin: 0 12px; color: #fff; text-decoration: none; font-size: 1.6rem;">
+        <span style="vertical-align: middle;">
+          <svg width="24" height="24" fill="currentColor" style="vertical-align: middle;"><path d="M17.53 3H21l-7.19 8.21L22 21h-6.5l-5.18-6.01L3 21H0l7.78-8.89L2 3h6.5l4.7 5.45L17.53 3zm-2.1 15h2.3l-6.29-7.29l-2.3-2.66L2.47 5h2.3l6.29 7.29l2.3 2.66L19.53 19z"/></svg>
+        </span>
+      </a>
+    </div>
+    <p style="margin: 0; font-size: 0.85rem;">© 2024 Nomadic Performance. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>

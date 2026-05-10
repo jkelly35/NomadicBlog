@@ -29,52 +29,116 @@
 
   <main class="program-demo-main">
     <section class="program-demo-container">
+      <!-- Header Section -->
       <div class="program-demo-header">
-        <div>
-          <p class="program-demo-kicker">Mock Training Program</p>
+        <div class="program-demo-header-content">
+          <p class="program-demo-kicker">Training Program</p>
           <h1 data-program-title>8-Week Mountain Performance Block</h1>
-          <p class="program-demo-subtitle">Example workout logger. Enter sets, reps, load, and notes to simulate athlete progress tracking.</p>
+          <p class="program-demo-subtitle">Track your daily workouts and monitor your progress through the program</p>
         </div>
-        <a class="btn profile-btn-cancel" href="profile.html">Back to Athlete Dashboard</a>
+        <a class="btn profile-btn-cancel" href="profile.html" data-program-back-link>← Back to Dashboard</a>
       </div>
 
-      <div class="program-demo-toolbar">
-        <label for="workout-day-select">Workout Day</label>
-        <select id="workout-day-select" data-workout-day>
-          <option value="day-1">Day 1 - Lower Body Power</option>
-          <option value="day-2">Day 2 - Upper Pull + Core</option>
-          <option value="day-3">Day 3 - Conditioning</option>
-        </select>
-        <button type="button" class="btn profile-btn-cancel" data-add-set-row>+ Add Set Row</button>
+      <div class="program-builder-panel" data-template-builder-panel hidden>
+        <div class="program-builder-panel-header">
+          <h2>Template Builder</h2>
+          <p>Create and save reusable training program templates for coaching.</p>
+        </div>
+        <div class="program-builder-panel-controls">
+          <input
+            type="text"
+            class="program-builder-name"
+            placeholder="Template name (e.g., 8-Week Ski Power Build)"
+            data-template-name
+          />
+          <div class="program-builder-structure-row">
+            <label class="program-builder-structure-field">
+              <span>Weeks</span>
+              <input type="number" min="1" max="24" step="1" value="1" data-template-weeks />
+            </label>
+            <label class="program-builder-structure-field">
+              <span>Workouts / Week</span>
+              <input type="number" min="1" max="14" step="1" value="3" data-template-workouts-per-week />
+            </label>
+            <button type="button" class="btn admin-btn-refresh" data-template-structure-apply>Apply</button>
+            <button type="button" class="btn btn-secondary" data-template-seed-skeleton>Seed Program Skeleton</button>
+          </div>
+        </div>
       </div>
 
-      <div class="program-demo-progress" data-completion-summary>
-        Completion: 0 / 0 sets marked done
+      <!-- Program Overview Stats -->
+      <div class="program-stats">
+        <div class="program-stat-card">
+          <div class="stat-value" data-total-workouts>0</div>
+          <div class="stat-label">Workouts Logged</div>
+        </div>
+        <div class="program-stat-card">
+          <div class="stat-value" data-total-sets>0</div>
+          <div class="stat-label">Sets Completed</div>
+        </div>
+        <div class="program-stat-card">
+          <div class="stat-value" data-program-progress>0%</div>
+          <div class="stat-label">Progress</div>
+        </div>
       </div>
 
-      <div class="program-demo-table-wrap">
-        <table class="program-demo-table">
-          <thead>
-            <tr>
-              <th>Exercise</th>
-              <th>Set</th>
-              <th>Reps</th>
-              <th>Weight</th>
-              <th>RPE</th>
-              <th>Notes</th>
-              <th>Done</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody data-workout-rows></tbody>
-        </table>
+      <!-- Day Selector -->
+      <div class="program-demo-day-selector">
+        <h2 class="day-selector-title">Select Workout</h2>
+        <div class="day-tabs-container">
+          <select id="workout-day-select" class="day-select-dropdown" data-workout-day></select>
+          <div class="day-info" data-day-info>Select a workout day to begin logging</div>
+        </div>
       </div>
 
-      <div class="program-demo-actions">
-        <button type="button" class="btn profile-btn-save" data-save-workout>Save Workout Log</button>
-        <button type="button" class="btn profile-btn-delete" data-clear-workout>Clear Day Log</button>
+      <!-- Workout Progress Summary -->
+      <div class="program-demo-progress-card" data-completion-summary>
+        <div class="progress-icon">✓</div>
+        <div class="progress-content">
+          <div class="progress-title">Daily Progress</div>
+          <div class="progress-text">Completion: 0 / 0 sets marked done</div>
+        </div>
       </div>
 
+      <!-- Workout Logger Table -->
+      <div class="program-demo-section">
+        <h2 class="section-title">Workout Log</h2>
+        <div class="program-demo-table-wrap">
+          <table class="program-demo-table">
+            <thead>
+              <tr>
+                <th>Exercise</th>
+                <th>Set</th>
+                <th>Reps</th>
+                <th>Weight (lbs)</th>
+                <th>RPE</th>
+                <th>Notes</th>
+                <th class="col-checkbox">Done</th>
+                <th class="col-action"></th>
+              </tr>
+            </thead>
+            <tbody data-workout-rows></tbody>
+          </table>
+          <div class="program-demo-table-empty" data-empty-state style="display: none;">
+            <p>No workout data yet. Add your first set to get started.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions Section -->
+      <div class="program-demo-actions-section">
+        <button type="button" class="btn btn-primary" data-add-exercise>
+          <span>+</span> Add Exercise
+        </button>
+        <button type="button" class="btn btn-secondary" data-save-workout>
+          <span>💾</span> Save Workout Log
+        </button>
+        <button type="button" class="btn btn-danger" data-clear-workout>
+          <span>🗑</span> Clear Day Log
+        </button>
+      </div>
+
+      <!-- Status Message -->
       <p class="profile-status" role="status" aria-live="polite" data-workout-status></p>
     </section>
   </main>

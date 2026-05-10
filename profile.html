@@ -41,19 +41,17 @@
         <h1 class="section-heading">Athlete Dashboard</h1>
         <div class="profile-dashboard-heading-row">
           <p class="profile-dashboard-subtitle">Your training, testing, and progress hub.</p>
-          <button type="button" class="btn profile-btn-edit-profile" data-profile-edit-toggle aria-expanded="false" aria-controls="profile-editor-section">Edit Athlete Profile</button>
         </div>
 
         <div class="profile-section">
-          <h2>Athlete Overview</h2>
+          <div class="profile-section-header">
+            <h2>Athlete Overview</h2>
+            <button type="button" class="btn profile-btn-edit-profile" data-profile-edit-toggle aria-expanded="false" aria-controls="profile-editor-section">Edit Athlete Profile</button>
+          </div>
           <div class="profile-hero-stats">
             <div class="profile-hero-chip">
-              <span class="profile-hero-label">Primary Sport</span>
+              <span class="profile-hero-label">Sports</span>
               <strong data-hero-sport>—</strong>
-            </div>
-            <div class="profile-hero-chip">
-              <span class="profile-hero-label">Experience Level</span>
-              <strong data-hero-level>—</strong>
             </div>
             <div class="profile-hero-chip">
               <span class="profile-hero-label">Training Base</span>
@@ -66,13 +64,17 @@
               <p class="profile-info-value" data-profile-email>—</p>
             </div>
             <div class="profile-info-item">
-              <label>Account Created</label>
-              <p class="profile-info-value" data-profile-created>—</p>
+              <label>DOB / Age</label>
+              <p class="profile-info-value" data-profile-dob-age>—</p>
             </div>
-            <div class="profile-info-item">
-              <label>Last Sign In</label>
-              <p class="profile-info-value" data-profile-last-signin>—</p>
+          </div>
+          <div class="profile-sport-overview" data-sport-overview-summary hidden></div>
+          <div class="profile-account-actions">
+            <div class="profile-account-actions-row">
+              <button type="button" class="btn profile-btn-reset-password" data-profile-reset-password>Reset My Password</button>
+              <button type="button" class="btn profile-btn-logout" data-profile-logout>Log Out</button>
             </div>
+            <p class="profile-status" role="status" aria-live="polite" data-password-status></p>
           </div>
         </div>
 
@@ -89,29 +91,22 @@
               <input id="profile-name" name="name" type="text" placeholder="Enter your full name" />
             </div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label for="profile-sport">Primary Sport</label>
-                <select id="profile-sport" name="sport">
-                  <option value="">Select primary sport</option>
-                  <option value="skiing">Skiing</option>
-                  <option value="snowboarding">Snowboarding</option>
-                  <option value="climbing">Climbing</option>
-                  <option value="mountainbiking">Mountain Biking</option>
-                  <option value="trail-running">Trail Running</option>
-                  <option value="mixed">Mixed / Multi-Sport</option>
-                </select>
+            <div class="form-group">
+              <label>Sports (select all that apply)</label>
+              <div class="sport-checkbox-grid" data-sports-picker>
+                <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="skiing" /> Skiing</label>
+                <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="snowboarding" /> Snowboarding</label>
+                <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="climbing" /> Climbing</label>
+                <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="mountainbiking" /> Mountain Biking</label>
+                <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="trail-running" /> Trail Running</label>
+                <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="mixed" /> Mixed / Multi-Sport</label>
               </div>
+            </div>
 
-              <div class="form-group">
-                <label for="profile-level">Experience Level</label>
-                <select id="profile-level" name="level">
-                  <option value="">Select level</option>
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                  <option value="professional">Professional</option>
-                </select>
+            <div class="form-group">
+              <label>Sport-Specific Overview</label>
+              <div class="sport-overview-editor" data-sport-overview-editor>
+                <p class="sport-overview-empty">Select one or more sports to customize your overview details.</p>
               </div>
             </div>
 
@@ -159,20 +154,26 @@
               <h2>Athlete Metrics</h2>
               <p class="profile-section-copy">Track your baseline and performance testing metrics. Coaches can tailor these to your sport.</p>
             </div>
-            <button type="button" class="btn profile-btn-cancel" data-metric-add>+ Add Metric</button>
+            <div class="metrics-actions">
+              <button type="button" class="btn profile-btn-edit-profile" data-metric-manage>Manage Metrics</button>
+            </div>
           </div>
 
           <div class="metrics-list" data-metrics-list>
             <p class="profile-loading">Loading metrics...</p>
           </div>
 
-          <form class="metrics-form" data-metrics-form>
-            <div class="metrics-rows" data-metric-rows></div>
-            <div class="profile-form-actions">
-              <button type="submit" class="btn profile-btn-save">Save Metrics</button>
-            </div>
-            <p class="profile-status" role="status" aria-live="polite" data-metrics-status></p>
-          </form>
+          <div class="metrics-editor-panel" id="metrics-editor-panel" hidden data-metrics-editor>
+            <p class="metrics-editor-copy">Add or remove metrics below, then save to refresh the cards above.</p>
+            <form class="metrics-form" data-metrics-form>
+              <div class="metrics-rows" data-metric-rows></div>
+              <div class="profile-form-actions metrics-editor-actions">
+                <button type="button" class="btn profile-btn-cancel" data-metrics-cancel>Cancel</button>
+                <button type="submit" class="btn profile-btn-save">Save Metrics</button>
+              </div>
+              <p class="profile-status" role="status" aria-live="polite" data-metrics-status></p>
+            </form>
+          </div>
         </div>
 
         <!-- Current Training Program Section -->
@@ -191,6 +192,38 @@
       </div>
     </div>
   </main>
+
+  <div class="admin-modal" data-coach-program-modal hidden>
+    <div class="admin-modal-backdrop" data-coach-program-close></div>
+    <div class="admin-modal-panel admin-assign-modal-panel" role="dialog" aria-modal="true" aria-labelledby="coach-program-title">
+      <button type="button" class="admin-modal-close" data-coach-program-close aria-label="Close">&times;</button>
+      <h2 id="coach-program-title">Assign Training Program to Athlete</h2>
+
+      <div class="admin-modal-content">
+        <div class="admin-modal-section">
+          <h3 data-coach-program-athlete-label>Selected Athlete</h3>
+          <input
+            type="text"
+            class="admin-search"
+            placeholder="Search templates by name..."
+            data-coach-program-search
+          />
+          <div class="admin-assign-list" data-coach-program-list>
+            <p class="admin-loading">Loading templates...</p>
+          </div>
+        </div>
+
+        <div class="admin-modal-section">
+          <div class="admin-modal-actions">
+            <button type="button" class="btn admin-btn-primary" data-coach-program-assign>Assign to Athlete</button>
+            <button type="button" class="btn admin-btn-reset-password" data-coach-program-close>Cancel</button>
+          </div>
+        </div>
+
+        <p class="admin-modal-status" role="status" aria-live="polite" data-coach-program-status></p>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== Footer ===== -->
   <footer style="background: #0e4749; color: #fff; padding: 32px 0 16px 0; text-align: center; margin-top: 48px;">

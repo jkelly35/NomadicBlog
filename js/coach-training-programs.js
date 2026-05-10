@@ -1,0 +1,739 @@
+(function () {
+  var ADMIN_EMAIL = "joe@nomadicperformance.com";
+  var TEMPLATE_LIBRARY_KEY = "nomadic_training_program_templates_v1";
+  var TEMPLATE_MARKER = "__NOMADIC_TEMPLATE__";
+
+  var state = {
+    client: null,
+    user: null,
+    guardEl: null,
+    contentEl: null,
+    templates: [],
+    athletes: [],
+    assignmentTemplateId: null,
+    filter: "active"
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    init();
+  });
+
+  function init() {
+    state.guardEl = document.querySelector("[data-programs-guard]");
+    state.contentEl = document.querySelector("[data-programs-content]");
+
+    if (!window.supabase || !window.supabase.createClient) {
+      showGuardError("Supabase client library failed to load.");
+      return;
+    }
+
+    var url = window.NOMADIC_SUPABASE_URL;
+    var key = window.NOMADIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      showGuardError("Supabase configuration is incomplete.");
+      return;
+    }
+
+    state.client = window.supabase.createClient(url, key);
+
+    state.client.auth.getSession().then(function (result) {
+      var session = result && result.data && result.data.session;
+      if (!session || !session.user) {
+        redirectHome();
+        return;
+      }
+
+      state.user = session.user;
+      if (String(state.user.email || "").toLowerCase() !== ADMIN_EMAIL) {
+        showGuardError("You do not have permission to access this page.");
+        setTimeout(redirectHome, 1800);
+        return;
+      }
+
+      showContent();
+      bindEvents();
+      loadTemplates();
+      loadAthletes();
+    });
+
+    state.client.auth.onAuthStateChange(function (_event, session) {
+      if (!session) {
+        redirectHome();
+      }
+    });
+  }
+
+  function bindEvents() {
+    var createBtn = document.querySelector("[data-programs-create]");
+    if (createBtn) {
+      createBtn.addEventListener("click", function () {
+        window.location.href = "training-program-example.html?builder=1";
+      });
+    }
+
+    var filters = document.querySelector("[data-programs-filters]");
+    if (filters) {
+      filters.addEventListener("click", function (event) {
+        var filterBtn = event.target.closest("[data-programs-filter]");
+        if (!filterBtn) {
+          return;
+        }
+
+        state.filter = filterBtn.getAttribute("data-programs-filter") || "active";
+        Array.prototype.slice
+          .call(filters.querySelectorAll("[data-programs-filter]"))
+          .forEach(function (btn) {
+            btn.classList.remove("active");
+          });
+        filterBtn.classList.add("active");
+        renderTemplates();
+      });
+    }
+
+    var list = document.querySelector("[data-programs-list]");
+    if (list) {
+      list.addEventListener("click", function (event) {
+        var actionTarget = event.target.closest("[data-program-action]");
+        if (!actionTarget) {
+          return;
+        }
+
+        var action = actionTarget.getAttribute("data-program-action");
+        var templateId = actionTarget.getAttribute("data-program-id");
+        if (!templateId) {
+          return;
+        }
+
+        if (action === "edit") {
+          window.location.href =
+            "training-program-example.html?builder=1&templateId=" + encodeURIComponent(templateId);
+          return;
+        }
+
+        if (action === "assign") {
+          onAssignTemplate(templateId);
+          return;
+        }
+
+        if (action === "duplicate") {
+          onDuplicateTemplate(templateId);
+          return;
+        }
+
+        if (action === "archive") {
+          onToggleArchive(templateId);
+          return;
+        }
+
+        if (action === "delete") {
+          onDeleteTemplate(templateId);
+        }
+      });
+    }
+
+    var closeAssignBtns = document.querySelectorAll("[data-programs-assign-close]");
+    closeAssignBtns.forEach(function (btn) {
+      btn.addEventListener("click", closeAssignModal);
+    });
+
+    var assignSearch = document.querySelector("[data-programs-assign-search]");
+    if (assignSearch) {
+      assignSearch.addEventListener("input", function () {
+        renderAssignAthleteList(assignSearch.value || "");
+      });
+    }
+
+    var selectAllBtn = document.querySelector("[data-programs-assign-select-all]");
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener("click", function () {
+        var list = document.querySelector("[data-programs-assign-list]");
+        if (!list) return;
+        list.querySelectorAll("[data-programs-assign-athlete]").forEach(function (checkbox) {
+          checkbox.checked = true;
+        });
+      });
+    }
+
+    var clearAllBtn = document.querySelector("[data-programs-assign-clear-all]");
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener("click", function () {
+        var list = document.querySelector("[data-programs-assign-list]");
+        if (!list) return;
+        list.querySelectorAll("[data-programs-assign-athlete]").forEach(function (checkbox) {
+          checkbox.checked = false;
+        });
+      });
+    }
+
+    var assignSubmitBtn = document.querySelector("[data-programs-assign-submit]");
+    if (assignSubmitBtn) {
+      assignSubmitBtn.addEventListener("click", onConfirmAssignTemplate);
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        closeAssignModal();
+      }
+    });
+  }
+
+  function loadAthletes() {
+    if (!state.client) {
+      state.athletes = [];
+      return;
+    }
+
+    state.client
+      .from("admin_all_users")
+      .select("user_id,email,name,sport")
+      .order("user_created_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        state.athletes = result.data || [];
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to load athletes.", "error");
+      });
+  }
+
+  function loadTemplates() {
+    if (!state.client) {
+      state.templates = readTemplateLibrary();
+      renderTemplates();
+      return;
+    }
+
+    state.client
+      .from("training_programs")
+      .select("id,name,description,created_at,updated_at")
+      .order("updated_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingTableError(result.error)) {
+            state.templates = readTemplateLibrary();
+            renderTemplates();
+            setStatus("Using local templates until Supabase training_programs is available.", "info");
+            return;
+          }
+
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        state.templates = (result.data || [])
+          .map(parseTemplateRow)
+          .filter(function (template) {
+            return !!template;
+          })
+          .sort(function (a, b) {
+            var aDate = new Date(a.updated_at || a.created_at || 0).getTime();
+            var bDate = new Date(b.updated_at || b.created_at || 0).getTime();
+            return bDate - aDate;
+          });
+
+        renderTemplates();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to load templates.", "error");
+      });
+  }
+
+  function renderTemplates() {
+    var list = document.querySelector("[data-programs-list]");
+    if (!list) {
+      return;
+    }
+
+    var visible = state.templates.filter(function (template) {
+      if (state.filter === "all") {
+        return true;
+      }
+      if (state.filter === "archived") {
+        return !!template.archived;
+      }
+      return !template.archived;
+    });
+
+    if (!visible.length) {
+      list.innerHTML = '<p class="admin-loading">No templates in this view yet.</p>';
+      return;
+    }
+
+    list.innerHTML = visible
+      .map(function (template) {
+        var archiveLabel = template.archived ? "Unarchive" : "Archive";
+        return (
+          '<article class="admin-program-item">' +
+          '<div class="admin-program-item-main">' +
+          '<h3>' + escapeHtml(template.name || "Untitled Template") + '</h3>' +
+          '<p>Last updated: ' + escapeHtml(formatDate(template.updated_at || template.created_at)) +
+          (template.archived ? " · Archived" : "") +
+          '</p>' +
+          '</div>' +
+          '<div class="admin-program-item-actions">' +
+          '<button type="button" class="btn admin-btn-small" data-program-action="edit" data-program-id="' + escapeAttribute(template.id) + '">Edit</button>' +
+          '<button type="button" class="btn admin-btn-small" data-program-action="assign" data-program-id="' + escapeAttribute(template.id) + '">Assign</button>' +
+          '<button type="button" class="btn admin-btn-small" data-program-action="duplicate" data-program-id="' + escapeAttribute(template.id) + '">Duplicate</button>' +
+          '<button type="button" class="btn admin-btn-archive-mini" data-program-action="archive" data-program-id="' + escapeAttribute(template.id) + '">' + archiveLabel + '</button>' +
+          '<button type="button" class="btn admin-btn-delete-mini" data-program-action="delete" data-program-id="' + escapeAttribute(template.id) + '">Delete</button>' +
+          '</div>' +
+          '</article>'
+        );
+      })
+      .join("");
+  }
+
+  function onAssignTemplate(templateId) {
+    if (!templateId) {
+      return;
+    }
+
+    var template = getTemplateById(templateId);
+    if (!template || !state.client) {
+      setStatus("Template not found.", "error");
+      return;
+    }
+
+    if (!state.athletes.length) {
+      setStatus("Load athletes before assigning templates.", "error");
+      return;
+    }
+
+    state.assignmentTemplateId = templateId;
+
+    var titleEl = document.querySelector("[data-programs-assign-template-name]");
+    if (titleEl) {
+      titleEl.textContent = "Assign: " + (template.name || "Template");
+    }
+
+    var searchInput = document.querySelector("[data-programs-assign-search]");
+    if (searchInput) {
+      searchInput.value = "";
+    }
+
+    setAssignStatus("", "info");
+    renderAssignAthleteList("");
+    showAssignModal();
+  }
+
+  function renderAssignAthleteList(searchTerm) {
+    var list = document.querySelector("[data-programs-assign-list]");
+    if (!list) {
+      return;
+    }
+
+    var query = String(searchTerm || "").trim().toLowerCase();
+    var filtered = state.athletes.filter(function (athlete) {
+      if (!query) {
+        return true;
+      }
+
+      var email = String(athlete.email || "").toLowerCase();
+      var name = String(athlete.name || "").toLowerCase();
+      var sport = String(athlete.sport || "").toLowerCase();
+      return email.indexOf(query) > -1 || name.indexOf(query) > -1 || sport.indexOf(query) > -1;
+    });
+
+    if (!filtered.length) {
+      list.innerHTML = '<p class="admin-loading">No athletes match this search.</p>';
+      return;
+    }
+
+    list.innerHTML = filtered
+      .map(function (athlete) {
+        return (
+          '<label class="admin-assign-item">' +
+          '<input type="checkbox" data-programs-assign-athlete data-athlete-id="' + escapeAttribute(athlete.user_id || "") + '" />' +
+          '<span class="admin-assign-item-main">' +
+          '<strong>' + escapeHtml(athlete.name || athlete.email || "Athlete") + '</strong>' +
+          '<small>' + escapeHtml(athlete.email || "") + (athlete.sport ? " • " + escapeHtml(athlete.sport) : "") + '</small>' +
+          '</span>' +
+          '</label>'
+        );
+      })
+      .join("");
+  }
+
+  function onConfirmAssignTemplate() {
+    var template = getTemplateById(state.assignmentTemplateId);
+    if (!template || !state.client) {
+      setAssignStatus("Template not found.", "error");
+      return;
+    }
+
+    var list = document.querySelector("[data-programs-assign-list]");
+    if (!list) {
+      return;
+    }
+
+    var selectedIds = Array.prototype.slice
+      .call(list.querySelectorAll("[data-programs-assign-athlete]:checked"))
+      .map(function (checkbox) {
+        return String(checkbox.getAttribute("data-athlete-id") || "").trim();
+      })
+      .filter(function (id) {
+        return !!id;
+      });
+
+    if (!selectedIds.length) {
+      setAssignStatus("Select at least one athlete.", "error");
+      return;
+    }
+
+    var now = new Date().toISOString();
+    var rows = selectedIds.map(function (userId) {
+      return {
+        user_id: userId,
+        program_id: template.id,
+        program_name: template.name,
+        is_active: true,
+        assigned_at: now,
+        assigned_by: state.user ? state.user.id : null
+      };
+    });
+
+    setAssignStatus("Assigning template to " + selectedIds.length + " athlete(s)...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .update({ is_active: false })
+      .in("user_id", selectedIds)
+      .eq("is_active", true)
+      .then(function (deactivateResult) {
+        if (deactivateResult.error) {
+          setAssignStatus(deactivateResult.error.message, "error");
+          return;
+        }
+
+        state.client
+          .from("user_training_programs")
+          .insert(rows)
+          .then(function (insertResult) {
+            if (insertResult.error) {
+              setAssignStatus(insertResult.error.message, "error");
+              return;
+            }
+
+            setAssignStatus("Assigned template to " + selectedIds.length + " athlete(s).", "success");
+            setStatus("Assigned '" + (template.name || "Template") + "' to " + selectedIds.length + " athlete(s).", "success");
+            setTimeout(function () {
+              closeAssignModal();
+            }, 700);
+          })
+          .catch(function (error) {
+            setAssignStatus(error && error.message ? error.message : "Failed to assign template.", "error");
+          });
+      })
+      .catch(function (error) {
+        setAssignStatus(error && error.message ? error.message : "Failed to assign template.", "error");
+      });
+  }
+
+  function showAssignModal() {
+    var modal = document.querySelector("[data-programs-assign-modal]");
+    if (modal) {
+      modal.hidden = false;
+      document.body.classList.add("admin-modal-open");
+    }
+  }
+
+  function closeAssignModal() {
+    var modal = document.querySelector("[data-programs-assign-modal]");
+    if (modal) {
+      modal.hidden = true;
+      document.body.classList.remove("admin-modal-open");
+    }
+
+    state.assignmentTemplateId = null;
+    setAssignStatus("", "info");
+  }
+
+  function setAssignStatus(message, variant) {
+    var statusEl = document.querySelector("[data-programs-assign-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
+  }
+
+  function onDuplicateTemplate(templateId) {
+    var template = getTemplateById(templateId);
+    if (!template || !state.client) {
+      setStatus("Template not found.", "error");
+      return;
+    }
+
+    var payload = {
+      archived: false,
+      structure: template.structure || { weeks: 1, workoutsPerWeek: 3 },
+      days: template.days || { "day-1": [], "day-2": [], "day-3": [] }
+    };
+
+    state.client
+      .from("training_programs")
+      .insert({
+        name: (template.name || "Template") + " (Copy)",
+        description: serializeTemplatePayload(payload)
+      })
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        setStatus("Template duplicated.", "success");
+        loadTemplates();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to duplicate template.", "error");
+      });
+  }
+
+  function onToggleArchive(templateId) {
+    var template = getTemplateById(templateId);
+    if (!template || !state.client) {
+      setStatus("Template not found.", "error");
+      return;
+    }
+
+    var payload = {
+      archived: !template.archived,
+      structure: template.structure || { weeks: 1, workoutsPerWeek: 3 },
+      days: template.days || { "day-1": [], "day-2": [], "day-3": [] }
+    };
+
+    state.client
+      .from("training_programs")
+      .update({ description: serializeTemplatePayload(payload) })
+      .eq("id", template.id)
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        setStatus(template.archived ? "Template unarchived." : "Template archived.", "info");
+        loadTemplates();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to update template.", "error");
+      });
+  }
+
+  function onDeleteTemplate(templateId) {
+    var template = getTemplateById(templateId);
+    if (!template || !state.client) {
+      setStatus("Template not found.", "error");
+      return;
+    }
+
+    if (!confirm("Delete " + (template.name || "this template") + "?")) {
+      return;
+    }
+
+    setStatus("Removing template from active athlete programs...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .update({ is_active: false })
+      .eq("program_id", templateId)
+      .eq("is_active", true)
+      .then(function (deactivateResult) {
+        if (deactivateResult.error) {
+          setStatus(deactivateResult.error.message, "error");
+          return;
+        }
+
+        state.client
+          .from("training_programs")
+          .delete()
+          .eq("id", templateId)
+          .then(function (result) {
+            if (result.error) {
+              setStatus(result.error.message, "error");
+              return;
+            }
+
+            setStatus("Template deleted and removed from active athlete programs.", "success");
+            loadTemplates();
+          })
+          .catch(function (error) {
+            setStatus(error && error.message ? error.message : "Failed to delete template.", "error");
+          });
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to remove template from athletes.", "error");
+      });
+  }
+
+  function getTemplateById(templateId) {
+    return state.templates.find(function (item) {
+      return item.id === templateId;
+    });
+  }
+
+  function parseTemplateRow(row) {
+    if (!row || !row.id) {
+      return null;
+    }
+
+    var payload = parseTemplatePayload(row.description);
+    if (!payload) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      name: row.name || "Untitled Template",
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      archived: !!payload.archived,
+      structure: payload.structure || { weeks: 1, workoutsPerWeek: 3 },
+      days: payload.days || { "day-1": [], "day-2": [], "day-3": [] }
+    };
+  }
+
+  function parseTemplatePayload(description) {
+    var value = String(description || "");
+    if (value.indexOf(TEMPLATE_MARKER) !== 0) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(value.slice(TEMPLATE_MARKER.length));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function serializeTemplatePayload(payload) {
+    var safePayload = {
+      archived: !!(payload && payload.archived),
+      structure: payload && payload.structure ? payload.structure : { weeks: 1, workoutsPerWeek: 3 },
+      days: payload && payload.days ? payload.days : { "day-1": [], "day-2": [], "day-3": [] }
+    };
+    return TEMPLATE_MARKER + JSON.stringify(safePayload);
+  }
+
+  function readTemplateLibrary() {
+    try {
+      var raw = window.localStorage.getItem(TEMPLATE_LIBRARY_KEY);
+      if (!raw) {
+        return [];
+      }
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.map(function (item) {
+        return {
+          id: item.id,
+          name: item.name || "Untitled Template",
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          archived: !!item.archived,
+          structure: item.structure || { weeks: 1, workoutsPerWeek: 3 },
+          days: item.days || {}
+        };
+      });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function isMissingTableError(error) {
+    var msg = error && error.message ? error.message.toLowerCase() : "";
+    return !!(error && error.code === "42P01") || msg.indexOf("does not exist") > -1;
+  }
+
+  function setStatus(message, variant) {
+    var statusEl = document.querySelector("[data-programs-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
+  }
+
+  function showContent() {
+    if (state.guardEl) {
+      state.guardEl.hidden = true;
+    }
+    if (state.contentEl) {
+      state.contentEl.hidden = false;
+    }
+  }
+
+  function showGuardError(message) {
+    if (!state.guardEl) {
+      return;
+    }
+
+    state.guardEl.innerHTML =
+      '<div style="padding: 2rem; text-align: center; color: #9f2d20;">' +
+      '<p style="font-size: 1.1rem; font-weight: 700;">' +
+      escapeHtml(message || "Access denied.") +
+      "</p>" +
+      '<p><a href="admin.html" class="btn" style="display:inline-block; margin-top: 1rem;">Return to Coaching Dashboard</a></p>' +
+      "</div>";
+  }
+
+  function redirectHome() {
+    window.location.href = "index.html";
+  }
+
+  function formatDate(dateString) {
+    try {
+      var date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+      });
+    } catch (e) {
+      return dateString || "N/A";
+    }
+  }
+
+  function escapeHtml(text) {
+    if (!text) return "";
+    var map = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    };
+    return String(text).replace(/[&<>"']/g, function (m) {
+      return map[m];
+    });
+  }
+
+  function escapeAttribute(text) {
+    return escapeHtml(String(text || "")).replace(/`/g, "");
+  }
+})();

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exercise Library - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/exercise-library.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="services.html">Services</a>
+      <a href="admin.html">Coaching Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+      <div data-library-guard>
+        <p class="admin-loading">Verifying admin access...</p>
+      </div>
+
+      <div class="admin-content" hidden data-library-content>
+        <div class="admin-header">
+          <h1>Exercise Library</h1>
+          <p class="admin-subtitle">Create, tag, and manage reusable exercises for programming.</p>
+        </div>
+
+        <div class="admin-programs">
+          <div class="admin-library-controls">
+            <input
+              type="text"
+              class="admin-search"
+              placeholder="Search by name, tags, sport, or equipment..."
+              data-library-search
+            />
+            <select class="admin-search" data-library-filter-pattern>
+              <option value="">All Movement Patterns</option>
+              <option value="squat">Squat</option>
+              <option value="hinge">Hinge</option>
+              <option value="push">Push</option>
+              <option value="pull">Pull</option>
+              <option value="carry">Carry</option>
+              <option value="rotation">Rotation</option>
+              <option value="core">Core</option>
+              <option value="plyometric">Plyometric</option>
+              <option value="locomotion">Locomotion</option>
+            </select>
+            <select class="admin-search" data-library-filter-sport>
+              <option value="">All Sports</option>
+              <option value="climbing">Climbing</option>
+              <option value="skiing">Skiing</option>
+              <option value="snowboarding">Snowboarding</option>
+              <option value="mountainbiking">Mountain Biking</option>
+              <option value="trail-running">Trail Running</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </div>
+
+          <div class="admin-library-list" data-library-list>
+            <p class="admin-loading">No exercises in library yet.</p>
+          </div>
+        </div>
+
+        <div class="admin-programs">
+          <h2 data-library-form-title>Add Exercise</h2>
+          <form class="admin-library-form" data-library-form>
+            <input type="hidden" data-library-id />
+            <div class="admin-modal-info-row">
+              <label>Exercise Name</label>
+              <input type="text" required data-library-name placeholder="e.g., Back Squat" />
+            </div>
+
+            <div class="admin-library-grid">
+              <div class="admin-modal-info-row">
+                <label>Movement Pattern</label>
+                <select data-library-pattern>
+                  <option value="">Select</option>
+                  <option value="squat">Squat</option>
+                  <option value="hinge">Hinge</option>
+                  <option value="push">Push</option>
+                  <option value="pull">Pull</option>
+                  <option value="carry">Carry</option>
+                  <option value="rotation">Rotation</option>
+                  <option value="core">Core</option>
+                  <option value="plyometric">Plyometric</option>
+                  <option value="locomotion">Locomotion</option>
+                </select>
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Equipment</label>
+                <select data-library-equipment>
+                  <option value="">Select</option>
+                  <option value="bodyweight">Bodyweight</option>
+                  <option value="barbell">Barbell</option>
+                  <option value="dumbbell">Dumbbell</option>
+                  <option value="kettlebell">Kettlebell</option>
+                  <option value="cable">Cable</option>
+                  <option value="machine">Machine</option>
+                  <option value="band">Band</option>
+                  <option value="sled">Sled</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Primary Muscle</label>
+                <select data-library-muscle>
+                  <option value="">Select</option>
+                  <option value="quads">Quads</option>
+                  <option value="glutes">Glutes</option>
+                  <option value="hamstrings">Hamstrings</option>
+                  <option value="calves">Calves</option>
+                  <option value="core">Core</option>
+                  <option value="back">Back</option>
+                  <option value="chest">Chest</option>
+                  <option value="shoulders">Shoulders</option>
+                  <option value="arms">Arms</option>
+                  <option value="full-body">Full Body</option>
+                </select>
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Training Goal</label>
+                <select data-library-goal>
+                  <option value="">Select</option>
+                  <option value="strength">Strength</option>
+                  <option value="power">Power</option>
+                  <option value="hypertrophy">Hypertrophy</option>
+                  <option value="endurance">Endurance</option>
+                  <option value="mobility">Mobility</option>
+                  <option value="stability">Stability</option>
+                  <option value="rehab">Rehab</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label>Sport Tags</label>
+              <div class="admin-library-sports">
+                <label><input type="checkbox" value="climbing" data-library-sport /> Climbing</label>
+                <label><input type="checkbox" value="skiing" data-library-sport /> Skiing</label>
+                <label><input type="checkbox" value="snowboarding" data-library-sport /> Snowboarding</label>
+                <label><input type="checkbox" value="mountainbiking" data-library-sport /> Mountain Biking</label>
+                <label><input type="checkbox" value="trail-running" data-library-sport /> Trail Running</label>
+                <label><input type="checkbox" value="mixed" data-library-sport /> Mixed</label>
+              </div>
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label>Custom Tags (comma separated)</label>
+              <input type="text" data-library-custom-tags placeholder="e.g., unilateral, low-impact, post-injury" />
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label>Description</label>
+              <textarea rows="2" data-library-description placeholder="What this exercise trains and why it is used."></textarea>
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label>Coaching Cues</label>
+              <textarea rows="2" data-library-cues placeholder="Key technical cues to coach this movement."></textarea>
+            </div>
+
+            <div class="admin-modal-actions">
+              <button type="submit" class="btn admin-btn-primary">Save Exercise</button>
+              <button type="button" class="btn admin-btn-reset-password" data-library-clear>New Exercise</button>
+              <a href="admin.html" class="btn admin-btn-reset-password" style="text-align:center;">Back to Dashboard</a>
+            </div>
+          </form>
+        </div>
+
+        <p class="admin-status" role="status" aria-live="polite" data-library-status></p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

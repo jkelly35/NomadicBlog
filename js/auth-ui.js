@@ -165,6 +165,15 @@
         if (!btn) state.authButton = mountLoginButton();
       }
     }
+
+    if (shouldForcePasswordUpdate(user)) {
+      var onUpdatePasswordPage = window.location.pathname.indexOf("update-password.html") > -1;
+      if (!onUpdatePasswordPage) {
+        window.location.href = "update-password.html?firstLogin=1";
+        return;
+      }
+    }
+
     syncModalMode();
   }
 
@@ -289,6 +298,12 @@
           return;
         }
 
+        var signedInUser = result && result.data && result.data.user ? result.data.user : null;
+        if (shouldForcePasswordUpdate(signedInUser)) {
+          window.location.href = "update-password.html?firstLogin=1";
+          return;
+        }
+
         // On successful sign in, redirect based on email
         var userEmail = (result.data && result.data.user && result.data.user.email) || email;
         if (userEmail === "joe@nomadicperformance.com") {
@@ -371,5 +386,13 @@
 
     state.status.textContent = "";
     state.status.classList.remove("is-error", "is-success", "is-info");
+  }
+
+  function shouldForcePasswordUpdate(user) {
+    if (!user || !user.user_metadata) {
+      return false;
+    }
+
+    return user.user_metadata.must_change_password === true;
   }
 })();

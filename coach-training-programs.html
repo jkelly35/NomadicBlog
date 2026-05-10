@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coach Training Programs - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/coach-training-programs.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="services.html">Services</a>
+      <a href="admin.html">Coaching Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+      <div data-programs-guard>
+        <p class="admin-loading">Verifying admin access...</p>
+      </div>
+
+      <div class="admin-content" hidden data-programs-content>
+        <div class="admin-header">
+          <h1>Training Programs</h1>
+          <p class="admin-subtitle">View all templates and create new programs.</p>
+        </div>
+
+        <section class="admin-programs" aria-label="Training Program Templates">
+          <div class="admin-programs-header">
+            <div>
+              <h2>Program Library</h2>
+              <p>Manage existing templates and build new ones.</p>
+            </div>
+            <div class="admin-programs-header-actions">
+              <button class="btn admin-btn-refresh" type="button" data-programs-create>
+                + Create Training Program
+              </button>
+              <a class="btn admin-btn-reset-password" href="admin.html">Back to Dashboard</a>
+            </div>
+          </div>
+
+          <div class="admin-program-filters" data-programs-filters>
+            <button type="button" class="admin-filter-btn active" data-programs-filter="active">Active</button>
+            <button type="button" class="admin-filter-btn" data-programs-filter="archived">Archived</button>
+            <button type="button" class="admin-filter-btn" data-programs-filter="all">All</button>
+          </div>
+
+          <div class="admin-program-list" data-programs-list>
+            <p class="admin-loading">Loading templates...</p>
+          </div>
+        </section>
+
+        <p class="admin-status" role="status" aria-live="polite" data-programs-status></p>
+      </div>
+    </div>
+  </main>
+
+  <div class="admin-modal" data-programs-assign-modal hidden>
+    <div class="admin-modal-backdrop" data-programs-assign-close></div>
+    <div class="admin-modal-panel admin-assign-modal-panel" role="dialog" aria-modal="true" aria-labelledby="programs-assign-title">
+      <button type="button" class="admin-modal-close" data-programs-assign-close aria-label="Close">&times;</button>
+      <h2 id="programs-assign-title">Assign Training Program</h2>
+
+      <div class="admin-modal-content">
+        <div class="admin-modal-section">
+          <h3 data-programs-assign-template-name>Template</h3>
+          <div class="admin-assign-controls">
+            <input
+              type="text"
+              class="admin-search"
+              placeholder="Search athletes by name, email, or sport..."
+              data-programs-assign-search
+            />
+            <div class="admin-assign-actions">
+              <button type="button" class="btn admin-btn-small" data-programs-assign-select-all>Select All</button>
+              <button type="button" class="btn admin-btn-small" data-programs-assign-clear-all>Clear</button>
+            </div>
+          </div>
+          <div class="admin-assign-list" data-programs-assign-list>
+            <p class="admin-loading">Loading athletes...</p>
+          </div>
+        </div>
+
+        <div class="admin-modal-section">
+          <div class="admin-modal-actions">
+            <button type="button" class="btn admin-btn-primary" data-programs-assign-submit>Assign to Selected Athletes</button>
+            <button type="button" class="btn admin-btn-reset-password" data-programs-assign-close>Cancel</button>
+          </div>
+        </div>
+
+        <p class="admin-modal-status" role="status" aria-live="polite" data-programs-assign-status></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
