@@ -848,6 +848,7 @@
         }
 
          updateYBalanceDraftValue(card);
+         updateSingleLegSquatDraftValue(card);
          updateEdgePullDraftValue(card);
          updateGrantDraftValue(card);
         updateLegLengthEstimateNote(card);
@@ -2907,6 +2908,7 @@
     var categoryInput = card.querySelector('[data-metric-edit="category"]');
     var legLengthNote = card.querySelector("[data-leglength-estimate-note]");
     var isYBalance = isYBalanceMetricName(metric.metric_name || "");
+    var isSingleLegSquat = isSingleLegSquatMetricName(metric.metric_name || "");
     var isEdgePull = isEdgePullMetricName(metric.metric_name || "");
     var isGrant = isAdaptedGrantFootRaiseMetricName(metric.metric_name || "");
 
@@ -2940,7 +2942,7 @@
     }
 
     if (yBalanceGrid) {
-      yBalanceGrid.hidden = !(isYBalance || isEdgePull);
+      yBalanceGrid.hidden = !(isYBalance || isEdgePull || isSingleLegSquat);
     }
 
     if (grantGrid) {
@@ -2975,6 +2977,39 @@
     }
 
     card.removeAttribute("data-metric-ybalance");
+
+    if (isSingleLegSquat) {
+      card.setAttribute("data-metric-squat", "true");
+
+      var leftSquatMetric = metric._pairedSideMetrics && metric._pairedSideMetrics.left;
+      var rightSquatMetric = metric._pairedSideMetrics && metric._pairedSideMetrics.right;
+      var leftSquatParsed = parseNumericMetricValue(leftSquatMetric && leftSquatMetric.metric_value);
+      var rightSquatParsed = parseNumericMetricValue(rightSquatMetric && rightSquatMetric.metric_value);
+      var shouldBlankForTestSquat = modeValue === "test";
+
+      if (leftInput) {
+        leftInput.value = shouldBlankForTestSquat
+          ? ""
+          : (Number.isFinite(leftSquatParsed) ? formatMetricNumber(leftSquatParsed) : "");
+      }
+      if (rightInput) {
+        rightInput.value = shouldBlankForTestSquat
+          ? ""
+          : (Number.isFinite(rightSquatParsed) ? formatMetricNumber(rightSquatParsed) : "");
+      }
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+
+      updateSingleLegSquatDraftValue(card);
+
+      if (leftInput) {
+        leftInput.focus();
+      }
+      return;
+    }
+
+    card.removeAttribute("data-metric-squat");
 
     if (isEdgePull) {
       card.setAttribute("data-metric-edgepull", "true");
@@ -5648,6 +5683,51 @@
     }
   }
 
+  function updateSingleLegSquatDraftValue(card) {
+    if (!card) {
+      return;
+    }
+
+    var name = String((card.querySelector('[data-metric-edit="name"]') || {}).value || "").trim();
+    if (!isSingleLegSquatMetricName(name)) {
+      card.removeAttribute("data-metric-squat");
+      return;
+    }
+
+    card.setAttribute("data-metric-squat", "true");
+
+    var leftRaw = String((card.querySelector('[data-metric-edit="left"]') || {}).value || "").trim();
+    var rightRaw = String((card.querySelector('[data-metric-edit="right"]') || {}).value || "").trim();
+    var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
+    var symmetryInput = card.querySelector('[data-metric-edit="symmetry"]');
+    var valueInput = card.querySelector('[data-metric-edit="value"]');
+
+    var left = parseNumericMetricValue(leftRaw);
+    var right = parseNumericMetricValue(rightRaw);
+
+    if (left === null || right === null) {
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+      if (valueInput) {
+        valueInput.value = "";
+      }
+      return;
+    }
+
+    var leftText = formatMetricDisplayValue(left, unit);
+    var rightText = formatMetricDisplayValue(right, unit);
+    var symmetry = calculateSymmetryPercent(left, right);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    if (symmetryInput) {
+      symmetryInput.value = symmetryText;
+    }
+    if (valueInput) {
+      valueInput.value = "L Leg " + leftText + " | R Leg " + rightText + " | Symmetry " + symmetryText;
+    }
+  }
+
   function updateEdgePullDraftValue(card) {
     if (!card) {
       return;
@@ -5983,7 +6063,102 @@
     var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
     var category = String((card.querySelector('[data-metric-edit="category"]') || {}).value || "").trim() || "Performance";
     var isYBalance = isYBalanceMetricName(name);
+    var isSingleLegSquat = isSingleLegSquatMetricName(name);
     var isEdgePull = isEdgePullMetricName(name);
+
+    if (isSingleLegSquat) {
+      updateSingleLegSquatDraftValue(card);
+
+      var leftSquatInput = card.querySelector('[data-metric-edit="left"]');
+      var rightSquatInput = card.querySelector('[data-metric-edit="right"]');
+      var leftSquatRaw = String((leftSquatInput && leftSquatInput.value) || "").trim();
+      var rightSquatRaw = String((rightSquatInput && rightSquatInput.value) || "").trim();
+      var leftSquatValue = parseNumericMetricValue(leftSquatRaw);
+      var rightSquatValue = parseNumericMetricValue(rightSquatRaw);
+
+      if (!Number.isFinite(leftSquatValue) || !Number.isFinite(rightSquatValue)) {
+        setMetricsStatus("Single Leg Squat requires both L Leg and R Leg values.", "error");
+        return;
+      }
+
+      var squatBaseName = String(name || "")
+        .replace(/\s*\((left|right)\)\s*$/i, "")
+        .trim();
+      var squatLeftName = squatBaseName + " (Left)";
+      var squatRightName = squatBaseName + " (Right)";
+
+      var squatPayloads = [
+        {
+          user_id: viewedUserId,
+          metric_name: squatLeftName,
+          metric_value: formatMetricNumber(leftSquatValue),
+          metric_unit: unit,
+          metric_category: category,
+          updated_at: new Date().toISOString()
+        },
+        {
+          user_id: viewedUserId,
+          metric_name: squatRightName,
+          metric_value: formatMetricNumber(rightSquatValue),
+          metric_unit: unit,
+          metric_category: category,
+          updated_at: new Date().toISOString()
+        }
+      ];
+
+      var squatMetricKey = String(card.getAttribute("data-metric-key") || "");
+      var currentSquatMetric = findLatestMetricByKey(squatMetricKey);
+      var currentSquatPair = currentSquatMetric && currentSquatMetric._pairedSideMetrics ? currentSquatMetric._pairedSideMetrics : null;
+      var currentSquatLeft = parseNumericMetricValue(currentSquatPair && currentSquatPair.left && currentSquatPair.left.metric_value);
+      var currentSquatRight = parseNumericMetricValue(currentSquatPair && currentSquatPair.right && currentSquatPair.right.metric_value);
+      var hasSameSquatValues =
+        Number.isFinite(currentSquatLeft) && Number.isFinite(currentSquatRight) &&
+        currentSquatLeft === leftSquatValue &&
+        currentSquatRight === rightSquatValue &&
+        normalizeMetricValue(currentSquatMetric && currentSquatMetric.metric_unit) === normalizeMetricValue(unit) &&
+        normalizeMetricValue(currentSquatMetric && currentSquatMetric.metric_category) === normalizeMetricValue(category) &&
+        normalizeMetricValue(currentSquatMetric && currentSquatMetric.metric_name) === normalizeMetricValue(squatBaseName);
+
+      if (hasSameSquatValues && mode !== "test") {
+        setMetricsStatus("No metric changes detected.", "info");
+        closeMetricCardEditor(card);
+        return;
+      }
+
+      setMetricsStatus(mode === "test" ? "Logging new side-specific test score..." : "Saving side-specific metric update...", "info");
+
+      state.client
+        .from("athlete_metrics")
+        .insert(squatPayloads)
+        .select("*")
+        .then(function (insertResult) {
+          if (insertResult.error) {
+            if (isMissingRelationError(insertResult.error)) {
+              setMetricsStatus("Metrics table not found. Create athlete_metrics in Supabase before saving metrics.", "error");
+              return;
+            }
+
+            if (isRlsError(insertResult.error)) {
+              setMetricsStatus("Permission denied by database policy while saving metrics. Ask admin to update athlete_metrics RLS policy for coach edits.", "error");
+              return;
+            }
+
+            setMetricsStatus(insertResult.error.message, "error");
+            return;
+          }
+
+          var inserted = Array.isArray(insertResult.data) ? insertResult.data : squatPayloads;
+          state.metrics = inserted.concat(state.metrics || []);
+          state.metricsLatest = getLatestMetrics(state.metrics);
+          renderMetricsCards();
+          renderMetricRowsFromData(state.metricsLatest);
+          setMetricsStatus(mode === "test" ? "New side-specific test score logged." : "Metric updated.", "success");
+        })
+        .catch(function (error) {
+          setMetricsStatus(error && error.message ? error.message : "Failed to save metric.", "error");
+        });
+      return;
+    }
 
     if (isEdgePull) {
       updateEdgePullDraftValue(card);
