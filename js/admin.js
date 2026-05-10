@@ -5,6 +5,132 @@
   var EXERCISE_LIBRARY_KEY = "nomadic_exercise_library_v1";
   var EXERCISE_LIBRARY_TABLE = "exercise_library";
   var TEMPLATE_MARKER = "__NOMADIC_TEMPLATE__";
+  var METRIC_TEMPLATES_BY_SPORT = {
+    running: [
+      { name: "Vertical Jump", unit: "cm", category: "Strength" },
+      { name: "Single Leg Squat Test", unit: "reps", category: "Strength", bilateral: true },
+      { name: "Single Leg Heel Raise", unit: "reps", category: "Strength", bilateral: true },
+      { name: "Side Plank with Hip Abduction", unit: "sec", category: "Strength", bilateral: true },
+      { name: "Y Balance", unit: "%", category: "Mobility", bilateral: true }
+    ],
+    cycling: [
+      { name: "20-min Power (FTP Estimate)", unit: "watts", category: "Performance" },
+      { name: "Resting HR", unit: "bpm", category: "Cardio" },
+      { name: "Max HR", unit: "bpm", category: "Cardio" },
+      { name: "VO2 Max (estimated)", unit: "ml/kg/min", category: "Cardio" },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Single Leg Squat", unit: "reps", category: "Strength", bilateral: true },
+      { name: "Hip Flexor Flexibility", unit: "deg", category: "Mobility" }
+    ],
+    skiing: [
+      { name: "Single Leg Sit to Stand", unit: "reps", category: "Strength" },
+      { name: "Side Plank", unit: "sec", category: "Strength", bilateral: true },
+      { name: "Nordic Hamstring", unit: "reps", category: "Strength" },
+      { name: "Broad Jump", unit: "cm", category: "Strength" },
+      { name: "Triple Hop", unit: "cm", category: "Performance" },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Step Down", unit: "reps", category: "Mobility" },
+      { name: "Resting HR", unit: "bpm", category: "Cardio" }
+    ],
+    snowboarding: [
+      { name: "Single Leg Sit to Stand", unit: "reps", category: "Strength" },
+      { name: "Side Plank", unit: "sec", category: "Strength", bilateral: true },
+      { name: "Broad Jump", unit: "cm", category: "Performance" },
+      { name: "Triple Hop", unit: "cm", category: "Performance" },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Step Down", unit: "reps", category: "Mobility" },
+      { name: "Resting HR", unit: "bpm", category: "Cardio" }
+    ],
+    climbing: [
+      { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
+      { name: "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)", unit: "reps", category: "Strength" },
+      { name: "20mm Edge Pull", unit: "kg", category: "Strength", bilateral: true },
+      { name: "Max Pull Ups", unit: "reps", category: "Strength" },
+      { name: "Max Hang", unit: "sec", category: "Performance" },
+      { name: "90 Degree Bent Leg Hang", unit: "sec", category: "Strength" },
+      { name: "Adapted Grant Foot Raise", unit: "deg", category: "Mobility", bilateral: true },
+      { name: "Ape Index", unit: "cm", category: "Performance", apeIndex: true }
+    ],
+    hiking: [
+      { name: "6-min Walk", unit: "m", category: "Cardio" },
+      { name: "Step-down", unit: "reps", category: "Strength" },
+      { name: "Single Leg Balance", unit: "sec", category: "Mobility" },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Resting HR", unit: "bpm", category: "Cardio" },
+      { name: "Grip Strength", unit: "kg", category: "Strength" },
+      { name: "Loaded Carry (15kg)", unit: "min", category: "Performance" }
+    ]
+  };
+  var BASELINE_TEMPLATES = {
+    running: [
+      { name: "Vertical Jump", unit: "cm", category: "Strength" },
+      { name: "Single Leg Squat Test", unit: "reps", category: "Strength", bilateral: true },
+      { name: "Single Leg Heel Raise", unit: "reps", category: "Strength", bilateral: true },
+      { name: "Side Plank with Hip Abduction", unit: "sec", category: "Strength", bilateral: true },
+      { name: "Y Balance", unit: "%", category: "Mobility", bilateral: true }
+    ],
+    cycling: [
+      { name: "20-min Power (FTP Estimate)", unit: "watts", category: "Performance" },
+      { name: "Resting HR", unit: "bpm", category: "Cardio" },
+      { name: "Max HR", unit: "bpm", category: "Cardio" },
+      { name: "VO2 Max (estimated)", unit: "ml/kg/min", category: "Cardio" },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Single Leg Squat", unit: "reps", category: "Strength", bilateral: true },
+      { name: "Hip Flexor Flexibility", unit: "deg", category: "Mobility" }
+    ],
+    skiing: [
+      { name: "Single Leg Sit to Stand", unit: "reps", category: "Strength" },
+      { name: "Side Plank", unit: "sec", category: "Strength", bilateral: true },
+      { name: "Nordic Hamstring", unit: "reps", category: "Strength" },
+      { name: "Broad Jump", unit: "cm", category: "Strength" },
+      { name: "Triple Hop", unit: "cm", category: "Performance" },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Step Down", unit: "reps", category: "Mobility" },
+      { name: "Resting HR", unit: "bpm", category: "Cardio" }
+    ],
+    snowboarding: [
+      { name: "Single Leg Sit to Stand", unit: "reps", category: "Strength" },
+      { name: "Side Plank", unit: "sec", category: "Strength", bilateral: true },
+      { name: "Broad Jump", unit: "cm", category: "Performance" },
+      { name: "Triple Hop", unit: "cm", category: "Performance" },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Step Down", unit: "reps", category: "Mobility" },
+      { name: "Resting HR", unit: "bpm", category: "Cardio" }
+    ],
+    climbing: [
+      { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
+      { name: "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)", unit: "reps", category: "Strength" },
+      { name: "20mm Edge Pull", unit: "kg", category: "Strength", bilateral: true },
+      { name: "Max Pull Ups", unit: "reps", category: "Strength" },
+      { name: "Max Hang", unit: "sec", category: "Performance" },
+      { name: "90 Degree Bent Leg Hang", unit: "sec", category: "Strength" },
+      { name: "Adapted Grant Foot Raise", unit: "deg", category: "Mobility", bilateral: true },
+      { name: "Ape Index", unit: "cm", category: "Performance", apeIndex: true }
+    ],
+    hiking: [
+      { name: "6-min Walk", unit: "m", category: "Cardio" },
+      { name: "Step-down", unit: "reps", category: "Strength" },
+      { name: "Single Leg Balance", unit: "sec", category: "Mobility" },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Resting HR", unit: "bpm", category: "Cardio" },
+      { name: "Grip Strength", unit: "kg", category: "Strength" },
+      { name: "Loaded Carry (15kg)", unit: "min", category: "Performance" }
+    ],
+    general: [
+      { name: "Resting HR", unit: "bpm", category: "Cardio" },
+      { name: "Push-up Max", unit: "reps", category: "Strength" },
+      { name: "Pull-up Max", unit: "reps", category: "Strength" },
+      { name: "Broad Jump", unit: "cm", category: "Strength" },
+      { name: "Plank Hold", unit: "sec", category: "Strength" },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Hip Flexion", unit: "deg", category: "Mobility" },
+      { name: "1-Mile Run", unit: "mm:ss", category: "Cardio" }
+    ]
+  };
   var state = {
     client: null,
     user: null,
@@ -99,6 +225,78 @@
       addAthleteBtn.addEventListener("click", onAddAthleteAccount);
     }
 
+    var addAthleteForm = document.querySelector("[data-admin-add-athlete-form]");
+    if (addAthleteForm) {
+      addAthleteForm.addEventListener("submit", onSubmitAddAthleteAccount);
+    }
+
+    var addAthleteGenerate = document.querySelector("[data-admin-add-athlete-generate-password]");
+    if (addAthleteGenerate) {
+      addAthleteGenerate.addEventListener("change", toggleAddAthletePasswordMode);
+    }
+
+    var addAthleteSport = document.querySelector("[data-admin-add-athlete-sport]");
+    if (addAthleteSport) {
+      addAthleteSport.addEventListener("change", function () {
+        var sportToKey = {
+          running: "running", cycling: "cycling",
+          skiing: "skiing", snowboarding: "snowboarding",
+          climbing: "climbing", hiking: "hiking"
+        };
+        var raw = String(this.value || "").trim().toLowerCase();
+        var key = sportToKey[raw] || "general";
+        var templateSelect = document.querySelector("[data-admin-add-athlete-template-select]");
+        if (templateSelect) {
+          templateSelect.value = key;
+        }
+        loadAddAthleteTemplate(key);
+      });
+    }
+
+    document.querySelectorAll("[data-admin-add-athlete-close]").forEach(function (button) {
+      button.addEventListener("click", closeAddAthleteModal);
+    });
+
+    var addAthleteCopyBtn = document.querySelector("[data-admin-add-athlete-copy]");
+    if (addAthleteCopyBtn) {
+      addAthleteCopyBtn.addEventListener("click", copyAddAthleteCredentials);
+    }
+
+    var addMetricRowBtn = document.querySelector("[data-admin-add-athlete-metric-row-add]");
+    if (addMetricRowBtn) {
+      addMetricRowBtn.addEventListener("click", function () {
+        appendAddAthleteMetricRow({ name: "", value: "", unit: "", category: "Performance" });
+      });
+    }
+
+    var loadTemplateBtn = document.querySelector("[data-admin-add-athlete-template-load]");
+    if (loadTemplateBtn) {
+      loadTemplateBtn.addEventListener("click", function () {
+        var templateSelect = document.querySelector("[data-admin-add-athlete-template-select]");
+        var key = templateSelect ? String(templateSelect.value || "").trim() : "";
+        if (!key) {
+          setAddAthleteStatus("Please choose a template from the dropdown first.", "error");
+          return;
+        }
+        loadAddAthleteTemplate(key);
+      });
+    }
+
+    var addAthleteMetricsList = document.querySelector("[data-admin-add-athlete-metrics]");
+    if (addAthleteMetricsList) {
+      addAthleteMetricsList.addEventListener("click", function (event) {
+        var removeBtn = event.target && event.target.closest("[data-admin-add-athlete-metric-remove]");
+        if (!removeBtn) {
+          return;
+        }
+
+        var row = removeBtn.closest("[data-admin-add-athlete-metric-row]");
+        if (row && row.parentNode) {
+          row.parentNode.removeChild(row);
+        }
+      });
+    }
+
 
     var modalBackdrop = document.querySelector("[data-admin-modal-close]");
     if (modalBackdrop) {
@@ -182,6 +380,7 @@
 
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
+        closeAddAthleteModal();
         closeModal();
         closeAssignModal();
         closeExerciseLibraryModal();
@@ -1209,8 +1408,8 @@
 
     // List of preset metric names
     var presetNames = [
-      "Power Push Up",
-      "Shoulder Tap Test",
+      "Countermovement Push-Up (CMPU)",
+      "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)",
       "20mm Edge Pull Strength",
       "Max Pull Ups",
       "Max Hang Time",
@@ -1555,34 +1754,74 @@
   }
 
   function onAddAthleteAccount() {
+    openAddAthleteModal();
+  }
+
+  function onSubmitAddAthleteAccount(event) {
+    if (event && typeof event.preventDefault === "function") {
+      event.preventDefault();
+    }
+
     if (!state.client || !state.user) {
       setStatus("You must be logged in as coach to add athletes.", "error");
       return;
     }
 
-    var email = String(prompt("Athlete email:", "") || "").trim().toLowerCase();
+    var emailField = document.querySelector("[data-admin-add-athlete-email]");
+    var nameField = document.querySelector("[data-admin-add-athlete-name]");
+    var sportField = document.querySelector("[data-admin-add-athlete-sport]");
+    var levelField = document.querySelector("[data-admin-add-athlete-level]");
+    var sexField = document.querySelector("[data-admin-add-athlete-sex]");
+    var heightField = document.querySelector("[data-admin-add-athlete-height]");
+    var autoPasswordField = document.querySelector("[data-admin-add-athlete-generate-password]");
+    var customPasswordField = document.querySelector("[data-admin-add-athlete-password]");
+
+    var email = String((emailField && emailField.value) || "").trim().toLowerCase();
     if (!email) {
+      setAddAthleteStatus("Email is required.", "error");
+      if (emailField) {
+        emailField.focus();
+      }
       return;
     }
 
     if (email.indexOf("@") < 1 || email.indexOf(".") < 3) {
-      setStatus("Please enter a valid athlete email.", "error");
+      setAddAthleteStatus("Please enter a valid athlete email.", "error");
       return;
     }
 
-    var name = String(prompt("Athlete full name (optional):", "") || "").trim();
-    var sport = String(prompt("Primary sport (optional):", "") || "").trim();
-    var level = String(prompt("Experience level (optional):", "") || "").trim();
+    var emailExists = state.athletes.some(function (athlete) {
+      return String(athlete && athlete.email || "").trim().toLowerCase() === email;
+    });
+    if (emailExists) {
+      setAddAthleteStatus("An athlete account with this email already exists.", "info");
+      return;
+    }
 
-    var defaultPassword = "password";
+    var name = String((nameField && nameField.value) || "").trim();
+    var sport = String((sportField && sportField.value) || "").trim();
+    var level = String((levelField && levelField.value) || "").trim();
+    var sex = String((sexField && sexField.value) || "").trim() || null;
+    var height = parseFloat((heightField && heightField.value) || "") || null;
+
+    var useGeneratedPassword = !autoPasswordField || !!autoPasswordField.checked;
+    var defaultPassword = useGeneratedPassword
+      ? buildTemporaryPassword()
+      : String((customPasswordField && customPasswordField.value) || "").trim();
+
+    if (!defaultPassword || defaultPassword.length < 8) {
+      setAddAthleteStatus("Temporary password must be at least 8 characters.", "error");
+      return;
+    }
+
     var isolatedAuthClient = createIsolatedAuthClient();
 
     if (!isolatedAuthClient) {
-      setStatus("Could not create signup client.", "error");
+      setAddAthleteStatus("Could not create signup client.", "error");
       return;
     }
 
-    setStatus("Creating athlete account...", "info");
+    setAddAthleteStatus("Creating athlete account...", "info");
 
     isolatedAuthClient.auth
       .signUp({
@@ -1600,34 +1839,418 @@
         if (result.error) {
           var errorMessage = String(result.error.message || "");
           if (errorMessage.toLowerCase().indexOf("already") > -1) {
-            setStatus("Athlete already exists. No email was sent.", "info");
+            setAddAthleteStatus("Athlete already exists. No email was sent.", "info");
             return;
           }
 
-          setStatus(result.error.message, "error");
+          setAddAthleteStatus(result.error.message, "error");
           return;
         }
 
         var createdUserId = result.data && result.data.user && result.data.user.id;
+        var initialMetrics = collectAddAthleteMetricRows();
+
         if (createdUserId) {
           upsertAthleteProfile(createdUserId, {
             name: name,
             sport: sport,
-            level: level
+             level: level,
+             sex: sex,
+             height_cm: height
           });
+
+          saveInitialAthleteMetrics(createdUserId, initialMetrics)
+            .then(function () {
+              if (initialMetrics.length) {
+                setAddAthleteStatus(
+                  "Athlete account created with " + initialMetrics.length + " baseline metric(s). Share login details below.",
+                  "success"
+                );
+              } else {
+                setAddAthleteStatus("Athlete account created. Share temporary login details below.", "success");
+              }
+            })
+            .catch(function (metricsError) {
+              setAddAthleteStatus(
+                "Athlete account created, but baseline metrics were not saved: " +
+                  (metricsError && metricsError.message ? metricsError.message : "Unknown error"),
+                "info"
+              );
+            });
+        } else {
+          setAddAthleteStatus(
+            "Athlete account created, but profile id was unavailable for baseline metrics.",
+            "info"
+          );
         }
 
-        setStatus(
-          "Athlete account created. Default password is 'password'. Ask athlete to change it after first login.",
-          "success"
-        );
+        setAddAthleteCredentialPreview(email, defaultPassword, name);
+        setStatus("Athlete account created for " + email + ".", "success");
 
         setTimeout(function () {
           loadAthletes();
         }, 600);
       })
       .catch(function (error) {
-        setStatus(error && error.message ? error.message : "Failed to create athlete account.", "error");
+        setAddAthleteStatus(
+          error && error.message ? error.message : "Failed to create athlete account.",
+          "error"
+        );
+      });
+  }
+
+  function openAddAthleteModal() {
+    var modal = document.querySelector("[data-admin-add-athlete-modal]");
+    if (!modal) {
+      return;
+    }
+
+    modal.hidden = false;
+    syncModalBodyState();
+    resetAddAthleteForm();
+
+    var emailField = document.querySelector("[data-admin-add-athlete-email]");
+    if (emailField) {
+      emailField.focus();
+    }
+  }
+
+  function closeAddAthleteModal() {
+    var modal = document.querySelector("[data-admin-add-athlete-modal]");
+    if (!modal || modal.hidden) {
+      return;
+    }
+
+    modal.hidden = true;
+    syncModalBodyState();
+  }
+
+  function toggleAddAthletePasswordMode() {
+    var autoField = document.querySelector("[data-admin-add-athlete-generate-password]");
+    var customRow = document.querySelector("[data-admin-add-athlete-custom-password-row]");
+    var customField = document.querySelector("[data-admin-add-athlete-password]");
+    var useAuto = !autoField || !!autoField.checked;
+
+    if (customRow) {
+      customRow.hidden = useAuto;
+    }
+
+    if (customField) {
+      customField.required = !useAuto;
+      if (useAuto) {
+        customField.value = "";
+      }
+    }
+  }
+
+  function resetAddAthleteForm() {
+    var form = document.querySelector("[data-admin-add-athlete-form]");
+    if (form) {
+      form.reset();
+    }
+
+    var autoField = document.querySelector("[data-admin-add-athlete-generate-password]");
+    if (autoField) {
+      autoField.checked = true;
+    }
+
+    toggleAddAthletePasswordMode();
+    setAddAthleteStatus("", "info");
+
+    var metricRows = document.querySelector("[data-admin-add-athlete-metrics]");
+    if (metricRows) {
+      metricRows.innerHTML = "";
+    }
+
+    loadAddAthleteTemplate("general");
+
+    var templateSelect = document.querySelector("[data-admin-add-athlete-template-select]");
+    if (templateSelect) {
+      templateSelect.value = "general";
+    }
+
+    var credsPanel = document.querySelector("[data-admin-add-athlete-credentials]");
+    if (credsPanel) {
+      credsPanel.hidden = true;
+    }
+
+    var credsPreview = document.querySelector("[data-admin-add-athlete-credentials-preview]");
+    if (credsPreview) {
+      credsPreview.textContent = "";
+    }
+  }
+
+  function setAddAthleteStatus(message, variant) {
+    var statusEl = document.querySelector("[data-admin-add-athlete-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
+  }
+
+  function setAddAthleteCredentialPreview(email, password, name) {
+    var panel = document.querySelector("[data-admin-add-athlete-credentials]");
+    var preview = document.querySelector("[data-admin-add-athlete-credentials-preview]");
+    if (!panel || !preview) {
+      return;
+    }
+
+    var lines = [
+      "Nomadic Performance Athlete Account",
+      name ? "Name: " + name : null,
+      "Email: " + email,
+      "Temporary Password: " + password,
+      "Login URL: " + window.location.origin + "/index.html",
+      "Please change this password after first login."
+    ].filter(function (line) {
+      return !!line;
+    });
+
+    preview.textContent = lines.join("\n");
+    panel.hidden = false;
+  }
+
+  function copyAddAthleteCredentials() {
+    var preview = document.querySelector("[data-admin-add-athlete-credentials-preview]");
+    var content = String((preview && preview.textContent) || "").trim();
+    if (!content) {
+      setAddAthleteStatus("No credentials to copy yet.", "info");
+      return;
+    }
+
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+      setAddAthleteStatus("Clipboard is unavailable in this browser.", "error");
+      return;
+    }
+
+    navigator.clipboard
+      .writeText(content)
+      .then(function () {
+        setAddAthleteStatus("Credentials copied to clipboard.", "success");
+      })
+      .catch(function () {
+        setAddAthleteStatus("Could not copy credentials. Please copy manually.", "error");
+      });
+  }
+
+  function buildTemporaryPassword() {
+    var alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%!";
+    var length = 14;
+    var result = "";
+
+    for (var i = 0; i < length; i += 1) {
+      var index = Math.floor(Math.random() * alphabet.length);
+      result += alphabet.charAt(index);
+    }
+
+    return result;
+  }
+
+  function appendAddAthleteMetricRow(values) {
+    var list = document.querySelector("[data-admin-add-athlete-metrics]");
+    if (!list) {
+      return;
+    }
+
+    var metric = values || {};
+    var row = document.createElement("div");
+    row.setAttribute("data-admin-add-athlete-metric-row", "1");
+
+    if (metric.apeIndex) {
+      row.className = "admin-add-athlete-metric-row admin-add-athlete-metric-row--ape";
+      row.setAttribute("data-ape-index-row", "1");
+      row.innerHTML =
+        '<span class="admin-ape-label">Ape Index</span>' +
+        '<input type="number" data-add-athlete-ape-height placeholder="Height (cm)" />' +
+        '<input type="number" data-add-athlete-ape-wingspan placeholder="Wingspan (cm)" />' +
+        '<input type="text" data-add-athlete-metric-value placeholder="= cm" readonly class="admin-ape-result" />' +
+        '<button type="button" class="btn admin-btn-delete-mini" data-admin-add-athlete-metric-remove>Remove</button>';
+
+      list.appendChild(row);
+
+      var heightInput = row.querySelector("[data-add-athlete-ape-height]");
+      var wingspanInput = row.querySelector("[data-add-athlete-ape-wingspan]");
+      var valueInput = row.querySelector("[data-add-athlete-metric-value]");
+      function calcApeIndex() {
+        var h = parseFloat(heightInput.value);
+        var w = parseFloat(wingspanInput.value);
+        valueInput.value = (!isNaN(h) && !isNaN(w)) ? (w - h).toFixed(1) : "";
+      }
+      heightInput.addEventListener("input", calcApeIndex);
+      wingspanInput.addEventListener("input", calcApeIndex);
+    } else {
+      row.className = "admin-add-athlete-metric-row";
+      row.innerHTML =
+        '<input type="text" data-add-athlete-metric-name placeholder="Metric" value="' + escapeAttribute(metric.name || "") + '" />' +
+        '<input type="text" data-add-athlete-metric-value placeholder="Result" value="' + escapeAttribute(metric.value || "") + '" />' +
+        '<input type="text" data-add-athlete-metric-unit placeholder="Unit" value="' + escapeAttribute(metric.unit || "") + '" />' +
+        '<select data-add-athlete-metric-category>' +
+        buildAddAthleteMetricCategoryOptions(metric.category || "Performance") +
+        '</select>' +
+        '<button type="button" class="btn admin-btn-delete-mini" data-admin-add-athlete-metric-remove>Remove</button>';
+
+      list.appendChild(row);
+    }
+  }
+
+  function buildAddAthleteMetricCategoryOptions(selectedCategory) {
+    var categories = ["Strength", "Cardio", "Mobility", "Performance"];
+    return categories
+      .map(function (category) {
+        var selected = category === selectedCategory ? " selected" : "";
+        return '<option value="' + escapeAttribute(category) + '"' + selected + '>' + escapeHtml(category) + '</option>';
+      })
+      .join("");
+  }
+
+  function collectAddAthleteMetricRows() {
+    var list = document.querySelector("[data-admin-add-athlete-metrics]");
+    if (!list) {
+      return [];
+    }
+
+    return Array.prototype.slice
+      .call(list.querySelectorAll("[data-admin-add-athlete-metric-row]"))
+      .map(function (row) {
+        if (row.hasAttribute("data-ape-index-row")) {
+          var apeValue = String((row.querySelector("[data-add-athlete-metric-value]") || {}).value || "").trim();
+          return {
+            metric_name: "Ape Index",
+            metric_value: apeValue,
+            metric_unit: "cm",
+            metric_category: "Performance"
+          };
+        }
+
+        var name = String((row.querySelector("[data-add-athlete-metric-name]") || {}).value || "").trim();
+        var value = String((row.querySelector("[data-add-athlete-metric-value]") || {}).value || "").trim();
+        var unit = String((row.querySelector("[data-add-athlete-metric-unit]") || {}).value || "").trim();
+        var category = String((row.querySelector("[data-add-athlete-metric-category]") || {}).value || "").trim() || "Performance";
+
+        return {
+          metric_name: name,
+          metric_value: value,
+          metric_unit: unit,
+          metric_category: category
+        };
+      })
+      .filter(function (metric) {
+        return !!metric.metric_name;
+      });
+  }
+
+  function expandTemplateMetrics(templates) {
+    var result = [];
+    templates.forEach(function (t) {
+      if (t.bilateral) {
+        result.push({ name: t.name + " (Left)", unit: t.unit, category: t.category });
+        result.push({ name: t.name + " (Right)", unit: t.unit, category: t.category });
+      } else {
+        result.push(t);
+      }
+    });
+    return result;
+  }
+
+  function seedAddAthleteMetricRowsFromSport() {
+    var sportField = document.querySelector("[data-admin-add-athlete-sport]");
+    var sport = String((sportField && sportField.value) || "").trim().toLowerCase();
+    var raw = METRIC_TEMPLATES_BY_SPORT[sport] || [
+      { name: "Resting HR", unit: "bpm", category: "Cardio" },
+      { name: "Weight", unit: "kg", category: "Performance" },
+      { name: "Vertical Jump", unit: "cm", category: "Strength" }
+    ];
+    var templates = expandTemplateMetrics(raw);
+
+    var list = document.querySelector("[data-admin-add-athlete-metrics]");
+    if (!list) {
+      return;
+    }
+
+    list.innerHTML = "";
+    templates.forEach(function (template) {
+      appendAddAthleteMetricRow({
+        name: template.name,
+        value: "",
+        unit: template.unit,
+        category: template.category
+      });
+    });
+
+    setAddAthleteStatus("Loaded " + templates.length + " suggested baseline metrics.", "info");
+  }
+
+  function loadAddAthleteTemplate(key) {
+    var templates = BASELINE_TEMPLATES[key];
+    if (!templates || !templates.length) {
+      setAddAthleteStatus("No template found for: " + key, "error");
+      return;
+    }
+
+    var list = document.querySelector("[data-admin-add-athlete-metrics]");
+    if (!list) {
+      return;
+    }
+
+    list.innerHTML = "";
+    expandTemplateMetrics(templates).forEach(function (template) {
+      appendAddAthleteMetricRow({
+        name: template.name,
+        value: "",
+        unit: template.unit,
+        category: template.category,
+        apeIndex: template.apeIndex || false
+      });
+    });
+
+    var labelMap = {
+      running: "Running Baseline",
+      cycling: "Cycling Baseline",
+      skiing: "Ski Fitness Baseline",
+      snowboarding: "Snowboard Fitness Baseline",
+      climbing: "Climbing Fitness Baseline",
+      hiking: "Hiking Baseline",
+      general: "General Fitness Baseline"
+    };
+    setAddAthleteStatus(
+      "Loaded " + templates.length + " metrics from \"" + (labelMap[key] || key) + "\" template.",
+      "info"
+    );
+  }
+
+  function saveInitialAthleteMetrics(userId, metrics) {
+    if (!state.client || !userId || !metrics || !metrics.length) {
+      return Promise.resolve();
+    }
+
+    var nowIso = new Date().toISOString();
+    var rows = metrics.map(function (metric) {
+      return {
+        user_id: userId,
+        metric_name: metric.metric_name,
+        metric_value: metric.metric_value || "",
+        metric_unit: metric.metric_unit || "",
+        metric_category: metric.metric_category || "Performance",
+        updated_at: nowIso
+      };
+    });
+
+    return state.client
+      .from("athlete_metrics")
+      .insert(rows)
+      .then(function (result) {
+        if (result.error) {
+          throw result.error;
+        }
       });
   }
 
@@ -1641,6 +2264,8 @@
       name: profile && profile.name ? profile.name : null,
       sport: profile && profile.sport ? profile.sport : null,
       level: profile && profile.level ? profile.level : null,
+       sex: profile && profile.sex ? profile.sex : null,
+       height_cm: profile && profile.height_cm ? profile.height_cm : null,
       updated_at: new Date().toISOString()
     };
 
@@ -1713,10 +2338,15 @@
   }
 
   function syncModalBodyState() {
+    var addAthleteModal = document.querySelector("[data-admin-add-athlete-modal]");
     var athleteModal = document.querySelector("[data-admin-modal]");
     var assignModal = document.querySelector("[data-admin-assign-modal]");
     var libraryModal = document.querySelector("[data-admin-library-modal]");
-    var anyOpen = (athleteModal && !athleteModal.hidden) || (assignModal && !assignModal.hidden) || (libraryModal && !libraryModal.hidden);
+    var anyOpen =
+      (addAthleteModal && !addAthleteModal.hidden) ||
+      (athleteModal && !athleteModal.hidden) ||
+      (assignModal && !assignModal.hidden) ||
+      (libraryModal && !libraryModal.hidden);
     if (anyOpen) {
       document.body.classList.add("admin-modal-open");
     } else {

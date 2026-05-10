@@ -2080,6 +2080,13 @@ footer a:hover {
   font-weight: 700;
 }
 
+.metric-input-note {
+  margin: 0.1rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #496262;
+}
+
 .metric-card[data-metric-ybalance="true"] [data-metric-edit="value"] {
   display: none;
 }
@@ -4873,6 +4880,120 @@ footer a:hover {
   gap: 0.65rem;
 }
 
+.admin-add-athlete-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-add-athlete-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.admin-add-athlete-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: #244b4b;
+  font-size: 0.9rem;
+  margin-bottom: 0.7rem;
+}
+
+.admin-add-athlete-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: #1f5555;
+}
+
+.admin-add-athlete-help {
+  margin: 0;
+  color: #516767;
+  font-size: 0.85rem;
+}
+
+.admin-add-athlete-credentials-preview {
+  margin: 0 0 0.7rem;
+  border: 1px solid #d8ccbd;
+  border-radius: 8px;
+  padding: 0.8rem;
+  background: #fff;
+  color: #1a3f3f;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
++
++.admin-add-athlete-metric-actions {
++  display: flex;
++  gap: 0.5rem;
++  flex-wrap: wrap;
++  align-items: center;
++  margin: 0.7rem 0;
++}
++
++.admin-add-athlete-template-picker {
++  display: flex;
++  gap: 0.35rem;
++  align-items: center;
++  flex: 1;
++  min-width: 0;
++}
++
++.admin-add-athlete-template-picker select {
++  flex: 1;
++  min-width: 0;
++  border: 1px solid #c9beb0;
++  border-radius: 8px;
++  padding: 0.55rem 0.7rem;
++  font-size: 0.88rem;
++  background: #fff;
++  color: #3a2e2e;
++  cursor: pointer;
++}
++
++.admin-add-athlete-metrics {
++  display: grid;
++  gap: 0.5rem;
++}
++
++.admin-add-athlete-metric-row {
++  display: grid;
++  grid-template-columns: 1.3fr 1fr 0.8fr 1fr auto;
++  gap: 0.45rem;
++  align-items: center;
++}
++
++.admin-add-athlete-metric-row input,
++.admin-add-athlete-metric-row select {
++  border: 1px solid #c9beb0;
++  border-radius: 8px;
++  padding: 0.62rem 0.7rem;
++  font-size: 0.88rem;
++  font-family: inherit;
++  background: #fff;
++}
++
++.admin-add-athlete-metric-row--ape {
++  grid-template-columns: auto 1fr 1fr auto auto;
++}
++
++.admin-ape-label {
++  font-size: 0.82rem;
++  font-weight: 600;
++  color: #5a3e2b;
++  white-space: nowrap;
++  padding: 0 0.25rem;
++}
++
++.admin-ape-result {
++  background: #f5f0eb !important;
++  color: #7a6a5a !important;
++  font-weight: 600;
++  cursor: default;
++}
+
 .admin-library-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4905,7 +5026,12 @@ footer a:hover {
 
   .admin-library-controls,
   .admin-library-grid,
-  .admin-library-sports {
+  .admin-library-sports,
+  .admin-add-athlete-grid {
     grid-template-columns: 1fr;
   }
++
++  .admin-add-athlete-metric-row {
++    grid-template-columns: 1fr;
++  }
 }

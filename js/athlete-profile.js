@@ -26,6 +26,7 @@
     metricsEditorToggle: null,
     metricsContent: null,
     metricsCollapseToggle: null,
+    metricsSummaryBtn: null,
     stravaConnectBtn: null,
     stravaSyncBtn: null,
     stravaDisconnectBtn: null,
@@ -92,6 +93,7 @@
     state.metricsEditorToggle = null;
     state.metricsContent = document.querySelector("[data-metrics-content]");
     state.metricsCollapseToggle = document.querySelector("[data-metrics-collapse-toggle]");
+    state.metricsSummaryBtn = document.querySelector("[data-metrics-summary-pdf]");
     state.stravaConnectBtn = document.querySelector("[data-strava-connect]");
     state.stravaSyncBtn = document.querySelector("[data-strava-sync]");
     state.stravaDisconnectBtn = document.querySelector("[data-strava-disconnect]");
@@ -335,6 +337,7 @@
     var locationField = state.form.querySelector("[name='location']");
     var heightField = state.form.querySelector("[name='height_cm']");
     var weightField = state.form.querySelector("[name='weight_kg']");
+    var sexField = state.form.querySelector("[name='sex']");
 
     if (emailField) emailField.value = (state.viewUser && state.viewUser.email) || "";
     if (nameField) nameField.value = profile && profile.name ? profile.name : "";
@@ -343,6 +346,7 @@
     if (locationField) locationField.value = profile && profile.location ? profile.location : "";
     if (heightField) heightField.value = profile && profile.height_cm ? profile.height_cm : "";
     if (weightField) weightField.value = profile && profile.weight_kg ? profile.weight_kg : "";
+    if (sexField) sexField.value = getProfileSexForFormValue(profile);
 
     var sports = getProfileSports(profile);
     setSelectedSportsInForm(sports);
@@ -580,6 +584,7 @@
           '</div>' +
           '<input type="text" data-metric-edit="unit" placeholder="Unit" value="' + escapeAttribute(metric.metric_unit || "") + '" />' +
           '<input type="text" data-metric-edit="category" placeholder="Category" value="' + escapeAttribute(metric.metric_category || "Performance") + '" />' +
+          '<p class="metric-input-note" data-leglength-estimate-note hidden>Norm note: For Y Balance and Adapted Grant Foot Raise, leg length is estimated as height x 0.53 when direct leg length is not provided.</p>' +
           "</div>" +
           '<div class="metric-card-actions metric-card-actions-back metric-card-actions-benchmark">' +
           '<button type="button" class="metric-card-btn" data-metric-flip-close>Close</button>' +
@@ -687,6 +692,10 @@
       state.metricsCollapseToggle.addEventListener("click", function () {
         toggleMetricsSection();
       });
+    }
+
+    if (state.metricsSummaryBtn) {
+      state.metricsSummaryBtn.addEventListener("click", onGenerateMetricSummaryPdf);
     }
 
     if (state.stravaConnectBtn) {
@@ -832,6 +841,7 @@
         }
 
         updateYBalanceDraftValue(card);
+        updateLegLengthEstimateNote(card);
       });
     }
 
@@ -968,6 +978,7 @@
     var desiredEmail = String(formData.get("email") || "").trim();
     var desiredHeight = parseFloat(formData.get("height_cm") || "") || null;
     var desiredWeight = parseFloat(formData.get("weight_kg") || "") || null;
+    var desiredSex = String(formData.get("sex") || "").trim() || null;
     var profileData = {
       user_id: viewedUserId,
       name: String(formData.get("name") || "").trim(),
@@ -979,6 +990,7 @@
       location: String(formData.get("location") || "").trim(),
       height_cm: desiredHeight,
       weight_kg: desiredWeight,
+      sex: desiredSex,
       updated_at: new Date().toISOString()
     };
 
@@ -1024,6 +1036,7 @@
       "sports",
       "height_cm",
       "weight_kg",
+      "sex",
       "bio",
       "age",
       "location",
@@ -2714,6 +2727,7 @@
     var yBalanceGrid = card.querySelector("[data-metric-ybalance-grid]");
     var unitInput = card.querySelector('[data-metric-edit="unit"]');
     var categoryInput = card.querySelector('[data-metric-edit="category"]');
+    var legLengthNote = card.querySelector("[data-leglength-estimate-note]");
     var isYBalance = isYBalanceMetricName(metric.metric_name || "");
 
     if (label) {
@@ -2728,6 +2742,14 @@
     }
     if (categoryInput) {
       categoryInput.value = metric.metric_category || "Performance";
+    }
+
+    if (legLengthNote) {
+      var metricName = String(metric.metric_name || "");
+      var showNote =
+        isYBalanceMetricName(metricName) ||
+        isAdaptedGrantFootRaiseMetricName(metricName);
+      legLengthNote.hidden = !showNote;
     }
 
     if (yBalanceGrid) {
@@ -2812,6 +2834,50 @@
     var valueWithUnit = metricUnit ? readableValue + " " + metricUnit : readableValue;
     var normalizedName = normalizeMetricValue(metricName);
 
+    if (isVerticalJumpMetricName(normalizedName)) {
+      return buildVerticalJumpBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isEdgePullMetricName(normalizedName)) {
+      return buildEdgePullBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isSingleLegSquatMetricName(normalizedName)) {
+      return buildSingleLegSquatBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isSidePlankMetricName(normalizedName)) {
+      return buildSidePlankBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isYBalanceMetricName(normalizedName)) {
+      return buildYBalanceReachBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isMaxHangMetricName(normalizedName)) {
+      return buildMaxHangBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isMaxPullUpMetricName(normalizedName)) {
+      return buildMaxPullUpBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isHanging90DegreeHoldMetricName(normalizedName)) {
+      return buildHanging90DegreeHoldBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isCountermovementPushUpMetricName(normalizedName)) {
+      return buildCountermovementPushUpBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isCkcuestMetricName(normalizedName)) {
+      return buildCkcuestBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (isAdaptedGrantFootRaiseMetricName(normalizedName)) {
+      return buildAdaptedGrantFootRaiseBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
     var definitions = [
       {
         keys: ["vertical jump", "countermovement jump", "cmj"],
@@ -2866,7 +2932,7 @@
         }
       },
       {
-        keys: ["pull up", "pull-up", "max hang", "20mm edge pull", "edge pull"],
+        keys: ["pull up", "pull-up", "20mm edge pull", "edge pull"],
         range: "Upper-pull benchmark guide: <5 developing, 5-10 functional, 11-15 strong, 16+ advanced (strict reps).",
         classify: function (value) {
           return classifyHigherBetter(value, [5, 11, 16], ["Developing", "Functional", "Strong", "Advanced"]);
@@ -2929,6 +2995,1626 @@
       range: "Reference: " + definition.range,
       meaning: "Meaning: " + meaningText
     };
+  }
+
+  function onGenerateMetricSummaryPdf() {
+    if (!state.metricsLatest || !state.metricsLatest.length) {
+      setMetricsStatus("No metrics available yet. Add test results first.", "info");
+      return;
+    }
+
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      setMetricsStatus("PDF library did not load. Refresh and try again.", "error");
+      return;
+    }
+
+    try {
+      var jsPDF = window.jspdf.jsPDF;
+      var doc = new jsPDF({ unit: "pt", format: "letter" });
+      var report = buildMetricSummaryReport(state.metricsLatest);
+      var pageWidth = doc.internal.pageSize.getWidth();
+      var pageHeight = doc.internal.pageSize.getHeight();
+      var margin = 40;
+      var maxWidth = pageWidth - margin * 2;
+      var y = 48;
+      var lineHeight = 14;
+      var athleteLabel =
+        (state.profile && state.profile.name) ||
+        (state.viewUser && state.viewUser.email) ||
+        "Athlete";
+
+      function ensureSpace(requiredHeight) {
+        if (y + requiredHeight <= pageHeight - margin) {
+          return;
+        }
+        doc.addPage();
+        y = margin;
+      }
+
+      function writeWrapped(text, fontSize, color) {
+        var safeText = String(text || "");
+        doc.setFontSize(fontSize || 10);
+        if (Array.isArray(color) && color.length === 3) {
+          doc.setTextColor(color[0], color[1], color[2]);
+        } else {
+          doc.setTextColor(33, 33, 33);
+        }
+        var lines = doc.splitTextToSize(safeText, maxWidth);
+        ensureSpace(lines.length * lineHeight + 2);
+        doc.text(lines, margin, y);
+        y += lines.length * lineHeight;
+      }
+
+      doc.setFontSize(18);
+      doc.setTextColor(20, 20, 20);
+      doc.text("Athlete Testing Summary", margin, y);
+      y += 20;
+
+      writeWrapped("Athlete: " + athleteLabel, 11);
+      writeWrapped("Generated: " + formatDate(new Date().toISOString()), 11);
+      writeWrapped("Metrics Included: " + String(report.rows.length), 11);
+      y += 4;
+
+      writeWrapped("Flags", 13);
+      if (!report.flagLines.length) {
+        writeWrapped("No high-priority flags detected from current benchmark references.", 10, [34, 102, 34]);
+      } else {
+        report.flagLines.forEach(function (line) {
+          writeWrapped("- " + line, 10, [158, 43, 32]);
+        });
+      }
+
+      y += 8;
+      writeWrapped("Metric-by-Metric Normative Comparison", 13);
+
+      report.rows.forEach(function (row, index) {
+        ensureSpace(120);
+        writeWrapped(String(index + 1) + ". " + row.name, 12);
+        writeWrapped("Result: " + row.result, 10);
+        writeWrapped("Rating: " + row.rating, 10, row.flag ? [158, 43, 32] : [33, 33, 33]);
+        writeWrapped("Normative Reference: " + row.reference, 10);
+        writeWrapped("Interpretation: " + row.meaning, 10);
+        if (row.flag) {
+          writeWrapped("Flag: " + row.flag, 10, [158, 43, 32]);
+        }
+        y += 4;
+      });
+
+      y += 8;
+      writeWrapped(
+        "Note: Normative values are guideposts and should be interpreted with sport demands, injury history, and coaching judgment.",
+        9,
+        [85, 85, 85]
+      );
+
+      var safeAthlete = String(athleteLabel || "athlete")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "athlete";
+      var fileName = "metric-summary-" + safeAthlete + ".pdf";
+      doc.save(fileName);
+      setMetricsStatus("Metric summary PDF generated.", "success");
+    } catch (error) {
+      setMetricsStatus(
+        error && error.message ? error.message : "Failed to generate metric summary PDF.",
+        "error"
+      );
+    }
+  }
+
+  function buildMetricSummaryReport(metrics) {
+    var rows = (metrics || []).map(function (metric) {
+      var summary = buildMetricBenchmarkSummary(metric);
+      var rating = extractBenchmarkLabel(summary.rating, "Rating:");
+      var reference = extractBenchmarkLabel(summary.range, "Reference:");
+      var meaning = extractBenchmarkLabel(summary.meaning, "Meaning:");
+      var result = buildMetricResultLabel(metric);
+      var flag = deriveMetricFlag(metric, rating, result);
+
+      return {
+        name: String(metric.metric_name || "Metric"),
+        result: result,
+        rating: rating,
+        reference: reference,
+        meaning: meaning,
+        flag: flag
+      };
+    });
+
+    var bilateralFlags = buildBilateralMetricFlags(metrics);
+    var metricFlags = rows
+      .filter(function (row) {
+        return !!row.flag;
+      })
+      .map(function (row) {
+        return row.name + ": " + row.flag;
+      });
+
+    return {
+      rows: rows,
+      flagLines: metricFlags.concat(bilateralFlags)
+    };
+  }
+
+  function extractBenchmarkLabel(text, prefix) {
+    var value = String(text || "").trim();
+    var labelPrefix = String(prefix || "").trim();
+    if (!labelPrefix) {
+      return value;
+    }
+    if (value.indexOf(labelPrefix) === 0) {
+      return value.slice(labelPrefix.length).trim();
+    }
+    return value;
+  }
+
+  function buildMetricResultLabel(metric) {
+    var value = String(metric && metric.metric_value || "").trim();
+    var unit = String(metric && metric.metric_unit || "").trim();
+    if (!value) {
+      return "Not recorded";
+    }
+    return unit ? value + " " + unit : value;
+  }
+
+  function deriveMetricFlag(metric, rating, resultText) {
+    var cleanRating = String(rating || "").trim().toLowerCase();
+    if (!resultText || String(resultText).toLowerCase() === "not recorded") {
+      return "Missing result";
+    }
+    if (cleanRating.indexOf("add a numeric") !== -1) {
+      return "Result format needs numeric value for normative comparison";
+    }
+    if (
+      cleanRating === "developing" ||
+      cleanRating === "elevated" ||
+      cleanRating === "below average" ||
+      cleanRating === "below beginner"
+    ) {
+      return "Below normative target";
+    }
+
+    var metricName = String(metric && metric.metric_name || "");
+    if (isYBalanceMetricName(metricName)) {
+      var parsed = parseYBalanceLegValues(String(metric && metric.metric_value || ""));
+      if (parsed && parsed.left !== null && parsed.right !== null) {
+        var symmetry = calculateSymmetryPercent(parsed.left, parsed.right);
+        if (symmetry !== null && symmetry < 95) {
+          return "Y Balance asymmetry flagged (" + formatMetricNumber(symmetry) + "% symmetry)";
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function isVerticalJumpMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      name.indexOf("vertical jump") !== -1 ||
+      name.indexOf("countermovement jump") !== -1 ||
+      name === "cmj" ||
+      name.indexOf(" cmj") !== -1 ||
+      name.indexOf("cmj ") !== -1
+    );
+  }
+
+  function isEdgePullMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return name.indexOf("20mm edge pull") !== -1 || name.indexOf("edge pull") !== -1;
+  }
+
+  function isSingleLegSquatMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      name.indexOf("single leg squat") !== -1 ||
+      name.indexOf("single-leg squat") !== -1 ||
+      name.indexOf("sl squat") !== -1
+    );
+  }
+
+  function isSidePlankMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      (name.indexOf("side plank") !== -1 && name.indexOf("hip abduction") !== -1) ||
+      name.indexOf("side plank hip abduction") !== -1 ||
+      name.indexOf("plank hold") !== -1
+    );
+  }
+
+  function isMaxPullUpMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      name.indexOf("max pull up") !== -1 ||
+      name.indexOf("pull up") !== -1 ||
+      name.indexOf("pullup") !== -1 ||
+      name.indexOf("pull-up") !== -1
+    );
+  }
+
+  function isMaxHangMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      name.indexOf("max hang") !== -1 ||
+      name.indexOf("dead hang") !== -1 ||
+      name.indexOf("bar hang") !== -1
+    );
+  }
+
+  function isHanging90DegreeHoldMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      name.indexOf("90 degree hold") !== -1 ||
+      name.indexOf("90 degree") !== -1 ||
+      name.indexOf("90 degree bent leg") !== -1 ||
+      name.indexOf("hanging 90") !== -1 ||
+      name.indexOf("hip flexion hold") !== -1
+    );
+  }
+
+  function isCountermovementPushUpMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      name.indexOf("countermovement push-up") !== -1 ||
+      name.indexOf("countermovement push up") !== -1 ||
+      name.indexOf("cmpu") !== -1 ||
+      name.indexOf("power push up") !== -1
+    );
+  }
+
+  function isCkcuestMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      name.indexOf("closed kinetic chain upper extremity stability test") !== -1 ||
+      name.indexOf("ckcuest") !== -1 ||
+      name.indexOf("shoulder tap test") !== -1 ||
+      name.indexOf("shoulder tap") !== -1
+    );
+  }
+
+  function isAdaptedGrantFootRaiseMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      name.indexOf("grant foot raise") !== -1 ||
+      name.indexOf("adapted grant") !== -1 ||
+      name.indexOf("foot raise") !== -1 ||
+      name.indexOf("grant reach") !== -1
+    );
+  }
+
+  function buildSingleLegSquatBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var bands = getSingleLegSquatNormBandForSex(sex);
+
+    if (numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to unlock benchmark comparison.",
+        range:
+          "Reference: 30-second Single-Leg Squat uses sex-specific rep bands for Developing to Elite.",
+        meaning:
+          "Meaning: Enter numeric reps from a standardized 30-second test (controlled reps, no hand support, full extension)."
+      };
+    }
+
+    if (!bands) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men: Developing <12, Recreational 12-16, Trained 17-21, Advanced 22-26, Elite 27+. " +
+          "Women: Developing <10, Recreational 10-14, Trained 15-19, Advanced 20-24, Elite 25+.",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply Single-Leg Squat normative values."
+      };
+    }
+
+    var rating = classifySingleLegSquatReps(numericValue, bands);
+    var meaningByRating = {
+      Developing: "Single-leg capacity is currently a limiter. Prioritize unilateral strength, control, and tempo quality.",
+      Recreational: "Foundational single-leg control is present. Continue progressing depth quality and endurance.",
+      Trained: "Solid single-leg strength-endurance profile for most field and mountain demands.",
+      Advanced: "High unilateral control and endurance. Emphasize transfer to high-load and reactive tasks.",
+      Elite: "Exceptional 30-second single-leg squat capacity. Maintain quality while progressing sport-specific complexity."
+    };
+
+    return {
+      currentValue: "Current score: " + valueWithUnit,
+      rating: "Rating: " + rating,
+      range:
+        "Reference: " +
+        (bands.sex === "male" ? "Men" : "Women") +
+        " 30s norms - Developing <" +
+        bands.recreationalLow +
+        ", Recreational " +
+        bands.recreationalLow +
+        "-" +
+        bands.recreationalHigh +
+        ", Trained " +
+        bands.trainedLow +
+        "-" +
+        bands.trainedHigh +
+        ", Advanced " +
+        bands.advancedLow +
+        "-" +
+        bands.advancedHigh +
+        ", Elite " +
+        bands.eliteLow +
+        "+ reps.",
+      meaning: "Meaning: " + (meaningByRating[rating] || "Interpret with training context and trend direction.")
+    };
+  }
+
+  function classifySingleLegSquatReps(reps, bands) {
+    if (!Number.isFinite(reps) || !bands) {
+      return "Needs Data";
+    }
+    if (reps < bands.recreationalLow) {
+      return "Developing";
+    }
+    if (reps <= bands.recreationalHigh) {
+      return "Recreational";
+    }
+    if (reps <= bands.trainedHigh) {
+      return "Trained";
+    }
+    if (reps <= bands.advancedHigh) {
+      return "Advanced";
+    }
+    return "Elite";
+  }
+
+  function getSingleLegSquatNormBandForSex(sex) {
+    if (!sex) {
+      return null;
+    }
+
+    var table = {
+      male: {
+        sex: "male",
+        recreationalLow: 12,
+        recreationalHigh: 16,
+        trainedLow: 17,
+        trainedHigh: 21,
+        advancedLow: 22,
+        advancedHigh: 26,
+        eliteLow: 27
+      },
+      female: {
+        sex: "female",
+        recreationalLow: 10,
+        recreationalHigh: 14,
+        trainedLow: 15,
+        trainedHigh: 19,
+        advancedLow: 20,
+        advancedHigh: 24,
+        eliteLow: 25
+      }
+    };
+
+    return table[sex] || null;
+  }
+
+  function classifySidePlankHoldTime(seconds, band) {
+    if (!Number.isFinite(seconds) || !band) {
+      return "Needs Data";
+    }
+    if (seconds < band.developingHigh) {
+      return "Developing";
+    }
+    if (seconds <= band.recreationalHigh) {
+      return "Recreational";
+    }
+    if (seconds <= band.trainedHigh) {
+      return "Trained";
+    }
+    if (seconds <= band.advancedHigh) {
+      return "Advanced";
+    }
+    return "Elite";
+  }
+
+  function getSidePlankNormBandForSex(sex) {
+    if (!sex) {
+      return null;
+    }
+
+    var table = {
+      male: {
+        sex: "male",
+        developingHigh: 20,
+        recreationalLow: 20,
+        recreationalHigh: 35,
+        trainedLow: 35,
+        trainedHigh: 50,
+        advancedLow: 50,
+        advancedHigh: 70,
+        eliteLow: 70
+      },
+      female: {
+        sex: "female",
+        developingHigh: 15,
+        recreationalLow: 15,
+        recreationalHigh: 30,
+        trainedLow: 30,
+        trainedHigh: 45,
+        advancedLow: 45,
+        advancedHigh: 60,
+        eliteLow: 60
+      }
+    };
+
+    return table[sex] || null;
+  }
+
+  function classifyMaxPullUpReps(reps, band) {
+    if (!Number.isFinite(reps) || !band) {
+      return "Needs Data";
+    }
+    if (reps < band.recreationalLow) {
+      return "Developing";
+    }
+    if (reps <= band.recreationalHigh) {
+      return "Recreational";
+    }
+    if (reps <= band.trainedHigh) {
+      return band.trainedLabel || "Trained";
+    }
+    if (reps <= band.advancedHigh) {
+      return "Advanced";
+    }
+    return "Elite";
+  }
+
+  function getMaxPullUpNormBandForSex(sex) {
+    if (!sex) {
+      return null;
+    }
+
+    var isClimber = isAthleteClimber();
+
+    if (isClimber) {
+      var climberTable = {
+        male: {
+          sex: "male",
+          sport: "climber",
+          recreationalLow: 8,
+          recreationalHigh: 12,
+          trainedLow: 12,
+          trainedHigh: 18,
+          trainedLabel: "Strong Intermediate",
+          advancedLow: 18,
+          advancedHigh: 25,
+          eliteLow: 25
+        },
+        female: {
+          sex: "female",
+          sport: "climber",
+          recreationalLow: 3,
+          recreationalHigh: 6,
+          trainedLow: 6,
+          trainedHigh: 10,
+          trainedLabel: "Strong Intermediate",
+          advancedLow: 10,
+          advancedHigh: 15,
+          eliteLow: 15
+        }
+      };
+      return climberTable[sex] || null;
+    }
+
+    var generalTable = {
+      male: {
+        sex: "male",
+        sport: "general",
+        recreationalLow: 4,
+        recreationalHigh: 7,
+        trainedLow: 8,
+        trainedHigh: 12,
+        trainedLabel: "Trained",
+        advancedLow: 13,
+        advancedHigh: 18,
+        eliteLow: 19
+      },
+      female: {
+        sex: "female",
+        sport: "general",
+        recreationalLow: 1,
+        recreationalHigh: 3,
+        trainedLow: 4,
+        trainedHigh: 7,
+        trainedLabel: "Trained",
+        advancedLow: 8,
+        advancedHigh: 12,
+        eliteLow: 13
+      }
+    };
+
+    return generalTable[sex] || null;
+  }
+
+  function isAthleteClimber() {
+    var profile = state.profile || {};
+    var sport = String(profile.sport || "").toLowerCase();
+    if (sport.indexOf("climb") !== -1) {
+      return true;
+    }
+
+    var sports = profile.sports || [];
+    if (Array.isArray(sports)) {
+      for (var i = 0; i < sports.length; i++) {
+        if (String(sports[i] || "").toLowerCase().indexOf("climb") !== -1) {
+          return true;
+        }
+      }
+    }
+
+    var overview = getProfileSportOverview(profile);
+    if (overview && overview.climbing) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function buildMaxPullUpBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var band = getMaxPullUpNormBandForSex(sex);
+
+    if (numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to unlock benchmark comparison.",
+        range:
+          "Reference: Max Pull Up uses sex-specific rep bands for Developing to Elite (general or climbing-specific norms).",
+        meaning:
+          "Meaning: Enter max reps from a standardized pull-up test. Climbing athletes will see climbing-specific benchmarks if sport is set to climbing."
+      };
+    }
+
+    if (!band) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men General: Developing 0-3, Recreational 4-7, Trained 8-12, Advanced 13-18, Elite 19+. " +
+          "Women General: Developing 0, Recreational 1-3, Trained 4-7, Advanced 8-12, Elite 13+. " +
+          "(Climbing norms available if sport includes climbing.)",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply Max Pull Up normative values."
+      };
+    }
+
+    var rating = classifyMaxPullUpReps(numericValue, band);
+    var isClimber = band.sport === "climber";
+    var sportLabel = isClimber ? "Climber" : "General Athlete";
+    var meaningByRating = {
+      Developing: "Pull-up capacity is limited. Build foundational upper-body strength and scapular stability with assisted progressions.",
+      Recreational: "Foundational pull-up strength is present. Continue gradual load increases with quality form focus.",
+      "Trained": "Solid pull-up capacity for general fitness. Progress with added load or volume variation.",
+      "Strong Intermediate": "Strong intermediate climbing pull-up profile. Emphasize power endurance and dynamic lock-off strength.",
+      Advanced: "High pull-up strength baseline. Continue progressive overload while maintaining movement quality.",
+      Elite: "Exceptional pull-up performance. Focus on sport-specific transfer and maintaining quality under fatigue."
+    };
+
+    var minReps = band.recreationalLow;
+    var maxReps = band.advancedHigh;
+
+    return {
+      currentValue: "Current score: " + valueWithUnit,
+      rating: "Rating: " + rating,
+      range:
+        "Reference: " +
+        sportLabel +
+        " (" +
+        (band.sex === "male" ? "Men" : "Women") +
+        ") - Developing <" +
+        minReps +
+        ", Recreational " +
+        band.recreationalLow +
+        "-" +
+        band.recreationalHigh +
+        ", " +
+        (band.trainedLabel || "Trained") +
+        " " +
+        band.trainedLow +
+        "-" +
+        band.trainedHigh +
+        ", Advanced " +
+        band.advancedLow +
+        "-" +
+        band.advancedHigh +
+        ", Elite " +
+        band.eliteLow +
+        "+ reps.",
+      meaning: "Meaning: " + (meaningByRating[rating] || "Interpret with training context and trend direction.")
+    };
+  }
+
+  function buildMaxHangBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    if (numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to unlock benchmark comparison.",
+        range:
+          "Reference: Bodyweight Dead Hang norms - Beginner 10-30s, Intermediate 30-90s, Advanced 90-150s, Elite 3-5 minutes.",
+        meaning:
+          "Meaning: Enter max dead-hang time in seconds from a standardized bodyweight test on a straight bar."
+      };
+    }
+
+    var rating = classifyMaxHangTime(numericValue);
+    var meaningByRating = {
+      "Below Beginner": "Foundational hang capacity is limited. Build grip endurance and tendon tolerance progressively.",
+      Beginner: "Baseline hang endurance is present. Continue progressive dead-hang exposure and recovery management.",
+      Intermediate: "Solid hang endurance profile. Progress toward longer isometric tolerance and climbing-specific transfer.",
+      Advanced: "High dead-hang endurance. Emphasize quality under fatigue and route-specific grip demands.",
+      Elite: "Exceptional dead-hang endurance. Focus on performance transfer, resilience, and maintaining tissue health."
+    };
+
+    return {
+      currentValue: "Current score: " + valueWithUnit,
+      rating: "Rating: " + rating,
+      range:
+        "Reference: Bodyweight Dead Hang norms - Beginner 10-30s, Intermediate 30-90s, Advanced 90-150s, Elite 180-300s (3-5 min).",
+      meaning: "Meaning: " + (meaningByRating[rating] || "Interpret with training context and trend direction.")
+    };
+  }
+
+  function classifyMaxHangTime(seconds) {
+    if (!Number.isFinite(seconds)) {
+      return "Needs Data";
+    }
+    if (seconds < 10) {
+      return "Below Beginner";
+    }
+    if (seconds <= 30) {
+      return "Beginner";
+    }
+    if (seconds <= 90) {
+      return "Intermediate";
+    }
+    if (seconds <= 150) {
+      return "Advanced";
+    }
+    return "Elite";
+  }
+
+  function classifyHanging90DegreeHoldTime(seconds, band) {
+    if (!Number.isFinite(seconds) || !band) {
+      return "Needs Data";
+    }
+    if (seconds < band.developingHigh) {
+      return "Developing";
+    }
+    if (seconds <= band.recreationalHigh) {
+      return "Recreational";
+    }
+    if (seconds <= band.trainedHigh) {
+      return "Trained";
+    }
+    if (seconds <= band.advancedHigh) {
+      return "Advanced";
+    }
+    return "Elite";
+  }
+
+  function getHanging90DegreeNormBandForSex(sex) {
+    if (!sex) {
+      return null;
+    }
+
+    var table = {
+      male: {
+        sex: "male",
+        developingHigh: 15,
+        recreationalLow: 15,
+        recreationalHigh: 30,
+        trainedLow: 30,
+        trainedHigh: 50,
+        advancedLow: 50,
+        advancedHigh: 75,
+        eliteLow: 75
+      },
+      female: {
+        sex: "female",
+        developingHigh: 10,
+        recreationalLow: 10,
+        recreationalHigh: 25,
+        trainedLow: 25,
+        trainedHigh: 40,
+        advancedLow: 40,
+        advancedHigh: 60,
+        eliteLow: 60
+      }
+    };
+
+    return table[sex] || null;
+  }
+
+  function buildHanging90DegreeHoldBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var band = getHanging90DegreeNormBandForSex(sex);
+
+    if (numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to unlock benchmark comparison.",
+        range:
+          "Reference: Hanging 90° Hip-Flexion Hold uses sex-specific hold-time bands (seconds) for Developing to Elite.",
+        meaning:
+          "Meaning: Enter hold time in seconds from a standardized Hanging 90° test (hips flexed to 90°, core engaged until form breakdown)."
+      };
+    }
+
+    if (!band) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men: Developing <15, Recreational 15-30, Trained 30-50, Advanced 50-75, Elite 75+. " +
+          "Women: Developing <10, Recreational 10-25, Trained 25-40, Advanced 40-60, Elite 60+ (all in seconds).",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply Hanging 90° Hip-Flexion Hold normative values."
+      };
+    }
+
+    var rating = classifyHanging90DegreeHoldTime(numericValue, band);
+    var meaningByRating = {
+      Developing: "Hip flexor and core endurance is limited. Build abdominal strength and hip flexor stamina with progressive holds and variations.",
+      Recreational: "Foundational core and hip flexor endurance is present. Continue progressing hold time with controlled movement.",
+      Trained: "Solid core-hip integration and endurance. Progress with added challenge (leg raises, tempo variation).",
+      Advanced: "High hip flexor endurance and core stability. Emphasize quality and transfer to sport-specific demands.",
+      Elite: "Exceptional Hanging 90° hold capacity. Maintain quality while progressing sport-specific core integration."
+    };
+
+    return {
+      currentValue: "Current score: " + valueWithUnit,
+      rating: "Rating: " + rating,
+      range:
+        "Reference: " +
+        (band.sex === "male" ? "Men" : "Women") +
+        " hold-time norms - Developing <" +
+        band.developingHigh +
+        "s, Recreational " +
+        band.recreationalLow +
+        "-" +
+        band.recreationalHigh +
+        "s, Trained " +
+        band.trainedLow +
+        "-" +
+        band.trainedHigh +
+        "s, Advanced " +
+        band.advancedLow +
+        "-" +
+        band.advancedHigh +
+        "s, Elite " +
+        band.eliteLow +
+        "+ seconds.",
+      meaning: "Meaning: " + (meaningByRating[rating] || "Interpret with training context and trend direction.")
+    };
+  }
+
+  function buildCountermovementPushUpBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    if (numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to log CMPU performance.",
+        range:
+          "Reference: CMPU is primarily an explosive power assessment using stretch-shortening cycle mechanics; use consistent setup and compare trend over time.",
+        meaning:
+          "Meaning: The Countermovement Push-Up (CMPU) is a plyometric upper-extremity power test. Perform a rapid, controlled descent from plank, then immediately reverse into a maximal-effort explosive push (often with hand lift-off) to maximize vertical velocity."
+      };
+    }
+
+    return {
+      currentValue: "Current score: " + valueWithUnit,
+      rating: "Rating: Performance recorded. Track repeated-test trend and output quality.",
+      range:
+        "Reference: CMPU assesses upper-limb neuromuscular force-time qualities (peak force, velocity, and power output) under plyometric SSC demand.",
+      meaning:
+        "Meaning: Use this as an explosive upper-extremity power marker: rapid controlled lowering followed by immediate maximal push. Keep technique and testing setup standardized to make sessions comparable."
+    };
+  }
+
+  function buildCkcuestBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var rating = "Needs Data";
+
+    if (Number.isFinite(numericValue)) {
+      if (numericValue < 21) {
+        rating = "Below Passing";
+      } else if (numericValue < 26) {
+        rating = "Passing";
+      } else {
+        rating = "Strong";
+      }
+    }
+
+    var sexNormLine =
+      sex === "male"
+        ? "Sex-specific context: men in some athletic cohorts average around 26 touches."
+        : sex === "female"
+        ? "Sex-specific context: women in some athletic cohorts average around 22 touches."
+        : "Sex-specific context: reported athletic averages are ~26 touches (men) and ~22 touches (women).";
+
+    if (numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score (average touches across trials) to benchmark CKCUEST.",
+        range:
+          "Reference: CKCUEST is a 15-second shoulder stability/endurance test; >=21 touches is commonly used as a pass threshold in many contexts.",
+        meaning:
+          "Meaning: Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST): from push-up/plank position with hands on two tape marks 36 inches (91 cm) apart, alternate opposite-hand taps for max touches in 15 seconds. Use one warm-up then three 15-second trials with 45-60 seconds rest; score is average touches."
+      };
+    }
+
+    return {
+      currentValue: "Current score: " + valueWithUnit,
+      rating: "Rating: " + rating,
+      range:
+        "Reference: CKCUEST protocol uses 3 scored 15-second trials (after warm-up), 45-60s rest, hands 36 in / 91 cm apart. " +
+        "Common pass benchmark is >=21 touches. " +
+        sexNormLine,
+      meaning:
+        "Meaning: CKCUEST measures shoulder stability, strength, and endurance for return-to-sport decision-making (especially overhead athletes). Consider averaging three trials and optionally normalizing by athlete height or deriving power from bodyweight."
+    };
+  }
+
+  function classifyAdaptedGrantFootRaise(normalizedScore) {
+    if (!Number.isFinite(normalizedScore)) {
+      return "Needs Data";
+    }
+    if (normalizedScore < 0.90) {
+      return "Novice";
+    }
+    if (normalizedScore < 0.97) {
+      return "Intermediate";
+    }
+    if (normalizedScore < 1.00) {
+      return "Advanced";
+    }
+    return "Elite";
+  }
+
+  function getAdaptedGrantFootRaiseNormBand() {
+    return {
+      noviceCm: 103.7,
+      intermediateLow: 108,
+      intermediateHigh: 110,
+      advancedLow: 111,
+      advancedHigh: 113,
+      eliteCm: 114,
+      noviceNormalized: 0.90,
+      intermediateNormalized: 0.97,
+      advancedNormalized: 1.00,
+      eliteNormalized: 1.01
+    };
+  }
+
+  function calculateLegLengthCm(heightCm) {
+    if (!Number.isFinite(heightCm) || heightCm <= 0) {
+      return null;
+    }
+    return heightCm * 0.53;
+  }
+
+  function buildAdaptedGrantFootRaiseBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    var heightCm = getAthleteHeightCmForBenchmarks();
+    var legLengthCm = heightCm ? calculateLegLengthCm(heightCm) : null;
+    var unit = normalizeMetricValue(metric && metric.metric_unit);
+    var reachCm = numericValue === null ? null : convertLengthToCm(numericValue, unit);
+    var normalizedScore = null;
+
+    if (reachCm !== null && legLengthCm !== null) {
+      normalizedScore = reachCm / legLengthCm;
+    }
+
+    if (reachCm === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to unlock benchmark comparison.",
+        range:
+          "Reference: Adapted Grant Foot Raise uses leg-length normalized climbing norms (Novice to Elite). " +
+          "Normalization formula: Reach Height ÷ Leg Length.",
+        meaning:
+          "Meaning: Enter foot raise height in cm or inches. Athlete height is required for normalization. Climbing-specific norms will apply."
+      };
+    }
+
+    if (!legLengthCm) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete height for normalization.",
+        range:
+          "Reference: Climbing norms (normalized): Novice ~104cm, Intermediate ~108-110cm, Advanced ~111-113cm, Elite ~114cm. " +
+          "Normalized using leg length (height × 0.53).",
+        meaning:
+          "Meaning: Set athlete height (height_cm) in profile. Normalized score = Foot Raise Height ÷ Leg Length. Taller athletes naturally reach higher but normalized values compare fairly."
+      };
+    }
+
+    var band = getAdaptedGrantFootRaiseNormBand();
+    var rating = classifyAdaptedGrantFootRaise(normalizedScore);
+    var meaningByRating = {
+      Novice: "Reaching baseline for climbing. Build leg length awareness and work on reach mechanics with flexibility training.",
+      Intermediate: "Solid reaching capacity for intermediate climbing demands. Progress with targeted hip mobility and reach-specific strength.",
+      Advanced: "High reaching capacity for advanced climbing movement. Emphasize locked-off reach and dynamic positioning.",
+      Elite: "Exceptional leg reach for elite climbing. Maintain quality and refine micro-adjustments for maximal reach utilization."
+    };
+
+    return {
+      currentValue:
+        "Current score: " +
+        valueWithUnit +
+        " | Normalized: " +
+        (normalizedScore ? formatMetricNumber(normalizedScore) : "—"),
+      rating: "Rating: " + rating,
+      range:
+        "Reference: Climbing norms (normalized by leg length) - Novice <0.90, Intermediate 0.90-0.97, Advanced 0.97-1.00, Elite 1.00+. " +
+        "Raw norms: Novice ~104cm, Intermediate ~108-110cm, Advanced ~111-113cm, Elite 114cm.",
+      meaning:
+        "Meaning: " +
+        (meaningByRating[rating] || "Interpret with training context and trend direction.") +
+        " Normalized scoring accounts for natural height variation."
+    };
+  }
+
+  function buildSidePlankBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var band = getSidePlankNormBandForSex(sex);
+
+    if (numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to unlock benchmark comparison.",
+        range:
+          "Reference: Side Plank + Hip Abduction uses sex-specific hold-time bands (seconds) for Developing to Elite.",
+        meaning:
+          "Meaning: Enter hold time in seconds from a standardized Side Plank with Hip Abduction test (seconds until form breakdown)."
+      };
+    }
+
+    if (!band) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men: Developing <20, Recreational 20-35, Trained 35-50, Advanced 50-70, Elite 70+. " +
+          "Women: Developing <15, Recreational 15-30, Trained 30-45, Advanced 45-60, Elite 60+ (all in seconds).",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply Side Plank + Hip Abduction normative values."
+      };
+    }
+
+    var rating = classifySidePlankHoldTime(numericValue, band);
+    var meaningByRating = {
+      Developing: "Lateral trunk endurance with hip control is limited. Build core anti-rotation strength and hip stabilizer capacity.",
+      Recreational: "Foundational lateral stability is present. Continue progressing hold time and adding dynamic hip movements.",
+      Trained: "Solid lateral core endurance for most mountain and field demands. Progress load or complexity.",
+      Advanced: "High lateral stability and hip control endurance. Emphasize reactive transfer and fatigue resistance.",
+      Elite: "Exceptional Side Plank + Hip Abduction capacity. Maintain quality while progressing sport-specific integration."
+    };
+
+    return {
+      currentValue: "Current score: " + valueWithUnit,
+      rating: "Rating: " + rating,
+      range:
+        "Reference: " +
+        (band.sex === "male" ? "Men" : "Women") +
+        " hold-time norms - Developing <" +
+        band.developingHigh +
+        "s, Recreational " +
+        band.recreationalLow +
+        "-" +
+        band.recreationalHigh +
+        "s, Trained " +
+        band.trainedLow +
+        "-" +
+        band.trainedHigh +
+        "s, Advanced " +
+        band.advancedLow +
+        "-" +
+        band.advancedHigh +
+        "s, Elite " +
+        band.eliteLow +
+        "+ seconds.",
+      meaning: "Meaning: " + (meaningByRating[rating] || "Interpret with training context and trend direction.")
+    };
+  }
+
+  function classifyYBalanceReach(percentageReach, band) {
+    if (!Number.isFinite(percentageReach) || !band) {
+      return "Needs Data";
+    }
+    if (percentageReach < band.developingHigh) {
+      return "Developing";
+    }
+    if (percentageReach <= band.recreationalHigh) {
+      return "Recreational";
+    }
+    if (percentageReach <= band.trainedHigh) {
+      return "Trained";
+    }
+    if (percentageReach <= band.advancedHigh) {
+      return "Advanced";
+    }
+    return "Elite Control";
+  }
+
+  function getYBalanceNormBandForSex(sex) {
+    if (!sex) {
+      return null;
+    }
+
+    var table = {
+      male: {
+        sex: "male",
+        developingHigh: 60,
+        recreationalLow: 60,
+        recreationalHigh: 65,
+        trainedLow: 65,
+        trainedHigh: 72,
+        advancedLow: 72,
+        advancedHigh: 78,
+        eliteLow: 78
+      },
+      female: {
+        sex: "female",
+        developingHigh: 65,
+        recreationalLow: 65,
+        recreationalHigh: 70,
+        trainedLow: 70,
+        trainedHigh: 77,
+        advancedLow: 77,
+        advancedHigh: 83,
+        eliteLow: 83
+      }
+    };
+
+    return table[sex] || null;
+  }
+
+  function buildYBalanceReachBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var band = getYBalanceNormBandForSex(sex);
+    var unit = normalizeMetricValue(metric && metric.metric_unit);
+    var heightCm = getAthleteHeightCmForBenchmarks();
+    var legLengthCm = heightCm ? calculateLegLengthCm(heightCm) : null;
+    var normalizedReachPercent = null;
+
+    if (numericValue !== null) {
+      if (unit.indexOf("%") !== -1) {
+        normalizedReachPercent = numericValue;
+      } else if (Number.isFinite(legLengthCm) && legLengthCm > 0) {
+        var reachCm = convertLengthToCm(numericValue, unit);
+        if (Number.isFinite(reachCm)) {
+          normalizedReachPercent = (reachCm / legLengthCm) * 100;
+        }
+      } else if (!unit) {
+        // Backward compatibility: if no unit is stored, assume value may already be normalized %.
+        normalizedReachPercent = numericValue;
+      }
+    }
+
+    if (numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to unlock benchmark comparison.",
+        range:
+          "Reference: Y Balance anterior reach uses sex-specific normalized reach categories (% leg length) for Developing to Elite Control.",
+        meaning:
+          "Meaning: Enter normalized anterior reach as % leg length, or enter reach distance (cm/in) with athlete height to auto-estimate leg length (height x 0.53). Clinical note: anterior reach asymmetry >4cm indicates elevated lower-extremity injury risk."
+      };
+    }
+
+    if (!band) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men: Developing <60%, Recreational 60-65%, Trained 65-72%, Advanced 72-78%, Elite >78%. " +
+          "Women: Developing <65%, Recreational 65-70%, Trained 70-77%, Advanced 77-83%, Elite >83% (all normalized to leg length).",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply Y Balance normative values."
+      };
+    }
+
+    if (!Number.isFinite(normalizedReachPercent)) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing data for leg-length normalization.",
+        range:
+          "Reference: Y Balance norms are based on normalized anterior reach (% leg length).",
+        meaning:
+          "Meaning: Enter athlete height in profile so leg length can be estimated (height x 0.53), or enter the Y Balance result directly as %."
+      };
+    }
+
+    var rating = classifyYBalanceReach(normalizedReachPercent, band);
+    var meaningByRating = {
+      Developing: "Anterior reach capacity is limited. Prioritize hip mobility, ankle dorsiflexion, and balance control in standing loads.",
+      Recreational: "Foundational mobility and balance present. Continue progressing reach distance with controlled tempo.",
+      Trained: "Solid anterior mobility and dynamic balance control. Maintain with sport-specific movement complexity.",
+      Advanced: "High reach capacity and balance poise. Continue progressive loading while monitoring asymmetry (>4cm indicates injury risk).",
+      "Elite Control": "Exceptional anterior reach and balance. Emphasize bilateral symmetry (<4cm asymmetry) and sport-specific transfer under fatigue."
+    };
+
+    return {
+      currentValue:
+        "Current score: " +
+        valueWithUnit +
+        " | Normalized reach: " +
+        formatMetricNumber(normalizedReachPercent) +
+        "%",
+      rating: "Rating: " + rating,
+      range:
+        "Reference: " +
+        (band.sex === "male" ? "Men" : "Women") +
+        " anterior reach norms - Developing <" +
+        band.developingHigh +
+        "%, Recreational " +
+        band.recreationalLow +
+        "-" +
+        band.recreationalHigh +
+        "%, Trained " +
+        band.trainedLow +
+        "-" +
+        band.trainedHigh +
+        "%, Advanced " +
+        band.advancedLow +
+        "-" +
+        band.advancedHigh +
+        "%, Elite >" +
+        band.eliteLow +
+        "% (normalized to leg length).",
+      meaning: "Meaning: " + (meaningByRating[rating] || "Interpret with training context and trend direction.")
+    };
+  }
+
+  function buildEdgePullBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var band = getEdgePullNormBandForSex(sex);
+    var unit = normalizeMetricValue(metric && metric.metric_unit);
+    var weightKg = getAthleteWeightKgForBenchmarks();
+    var pullLoadKg = numericValue === null ? null : convertMassToKg(numericValue, unit);
+    var relativeLoad = null;
+
+    if (numericValue !== null) {
+      if (unit.indexOf("%") !== -1) {
+        relativeLoad = numericValue;
+      } else if (Number.isFinite(weightKg) && weightKg > 0 && Number.isFinite(pullLoadKg)) {
+        relativeLoad = (pullLoadKg / weightKg) * 100;
+      }
+    }
+
+    if (numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to unlock benchmark comparison.",
+        range:
+          "Reference: 20mm Edge Pull uses sex-specific relative load ranges (% bodyweight).",
+        meaning:
+          "Meaning: Enter a numeric pull score. If score is in kg, athlete weight is required to calculate % bodyweight."
+      };
+    }
+
+    if (!band) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men - Developing <1.2x BW, Recreational 1.2-1.5x, Trained 1.5-1.8x, Advanced 1.8-2.1x, Elite >2.1x. " +
+          "Women - Developing <1.1x BW, Recreational 1.1-1.4x, Trained 1.4-1.7x, Advanced 1.7-2.0x, Elite >2.0x.",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply the 20mm Edge Pull normative table."
+      };
+    }
+
+    if (relativeLoad === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing bodyweight for relative-load comparison.",
+        range:
+          "Reference: Relative load is calculated as (edge pull load / bodyweight) x 100.",
+        meaning:
+          "Meaning: Enter athlete weight in profile and record edge pull in kg or lbs (or enter metric directly as %BW)."
+      };
+    }
+
+    var rating = classifyEdgePullRelativeLoad(relativeLoad, band);
+    var meaningByRating = {
+      Developing: "Developing relative finger-force output. Build tendon tolerance and progressive max-strength capacity.",
+      Recreational: "Recreational climbing force baseline. Continue steady finger-strength progression and recovery management.",
+      Trained: "Trained relative force profile with solid climbing transfer potential.",
+      Advanced: "Advanced relative edge-force output suited to higher climbing performance demands.",
+      Elite: "Elite relative edge-force output. Prioritize precision, resilience, and sport-specific transfer under fatigue."
+    };
+
+    return {
+      currentValue:
+        "Current score: " +
+        valueWithUnit +
+        " | Relative load: " +
+        formatMetricNumber(relativeLoad) +
+        "% BW",
+      rating: "Rating: " + rating,
+      range:
+        "Reference: " +
+        (band.sex === "male"
+          ? "Men"
+          : "Women") +
+        " Developing <" + band.developingHigh + "% (" + formatMetricNumber(band.developingHigh / 100) + "x BW) | Recreational " +
+        band.recreationalLow + "-" + band.recreationalHigh + "% (" + formatMetricNumber(band.recreationalLow / 100) + "-" + formatMetricNumber(band.recreationalHigh / 100) + "x) | Trained " +
+        band.trainedLow + "-" + band.trainedHigh + "% (" + formatMetricNumber(band.trainedLow / 100) + "-" + formatMetricNumber(band.trainedHigh / 100) + "x) | Advanced " +
+        band.advancedLow + "-" + band.advancedHigh + "% (" + formatMetricNumber(band.advancedLow / 100) + "-" + formatMetricNumber(band.advancedHigh / 100) + "x) | Elite >" + band.eliteLow + "% (" + formatMetricNumber(band.eliteLow / 100) + "x).",
+      meaning: "Meaning: " + (meaningByRating[rating] || "Interpret with training context and trend direction.")
+    };
+  }
+
+  function classifyEdgePullRelativeLoad(valuePercent, band) {
+    if (!Number.isFinite(valuePercent) || !band) {
+      return "Needs Data";
+    }
+    if (valuePercent < band.developingHigh) {
+      return "Developing";
+    }
+    if (valuePercent < band.trainedLow) {
+      return "Recreational";
+    }
+    if (valuePercent < band.advancedLow) {
+      return "Trained";
+    }
+    if (valuePercent < band.eliteLow) {
+      return "Advanced";
+    }
+    return "Elite";
+  }
+
+  function getAthleteWeightKgForBenchmarks() {
+    var profile = state.profile || {};
+    var weightUnit = resolveAthleteWeightUnitForBenchmarks();
+    var profileWeight = parseFloat(profile.weight_kg);
+    if (Number.isFinite(profileWeight) && profileWeight > 0) {
+      return convertMassToKg(profileWeight, weightUnit);
+    }
+
+    if (state.form) {
+      var weightField = state.form.querySelector("[name='weight_kg']");
+      var fieldWeight = parseFloat((weightField && weightField.value) || "");
+      if (Number.isFinite(fieldWeight) && fieldWeight > 0) {
+        return convertMassToKg(fieldWeight, weightUnit);
+      }
+    }
+
+    return null;
+  }
+
+  function resolveAthleteWeightUnitForBenchmarks() {
+    var profile = state.profile || {};
+    var overview = getProfileSportOverview(profile);
+    var general = overview && overview.general && typeof overview.general === "object"
+      ? overview.general
+      : {};
+
+    var rawCandidates = [
+      profile.weight_unit,
+      overview && overview.weight_unit,
+      general.weight_unit
+    ];
+
+    var raw = rawCandidates.find(function (value) {
+      return String(value || "").trim().length > 0;
+    });
+
+    var normalized = normalizeMetricValue(raw);
+    if (/\b(lb|lbs|pound|pounds)\b/.test(normalized)) {
+      return "lb";
+    }
+    return "kg";
+  }
+
+  function getAthleteHeightCmForBenchmarks() {
+    var profile = state.profile || {};
+    var profileHeight = parseFloat(profile.height_cm);
+    if (Number.isFinite(profileHeight) && profileHeight > 0) {
+      return profileHeight;
+    }
+
+    if (state.form) {
+      var heightField = state.form.querySelector("[name='height_cm']");
+      var fieldHeight = parseFloat((heightField && heightField.value) || "");
+      if (Number.isFinite(fieldHeight) && fieldHeight > 0) {
+        return fieldHeight;
+      }
+    }
+
+    return null;
+  }
+
+  function getEdgePullNormBandForSex(sex) {
+    if (!sex) {
+      return null;
+    }
+
+    var table = {
+      male: {
+        sex: "male",
+        developingHigh: 120,
+        recreationalLow: 120,
+        recreationalHigh: 150,
+        trainedLow: 150,
+        trainedHigh: 180,
+        advancedLow: 180,
+        advancedHigh: 210,
+        eliteLow: 210
+      },
+      female: {
+        sex: "female",
+        developingHigh: 110,
+        recreationalLow: 110,
+        recreationalHigh: 140,
+        trainedLow: 140,
+        trainedHigh: 170,
+        advancedLow: 170,
+        advancedHigh: 200,
+        eliteLow: 200
+      }
+    };
+
+    return table[sex] || null;
+  }
+
+  function getProfileSportOverview(profile) {
+    if (!profile || typeof profile.sport_overview !== "object") {
+      return null;
+    }
+    return profile.sport_overview;
+  }
+
+  function buildVerticalJumpBenchmarkSummary(metric, numericValue, valueWithUnit) {
+    var age = getAthleteAgeForBenchmarks();
+    var sex = resolveAthleteSexForBenchmarks();
+    var band = getVerticalJumpNormBand(age, sex);
+    var unit = normalizeMetricValue(metric && metric.metric_unit);
+    var valueCm = numericValue === null ? null : convertLengthToCm(numericValue, unit);
+    var ageLabel = age == null ? "age unknown" : String(age);
+    var sexLabel = sex === "male" ? "men" : sex === "female" ? "women" : "sex unknown";
+
+    if (valueCm === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add a numeric score to unlock benchmark comparison.",
+        range:
+          "Reference: Vertical jump age/sex norms available (men and women, 20-29 to 50+). " +
+          "Set profile age and sex for athlete-specific comparison.",
+        meaning:
+          "Meaning: Enter jump result as a number (cm or inches), and ensure athlete age/sex are set for precise normative interpretation."
+      };
+    }
+
+    if (!band) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete context for age/sex-specific norming.",
+        range:
+          "Reference: Vertical Jump Norms use sex-specific age bands (20-29, 30-39, 40-49, 50+). " +
+          "Current profile: age " + ageLabel + ", sex " + sexLabel + ".",
+        meaning:
+          "Meaning: Add athlete DOB/age and sex (male/female) in profile data to calculate vertical jump category from your normative table."
+      };
+    }
+
+    var rating = classifyVerticalJumpByAverageBand(valueCm, band);
+    var meaningByRating = {
+      "Below Average": "Jump power is below age/sex average. Prioritize lower-body force production, landing mechanics, and progressive power work.",
+      "Average": "Jump performance is in the expected range for this athlete's age/sex group.",
+      "Above Average": "Jump performance is above expected age/sex average. Maintain power while progressing sport-specific transfer."
+    };
+
+    return {
+      currentValue: "Current score: " + valueWithUnit,
+      rating: "Rating: " + rating,
+      range:
+        "Reference: " +
+        (band.sex === "male" ? "Men" : "Women") +
+        " " +
+        band.ageBandLabel +
+        " average = " +
+        band.inchesLabel +
+        " (" +
+        band.cmLabel +
+        ").",
+      meaning: "Meaning: " + (meaningByRating[rating] || "Interpret with training context and trend direction.")
+    };
+  }
+
+  function classifyVerticalJumpByAverageBand(valueCm, band) {
+    if (!band || !Number.isFinite(valueCm)) {
+      return "Needs Data";
+    }
+    if (valueCm < band.cmLow) {
+      return "Below Average";
+    }
+    if (valueCm > band.cmHigh) {
+      return "Above Average";
+    }
+    return "Average";
+  }
+
+  function getAthleteAgeForBenchmarks() {
+    var profile = state.profile || {};
+    var dob = getProfileDobValue(profile);
+    var dobAge = calculateAgeFromDob(dob);
+    if (dobAge != null) {
+      return dobAge;
+    }
+
+    var rawAge = parseInt(profile.age, 10);
+    if (Number.isFinite(rawAge) && rawAge > 0 && rawAge < 121) {
+      return rawAge;
+    }
+
+    return null;
+  }
+
+  function resolveAthleteSexForBenchmarks() {
+    var profile = state.profile || {};
+    var overview = getProfileSportOverview(profile);
+    var general = overview && overview.general && typeof overview.general === "object"
+      ? overview.general
+      : {};
+
+    var rawCandidates = [
+      profile.sex,
+      profile.gender,
+      profile.biological_sex,
+      general.sex,
+      general.gender,
+      general.biological_sex
+    ];
+
+    var raw = rawCandidates.find(function (value) {
+      return String(value || "").trim().length > 0;
+    });
+
+    var normalized = normalizeMetricValue(raw);
+    if (normalized === "male" || normalized === "m" || normalized === "man") {
+      return "male";
+    }
+    if (normalized === "female" || normalized === "f" || normalized === "woman") {
+      return "female";
+    }
+    return "";
+  }
+
+  function getProfileSexForFormValue(profile) {
+    var overview = getProfileSportOverview(profile);
+    var general = overview && overview.general && typeof overview.general === "object"
+      ? overview.general
+      : {};
+
+    var rawCandidates = [
+      profile && profile.sex,
+      profile && profile.gender,
+      profile && profile.biological_sex,
+      overview && overview.sex,
+      overview && overview.gender,
+      overview && overview.biological_sex,
+      general.sex,
+      general.gender,
+      general.biological_sex
+    ];
+
+    var raw = rawCandidates.find(function (value) {
+      return String(value || "").trim().length > 0;
+    });
+
+    var normalized = normalizeMetricValue(raw);
+    if (normalized === "male" || normalized === "m" || normalized === "man") {
+      return "male";
+    }
+    if (normalized === "female" || normalized === "f" || normalized === "woman") {
+      return "female";
+    }
+    if (
+      normalized === "prefer-not-to-say" ||
+      normalized === "prefer not to say" ||
+      normalized === "undisclosed"
+    ) {
+      return "prefer-not-to-say";
+    }
+    if (normalized === "other" || normalized === "nonbinary" || normalized === "non-binary") {
+      return "other";
+    }
+    return "";
+  }
+
+  function getVerticalJumpNormBand(age, sex) {
+    if (!Number.isFinite(age) || !sex) {
+      return null;
+    }
+
+    var ageBandLabel = "";
+    if (age >= 20 && age <= 29) {
+      ageBandLabel = "20-29";
+    } else if (age >= 30 && age <= 39) {
+      ageBandLabel = "30-39";
+    } else if (age >= 40 && age <= 49) {
+      ageBandLabel = "40-49";
+    } else if (age >= 50) {
+      ageBandLabel = "50+";
+    } else {
+      ageBandLabel = "20-29";
+    }
+
+    var tables = {
+      male: {
+        "20-29": { cmLow: 51, cmHigh: 56, inchesLabel: "20-22 in", cmLabel: "51-56 cm" },
+        "30-39": { cmLow: 46, cmHigh: 51, inchesLabel: "18-20 in", cmLabel: "46-51 cm" },
+        "40-49": { cmLow: 41, cmHigh: 46, inchesLabel: "16-18 in", cmLabel: "41-46 cm" },
+        "50+": { cmLow: 33, cmHigh: 41, inchesLabel: "13-16 in", cmLabel: "33-41 cm" }
+      },
+      female: {
+        "20-29": { cmLow: 41, cmHigh: 46, inchesLabel: "16-18 in", cmLabel: "41-46 cm" },
+        "30-39": { cmLow: 36, cmHigh: 41, inchesLabel: "14-16 in", cmLabel: "36-41 cm" },
+        "40-49": { cmLow: 31, cmHigh: 36, inchesLabel: "12-14 in", cmLabel: "31-36 cm" },
+        "50+": { cmLow: 26, cmHigh: 31, inchesLabel: "10-12 in", cmLabel: "26-31 cm" }
+      }
+    };
+
+    var sexTable = tables[sex];
+    if (!sexTable || !sexTable[ageBandLabel]) {
+      return null;
+    }
+
+    return {
+      sex: sex,
+      ageBandLabel: ageBandLabel,
+      cmLow: sexTable[ageBandLabel].cmLow,
+      cmHigh: sexTable[ageBandLabel].cmHigh,
+      inchesLabel: sexTable[ageBandLabel].inchesLabel,
+      cmLabel: sexTable[ageBandLabel].cmLabel
+    };
+  }
+
+  function buildBilateralMetricFlags(metrics) {
+    var groups = {};
+    (metrics || []).forEach(function (metric) {
+      var rawName = String(metric && metric.metric_name || "").trim();
+      var sideMatch = rawName.match(/^(.*)\((left|right)\)\s*$/i);
+      if (!sideMatch) {
+        return;
+      }
+
+      var baseName = String(sideMatch[1] || "").trim();
+      var side = String(sideMatch[2] || "").toLowerCase();
+      var score = parseNumericMetricValue(metric.metric_value);
+      if (!Number.isFinite(score)) {
+        return;
+      }
+
+      if (!groups[baseName]) {
+        groups[baseName] = {};
+      }
+      groups[baseName][side] = score;
+    });
+
+    return Object.keys(groups)
+      .map(function (name) {
+        var pair = groups[name] || {};
+        if (!Number.isFinite(pair.left) || !Number.isFinite(pair.right)) {
+          return "";
+        }
+        var symmetry = calculateSymmetryPercent(pair.left, pair.right);
+        if (symmetry === null || symmetry >= 95) {
+          return "";
+        }
+        return name + " side-to-side asymmetry flagged: " + formatMetricNumber(symmetry) + "% symmetry (<95%).";
+      })
+      .filter(function (line) {
+        return !!line;
+      });
   }
 
   function buildMetricFrontValueHtml(metric) {
@@ -3059,6 +4745,56 @@
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  function convertLengthToCm(value, unitText) {
+    if (!Number.isFinite(value)) {
+      return null;
+    }
+
+    var unit = normalizeMetricValue(unitText || "");
+    if (!unit) {
+      return value;
+    }
+
+    if (/\bcm\b/.test(unit) || /\bcentimet(er|re)s?\b/.test(unit)) {
+      return value;
+    }
+
+    if (/\b(in|inch|inches)\b/.test(unit) || unit === '"') {
+      return value * 2.54;
+    }
+
+    if (/\b(ft|foot|feet)\b/.test(unit)) {
+      return value * 30.48;
+    }
+
+    if (/\bmm\b/.test(unit) || /\bmillimeters?\b/.test(unit)) {
+      return value / 10;
+    }
+
+    if (/\bm\b/.test(unit) || /\bmeters?\b/.test(unit)) {
+      return value * 100;
+    }
+
+    return value;
+  }
+
+  function convertMassToKg(value, unitText) {
+    if (!Number.isFinite(value)) {
+      return null;
+    }
+
+    var unit = normalizeMetricValue(unitText || "");
+    if (!unit || /\b(kg|kilogram|kilograms)\b/.test(unit)) {
+      return value;
+    }
+
+    if (/\b(lb|lbs|pound|pounds)\b/.test(unit)) {
+      return value * 0.45359237;
+    }
+
+    return value;
+  }
+
   function updateYBalanceDraftValue(card) {
     if (!card) {
       return;
@@ -3102,6 +4838,21 @@
     if (valueInput) {
       valueInput.value = "L " + leftText + " | R " + rightText + " | Symmetry " + symmetryText;
     }
+  }
+
+  function updateLegLengthEstimateNote(card) {
+    if (!card) {
+      return;
+    }
+
+    var legLengthNote = card.querySelector("[data-leglength-estimate-note]");
+    if (!legLengthNote) {
+      return;
+    }
+
+    var name = String((card.querySelector('[data-metric-edit="name"]') || {}).value || "").trim();
+    var showNote = isYBalanceMetricName(name) || isAdaptedGrantFootRaiseMetricName(name);
+    legLengthNote.hidden = !showNote;
   }
 
   function isYBalanceMetricName(name) {

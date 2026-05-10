@@ -202,6 +202,7 @@
     setInputValue("location", athlete.location);
     setInputValue("height_cm", athlete.height_cm);
     setInputValue("weight_kg", athlete.weight_kg);
+    setInputValue("sex", getProfileSexForFormValue(athlete));
 
     updateCalculatedAgeDisplay(getDobFromProfile(athlete));
 
@@ -258,6 +259,7 @@
       location: String(formData.get("location") || "").trim(),
       height_cm: parseFloat(formData.get("height_cm") || "") || null,
       weight_kg: parseFloat(formData.get("weight_kg") || "") || null,
+      sex: String(formData.get("sex") || "").trim() || null,
       updated_at: new Date().toISOString()
     };
 
@@ -507,6 +509,48 @@
     }
 
     return baseOverview;
+  }
+
+  function getProfileSexForFormValue(profile) {
+    var overview = getProfileSportOverview(profile);
+    var general = overview && overview.general && typeof overview.general === "object"
+      ? overview.general
+      : {};
+
+    var rawCandidates = [
+      profile && profile.sex,
+      profile && profile.gender,
+      profile && profile.biological_sex,
+      overview && overview.sex,
+      overview && overview.gender,
+      overview && overview.biological_sex,
+      general.sex,
+      general.gender,
+      general.biological_sex
+    ];
+
+    var raw = rawCandidates.find(function (value) {
+      return String(value || "").trim().length > 0;
+    });
+
+    var normalized = String(raw || "").trim().toLowerCase();
+    if (normalized === "male" || normalized === "m" || normalized === "man") {
+      return "male";
+    }
+    if (normalized === "female" || normalized === "f" || normalized === "woman") {
+      return "female";
+    }
+    if (
+      normalized === "prefer-not-to-say" ||
+      normalized === "prefer not to say" ||
+      normalized === "undisclosed"
+    ) {
+      return "prefer-not-to-say";
+    }
+    if (normalized === "other" || normalized === "nonbinary" || normalized === "non-binary") {
+      return "other";
+    }
+    return "";
   }
 
   function renderSportOverviewEditor(selectedSports, existingOverview) {

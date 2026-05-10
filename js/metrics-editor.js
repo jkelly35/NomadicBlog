@@ -233,8 +233,8 @@
 
     var assessmentClusters = {
       climbing: [
-        { name: "Power Push Up", unit: "reps", category: "Strength" },
-        { name: "Shoulder Tap Test", unit: "reps", category: "Strength" },
+        { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
+        { name: "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)", unit: "reps", category: "Strength" },
         { name: "20mm Edge Pull Strength", unit: "kg", category: "Strength" },
         { name: "Max Pull Ups", unit: "reps", category: "Strength" },
         { name: "Max Hang Time", unit: "sec", category: "Strength" },
@@ -277,8 +277,8 @@
     if (!val) return;
 
     var presetDefaults = {
-      "Power Push Up": {unit: "reps", category: "Strength"},
-      "Shoulder Tap Test": {unit: "reps", category: "Strength"},
+      "Countermovement Push-Up (CMPU)": {unit: "reps", category: "Strength"},
+      "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)": {unit: "reps", category: "Strength"},
       "20mm Edge Pull Strength": {unit: "kg", category: "Strength"},
       "Max Pull Ups": {unit: "reps", category: "Strength"},
       "Max Hang Time": {unit: "sec", category: "Strength"},

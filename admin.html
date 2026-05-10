@@ -102,6 +102,135 @@
     </div>
   </main>
 
+  <!-- Add Athlete Account Modal -->
+  <div class="admin-modal" data-admin-add-athlete-modal hidden>
+    <div class="admin-modal-backdrop" data-admin-add-athlete-close></div>
+    <div class="admin-modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-add-athlete-title">
+      <button type="button" class="admin-modal-close" data-admin-add-athlete-close aria-label="Close">&times;</button>
+      <h2 id="admin-add-athlete-title">Add Athlete Account</h2>
+
+      <div class="admin-modal-content">
+        <form class="admin-add-athlete-form" data-admin-add-athlete-form>
+          <div class="admin-modal-section">
+            <h3>Account Details</h3>
+
+            <div class="admin-modal-info-row">
+              <label for="admin-add-athlete-email">Email</label>
+              <input id="admin-add-athlete-email" type="email" autocomplete="email" required data-admin-add-athlete-email />
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label for="admin-add-athlete-name">Full Name</label>
+              <input id="admin-add-athlete-name" type="text" autocomplete="name" data-admin-add-athlete-name />
+            </div>
+
+            <div class="admin-add-athlete-grid">
+              <div class="admin-modal-info-row">
+                <label for="admin-add-athlete-sport">Primary Sport</label>
+                <select id="admin-add-athlete-sport" data-admin-add-athlete-sport>
+                  <option value="">Select sport</option>
+                  <option value="Running">Running</option>
+                  <option value="Cycling">Cycling</option>
+                  <option value="Skiing">Skiing</option>
+                  <option value="Snowboarding">Snowboarding</option>
+                  <option value="Climbing">Climbing</option>
+                  <option value="Hiking">Hiking</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div class="admin-modal-info-row">
+                <label for="admin-add-athlete-level">Experience Level</label>
+                <select id="admin-add-athlete-level" data-admin-add-athlete-level>
+                  <option value="">Select level</option>
+                  <option value="Beginner">Beginner</option>
+                  <option value="Intermediate">Intermediate</option>
+                  <option value="Advanced">Advanced</option>
+                  <option value="Elite">Elite</option>
+                </select>
+              </div>
+              </div>
+
+              <div class="admin-add-athlete-grid">
+                <div class="admin-modal-info-row">
+                  <label for="admin-add-athlete-sex">Sex</label>
+                  <select id="admin-add-athlete-sex" data-admin-add-athlete-sex>
+                    <option value="">Select sex</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                    <option value="prefer-not-to-say">Prefer not to say</option>
+                  </select>
+                </div>
+
+                <div class="admin-modal-info-row">
+                  <label for="admin-add-athlete-height">Height (cm)</label>
+                  <input id="admin-add-athlete-height" type="number" min="1" max="300" data-admin-add-athlete-height />
+                </div>
+              </div>
+          </div>
+
+          <div class="admin-modal-section">
+            <h3>Login Setup</h3>
+
+            <label class="admin-add-athlete-checkbox">
+              <input type="checkbox" checked data-admin-add-athlete-generate-password />
+              <span>Generate secure temporary password automatically</span>
+            </label>
+
+            <div class="admin-modal-info-row" hidden data-admin-add-athlete-custom-password-row>
+              <label for="admin-add-athlete-password">Temporary Password</label>
+              <input id="admin-add-athlete-password" type="text" minlength="8" autocomplete="off" data-admin-add-athlete-password />
+            </div>
+
+            <p class="admin-add-athlete-help">
+              New accounts are flagged to change password after first login.
+            </p>
+          </div>
+
+          <div class="admin-modal-section">
+            <h3>Initial Metrics (Optional)</h3>
+            <p class="admin-add-athlete-help">
+              Add baseline tests and results now so the athlete dashboard is pre-populated.
+            </p>
+            <div class="admin-add-athlete-metric-actions">
+              <button type="button" class="btn admin-btn-small" data-admin-add-athlete-metric-row-add>+ Add Metric</button>
+              <div class="admin-add-athlete-template-picker">
+                <select data-admin-add-athlete-template-select aria-label="Baseline template">
+                  <option value="">— Quick Template —</option>
+                  <option value="running">Running Baseline</option>
+                  <option value="cycling">Cycling Baseline</option>
+                  <option value="skiing">Ski Fitness Baseline</option>
+                  <option value="snowboarding">Snowboard Fitness Baseline</option>
+                  <option value="climbing">Climbing Fitness Baseline</option>
+                  <option value="hiking">Hiking Baseline</option>
+                  <option value="general">General Fitness Baseline</option>
+                </select>
+                <button type="button" class="btn admin-btn-small" data-admin-add-athlete-template-load>Load</button>
+              </div>
+            </div>
+            <div class="admin-add-athlete-metrics" data-admin-add-athlete-metrics></div>
+          </div>
+
+          <div class="admin-modal-section">
+            <div class="admin-modal-actions">
+              <button type="submit" class="btn admin-btn-primary">Create Athlete Account</button>
+              <button type="button" class="btn admin-btn-reset-password" data-admin-add-athlete-close>Cancel</button>
+            </div>
+          </div>
+        </form>
+
+        <div class="admin-modal-section" hidden data-admin-add-athlete-credentials>
+          <h3>Share Login Details</h3>
+          <pre class="admin-add-athlete-credentials-preview" data-admin-add-athlete-credentials-preview></pre>
+          <button type="button" class="btn admin-btn-small" data-admin-add-athlete-copy>Copy Credentials</button>
+        </div>
+
+        <p class="admin-modal-status" role="status" aria-live="polite" data-admin-add-athlete-status></p>
+      </div>
+    </div>
+  </div>
+
   <!-- Athlete Detail Modal -->
   <div class="admin-modal" data-admin-modal hidden>
     <div class="admin-modal-backdrop" data-admin-modal-close></div>

@@ -122,6 +122,19 @@ CREATE POLICY "Anyone can read admins" ON admin_roles FOR SELECT USING (true);
 
 For now, admin access is verified client-side by email check. In production, consider using Supabase RLS policies with a server-side admin verification.
 
+To allow coach profile edits without RLS errors, run:
+
+- `sql/fix-athlete-profiles-coach-rls.sql`
+
+To backfill profile sex from legacy fields (gender/biological_sex/sport_overview), run once:
+
+- `sql/backfill-athlete-sex-from-legacy-columns.sql`
+
+This adds `athlete_profiles` policies that permit either:
+
+- the athlete's own account (`auth.uid() = user_id`), or
+- the coach/admin account (`joe@nomadicperformance.com`)
+
 ### Notes
 
 - Keep the anon key in `js/supabase-config.js` (do not use the service role key in browser code).
