@@ -1385,19 +1385,29 @@
         return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
       });
 
+    var pairedBaseKeys = {};
+    latestMetrics.forEach(function (metric) {
+      var parsed = isPairedSideVariantMetric(metric);
+      if (!parsed) {
+        return;
+      }
+      var baseKey = normalizeMetricValue(parsed.baseName) + "|" + normalizeMetricValue(metric.metric_unit);
+      pairedBaseKeys[baseKey] = true;
+    });
+
     var displayMap = {};
     latestMetrics.forEach(function (metric) {
       var parsed = isPairedSideVariantMetric(metric);
       if (!parsed) {
+        var metricKey = getMetricKey(metric);
+        if (pairedBaseKeys[metricKey]) {
+          return;
+        }
         displayMap[getMetricKey(metric)] = metric;
         return;
       }
 
       var exactBaseKey = normalizeMetricValue(parsed.baseName) + "|" + normalizeMetricValue(metric.metric_unit);
-      if (groups[exactBaseKey]) {
-        return;
-      }
-
       var combinedKey = exactBaseKey + "|" + parsed.group;
       if (!displayMap[combinedKey]) {
         displayMap[combinedKey] = {
