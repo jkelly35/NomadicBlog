@@ -1,0 +1,13 @@
+project_id = "nomadicblog"
+
+[functions.strava-connect-start]
+verify_jwt = true
+
+[functions.strava-sync-latest]
+verify_jwt = true
+
+[functions.strava-disconnect]
+verify_jwt = true
+
+[functions.strava-connect-callback]
+verify_jwt = false

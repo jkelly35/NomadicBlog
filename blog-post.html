@@ -3,16 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nomadic Performance - Training Programs</title>
+  <title>Blog Post - Nomadic Performance</title>
   <link rel="stylesheet" href="css/style.css" />
   <script defer src="js/analytics.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js"></script>
   <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/blog-post.js"></script>
 </head>
 <body>
-
-  <!-- ===== Header ===== -->
   <header>
     <div class="brand">
       <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
@@ -24,36 +23,25 @@
       <a href="about.html">About</a>
       <a href="field-guides.html">Field Guides</a>
       <a href="services.html">Services</a>
+      <a href="blog.html">Blog</a>
     </nav>
   </header>
 
-  <!-- ===== Main Content ===== -->
   <main>
-    <section class="services-hero" style="max-width:900px;margin:2.5rem auto;">
-      <h1>Training Programs</h1>
-      <p class="lead">Browse downloadable mountain-athlete training plans. New programs will be added here over time.</p>
+    <section class="field-guides-hero" style="margin-bottom: 1.2rem;">
+      <h2 data-blogpost-title>Loading post...</h2>
+      <p data-blogpost-meta>Fetching latest content...</p>
     </section>
 
-    <section style="max-width:1000px;margin:2rem auto;">
-      <div class="services-grid">
-        <article class="service-card">
-          <h3>Ski/Snowboard Prep Demo</h3>
-          <p>Demo ski-prep training program for previewing the structure and flow of your mountain performance plans.</p>
-          <p><strong>Format:</strong> PDF</p>
-          <p>Download the free PDF instantly.</p>
-          <p style="margin-top: 0.75rem;">
-            <a class="btn" href="TrainingPrograms/SkiPrepDemo.pdf">Get Free PDF →</a>
-          </p>
-        </article>
+    <section style="max-width: 900px; margin: 0 auto 2rem auto; padding: 0 1rem;">
+      <img data-blogpost-cover src="img/nomadicPerformanceLogo.png" alt="Blog cover" style="display:none;width:100%;max-height:420px;object-fit:cover;border-radius:12px;margin-bottom:1.4rem;" />
+      <article data-blogpost-content style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.6rem;"></article>
+      <div style="text-align:center;margin-top:1.6rem;">
+        <a class="btn" href="blog.html">Back to all posts</a>
       </div>
-
-      <p style="margin-top:1rem;">
-        <a href="services.html">← Back to Services</a>
-      </p>
     </section>
   </main>
 
-  <!-- ===== Footer ===== -->
   <footer style="background: #0e4749; color: #fff; padding: 24px 0 16px 0; text-align: center; margin-top: 48px;">
     <div style="margin-bottom: 10px;">
       <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Instagram</a>
@@ -63,6 +51,5 @@
     <p style="font-size: 1rem; opacity: 0.85;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
     <p style="font-size: 0.82rem; opacity: 0.9; max-width: 920px; margin: 8px auto 0 auto; line-height: 1.45;">Medical Disclaimer: Content on this site is for educational purposes only and is not medical advice. Always consult a qualified healthcare professional before starting any exercise, rehabilitation, or nutrition program.</p>
   </footer>
-
 </body>
 </html>

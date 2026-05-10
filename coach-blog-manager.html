@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coach Blog Manager - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/coach-blog-manager.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="services.html">Services</a>
+      <a href="admin.html">Coaching Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+      <div data-blogmgr-guard>
+        <p class="admin-loading">Verifying coach access...</p>
+      </div>
+
+      <div class="admin-content" hidden data-blogmgr-content>
+        <div class="admin-header">
+          <h1>Blog Manager</h1>
+          <p class="admin-subtitle">Create, edit, and publish blog posts without touching code.</p>
+        </div>
+
+        <section class="admin-modal-section" aria-label="Blog editor">
+          <h3 data-blogmgr-form-title>Create New Post</h3>
+          <form data-blogmgr-form>
+            <input type="hidden" data-blogmgr-id />
+
+            <div class="admin-modal-info-row">
+              <label for="blog-title">Title</label>
+              <input id="blog-title" type="text" required data-blogmgr-title />
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label for="blog-slug">Slug</label>
+              <input id="blog-slug" type="text" required data-blogmgr-slug placeholder="my-new-post" />
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label for="blog-category">Category</label>
+              <input id="blog-category" type="text" data-blogmgr-category placeholder="Performance Training" />
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label for="blog-image">Cover Image URL</label>
+              <input id="blog-image" type="url" data-blogmgr-cover placeholder="https://... or img/your-image.png" />
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label for="blog-published">Publish Date</label>
+              <input id="blog-published" type="datetime-local" data-blogmgr-published-at />
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label for="blog-excerpt">Excerpt</label>
+              <textarea id="blog-excerpt" rows="3" required data-blogmgr-excerpt></textarea>
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label for="blog-content">Post Content (HTML allowed)</label>
+              <textarea id="blog-content" rows="12" required data-blogmgr-content-html placeholder="<p>Your post content...</p>"></textarea>
+            </div>
+
+            <div class="admin-modal-info-row">
+              <label>
+                <input type="checkbox" checked data-blogmgr-is-published />
+                Publish immediately
+              </label>
+            </div>
+
+            <div class="admin-modal-actions">
+              <button type="submit" class="btn admin-btn-primary" data-blogmgr-save>Save Post</button>
+              <button type="button" class="btn admin-btn-reset-password" data-blogmgr-reset>Clear Form</button>
+              <a class="btn admin-btn-refresh" href="blog.html">View Blog Page</a>
+            </div>
+          </form>
+        </section>
+
+        <section class="admin-modal-section" aria-label="Published and draft posts">
+          <h3>Existing Posts</h3>
+          <div class="admin-table-wrapper">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Published</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody data-blogmgr-table-body>
+                <tr>
+                  <td colspan="4" style="text-align:center;padding:1.4rem;">Loading posts...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <p class="admin-status" role="status" aria-live="polite" data-blogmgr-status></p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

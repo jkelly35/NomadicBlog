@@ -60,6 +60,15 @@
               <span>Workouts / Week</span>
               <input type="number" min="1" max="14" step="1" value="3" data-template-workouts-per-week />
             </label>
+            <label class="program-builder-structure-field">
+              <span>Program Focus</span>
+              <select data-template-focus>
+                <option value="strength">Strength</option>
+                <option value="running">Running</option>
+                <option value="biking">Biking</option>
+                <option value="hybrid">Hybrid</option>
+              </select>
+            </label>
             <button type="button" class="btn admin-btn-refresh" data-template-structure-apply>Apply</button>
             <button type="button" class="btn btn-secondary" data-template-seed-skeleton>Seed Program Skeleton</button>
           </div>
@@ -89,6 +98,14 @@
           <select id="workout-day-select" class="day-select-dropdown" data-workout-day></select>
           <div class="day-info" data-day-info>Select a workout day to begin logging</div>
         </div>
+        <div class="program-day-type-controls" data-template-day-type-controls hidden>
+          <p class="program-day-type-label">Day Type</p>
+          <div class="program-day-type-actions">
+            <button type="button" class="btn admin-btn-small" data-template-day-type="strength">Strength Day</button>
+            <button type="button" class="btn admin-btn-small" data-template-day-type="running">Running Day</button>
+            <button type="button" class="btn admin-btn-small" data-template-day-type="biking">Biking Day</button>
+          </div>
+        </div>
       </div>
 
       <!-- Workout Progress Summary -->
@@ -109,9 +126,9 @@
               <tr>
                 <th>Exercise</th>
                 <th>Set</th>
-                <th>Reps</th>
-                <th>Weight (lbs)</th>
-                <th>RPE</th>
+                <th data-workout-header-primary>Reps</th>
+                <th data-workout-header-secondary>Weight (lbs)</th>
+                <th data-workout-header-tertiary>RPE</th>
                 <th>Notes</th>
                 <th class="col-checkbox">Done</th>
                 <th class="col-action"></th>

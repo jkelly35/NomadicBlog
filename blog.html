@@ -9,6 +9,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js"></script>
   <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/blog-list.js"></script>
 </head>
 <body>
   <header>
@@ -28,6 +29,7 @@
     <h2 class="section-heading">All Blog Posts</h2>
     <div class="posts-section-accent">
       <div class="posts-grid">
+        <div data-blog-list-dynamic style="display: contents;"></div>
         <!-- Card 0 -->
         <article class="card">
           <img src="img/SeasonalShifts.png" alt="Collage of skiing, biking, climbing, and gym training across mountain sport seasons" class="card-cover" />
@@ -153,7 +155,7 @@
         </article>
       </div>
     </div>
-    <a class="btn" href="blog.html" style="display:inline-block;margin:2.5rem auto 0 auto;font-size:1.1rem;">Back to Home</a>
+    <a class="btn" href="index.html" style="display:inline-block;margin:2.5rem auto 0 auto;font-size:1.1rem;">Back to Home</a>
   </main>
   <footer style="background: #0e4749; color: #fff; padding: 24px 0 16px 0; text-align: center; margin-top: 48px;">
     <div style="margin-bottom: 10px;">

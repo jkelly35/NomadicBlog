@@ -1,5 +1,8 @@
 (function () {
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
+  var METRICS_COLLAPSE_KEY = "nomadic.metricsSectionCollapsed";
+  var STRAVA_REDIRECT_STATUS_PARAM = "strava_status";
+  var STRAVA_REDIRECT_MESSAGE_PARAM = "strava_message";
   var state = {
     client: null,
     user: null,
@@ -9,6 +12,8 @@
     profile: null,
     metrics: [],
     metricsLatest: [],
+    stravaConnection: null,
+    stravaDailyMetrics: [],
     guardElement: null,
     contentElement: null,
     form: null,
@@ -19,6 +24,14 @@
     metricsStatus: null,
     metricsEditor: null,
     metricsEditorToggle: null,
+    metricsContent: null,
+    metricsCollapseToggle: null,
+    stravaConnectBtn: null,
+    stravaSyncBtn: null,
+    stravaDisconnectBtn: null,
+    stravaConnectionMeta: null,
+    stravaMetricsGrid: null,
+    stravaStatusElement: null,
     passwordStatus: null,
     editToggleButton: null,
     editorSection: null,
@@ -77,6 +90,14 @@
     state.metricsStatus = document.querySelector("[data-metrics-status]");
     state.metricsEditor = document.querySelector("[data-metrics-editor]");
     state.metricsEditorToggle = null;
+    state.metricsContent = document.querySelector("[data-metrics-content]");
+    state.metricsCollapseToggle = document.querySelector("[data-metrics-collapse-toggle]");
+    state.stravaConnectBtn = document.querySelector("[data-strava-connect]");
+    state.stravaSyncBtn = document.querySelector("[data-strava-sync]");
+    state.stravaDisconnectBtn = document.querySelector("[data-strava-disconnect]");
+    state.stravaConnectionMeta = document.querySelector("[data-strava-connection-meta]");
+    state.stravaMetricsGrid = document.querySelector("[data-strava-metrics-grid]");
+    state.stravaStatusElement = document.querySelector("[data-strava-status]");
     state.passwordStatus = document.querySelector("[data-password-status]");
     state.editToggleButton = document.querySelector("[data-profile-edit-toggle]");
     state.editorSection = document.querySelector("[data-profile-editor]");
@@ -189,6 +210,8 @@
     populateUserInfo();
     loadProfileData();
     loadMetricsData();
+    loadStravaOverview();
+    maybeShowStravaRedirectStatus();
     loadCurrentTrainingProgram();
   }
 
@@ -210,6 +233,11 @@
 
     if (subtitle) {
       subtitle.textContent = "Coach view: review and edit this athlete's profile and metrics.";
+    }
+
+    var stravaCopy = document.querySelector("#profile-strava-section .profile-section-copy");
+    if (stravaCopy) {
+      stravaCopy.textContent = "Coach view: monitor this athlete's latest Strava sync and summary metrics.";
     }
 
     if (headingRow && !headingRow.querySelector("[data-coach-back-link]")) {
@@ -481,8 +509,7 @@
       .map(function (metric) {
         var metricKey = getMetricKey(metric);
         var name = escapeHtml(metric.metric_name || "Metric");
-        var value = escapeHtml(metric.metric_value || "—");
-        var unit = escapeHtml(metric.metric_unit || "");
+        var frontValueHtml = buildMetricFrontValueHtml(metric);
         var category = escapeHtml(metric.metric_category || "Performance");
         var updated = metric.updated_at ? formatDate(metric.updated_at) : "—";
         var trend = getMetricTrend(metric);
@@ -506,12 +533,21 @@
           '<article class="metric-card" data-metric-key="' + escapeAttribute(metricKey) + '">' +
           '<div class="metric-card-inner">' +
           '<div class="metric-card-face metric-card-front">' +
+          '<div class="metric-card-body">' +
           '<span class="metric-category">' + category + "</span>" +
           '<h3 class="metric-name">' + name + "</h3>" +
-          '<p class="metric-value">' + value + (unit ? '<span class="metric-unit"> ' + unit + "</span>" : "") + "</p>" +
+          '<p class="metric-value">' + frontValueHtml + "</p>" +
           '<p class="metric-trend ' + trendClass + '">' + trendText + "</p>" +
           (historyPoints ? '<div class="metric-history-row">' + historyPoints + "</div>" : "") +
+          '</div>' +
+          '<div class="metric-card-footer">' +
+          '<p class="metric-updated">Updated ' + updated + "</p>" +
           '<div class="metric-card-actions">' +
+          '<button type="button" class="metric-card-btn" data-metric-action="benchmark" data-metric-name="' +
+          escapeAttribute(metric.metric_name || "") +
+          '" data-metric-unit="' +
+          escapeAttribute(metric.metric_unit || "") +
+          '">Benchmarks</button>' +
           '<button type="button" class="metric-card-btn" data-metric-action="edit" data-metric-name="' +
           escapeAttribute(metric.metric_name || "") +
           '" data-metric-unit="' +
@@ -523,16 +559,31 @@
           escapeAttribute(metric.metric_unit || "") +
           '">+ Test</button>' +
           "</div>" +
-          '<p class="metric-updated">Updated ' + updated + "</p>" +
+          "</div>" +
           "</div>" +
           '<div class="metric-card-face metric-card-back">' +
           '<div class="metric-flip-label" data-metric-flip-label>Edit Metric</div>' +
+          '<div class="metric-benchmark" data-metric-benchmark>' +
+          '<p class="metric-benchmark-value" data-benchmark-value></p>' +
+          '<p class="metric-benchmark-rating" data-benchmark-rating></p>' +
+          '<p class="metric-benchmark-range" data-benchmark-range></p>' +
+          '<p class="metric-benchmark-meaning" data-benchmark-meaning></p>' +
+          '<p class="metric-benchmark-note">Benchmarks are general guideposts and should be interpreted with sport context, injury history, and coaching judgment.</p>' +
+          '</div>' +
           '<div class="metric-flip-grid">' +
           '<input type="text" data-metric-edit="name" placeholder="Metric name" value="' + escapeAttribute(metric.metric_name || "") + '" />' +
           '<input type="text" data-metric-edit="value" placeholder="Test value" value="' + escapeAttribute(metric.metric_value || "") + '" />' +
+          '<div class="metric-ybalance-grid" data-metric-ybalance-grid hidden>' +
+          '<input type="text" data-metric-edit="left" placeholder="L Leg" />' +
+          '<input type="text" data-metric-edit="right" placeholder="R Leg" />' +
+          '<input type="text" data-metric-edit="symmetry" placeholder="Symmetry" readonly />' +
+          '</div>' +
           '<input type="text" data-metric-edit="unit" placeholder="Unit" value="' + escapeAttribute(metric.metric_unit || "") + '" />' +
           '<input type="text" data-metric-edit="category" placeholder="Category" value="' + escapeAttribute(metric.metric_category || "Performance") + '" />' +
           "</div>" +
+          '<div class="metric-card-actions metric-card-actions-back metric-card-actions-benchmark">' +
+          '<button type="button" class="metric-card-btn" data-metric-flip-close>Close</button>' +
+          '</div>' +
           '<div class="metric-card-actions metric-card-actions-back">' +
           '<button type="button" class="metric-card-btn metric-card-btn-danger" data-metric-flip-delete>Delete Metric</button>' +
           '<button type="button" class="metric-card-btn" data-metric-flip-cancel>Cancel</button>' +
@@ -632,6 +683,24 @@
       state.metricsForm.addEventListener("submit", onMetricsSubmit);
     }
 
+    if (state.metricsCollapseToggle) {
+      state.metricsCollapseToggle.addEventListener("click", function () {
+        toggleMetricsSection();
+      });
+    }
+
+    if (state.stravaConnectBtn) {
+      state.stravaConnectBtn.addEventListener("click", onStravaConnect);
+    }
+
+    if (state.stravaSyncBtn) {
+      state.stravaSyncBtn.addEventListener("click", onStravaSync);
+    }
+
+    if (state.stravaDisconnectBtn) {
+      state.stravaDisconnectBtn.addEventListener("click", onStravaDisconnect);
+    }
+
     var manageMetricsBtn = document.querySelector("[data-metric-manage]");
     if (manageMetricsBtn) {
       manageMetricsBtn.addEventListener("click", function () {
@@ -700,6 +769,15 @@
           return;
         }
 
+        var closeFlipBtn = event.target && event.target.closest("[data-metric-flip-close]");
+        if (closeFlipBtn) {
+          var closeCard = closeFlipBtn.closest(".metric-card");
+          if (closeCard) {
+            closeMetricCardEditor(closeCard);
+          }
+          return;
+        }
+
         var saveFlipBtn = event.target && event.target.closest("[data-metric-flip-save]");
         if (saveFlipBtn) {
           var saveCard = saveFlipBtn.closest(".metric-card");
@@ -729,7 +807,31 @@
 
         if (action === "test") {
           openMetricCardEditor(actionBtn.closest(".metric-card"), metric, "test");
+          return;
         }
+
+        if (action === "benchmark") {
+          openMetricCardBenchmark(actionBtn.closest(".metric-card"), metric);
+        }
+      });
+
+      state.metricsList.addEventListener("input", function (event) {
+        var target = event && event.target;
+        if (!target) {
+          return;
+        }
+
+        var field = String(target.getAttribute("data-metric-edit") || "");
+        if (field !== "left" && field !== "right" && field !== "unit" && field !== "name") {
+          return;
+        }
+
+        var card = target.closest(".metric-card");
+        if (!card) {
+          return;
+        }
+
+        updateYBalanceDraftValue(card);
       });
     }
 
@@ -754,6 +856,8 @@
     if (deleteBtn) {
       deleteBtn.addEventListener("click", onDeleteAccount);
     }
+
+    applyMetricsSectionPreference();
 
     var resetPasswordBtn = document.querySelector("[data-profile-reset-password]");
     if (resetPasswordBtn) {
@@ -1092,6 +1196,45 @@
       });
   }
 
+  function applyMetricsSectionPreference() {
+    if (!state.metricsContent || !state.metricsCollapseToggle) {
+      return;
+    }
+
+    var collapsed = false;
+    try {
+      collapsed = window.localStorage.getItem(METRICS_COLLAPSE_KEY) === "1";
+    } catch (_error) {
+      collapsed = false;
+    }
+
+    setMetricsSectionCollapsed(collapsed);
+  }
+
+  function toggleMetricsSection() {
+    if (!state.metricsContent) {
+      return;
+    }
+
+    setMetricsSectionCollapsed(!state.metricsContent.hidden);
+  }
+
+  function setMetricsSectionCollapsed(collapsed) {
+    if (!state.metricsContent || !state.metricsCollapseToggle) {
+      return;
+    }
+
+    state.metricsContent.hidden = !!collapsed;
+    state.metricsCollapseToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    state.metricsCollapseToggle.textContent = collapsed ? "Show Metrics" : "Hide Metrics";
+
+    try {
+      window.localStorage.setItem(METRICS_COLLAPSE_KEY, collapsed ? "1" : "0");
+    } catch (_error) {
+      /* localStorage may be disabled by browser privacy settings */
+    }
+  }
+
   function getMetricKey(metric) {
     var name = normalizeMetricValue(metric && metric.metric_name);
     var unit = normalizeMetricValue(metric && metric.metric_unit);
@@ -1180,6 +1323,434 @@
 
     // Always use the non-join version to avoid ambiguous relationship embeds.
     loadCurrentTrainingProgramWithoutJoin(content);
+  }
+
+  function loadStravaOverview() {
+    if (!state.client || !getViewedUserId()) {
+      return;
+    }
+
+    renderStravaConnection(null, true);
+
+    state.client
+      .from("athlete_strava_connections")
+      .select("user_id,strava_athlete_id,athlete_name,athlete_username,connected_at,last_sync_at,sync_status,updated_at")
+      .eq("user_id", getViewedUserId())
+      .maybeSingle()
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingRelationError(result.error)) {
+            setStravaStatus(
+              "Strava tables are not set up yet. Run sql/create-strava-integration.sql in Supabase first.",
+              "error"
+            );
+            renderStravaConnection(null, false);
+            renderStravaMetrics([]);
+            return;
+          }
+
+          if (isRlsError(result.error)) {
+            setStravaStatus(
+              "Strava data is blocked by row-level security policy. Ask your admin to enable access.",
+              "error"
+            );
+            renderStravaConnection(null, false);
+            renderStravaMetrics([]);
+            return;
+          }
+
+          setStravaStatus(result.error.message, "error");
+          renderStravaConnection(null, false);
+          renderStravaMetrics([]);
+          return;
+        }
+
+        state.stravaConnection = result.data || null;
+        renderStravaConnection(state.stravaConnection, false);
+        loadStravaDailyMetrics();
+      })
+      .catch(function (error) {
+        setStravaStatus(error && error.message ? error.message : "Failed to load Strava connection.", "error");
+        renderStravaConnection(null, false);
+        renderStravaMetrics([]);
+      });
+  }
+
+  function loadStravaDailyMetrics() {
+    if (!state.client || !getViewedUserId()) {
+      return;
+    }
+
+    state.client
+      .from("athlete_strava_daily_metrics")
+      .select("metric_date,activity_count,distance_m,moving_time_sec,elevation_gain_m,training_load,resting_hr,hrv_ms,sleep_hours,recovery_score")
+      .eq("user_id", getViewedUserId())
+      .order("metric_date", { ascending: false })
+      .limit(30)
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingRelationError(result.error)) {
+            renderStravaMetrics([]);
+            return;
+          }
+
+          if (isRlsError(result.error)) {
+            setStravaStatus(
+              "Cannot read Strava metrics due to row-level security policy.",
+              "error"
+            );
+            renderStravaMetrics([]);
+            return;
+          }
+
+          setStravaStatus(result.error.message, "error");
+          renderStravaMetrics([]);
+          return;
+        }
+
+        state.stravaDailyMetrics = Array.isArray(result.data) ? result.data : [];
+        renderStravaMetrics(state.stravaDailyMetrics);
+      })
+      .catch(function (error) {
+        setStravaStatus(error && error.message ? error.message : "Failed to load Strava metrics.", "error");
+        renderStravaMetrics([]);
+      });
+  }
+
+  function renderStravaConnection(connection, isLoading) {
+    if (!state.stravaConnectionMeta) {
+      return;
+    }
+
+    if (isLoading) {
+      state.stravaConnectionMeta.innerHTML = '<p class="profile-loading">Checking Strava connection...</p>';
+      return;
+    }
+
+    var canManage = canManageStravaConnection();
+    var isConnected = !!connection;
+
+    if (state.stravaConnectBtn) {
+      state.stravaConnectBtn.hidden = !canManage || isConnected;
+      state.stravaConnectBtn.disabled = !canManage;
+    }
+    if (state.stravaSyncBtn) {
+      state.stravaSyncBtn.hidden = !isConnected;
+      state.stravaSyncBtn.disabled = !isConnected;
+    }
+    if (state.stravaDisconnectBtn) {
+      state.stravaDisconnectBtn.hidden = !canManage || !isConnected;
+      state.stravaDisconnectBtn.disabled = !canManage || !isConnected;
+    }
+
+    if (!isConnected) {
+      var coachHint = state.isCoachView
+        ? "This athlete has not connected Strava yet."
+        : "Connect your Strava account to pull activity and recovery metrics into this dashboard.";
+      state.stravaConnectionMeta.innerHTML =
+        '<p class="strava-connection-empty">' + escapeHtml(coachHint) + "</p>";
+      return;
+    }
+
+    var athleteLabel = connection.athlete_name || connection.athlete_username || "Connected athlete";
+    var syncLabel = connection.last_sync_at ? formatDate(connection.last_sync_at) : "Not synced yet";
+    var statusText = connection.sync_status || "connected";
+
+    state.stravaConnectionMeta.innerHTML =
+      '<div class="strava-connection-grid">' +
+      '<div class="strava-connection-item"><span>Account</span><strong>' + escapeHtml(athleteLabel) + "</strong></div>" +
+      '<div class="strava-connection-item"><span>Connection Status</span><strong>' + escapeHtml(statusText) + "</strong></div>" +
+      '<div class="strava-connection-item"><span>Last Sync</span><strong>' + escapeHtml(syncLabel) + "</strong></div>" +
+      "</div>";
+  }
+
+  function renderStravaMetrics(rows) {
+    if (!state.stravaMetricsGrid) {
+      return;
+    }
+
+    var data = Array.isArray(rows) ? rows : [];
+    if (!data.length) {
+      state.stravaMetricsGrid.innerHTML =
+        '<p class="strava-empty">No Strava metrics synced yet. Sync after connecting to populate this section.</p>';
+      return;
+    }
+
+    var recentSeven = data.slice(0, 7);
+    var latestWithRecovery = data.find(function (row) {
+      return row && (row.recovery_score != null || row.resting_hr != null || row.hrv_ms != null);
+    }) || data[0];
+
+    var totalDistanceMeters = sumNumeric(recentSeven, "distance_m");
+    var totalMovingTime = sumNumeric(recentSeven, "moving_time_sec");
+    var totalElevation = sumNumeric(recentSeven, "elevation_gain_m");
+    var totalActivities = sumNumeric(recentSeven, "activity_count");
+    var totalLoad = sumNumeric(recentSeven, "training_load");
+
+    var cards = [
+      { label: "7-Day Distance", value: formatDecimal(totalDistanceMeters / 1000, 1) + " km" },
+      { label: "7-Day Moving Time", value: formatDecimal(totalMovingTime / 3600, 1) + " h" },
+      { label: "7-Day Elevation", value: formatInteger(totalElevation) + " m" },
+      { label: "7-Day Activities", value: formatInteger(totalActivities) },
+      { label: "7-Day Training Load", value: formatInteger(totalLoad) },
+      { label: "Recovery Score", value: formatNullableNumber(latestWithRecovery && latestWithRecovery.recovery_score) },
+      { label: "Resting HR", value: formatNullableNumber(latestWithRecovery && latestWithRecovery.resting_hr, " bpm") },
+      { label: "HRV", value: formatNullableNumber(latestWithRecovery && latestWithRecovery.hrv_ms, " ms") }
+    ];
+
+    state.stravaMetricsGrid.innerHTML = cards
+      .map(function (item) {
+        return (
+          '<article class="strava-metric-card">' +
+          '<span class="strava-metric-label">' + escapeHtml(item.label) + "</span>" +
+          '<strong class="strava-metric-value">' + escapeHtml(item.value) + "</strong>" +
+          "</article>"
+        );
+      })
+      .join("");
+  }
+
+  function onStravaConnect() {
+    if (!canManageStravaConnection()) {
+      setStravaStatus("Only the athlete can connect a Strava account from this view.", "info");
+      return;
+    }
+
+    if (!state.client || !state.client.functions) {
+      setStravaStatus("Supabase Functions are not available in this build.", "error");
+      return;
+    }
+
+    setStravaStatus("Generating Strava authorization link...", "info");
+
+    state.client.functions
+      .invoke("strava-connect-start", {
+        body: {
+          redirectTo: getStravaRedirectUrl()
+        }
+      })
+      .then(function (result) {
+        if (result.error) {
+          setStravaStatus(formatStravaEdgeError(result.error, "strava-connect-start"), "error");
+          return;
+        }
+
+        var data = result.data || {};
+        var authUrl = data.auth_url || data.authUrl || data.url || "";
+        if (!authUrl) {
+          setStravaStatus("Strava auth URL was not returned by strava-connect-start.", "error");
+          return;
+        }
+
+        window.location.href = authUrl;
+      })
+      .catch(function (error) {
+        setStravaStatus(formatStravaEdgeError(error, "strava-connect-start"), "error");
+      });
+  }
+
+  function onStravaSync() {
+    if (!state.client || !state.client.functions) {
+      setStravaStatus("Supabase Functions are not available in this build.", "error");
+      return;
+    }
+
+    if (!state.stravaConnection) {
+      setStravaStatus("Connect Strava before requesting a sync.", "info");
+      return;
+    }
+
+    setStravaStatus("Syncing latest Strava metrics...", "info");
+
+    state.client.functions
+      .invoke("strava-sync-latest", {
+        body: {
+          days: 30
+        }
+      })
+      .then(function (result) {
+        if (result.error) {
+          setStravaStatus(formatStravaEdgeError(result.error, "strava-sync-latest"), "error");
+          return;
+        }
+
+        setStravaStatus("Strava sync complete.", "success");
+        loadStravaOverview();
+      })
+      .catch(function (error) {
+        setStravaStatus(formatStravaEdgeError(error, "strava-sync-latest"), "error");
+      });
+  }
+
+  function onStravaDisconnect() {
+    if (!canManageStravaConnection()) {
+      setStravaStatus("Only the athlete can disconnect a Strava account from this view.", "info");
+      return;
+    }
+
+    if (!state.client || !state.client.functions) {
+      setStravaStatus("Supabase Functions are not available in this build.", "error");
+      return;
+    }
+
+    if (!state.stravaConnection) {
+      setStravaStatus("No Strava account is currently connected.", "info");
+      return;
+    }
+
+    if (!confirm("Disconnect Strava from this athlete profile?")) {
+      return;
+    }
+
+    setStravaStatus("Disconnecting Strava account...", "info");
+
+    state.client.functions
+      .invoke("strava-disconnect", { body: {} })
+      .then(function (result) {
+        if (result.error) {
+          setStravaStatus(formatStravaEdgeError(result.error, "strava-disconnect"), "error");
+          return;
+        }
+
+        state.stravaConnection = null;
+        state.stravaDailyMetrics = [];
+        renderStravaConnection(null, false);
+        renderStravaMetrics([]);
+        setStravaStatus("Strava disconnected.", "success");
+      })
+      .catch(function (error) {
+        setStravaStatus(formatStravaEdgeError(error, "strava-disconnect"), "error");
+      });
+  }
+
+  function formatStravaEdgeError(error, functionName) {
+    var message = String((error && error.message) || "").trim();
+    var normalized = message.toLowerCase();
+
+    if (
+      normalized.indexOf("failed to send a request to the edge function") !== -1 ||
+      normalized.indexOf("requested function was not found") !== -1 ||
+      normalized.indexOf("not_found") !== -1
+    ) {
+      return (
+        "Could not reach " +
+        functionName +
+        ". Deploy Supabase Edge Functions and confirm project secrets are set. See supabase/functions/README.md."
+      );
+    }
+
+    if (normalized.indexOf("non-2xx") !== -1) {
+      return (
+        functionName +
+        " returned an error response. Check function logs in Supabase and verify STRAVA_* secrets are configured."
+      );
+    }
+
+    return message || ("Failed calling " + functionName + ".");
+  }
+
+  function maybeShowStravaRedirectStatus() {
+    var params;
+    try {
+      params = new URLSearchParams(window.location.search || "");
+    } catch (e) {
+      return;
+    }
+
+    var status = String(params.get(STRAVA_REDIRECT_STATUS_PARAM) || "").trim();
+    if (!status) {
+      return;
+    }
+
+    var message = String(params.get(STRAVA_REDIRECT_MESSAGE_PARAM) || "").trim();
+    if (!message) {
+      if (status === "connected") {
+        message = "Strava account connected. Run a sync to pull your latest metrics.";
+      } else if (status === "synced") {
+        message = "Strava metrics synced successfully.";
+      } else {
+        message = "There was an issue completing Strava connection.";
+      }
+    }
+
+    setStravaStatus(message, status === "error" ? "error" : "success");
+    params.delete(STRAVA_REDIRECT_STATUS_PARAM);
+    params.delete(STRAVA_REDIRECT_MESSAGE_PARAM);
+    if (window.history && window.history.replaceState) {
+      var cleanQuery = params.toString();
+      var cleanUrl = window.location.pathname + (cleanQuery ? "?" + cleanQuery : "") + window.location.hash;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }
+
+  function setStravaStatus(message, variant) {
+    if (!state.stravaStatusElement) {
+      return;
+    }
+
+    state.stravaStatusElement.textContent = message || "";
+    state.stravaStatusElement.classList.remove("is-error", "is-success", "is-info");
+
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      state.stravaStatusElement.classList.add("is-error");
+    } else if (variant === "success") {
+      state.stravaStatusElement.classList.add("is-success");
+    } else {
+      state.stravaStatusElement.classList.add("is-info");
+    }
+  }
+
+  function canManageStravaConnection() {
+    if (state.isCoachView) {
+      return false;
+    }
+    if (!state.user || !state.viewUser) {
+      return false;
+    }
+    return String(state.user.id || "") === String(state.viewUser.id || "");
+  }
+
+  function getStravaRedirectUrl() {
+    return window.location.origin + "/profile.html";
+  }
+
+  function sumNumeric(rows, key) {
+    return (rows || []).reduce(function (total, row) {
+      var value = Number(row && row[key]);
+      if (!Number.isFinite(value)) {
+        return total;
+      }
+      return total + value;
+    }, 0);
+  }
+
+  function formatInteger(value) {
+    if (!Number.isFinite(value)) {
+      return "—";
+    }
+    return String(Math.round(value));
+  }
+
+  function formatDecimal(value, places) {
+    if (!Number.isFinite(value)) {
+      return "—";
+    }
+    return value.toFixed(places);
+  }
+
+  function formatNullableNumber(value, suffix) {
+    var numberValue = Number(value);
+    if (!Number.isFinite(numberValue)) {
+      return "—";
+    }
+    var formatted = Math.abs(numberValue - Math.round(numberValue)) < 0.01
+      ? String(Math.round(numberValue))
+      : numberValue.toFixed(1);
+    return formatted + (suffix || "");
   }
 
   function loadCurrentTrainingProgramWithoutJoin(contentElement) {
@@ -2056,8 +2627,13 @@
     var label = card.querySelector("[data-metric-flip-label]");
     var nameInput = card.querySelector('[data-metric-edit="name"]');
     var valueInput = card.querySelector('[data-metric-edit="value"]');
+    var leftInput = card.querySelector('[data-metric-edit="left"]');
+    var rightInput = card.querySelector('[data-metric-edit="right"]');
+    var symmetryInput = card.querySelector('[data-metric-edit="symmetry"]');
+    var yBalanceGrid = card.querySelector("[data-metric-ybalance-grid]");
     var unitInput = card.querySelector('[data-metric-edit="unit"]');
     var categoryInput = card.querySelector('[data-metric-edit="category"]');
+    var isYBalance = isYBalanceMetricName(metric.metric_name || "");
 
     if (label) {
       label.textContent = modeValue === "test" ? "Log New Test" : "Edit Metric";
@@ -2072,10 +2648,442 @@
     if (categoryInput) {
       categoryInput.value = metric.metric_category || "Performance";
     }
+
+    if (yBalanceGrid) {
+      yBalanceGrid.hidden = !isYBalance;
+    }
+
+    if (isYBalance) {
+      card.setAttribute("data-metric-ybalance", "true");
+
+      var parsed = parseYBalanceLegValues(metric.metric_value || "");
+      var shouldBlankForTest = modeValue === "test";
+      if (leftInput) {
+        leftInput.value = shouldBlankForTest
+          ? ""
+          : (parsed.left === null ? "" : formatMetricNumber(parsed.left));
+      }
+      if (rightInput) {
+        rightInput.value = shouldBlankForTest
+          ? ""
+          : (parsed.right === null ? "" : formatMetricNumber(parsed.right));
+      }
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+
+      updateYBalanceDraftValue(card);
+
+      if (leftInput) {
+        leftInput.focus();
+      }
+      return;
+    }
+
+    card.removeAttribute("data-metric-ybalance");
+
     if (valueInput) {
       valueInput.value = modeValue === "test" ? "" : (metric.metric_value || "");
       valueInput.focus();
     }
+  }
+
+  function openMetricCardBenchmark(card, metric) {
+    if (!card || !metric) {
+      return;
+    }
+
+    closeAllMetricCardEditors();
+
+    var summary = buildMetricBenchmarkSummary(metric);
+    card.classList.add("is-flipped");
+    card.setAttribute("data-metric-mode", "benchmark");
+
+    var label = card.querySelector("[data-metric-flip-label]");
+    var valueEl = card.querySelector("[data-benchmark-value]");
+    var ratingEl = card.querySelector("[data-benchmark-rating]");
+    var rangeEl = card.querySelector("[data-benchmark-range]");
+    var meaningEl = card.querySelector("[data-benchmark-meaning]");
+
+    if (label) {
+      label.textContent = "Benchmarks";
+    }
+    if (valueEl) {
+      valueEl.textContent = summary.currentValue;
+    }
+    if (ratingEl) {
+      ratingEl.textContent = summary.rating;
+    }
+    if (rangeEl) {
+      rangeEl.textContent = summary.range;
+    }
+    if (meaningEl) {
+      meaningEl.textContent = summary.meaning;
+    }
+  }
+
+  function buildMetricBenchmarkSummary(metric) {
+    var metricName = String(metric.metric_name || "");
+    var metricUnit = String(metric.metric_unit || "");
+    var metricValue = String(metric.metric_value || "").trim();
+    var numericValue = parseNumericMetricValue(metricValue);
+    var readableValue = metricValue || "Not recorded";
+    var valueWithUnit = metricUnit ? readableValue + " " + metricUnit : readableValue;
+    var normalizedName = normalizeMetricValue(metricName);
+
+    var definitions = [
+      {
+        keys: ["vertical jump", "countermovement jump", "cmj"],
+        range: "Typical adult field-guide range: <30 developing, 30-45 solid, 45-55 strong, 55+ advanced (cm).",
+        classify: function (value) {
+          return classifyHigherBetter(value, [30, 45, 55], ["Developing", "Solid", "Strong", "Advanced"]);
+        },
+        meaning: {
+          Developing: "Explosive lower-body power is a limiter. Prioritize jump mechanics, force production, and landing control.",
+          Solid: "Baseline power is functional. Continue progressing with plyometrics and unilateral strength.",
+          Strong: "Good power profile for most mountain and field sports. Maintain with quality speed-strength work.",
+          Advanced: "High explosive profile. Focus on transfer to sport-specific speed and fatigue resistance."
+        }
+      },
+      {
+        keys: ["single leg heel raise", "single-leg heel raise", "heel raise"],
+        range: "Single-leg heel raise guide: <20 developing, 20-30 functional, 31-40 strong, 40+ advanced (reps).",
+        classify: function (value) {
+          return classifyHigherBetter(value, [20, 31, 40], ["Developing", "Functional", "Strong", "Advanced"]);
+        },
+        meaning: {
+          Developing: "Calf endurance may limit climbing, running economy, or downhill tolerance.",
+          Functional: "Adequate endurance for general training. Build capacity for longer sessions.",
+          Strong: "Good lower-leg endurance for repeated loading and terrain variation.",
+          Advanced: "Excellent local endurance. Emphasize stiffness and reactive power transfer."
+        }
+      },
+      {
+        keys: ["side plank", "hip abduction hold", "plank"],
+        range: "Side plank hold guide: <30 developing, 30-45 functional, 46-75 strong, 75+ advanced (seconds).",
+        classify: function (value) {
+          return classifyHigherBetter(value, [30, 46, 75], ["Developing", "Functional", "Strong", "Advanced"]);
+        },
+        meaning: {
+          Developing: "Lateral trunk endurance is likely limiting. Build anti-rotation and hip control capacity.",
+          Functional: "Core endurance supports general movement demands but can improve under fatigue.",
+          Strong: "Good trunk endurance for force transfer and frontal-plane control.",
+          Advanced: "Excellent trunk stability reserve. Keep quality and progress sport-specific complexity."
+        }
+      },
+      {
+        keys: ["y balance", "anterior reach"],
+        range: "Anterior reach guide (as % leg length): <65 developing, 65-74 functional, 75-84 strong, 85+ advanced.",
+        classify: function (value) {
+          return classifyHigherBetter(value, [65, 75, 85], ["Developing", "Functional", "Strong", "Advanced"]);
+        },
+        meaning: {
+          Developing: "Dynamic balance/control may increase compensations under load or fatigue.",
+          Functional: "Movement control is serviceable. Build single-leg strength and reach quality.",
+          Strong: "Good single-leg control and mobility integration for multi-planar tasks.",
+          Advanced: "High dynamic control. Focus on maintaining symmetry and sport transfer."
+        }
+      },
+      {
+        keys: ["pull up", "pull-up", "max hang", "20mm edge pull", "edge pull"],
+        range: "Upper-pull benchmark guide: <5 developing, 5-10 functional, 11-15 strong, 16+ advanced (strict reps).",
+        classify: function (value) {
+          return classifyHigherBetter(value, [5, 11, 16], ["Developing", "Functional", "Strong", "Advanced"]);
+        },
+        meaning: {
+          Developing: "Pulling strength-endurance is likely a bottleneck. Progress with strict volume and hangs.",
+          Functional: "Useful baseline pulling capacity. Progress strength with targeted overload.",
+          Strong: "Good pulling profile for climbing and upper-body force tasks.",
+          Advanced: "High pulling capacity. Keep quality and monitor tendon load tolerance."
+        }
+      },
+      {
+        keys: ["resting hr", "resting heart rate"],
+        range: "Resting HR guide: >70 elevated, 60-70 average, 50-59 good, <50 highly trained (bpm).",
+        classify: function (value) {
+          return classifyLowerBetter(value, [70, 60, 50], ["Elevated", "Average", "Good", "Highly Trained"]);
+        },
+        meaning: {
+          Elevated: "Recovery capacity may be limited currently. Review sleep, stress, and aerobic base.",
+          Average: "General population range. Consistent aerobic training can improve economy.",
+          Good: "Efficient baseline for endurance and recovery demands.",
+          "Highly Trained": "Strong aerobic adaptation. Continue balancing intensity and recovery."
+        }
+      }
+    ];
+
+    var definition = definitions.find(function (item) {
+      return (item.keys || []).some(function (key) {
+        return normalizedName.indexOf(normalizeMetricValue(key)) !== -1;
+      });
+    });
+
+    var isYBalanceAnterior =
+      normalizedName.indexOf("y balance") !== -1 ||
+      normalizedName.indexOf("anterior reach") !== -1;
+
+    if (definition && isYBalanceAnterior) {
+      return buildYBalanceBenchmarkSummary(metric, definition);
+    }
+
+    if (!definition || numericValue === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: numericValue === null
+          ? "Rating: Add a numeric score to unlock benchmark comparison."
+          : "Rating: No direct benchmark mapped yet.",
+        range: definition
+          ? "Reference: " + definition.range
+          : "Reference: Coach-defined metric. Compare against your previous tests and sport demands.",
+        meaning: "Meaning: Use trend over time, left/right symmetry, and sport context to judge whether this metric is moving in the right direction."
+      };
+    }
+
+    var rating = definition.classify(numericValue);
+    var meaningText = definition.meaning[rating] || "Use this score with training context and trend direction.";
+
+    return {
+      currentValue: "Current score: " + valueWithUnit,
+      rating: "Rating: " + rating,
+      range: "Reference: " + definition.range,
+      meaning: "Meaning: " + meaningText
+    };
+  }
+
+  function buildMetricFrontValueHtml(metric) {
+    var metricName = String(metric.metric_name || "");
+    var metricUnit = String(metric.metric_unit || "").trim();
+    var metricValue = String(metric.metric_value || "").trim();
+    var normalizedName = normalizeMetricValue(metricName);
+    var isYBalanceAnterior =
+      normalizedName.indexOf("y balance") !== -1 ||
+      normalizedName.indexOf("anterior reach") !== -1;
+
+    if (!isYBalanceAnterior) {
+      var safeValue = escapeHtml(metricValue || "—");
+      var safeUnit = escapeHtml(metricUnit || "");
+      return safeValue + (safeUnit ? '<span class="metric-unit"> ' + safeUnit + "</span>" : "");
+    }
+
+    var parsed = parseYBalanceLegValues(metricValue);
+    if (!parsed || parsed.left === null || parsed.right === null) {
+      var fallbackValue = escapeHtml(metricValue || "—");
+      var fallbackUnit = escapeHtml(metricUnit || "");
+      return fallbackValue + (fallbackUnit ? '<span class="metric-unit"> ' + fallbackUnit + "</span>" : "");
+    }
+
+    var leftText = escapeHtml(formatMetricDisplayValue(parsed.left, metricUnit));
+    var rightText = escapeHtml(formatMetricDisplayValue(parsed.right, metricUnit));
+    var symmetry = calculateSymmetryPercent(parsed.left, parsed.right);
+    var symmetryText = symmetry === null ? "—" : escapeHtml(formatMetricNumber(symmetry) + "%");
+
+    return (
+      '<span class="metric-value-split">' +
+      '<span>L Leg ' + leftText + '</span>' +
+      '<span>R Leg ' + rightText + '</span>' +
+      '<span>Symmetry ' + symmetryText + '</span>' +
+      "</span>"
+    );
+  }
+
+  function buildYBalanceBenchmarkSummary(metric, definition) {
+    var metricUnit = String(metric.metric_unit || "").trim();
+    var metricValue = String(metric.metric_value || "").trim();
+    var parsed = parseYBalanceLegValues(metricValue);
+    var left = parsed && parsed.left;
+    var right = parsed && parsed.right;
+
+    if (left === null || right === null) {
+      return {
+        currentValue:
+          "Current score: L Leg — | R Leg — | Symmetry —",
+        rating:
+          "Rating: Add both leg values (example: L 74, R 71) to compare to Y Balance benchmarks.",
+        range:
+          "Reference: " + definition.range + " Symmetry target is typically >=95%.",
+        meaning:
+          "Meaning: Track both sides and symmetry over time. Large side-to-side gaps can indicate reduced single-leg control under fatigue."
+      };
+    }
+
+    var lowerLegScore = Math.min(left, right);
+    var rating = definition.classify(lowerLegScore);
+    var baseMeaning = definition.meaning[rating] || "Use this score with training context and trend direction.";
+    var symmetry = calculateSymmetryPercent(left, right);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+    var symmetryMeaning = "";
+
+    if (symmetry !== null) {
+      if (symmetry >= 95) {
+        symmetryMeaning = "Symmetry is strong.";
+      } else if (symmetry >= 90) {
+        symmetryMeaning = "Symmetry is moderate; monitor side-to-side control.";
+      } else {
+        symmetryMeaning = "Symmetry gap is notable; prioritize unilateral balance/control work.";
+      }
+    }
+
+    var leftText = formatMetricDisplayValue(left, metricUnit);
+    var rightText = formatMetricDisplayValue(right, metricUnit);
+
+    return {
+      currentValue:
+        "Current score: L Leg " + leftText + " | R Leg " + rightText + " | Symmetry " + symmetryText,
+      rating: "Rating: " + rating,
+      range:
+        "Reference: " + definition.range + " Symmetry target is typically >=95% (or <=4 cm side-to-side when measured in cm).",
+      meaning:
+        "Meaning: " + baseMeaning + (symmetryMeaning ? " " + symmetryMeaning : "")
+    };
+  }
+
+  function classifyHigherBetter(value, thresholds, labels) {
+    if (value < thresholds[0]) {
+      return labels[0];
+    }
+    if (value < thresholds[1]) {
+      return labels[1];
+    }
+    if (value < thresholds[2]) {
+      return labels[2];
+    }
+    return labels[3];
+  }
+
+  function classifyLowerBetter(value, thresholds, labels) {
+    if (value > thresholds[0]) {
+      return labels[0];
+    }
+    if (value >= thresholds[1]) {
+      return labels[1];
+    }
+    if (value >= thresholds[2]) {
+      return labels[2];
+    }
+    return labels[3];
+  }
+
+  function parseNumericMetricValue(rawValue) {
+    var text = String(rawValue || "").replace(/,/g, "").trim();
+    if (!text) {
+      return null;
+    }
+
+    var match = text.match(/-?\d+(?:\.\d+)?/);
+    if (!match) {
+      return null;
+    }
+
+    var parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function updateYBalanceDraftValue(card) {
+    if (!card) {
+      return;
+    }
+
+    var name = String((card.querySelector('[data-metric-edit="name"]') || {}).value || "").trim();
+    if (!isYBalanceMetricName(name)) {
+      card.removeAttribute("data-metric-ybalance");
+      return;
+    }
+
+    card.setAttribute("data-metric-ybalance", "true");
+
+    var leftRaw = String((card.querySelector('[data-metric-edit="left"]') || {}).value || "").trim();
+    var rightRaw = String((card.querySelector('[data-metric-edit="right"]') || {}).value || "").trim();
+    var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
+    var symmetryInput = card.querySelector('[data-metric-edit="symmetry"]');
+    var valueInput = card.querySelector('[data-metric-edit="value"]');
+
+    var left = parseNumericMetricValue(leftRaw);
+    var right = parseNumericMetricValue(rightRaw);
+
+    if (left === null || right === null) {
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+      if (valueInput) {
+        valueInput.value = "";
+      }
+      return;
+    }
+
+    var leftText = formatMetricDisplayValue(left, unit);
+    var rightText = formatMetricDisplayValue(right, unit);
+    var symmetry = calculateSymmetryPercent(left, right);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    if (symmetryInput) {
+      symmetryInput.value = symmetryText;
+    }
+    if (valueInput) {
+      valueInput.value = "L " + leftText + " | R " + rightText + " | Symmetry " + symmetryText;
+    }
+  }
+
+  function isYBalanceMetricName(name) {
+    var normalized = normalizeMetricValue(name);
+    return normalized.indexOf("y balance") !== -1 || normalized.indexOf("anterior reach") !== -1;
+  }
+
+  function parseYBalanceLegValues(rawValue) {
+    var text = String(rawValue || "").replace(/,/g, " ").trim();
+    if (!text) {
+      return { left: null, right: null };
+    }
+
+    var leftMatch = text.match(/(?:\bL\b|\bleft\b|\bl leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
+    var rightMatch = text.match(/(?:\bR\b|\bright\b|\br leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
+    var left = leftMatch ? Number(leftMatch[1]) : null;
+    var right = rightMatch ? Number(rightMatch[1]) : null;
+
+    if (Number.isFinite(left) && Number.isFinite(right)) {
+      return { left: left, right: right };
+    }
+
+    var numbers = text.match(/-?\d+(?:\.\d+)?/g) || [];
+    if (numbers.length >= 2) {
+      var first = Number(numbers[0]);
+      var second = Number(numbers[1]);
+      if (Number.isFinite(first) && Number.isFinite(second)) {
+        return { left: first, right: second };
+      }
+    }
+
+    return { left: null, right: null };
+  }
+
+  function calculateSymmetryPercent(left, right) {
+    if (!Number.isFinite(left) || !Number.isFinite(right)) {
+      return null;
+    }
+
+    var larger = Math.max(Math.abs(left), Math.abs(right));
+    var smaller = Math.min(Math.abs(left), Math.abs(right));
+    if (larger <= 0) {
+      return null;
+    }
+
+    return (smaller / larger) * 100;
+  }
+
+  function formatMetricDisplayValue(value, unit) {
+    var numericText = formatMetricNumber(value);
+    return unit ? numericText + " " + unit : numericText;
+  }
+
+  function formatMetricNumber(value) {
+    if (!Number.isFinite(value)) {
+      return "—";
+    }
+
+    var rounded = Math.round(value * 10) / 10;
+    if (Math.abs(rounded - Math.round(rounded)) < 0.0001) {
+      return String(Math.round(rounded));
+    }
+    return rounded.toFixed(1);
   }
 
   function closeMetricCardEditor(card) {
@@ -2189,6 +3197,16 @@
     var value = String((card.querySelector('[data-metric-edit="value"]') || {}).value || "").trim();
     var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
     var category = String((card.querySelector('[data-metric-edit="category"]') || {}).value || "").trim() || "Performance";
+    var isYBalance = isYBalanceMetricName(name);
+
+    if (isYBalance) {
+      updateYBalanceDraftValue(card);
+      value = String((card.querySelector('[data-metric-edit="value"]') || {}).value || "").trim();
+      if (!value) {
+        setMetricsStatus("Y Balance requires L Leg and R Leg values.", "error");
+        return;
+      }
+    }
 
     if (!name || !value) {
       setMetricsStatus("Metric name and value are required.", "error");

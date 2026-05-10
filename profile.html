@@ -155,25 +155,60 @@
               <p class="profile-section-copy">Track your baseline and performance testing metrics. Coaches can tailor these to your sport.</p>
             </div>
             <div class="metrics-actions">
+              <button
+                type="button"
+                class="btn profile-btn-cancel profile-btn-metrics-collapse"
+                data-metrics-collapse-toggle
+                aria-expanded="true"
+                aria-controls="athlete-metrics-content"
+              >
+                Hide Metrics
+              </button>
               <button type="button" class="btn profile-btn-edit-profile" data-metric-manage>Manage Metrics</button>
             </div>
           </div>
 
-          <div class="metrics-list" data-metrics-list>
-            <p class="profile-loading">Loading metrics...</p>
+          <div id="athlete-metrics-content" class="metrics-content" data-metrics-content>
+            <div class="metrics-list" data-metrics-list>
+              <p class="profile-loading">Loading metrics...</p>
+            </div>
+
+            <div class="metrics-editor-panel" id="metrics-editor-panel" hidden data-metrics-editor>
+              <p class="metrics-editor-copy">Add or remove metrics below, then save to refresh the cards above.</p>
+              <form class="metrics-form" data-metrics-form>
+                <div class="metrics-rows" data-metric-rows></div>
+                <div class="profile-form-actions metrics-editor-actions">
+                  <button type="button" class="btn profile-btn-cancel" data-metrics-cancel>Cancel</button>
+                  <button type="submit" class="btn profile-btn-save">Save Metrics</button>
+                </div>
+                <p class="profile-status" role="status" aria-live="polite" data-metrics-status></p>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-section" id="profile-strava-section">
+          <div class="profile-section-header">
+            <div>
+              <h2>Strava Overview</h2>
+              <p class="profile-section-copy">Connect Strava to pull activity and recovery trends into your dashboard.</p>
+            </div>
+            <div class="metrics-actions strava-actions">
+              <button type="button" class="btn profile-btn-edit-profile" data-strava-connect>Connect Strava</button>
+              <button type="button" class="btn profile-btn-cancel" data-strava-sync>Sync Now</button>
+              <button type="button" class="btn profile-btn-delete" data-strava-disconnect>Disconnect</button>
+            </div>
           </div>
 
-          <div class="metrics-editor-panel" id="metrics-editor-panel" hidden data-metrics-editor>
-            <p class="metrics-editor-copy">Add or remove metrics below, then save to refresh the cards above.</p>
-            <form class="metrics-form" data-metrics-form>
-              <div class="metrics-rows" data-metric-rows></div>
-              <div class="profile-form-actions metrics-editor-actions">
-                <button type="button" class="btn profile-btn-cancel" data-metrics-cancel>Cancel</button>
-                <button type="submit" class="btn profile-btn-save">Save Metrics</button>
-              </div>
-              <p class="profile-status" role="status" aria-live="polite" data-metrics-status></p>
-            </form>
+          <div class="strava-connection-meta" data-strava-connection-meta>
+            <p class="profile-loading">Checking Strava connection...</p>
           </div>
+
+          <div class="strava-metrics-grid" data-strava-metrics-grid>
+            <p class="profile-loading">Sync your account to view Strava metrics.</p>
+          </div>
+
+          <p class="profile-status" role="status" aria-live="polite" data-strava-status></p>
         </div>
 
         <!-- Current Training Program Section -->

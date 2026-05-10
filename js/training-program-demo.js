@@ -13,7 +13,9 @@
     structure: {
       weeks: 1,
       workoutsPerWeek: 3
-    }
+    },
+    templateFocus: "strength",
+    daySessionTypes: {}
   };
 
   var TEMPLATE_DRAFT_PREFIX = "nomadic_training_program_template_builder_draft_";
@@ -53,6 +55,10 @@
 
     refreshWorkoutDaySelect(daySelect);
     state.day = daySelect.value || getAllSlotKeys()[0] || "w1d1";
+
+    if (state.isTemplateBuilder) {
+      ensureDaySessionTypesForStructure();
+    }
 
     daySelect.addEventListener("change", function () {
       if (state.isTemplateBuilder) {
@@ -190,8 +196,10 @@
     var nameInput = document.querySelector("[data-template-name]");
     var weeksInput = document.querySelector("[data-template-weeks]");
     var workoutsInput = document.querySelector("[data-template-workouts-per-week]");
+    var focusInput = document.querySelector("[data-template-focus]");
     var applyStructureBtn = document.querySelector("[data-template-structure-apply]");
     var seedSkeletonBtn = document.querySelector("[data-template-seed-skeleton]");
+    var dayTypeControls = document.querySelector("[data-template-day-type-controls]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var backLink = document.querySelector("[data-program-back-link]");
@@ -200,6 +208,10 @@
 
     if (panel) {
       panel.hidden = false;
+    }
+
+    if (dayTypeControls) {
+      dayTypeControls.hidden = false;
     }
 
     if (saveBtn) {
@@ -238,6 +250,16 @@
       workoutsInput.value = String(state.structure.workoutsPerWeek);
     }
 
+    if (focusInput) {
+      focusInput.value = state.templateFocus || "strength";
+      focusInput.addEventListener("change", function () {
+        var nextFocus = String(focusInput.value || "strength").toLowerCase();
+        state.templateFocus = normalizeTemplateFocus(nextFocus);
+        ensureDaySessionTypesForStructure();
+        updateDayInfo();
+      });
+    }
+
     if (applyStructureBtn) {
       applyStructureBtn.addEventListener("click", function () {
         var nextWeeks = parseInt((weeksInput && weeksInput.value) || "1", 10);
@@ -251,6 +273,14 @@
         seedTemplateSkeleton();
       });
     }
+
+    var dayTypeButtons = document.querySelectorAll("[data-template-day-type]");
+    dayTypeButtons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        var nextType = button.getAttribute("data-template-day-type");
+        applyDayTypeToCurrentDay(nextType);
+      });
+    });
   }
 
   function setProgramTitleFromQuery() {
@@ -279,7 +309,9 @@
     }
 
     var label = labelForSlot(state.day);
-    dayInfo.textContent = "📅 " + label;
+    var dayType = getDayTypeForSlot(state.day);
+    var dayTypeLabel = dayType ? " • " + capitalize(dayType) + " Day" : "";
+    dayInfo.textContent = "📅 " + label + dayTypeLabel;
   }
 
   function updateTemplateStructure(weeks, workoutsPerWeek) {
@@ -293,6 +325,7 @@
       weeks: weeks,
       workoutsPerWeek: workoutsPerWeek
     });
+    ensureDaySessionTypesForStructure();
 
     var daySelect = document.querySelector("[data-workout-day]");
     if (daySelect) {
@@ -320,6 +353,7 @@
     }
 
     saveExercisesForDay(true);
+    ensureDaySessionTypesForStructure();
 
     var slotKeys = getAllSlotKeys();
     var seededCount = 0;
@@ -357,6 +391,22 @@
   function createStarterExercisesForSlot(slotKey) {
     var parsed = parseSlotKey(slotKey) || { week: 1, workout: 1 };
 
+    if (state.templateFocus === "running") {
+      return createRunningStarterExercises(parsed);
+    }
+
+    if (state.templateFocus === "biking") {
+      return createBikingStarterExercises(parsed);
+    }
+
+    if (state.templateFocus === "hybrid") {
+      return createHybridStarterExercises(parsed);
+    }
+
+    return createStrengthStarterExercises(parsed);
+  }
+
+  function createStrengthStarterExercises(parsed) {
     return [
       {
         name: "Warm Up Flow (Week " + parsed.week + ")",
@@ -400,6 +450,93 @@
     ];
   }
 
+  function createRunningStarterExercises(_parsed) {
+    return [
+      {
+        name: "Dynamic Run Warm-Up",
+        section: "Warm Up",
+        mode: "time",
+        superset_group: null,
+        sets: [{ reps: "10 min", weight: "", rpe: "", notes: "Mobility + strides", done: false }]
+      },
+      {
+        name: "Primary Interval Set",
+        section: "A Block",
+        mode: "endurance",
+        superset_group: null,
+        sets: [{ reps: "8 x 2:00", weight: "0.40 mi", rpe: "Z4", notes: "90s easy jog recoveries", done: false }]
+      },
+      {
+        name: "Steady Aerobic Run",
+        section: "B Block",
+        mode: "endurance",
+        superset_group: null,
+        sets: [{ reps: "35 min", weight: "5.0 mi", rpe: "Z2", notes: "Conversational effort", done: false }]
+      },
+      {
+        name: "Running Drill Circuit",
+        section: "C Block",
+        mode: "reps",
+        superset_group: null,
+        sets: [{ reps: "3 rounds", weight: "BW", rpe: "", notes: "A-skips, B-skips, bounds", done: false }]
+      },
+      {
+        name: "Cool Down Walk + Mobility",
+        section: "Cool Down",
+        mode: "time",
+        superset_group: null,
+        sets: [{ reps: "8 min", weight: "", rpe: "", notes: "Nasal breathing", done: false }]
+      }
+    ];
+  }
+
+  function createBikingStarterExercises(_parsed) {
+    return [
+      {
+        name: "Bike Warm-Up",
+        section: "Warm Up",
+        mode: "time",
+        superset_group: null,
+        sets: [{ reps: "12 min", weight: "", rpe: "", notes: "Progressive ramp", done: false }]
+      },
+      {
+        name: "Threshold Intervals",
+        section: "A Block",
+        mode: "endurance",
+        superset_group: null,
+        sets: [{ reps: "4 x 8:00", weight: "", rpe: "Z4", notes: "4:00 easy spin between", done: false }]
+      },
+      {
+        name: "Cadence Development",
+        section: "B Block",
+        mode: "endurance",
+        superset_group: null,
+        sets: [{ reps: "6 x 1:00", weight: "", rpe: "Z3", notes: "100+ rpm focus", done: false }]
+      },
+      {
+        name: "Strength Accessory",
+        section: "C Block",
+        mode: "reps",
+        superset_group: null,
+        sets: [{ reps: "3 x 8", weight: "", rpe: "", notes: "Single-leg hinge + split squat", done: false }]
+      },
+      {
+        name: "Cool Down Spin",
+        section: "Cool Down",
+        mode: "time",
+        superset_group: null,
+        sets: [{ reps: "10 min", weight: "", rpe: "", notes: "Easy zone 1", done: false }]
+      }
+    ];
+  }
+
+  function createHybridStarterExercises(parsed) {
+    if (parsed.workout % 2 === 1) {
+      return createRunningStarterExercises(parsed);
+    }
+    return createBikingStarterExercises(parsed);
+  }
+
   function addNewExercise() {
     var exerciseName = prompt("Enter exercise name (e.g., Back Squat):");
     if (!exerciseName || !exerciseName.trim()) {
@@ -413,8 +550,11 @@
 
     numSets = Math.max(1, Math.min(10, parseInt(numSets, 10)));
 
-    var modeInput = prompt("Track by reps or time? (Enter 'reps' or 'time')", "reps");
-    var mode = (modeInput && modeInput.toLowerCase().trim() === "time") ? "time" : "reps";
+    var modeInput = prompt("Track mode? Enter 'reps', 'time', or 'endurance'", "reps");
+    var mode = String(modeInput || "reps").toLowerCase().trim();
+    if (mode !== "time" && mode !== "endurance") {
+      mode = "reps";
+    }
 
     var sectionOptions = defaultSections.map(function(s, i) {
       return (i + 1) + ": " + s;
@@ -502,6 +642,8 @@
 
     var payload = {
       archived: false,
+      focus: state.templateFocus,
+      day_session_types: state.daySessionTypes || {},
       structure: state.structure,
       days: {
         
@@ -623,6 +765,9 @@
         }
 
         state.structure = normalizeStructure(payload.structure || deriveStructureFromDays(payload.days));
+        state.templateFocus = normalizeTemplateFocus(payload.focus);
+        state.daySessionTypes = normalizeDaySessionTypes(payload.day_session_types);
+        ensureDaySessionTypesForStructure();
         var normalizedDays = normalizeTemplateDays(payload.days);
         var daySelect = document.querySelector("[data-workout-day]");
         if (daySelect) {
@@ -642,6 +787,10 @@
         }
         if (workoutsInput) {
           workoutsInput.value = String(state.structure.workoutsPerWeek);
+        }
+        var focusInput = document.querySelector("[data-template-focus]");
+        if (focusInput) {
+          focusInput.value = state.templateFocus;
         }
         setProgramTitleFromQuery();
 
@@ -702,6 +851,9 @@
         }
 
         state.structure = normalizeStructure(payload.structure || deriveStructureFromDays(payload.days));
+        state.templateFocus = normalizeTemplateFocus(payload.focus);
+        state.daySessionTypes = normalizeDaySessionTypes(payload.day_session_types);
+        ensureDaySessionTypesForStructure();
         var daySelect = document.querySelector("[data-workout-day]");
         if (daySelect) {
           refreshWorkoutDaySelect(daySelect);
@@ -841,6 +993,8 @@
   function serializeTemplatePayload(payload) {
     var safePayload = {
       archived: !!(payload && payload.archived),
+      focus: normalizeTemplateFocus(payload && payload.focus),
+      day_session_types: normalizeDaySessionTypes(payload && payload.day_session_types),
       structure: normalizeStructure(payload && payload.structure),
       days: payload && payload.days ? payload.days : {}
     };
@@ -977,6 +1131,7 @@
     tbody.innerHTML = "";
 
     if (!state.exercises || state.exercises.length === 0) {
+      updateTableHeaders();
       if (emptyState) {
         emptyState.style.display = "block";
       }
@@ -986,6 +1141,8 @@
     if (emptyState) {
       emptyState.style.display = "none";
     }
+
+    updateTableHeaders();
 
     // Group exercises by section
     var sections = {};
@@ -1098,7 +1255,7 @@
         cells +=
           '<div class="exercise-name">' +
           escapeHtml(exercise.name) +
-          '</div><div class="exercise-mode-label">' + (exercise.mode === "time" ? "⏱ Time" : "Reps") + '</div>' +
+          '</div><div class="exercise-mode-label">' + modeLabel(exercise.mode) + '</div>' +
           actionsHtml +
           '</div></td>';
       }
@@ -1118,9 +1275,7 @@
         '" value="' +
         escapeAttribute(set.reps) +
         '" placeholder="' +
-        escapeAttribute(
-          set.target_reps || (exercise.mode === "time" ? "e.g. 45s" : "e.g. 5")
-        ) +
+        escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) +
         '" /></td>' +
         '<td><input type="text" data-field="weight" data-exercise="' +
         exerciseIdx +
@@ -1128,14 +1283,14 @@
         setIdx +
         '" value="' +
         escapeAttribute(set.weight) +
-        '" placeholder="' + escapeAttribute(set.target_weight || "e.g. 185") + '" /></td>' +
+        '" placeholder="' + escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode)) + '" /></td>' +
         '<td><input type="text" data-field="rpe" data-exercise="' +
         exerciseIdx +
         '" data-set="' +
         setIdx +
         '" value="' +
         escapeAttribute(set.rpe) +
-        '" placeholder="' + escapeAttribute(set.target_rpe || "1-10") + '" /></td>' +
+        '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" /></td>' +
         '<td><input type="text" data-field="notes" data-exercise="' +
         exerciseIdx +
         '" data-set="' +
@@ -1496,10 +1651,10 @@
     }
 
     var exercise = state.exercises[exerciseIdx];
-    var newMode = exercise.mode === "time" ? "reps" : "time";
+    var newMode = nextExerciseMode(exercise.mode);
     exercise.mode = newMode;
 
-    var modeText = newMode === "time" ? "time-based (e.g. 45s)" : "reps-based (e.g. 5, 8, 10)";
+    var modeText = modeDescription(newMode);
     setStatus(exercise.name + " switched to " + modeText + " tracking.", "success");
     renderRows();
   }
@@ -1661,6 +1816,175 @@
     progressEl.textContent = progress + "%";
   }
 
+  function applyDayTypeToCurrentDay(dayType) {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var normalizedType = normalizeDayType(dayType);
+    if (!normalizedType) {
+      setStatus("Unsupported day type.", "error");
+      return;
+    }
+
+    state.daySessionTypes[state.day] = normalizedType;
+
+    if (!Array.isArray(state.exercises) || !state.exercises.length) {
+      var parsed = parseSlotKey(state.day) || { week: 1, workout: 1 };
+      if (normalizedType === "running") {
+        state.exercises = createRunningStarterExercises(parsed);
+      } else if (normalizedType === "biking") {
+        state.exercises = createBikingStarterExercises(parsed);
+      } else {
+        state.exercises = createStrengthStarterExercises(parsed);
+      }
+    } else {
+      state.exercises = convertExercisesForDayType(state.exercises, normalizedType);
+    }
+
+    renderRows();
+    updateDayInfo();
+    setStatus("Converted this day to " + capitalize(normalizedType) + " format.", "success");
+  }
+
+  function convertExercisesForDayType(exercises, dayType) {
+    var normalizedType = normalizeDayType(dayType) || "strength";
+    return (Array.isArray(exercises) ? exercises : []).map(function (exercise, idx) {
+      var section = exercise && exercise.section ? exercise.section : defaultSections[1];
+      var converted = {
+        name: exercise && exercise.name ? exercise.name : "Exercise",
+        section: section,
+        mode: normalizeModeForDayType(exercise && exercise.mode, normalizedType, section),
+        superset_group: exercise ? exercise.superset_group || null : null,
+        sets: []
+      };
+
+      var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
+      if (!sets.length) {
+        sets = [{ reps: "", weight: "", rpe: "", notes: "", done: false }];
+      }
+
+      converted.sets = sets.map(function (set) {
+        return convertSetForDayType(set, converted.mode, normalizedType);
+      });
+
+      return converted;
+    });
+  }
+
+  function convertSetForDayType(set, mode, dayType) {
+    var source = set || {};
+    var converted = {
+      reps: source.reps != null ? source.reps : "",
+      weight: source.weight != null ? source.weight : "",
+      rpe: source.rpe != null ? source.rpe : "",
+      notes: source.notes != null ? source.notes : "",
+      done: !!source.done
+    };
+
+    if (mode === "endurance") {
+      converted.reps = converted.reps || "20:00";
+      converted.weight = converted.weight || (dayType === "running" ? "3.0 mi" : "" );
+      converted.rpe = converted.rpe || "Z2";
+      return converted;
+    }
+
+    if (mode === "time") {
+      converted.reps = converted.reps || "8 min";
+      return converted;
+    }
+
+    converted.reps = converted.reps || "8";
+    converted.weight = converted.weight || "";
+    converted.rpe = converted.rpe || "7";
+    return converted;
+  }
+
+  function normalizeModeForDayType(currentMode, dayType, section) {
+    var normalizedDayType = normalizeDayType(dayType) || "strength";
+    var normalizedSection = String(section || "").toLowerCase();
+    var isBookendSection = normalizedSection.indexOf("warm") === 0 || normalizedSection.indexOf("cool") === 0;
+
+    if (normalizedDayType === "running" || normalizedDayType === "biking") {
+      return isBookendSection ? "time" : "endurance";
+    }
+
+    if (isBookendSection) {
+      return "time";
+    }
+
+    if (currentMode === "endurance") {
+      return "reps";
+    }
+
+    return currentMode === "time" ? "time" : "reps";
+  }
+
+  function normalizeDaySessionTypes(map) {
+    var source = map && typeof map === "object" ? map : {};
+    var normalized = {};
+
+    Object.keys(source).forEach(function (slotKey) {
+      if (!/^w\d+d\d+$/i.test(slotKey)) {
+        return;
+      }
+
+      var dayType = normalizeDayType(source[slotKey]);
+      if (dayType) {
+        normalized[slotKey] = dayType;
+      }
+    });
+
+    return normalized;
+  }
+
+  function ensureDaySessionTypesForStructure() {
+    var existing = normalizeDaySessionTypes(state.daySessionTypes);
+    var next = {};
+    getAllSlotKeys().forEach(function (slotKey) {
+      next[slotKey] = existing[slotKey] || inferDefaultDayType(slotKey);
+    });
+    state.daySessionTypes = next;
+  }
+
+  function inferDefaultDayType(slotKey) {
+    if (state.templateFocus === "running") {
+      return "running";
+    }
+    if (state.templateFocus === "biking") {
+      return "biking";
+    }
+    if (state.templateFocus === "hybrid") {
+      var parsed = parseSlotKey(slotKey) || { workout: 1 };
+      return parsed.workout % 2 === 1 ? "running" : "biking";
+    }
+    return "strength";
+  }
+
+  function getDayTypeForSlot(slotKey) {
+    if (!state.isTemplateBuilder) {
+      return null;
+    }
+    var normalized = normalizeDayType(state.daySessionTypes && state.daySessionTypes[slotKey]);
+    return normalized || inferDefaultDayType(slotKey);
+  }
+
+  function normalizeDayType(value) {
+    var next = String(value || "").toLowerCase();
+    if (next === "strength" || next === "running" || next === "biking") {
+      return next;
+    }
+    return null;
+  }
+
+  function capitalize(value) {
+    var text = String(value || "");
+    if (!text) {
+      return "";
+    }
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
   function defaultExercisesForDay(day) {
     if (day === "w1d2") {
       return [
@@ -1783,6 +2107,102 @@
         sets: [{ reps: "5 min", weight: "", rpe: "", notes: "", done: false }]
       }
     ];
+  }
+
+  function normalizeTemplateFocus(value) {
+    var focus = String(value || "strength").toLowerCase();
+    if (isSupportedTemplateFocus(focus)) {
+      return focus;
+    }
+    return "strength";
+  }
+
+  function isSupportedTemplateFocus(value) {
+    return value === "strength" || value === "running" || value === "biking" || value === "hybrid";
+  }
+
+  function nextExerciseMode(currentMode) {
+    if (currentMode === "reps") {
+      return "time";
+    }
+    if (currentMode === "time") {
+      return "endurance";
+    }
+    return "reps";
+  }
+
+  function modeLabel(mode) {
+    if (mode === "time") {
+      return "⏱ Time";
+    }
+    if (mode === "endurance") {
+      return "🏃 Endurance";
+    }
+    return "Reps";
+  }
+
+  function modeDescription(mode) {
+    if (mode === "time") {
+      return "time-based (e.g. 45s)";
+    }
+    if (mode === "endurance") {
+      return "endurance-based (duration, distance, and zone/power)";
+    }
+    return "reps-based (e.g. 5, 8, 10)";
+  }
+
+  function modePrimaryPlaceholder(mode) {
+    if (mode === "time") {
+      return "e.g. 45s";
+    }
+    if (mode === "endurance") {
+      return "e.g. 20:00";
+    }
+    return "e.g. 5";
+  }
+
+  function modeSecondaryPlaceholder(mode) {
+    if (mode === "endurance") {
+      return "e.g. 3.0 mi / 25 km";
+    }
+    return "e.g. 185";
+  }
+
+  function modeTertiaryPlaceholder(mode) {
+    if (mode === "endurance") {
+      return "e.g. Z2 / 235W / 7";
+    }
+    return "1-10";
+  }
+
+  function updateTableHeaders() {
+    var primary = document.querySelector("[data-workout-header-primary]");
+    var secondary = document.querySelector("[data-workout-header-secondary]");
+    var tertiary = document.querySelector("[data-workout-header-tertiary]");
+
+    if (!primary || !secondary || !tertiary) {
+      return;
+    }
+
+    var hasEndurance = (state.exercises || []).some(function (exercise) {
+      return exercise && exercise.mode === "endurance";
+    });
+
+    if (!hasEndurance && state.isTemplateBuilder) {
+      var dayType = getDayTypeForSlot(state.day);
+      hasEndurance = dayType === "running" || dayType === "biking";
+    }
+
+    if (hasEndurance) {
+      primary.textContent = "Duration";
+      secondary.textContent = "Distance";
+      tertiary.textContent = "Zone / Power / Effort";
+      return;
+    }
+
+    primary.textContent = "Reps";
+    secondary.textContent = "Weight (lbs)";
+    tertiary.textContent = "RPE";
   }
 
   function storageKeyForDay() {
