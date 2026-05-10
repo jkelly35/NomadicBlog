@@ -1531,7 +1531,7 @@
       })
       .then(function (result) {
         if (result.error) {
-          setStravaStatus(formatStravaEdgeError(result.error, "strava-connect-start"), "error");
+          handleStravaEdgeError(result.error, "strava-connect-start");
           return;
         }
 
@@ -1545,7 +1545,7 @@
         window.location.href = authUrl;
       })
       .catch(function (error) {
-        setStravaStatus(formatStravaEdgeError(error, "strava-connect-start"), "error");
+        handleStravaEdgeError(error, "strava-connect-start");
       });
   }
 
@@ -1570,7 +1570,7 @@
       })
       .then(function (result) {
         if (result.error) {
-          setStravaStatus(formatStravaEdgeError(result.error, "strava-sync-latest"), "error");
+          handleStravaEdgeError(result.error, "strava-sync-latest");
           return;
         }
 
@@ -1578,7 +1578,7 @@
         loadStravaOverview();
       })
       .catch(function (error) {
-        setStravaStatus(formatStravaEdgeError(error, "strava-sync-latest"), "error");
+        handleStravaEdgeError(error, "strava-sync-latest");
       });
   }
 
@@ -1608,7 +1608,7 @@
       .invoke("strava-disconnect", { body: {} })
       .then(function (result) {
         if (result.error) {
-          setStravaStatus(formatStravaEdgeError(result.error, "strava-disconnect"), "error");
+          handleStravaEdgeError(result.error, "strava-disconnect");
           return;
         }
 
@@ -1619,8 +1619,89 @@
         setStravaStatus("Strava disconnected.", "success");
       })
       .catch(function (error) {
-        setStravaStatus(formatStravaEdgeError(error, "strava-disconnect"), "error");
+        handleStravaEdgeError(error, "strava-disconnect");
       });
+  }
+
+  function handleStravaEdgeError(error, functionName) {
+    resolveStravaEdgeError(error, functionName)
+      .then(function (message) {
+        setStravaStatus(message, "error");
+      })
+      .catch(function () {
+        setStravaStatus(formatStravaEdgeError(error, functionName), "error");
+      });
+  }
+
+  function resolveStravaEdgeError(error, functionName) {
+    var baseMessage = formatStravaEdgeError(error, functionName);
+    var context = error && error.context;
+
+    if (!context || typeof context.clone !== "function") {
+      return Promise.resolve(baseMessage);
+    }
+
+    return context
+      .clone()
+      .json()
+      .then(function (payload) {
+        var detail = "";
+        if (payload && typeof payload.error === "string") {
+          detail = payload.error;
+        } else if (payload && typeof payload.message === "string") {
+          detail = payload.message;
+        } else if (payload && typeof payload.code === "string") {
+          detail = payload.code;
+        }
+
+        if (!detail) {
+          return buildStravaStatusMessageFromHttp(context.status, baseMessage, functionName);
+        }
+
+        return buildStravaStatusMessageFromDetail(detail, context.status, functionName, baseMessage);
+      })
+      .catch(function () {
+        return buildStravaStatusMessageFromHttp(context.status, baseMessage, functionName);
+      });
+  }
+
+  function buildStravaStatusMessageFromHttp(status, fallbackMessage, functionName) {
+    if (status === 401) {
+      return "You are not authenticated. Sign in again and retry " + functionName + ".";
+    }
+
+    if (status === 404) {
+      return (
+        "Could not reach " +
+        functionName +
+        ". Deploy Supabase Edge Functions and confirm project secrets are set. See supabase/functions/README.md."
+      );
+    }
+
+    return fallbackMessage;
+  }
+
+  function buildStravaStatusMessageFromDetail(detail, status, functionName, fallbackMessage) {
+    var cleanDetail = String(detail || "").trim();
+    var normalized = cleanDetail.toLowerCase();
+
+    if (
+      normalized.indexOf("missing authorization header") !== -1 ||
+      normalized.indexOf("missing authorization bearer token") !== -1 ||
+      normalized.indexOf("unable to authenticate user") !== -1
+    ) {
+      return "Your login session is missing or expired. Sign in again and retry " + functionName + ".";
+    }
+
+    if (normalized.indexOf("missing required environment variable") !== -1) {
+      return functionName + " is missing a required secret: " + cleanDetail;
+    }
+
+    if (status === 401) {
+      return "You are not authenticated. Sign in again and retry " + functionName + ".";
+    }
+
+    return functionName + " error: " + cleanDetail;
   }
 
   function formatStravaEdgeError(error, functionName) {
