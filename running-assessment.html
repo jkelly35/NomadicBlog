@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Running Fitness Assessment - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <style>
+    .assessment-content,
+    .assessment-content * {
+      color: #000000 !important;
+    }
+
+    #assessmentCards {
+      color: #111111;
+    }
+
+    #assessmentCards > div {
+      color: #111111;
+    }
+
+    #assessmentCards > div div {
+      color: #111111;
+      line-height: 1.6;
+    }
+
+    #assessmentCards strong {
+      color: #0f2d2d;
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html" class="active">Field Guides</a>
+      <a href="services.html">Services</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="field-guides-hero">
+      <h2 style="font-size:2.1em;letter-spacing:-0.01em;font-weight:700;color:#f5f0e8;text-align:center;margin-bottom:2.2rem;">Running Fitness Assessment</h2>
+
+      <div id="assessmentCards" class="assessment-content" style="display:flex;flex-wrap:wrap;gap:1.5em;justify-content:center;margin-bottom:2.2em;">
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">Vertical Jump Height</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Explosive lower-body power and rate of force development.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Running economy and sprint performance depend on how efficiently force is produced and transferred into the ground.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Complete 2-3 maximal countermovement jumps, record the best jump height, and use consistent arm-swing rules across attempts.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">SL Squat Test</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Single-leg strength, alignment control, and hip-knee-ankle coordination.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Poor control in single-leg patterns can increase tissue load and reduce running efficiency.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Perform controlled single-leg squats on each side for quality reps while maintaining knee tracking and trunk stability.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">Side Plank with Hip Abduction Hold</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Lateral core endurance and hip abductor capacity under isometric demand.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Strong lateral stability helps control pelvis position and reduce compensations during stance phase.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Assume a side plank, raise the top leg into abduction, and hold with stable trunk and pelvis; record hold time per side.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">Single Leg Heel Raise</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Calf complex muscular endurance and ankle stiffness control.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> The calf-ankle complex is critical for propulsion, cadence support, and load tolerance in runners.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Perform repeated full-range single-leg heel raises at a controlled tempo until form breakdown; record reps each side.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">Y Balance (Anterior Reach)</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Dynamic balance, single-leg stability, and mobility integration.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Asymmetries or poor anterior reach can reflect deficits in control that influence injury risk and performance.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Balance on one leg, reach the opposite foot anteriorly to maximum control, and record best distance for each side.</div>
+        </div>
+      </div>
+
+      <div class="assessment-content" style="background:#fff;border-left:5px solid #1f5555;padding:1.7rem 2.2rem;margin:2.2rem 0 1.2rem 0;border-radius:10px;max-width:900px;margin-left:auto;margin-right:auto;box-shadow:0 4px 18px rgba(31,85,85,0.08);font-size:1.02em;color:#111;">
+        <h3 style="margin-top:0;margin-bottom:0.8em;color:#1f5555;font-size:1.3em;letter-spacing:-0.01em;">Assessment Overview</h3>
+        <p style="margin-bottom:0.9em;"><strong>Running Fitness Assessment</strong> combines five core tests to profile force production, single-leg control, trunk stability, and endurance qualities relevant to running performance.</p>
+        <p style="margin-bottom:0;">Use this battery to establish baseline readiness, identify side-to-side asymmetries, and direct individualized training priorities.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer style="background: #0e4749; color: #fff; padding: 24px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 10px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Instagram</a>
+      <a href="https://x.com/NomadPerformCo" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">X</a>
+      <a href="https://strava.app.link/XGMKMXacL1b" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Strava</a>
+    </div>
+    <p style="font-size: 1rem; opacity: 0.85;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
+    <p style="font-size: 0.82rem; opacity: 0.9; max-width: 920px; margin: 8px auto 0 auto; line-height: 1.45;">Medical Disclaimer: Content on this site is for educational purposes only and is not medical advice. Always consult a qualified healthcare professional before starting any exercise, rehabilitation, or nutrition program.</p>
+  </footer>
+</body>
+</html>

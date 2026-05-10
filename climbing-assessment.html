@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Climbing Fitness Assessment - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <style>
+    .assessment-content,
+    .assessment-content * {
+      color: #000000 !important;
+    }
+
+    #assessmentCards {
+      color: #111111;
+    }
+
+    #assessmentCards > div {
+      color: #111111;
+    }
+
+    #assessmentCards > div div {
+      color: #111111;
+      line-height: 1.6;
+    }
+
+    #assessmentCards strong {
+      color: #0f2d2d;
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html" class="active">Field Guides</a>
+      <a href="services.html">Services</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="field-guides-hero">
+      <h2 style="font-size:2.1em;letter-spacing:-0.01em;font-weight:700;color:#f5f0e8;text-align:center;margin-bottom:2.2rem;">Climbing Fitness Assessment</h2>
+
+      <div id="assessmentCards" class="assessment-content" style="display:flex;flex-wrap:wrap;gap:1.5em;justify-content:center;margin-bottom:2.2em;">
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">Power Push Up</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Upper-body pressing power and explosive force expression.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Supports dynamic movement, body tension transitions, and shoulder resilience.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Execute explosive push-ups with consistent depth and full lockout; record max quality reps or peak power metric if available.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">20mm Edge Pull</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Finger flexor and pulling force capacity on a standardized edge.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Edge-specific pulling strength is highly relevant to route difficulty and sustained grip output.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Using a 20mm edge, perform a controlled pull or isometric effort under standardized setup and record best valid attempt.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">Max Pull Ups or Max Hang Time</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Relative pulling endurance and upper-body work capacity.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Indicates the ability to sustain repeated pulling effort over long climbing bouts.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Choose either strict max pull-ups or max dead-hang time with standardized grip and strict criteria, then record best outcome.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">Shoulder Tap Test</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Shoulder girdle stability, trunk control, and anti-rotation endurance.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Better shoulder control supports force transfer and reduces breakdown in loaded positions.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> From high plank, alternate shoulder taps while minimizing trunk sway; record quality reps in the test interval.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">Adapted Grant Foot Raise</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Lower-leg and foot strength-endurance relevant to edging and foothold control.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Foot and calf durability are key for precision placement and prolonged route efficiency.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Complete controlled repeated raises under the adapted Grant protocol and record valid reps per side.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">Ape Index</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Wingspan-to-height relationship (anthropometric leverage profile).</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Can influence reach options, positioning strategies, and movement selection on the wall.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Measure height and arm span, then compute Ape Index as arm span minus height (or ratio).</div>
+        </div>
+      </div>
+
+      <div class="assessment-content" style="background:#fff;border-left:5px solid #1f5555;padding:1.7rem 2.2rem;margin:2.2rem 0 1.2rem 0;border-radius:10px;max-width:900px;margin-left:auto;margin-right:auto;box-shadow:0 4px 18px rgba(31,85,85,0.08);font-size:1.02em;color:#111;">
+        <h3 style="margin-top:0;margin-bottom:0.8em;color:#1f5555;font-size:1.3em;letter-spacing:-0.01em;">Assessment Overview</h3>
+        <p style="margin-bottom:0.9em;"><strong>Climbing Fitness Assessment</strong> combines six key tests to profile pushing power, edge-specific pulling strength, shoulder stability, foot endurance, and leverage characteristics.</p>
+        <p style="margin-bottom:0;">Use this battery to set baselines, identify limiting factors, and guide targeted climbing performance development.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer style="background: #0e4749; color: #fff; padding: 24px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 10px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Instagram</a>
+      <a href="https://x.com/NomadPerformCo" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">X</a>
+      <a href="https://strava.app.link/XGMKMXacL1b" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Strava</a>
+    </div>
+    <p style="font-size: 1rem; opacity: 0.85;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
+    <p style="font-size: 0.82rem; opacity: 0.9; max-width: 920px; margin: 8px auto 0 auto; line-height: 1.45;">Medical Disclaimer: Content on this site is for educational purposes only and is not medical advice. Always consult a qualified healthcare professional before starting any exercise, rehabilitation, or nutrition program.</p>
+  </footer>
+</body>
+</html>
