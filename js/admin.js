@@ -8,18 +8,18 @@
   var METRIC_TEMPLATES_BY_SPORT = {
     running: [
       { name: "Vertical Jump", unit: "cm", category: "Strength" },
-      { name: "Single Leg Squat Test", unit: "reps", category: "Strength", bilateral: true },
-      { name: "Single Leg Heel Raise", unit: "reps", category: "Strength", bilateral: true },
-      { name: "Side Plank with Hip Abduction", unit: "sec", category: "Strength", bilateral: true },
-      { name: "Y Balance", unit: "%", category: "Mobility", bilateral: true }
+      { name: "Single Leg Squat Test", unit: "reps", category: "Strength", bilateral: false },
+      { name: "Single Leg Heel Raise", unit: "reps", category: "Strength", bilateral: false },
+      { name: "Side Plank with Hip Abduction", unit: "sec", category: "Strength", bilateral: false },
+      { name: "Y Balance", unit: "%", category: "Mobility", bilateral: false }
     ],
     cycling: [
       { name: "20-min Power (FTP Estimate)", unit: "watts", category: "Performance" },
       { name: "Resting HR", unit: "bpm", category: "Cardio" },
       { name: "Max HR", unit: "bpm", category: "Cardio" },
       { name: "VO2 Max (estimated)", unit: "ml/kg/min", category: "Cardio" },
-      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
-      { name: "Single Leg Squat", unit: "reps", category: "Strength", bilateral: true },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: false },
+      { name: "Single Leg Squat", unit: "reps", category: "Strength", bilateral: false },
       { name: "Hip Flexor Flexibility", unit: "deg", category: "Mobility" }
     ],
     skiing: [
@@ -28,8 +28,8 @@
       { name: "Nordic Hamstring", unit: "reps", category: "Strength" },
       { name: "Broad Jump", unit: "cm", category: "Strength" },
       { name: "Triple Hop", unit: "cm", category: "Performance" },
-      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
-      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: false },
+      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: false },
       { name: "Step Down", unit: "reps", category: "Mobility" },
       { name: "Resting HR", unit: "bpm", category: "Cardio" }
     ],
@@ -38,15 +38,15 @@
       { name: "Side Plank", unit: "sec", category: "Strength", bilateral: true },
       { name: "Broad Jump", unit: "cm", category: "Performance" },
       { name: "Triple Hop", unit: "cm", category: "Performance" },
-      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
-      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: false },
+      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: false },
       { name: "Step Down", unit: "reps", category: "Mobility" },
       { name: "Resting HR", unit: "bpm", category: "Cardio" }
     ],
     climbing: [
       { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
       { name: "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)", unit: "reps", category: "Strength" },
-      { name: "20mm Edge Hang", unit: "kg", category: "Strength", bilateral: false },
+      { name: "20mm Edge Pull", unit: "kg", category: "Strength", bilateral: true },
       { name: "Max Pull Ups", unit: "reps", category: "Strength" },
       { name: "Max Hang", unit: "sec", category: "Performance" },
       { name: "90 Degree Bent Leg Hang", unit: "sec", category: "Strength" },
@@ -57,7 +57,7 @@
       { name: "6-min Walk", unit: "m", category: "Cardio" },
       { name: "Step-down", unit: "reps", category: "Strength" },
       { name: "Single Leg Balance", unit: "sec", category: "Mobility" },
-      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: false },
       { name: "Resting HR", unit: "bpm", category: "Cardio" },
       { name: "Grip Strength", unit: "kg", category: "Strength" },
       { name: "Loaded Carry (15kg)", unit: "min", category: "Performance" }
@@ -66,18 +66,18 @@
   var BASELINE_TEMPLATES = {
     running: [
       { name: "Vertical Jump", unit: "cm", category: "Strength" },
-      { name: "Single Leg Squat Test", unit: "reps", category: "Strength", bilateral: true },
-      { name: "Single Leg Heel Raise", unit: "reps", category: "Strength", bilateral: true },
-      { name: "Side Plank with Hip Abduction", unit: "sec", category: "Strength", bilateral: true },
-      { name: "Y Balance", unit: "%", category: "Mobility", bilateral: true }
+      { name: "Single Leg Squat Test", unit: "reps", category: "Strength", bilateral: false },
+      { name: "Single Leg Heel Raise", unit: "reps", category: "Strength", bilateral: false },
+      { name: "Side Plank with Hip Abduction", unit: "sec", category: "Strength", bilateral: false },
+      { name: "Y Balance", unit: "%", category: "Mobility", bilateral: false }
     ],
     cycling: [
       { name: "20-min Power (FTP Estimate)", unit: "watts", category: "Performance" },
       { name: "Resting HR", unit: "bpm", category: "Cardio" },
       { name: "Max HR", unit: "bpm", category: "Cardio" },
       { name: "VO2 Max (estimated)", unit: "ml/kg/min", category: "Cardio" },
-      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
-      { name: "Single Leg Squat", unit: "reps", category: "Strength", bilateral: true },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: false },
+      { name: "Single Leg Squat", unit: "reps", category: "Strength", bilateral: false },
       { name: "Hip Flexor Flexibility", unit: "deg", category: "Mobility" }
     ],
     skiing: [
@@ -86,8 +86,8 @@
       { name: "Nordic Hamstring", unit: "reps", category: "Strength" },
       { name: "Broad Jump", unit: "cm", category: "Strength" },
       { name: "Triple Hop", unit: "cm", category: "Performance" },
-      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
-      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: false },
+      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: false },
       { name: "Step Down", unit: "reps", category: "Mobility" },
       { name: "Resting HR", unit: "bpm", category: "Cardio" }
     ],
@@ -96,15 +96,15 @@
       { name: "Side Plank", unit: "sec", category: "Strength", bilateral: true },
       { name: "Broad Jump", unit: "cm", category: "Performance" },
       { name: "Triple Hop", unit: "cm", category: "Performance" },
-      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
-      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: false },
+      { name: "Y Balance – PM", unit: "%", category: "Mobility", bilateral: false },
       { name: "Step Down", unit: "reps", category: "Mobility" },
       { name: "Resting HR", unit: "bpm", category: "Cardio" }
     ],
     climbing: [
       { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
       { name: "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)", unit: "reps", category: "Strength" },
-      { name: "20mm Edge Hang", unit: "kg", category: "Strength", bilateral: false },
+      { name: "20mm Edge Pull", unit: "kg", category: "Strength", bilateral: true },
       { name: "Max Pull Ups", unit: "reps", category: "Strength" },
       { name: "Max Hang", unit: "sec", category: "Performance" },
       { name: "90 Degree Bent Leg Hang", unit: "sec", category: "Strength" },
@@ -115,7 +115,7 @@
       { name: "6-min Walk", unit: "m", category: "Cardio" },
       { name: "Step-down", unit: "reps", category: "Strength" },
       { name: "Single Leg Balance", unit: "sec", category: "Mobility" },
-      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: false },
       { name: "Resting HR", unit: "bpm", category: "Cardio" },
       { name: "Grip Strength", unit: "kg", category: "Strength" },
       { name: "Loaded Carry (15kg)", unit: "min", category: "Performance" }
@@ -126,7 +126,7 @@
       { name: "Pull-up Max", unit: "reps", category: "Strength" },
       { name: "Broad Jump", unit: "cm", category: "Strength" },
       { name: "Plank Hold", unit: "sec", category: "Strength" },
-      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: true },
+      { name: "Y Balance – Anterior", unit: "%", category: "Mobility", bilateral: false },
       { name: "Hip Flexion", unit: "deg", category: "Mobility" },
       { name: "1-Mile Run", unit: "mm:ss", category: "Cardio" }
     ]
@@ -1410,7 +1410,7 @@
     var presetNames = [
       "Countermovement Push-Up (CMPU)",
       "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)",
-      "20mm Edge Hang Strength",
+      "20mm Edge Pull Strength",
       "Max Pull Ups",
       "Max Hang Time",
       "90 Degree Bent Leg Hang",
@@ -1418,7 +1418,7 @@
       "Ape Index",
       "Vertical Jump Height",
       "Single Leg Squat Test",
-      "Single Leg Heel Raise Test",
+      "Single Leg Heel Raise",
       "Side Plank with Hip Abduction Hold (Max Time)",
       "Knee to Wall (Ankle DF Test)",
       "Y Balance (Anterior Reach)",

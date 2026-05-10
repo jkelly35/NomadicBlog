@@ -235,7 +235,7 @@
       climbing: [
         { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
         { name: "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)", unit: "reps", category: "Strength" },
-        { name: "20mm Edge Hang Strength", unit: "kg", category: "Strength" },
+        { name: "20mm Edge Pull Strength", unit: "kg", category: "Strength" },
         { name: "Max Pull Ups", unit: "reps", category: "Strength" },
         { name: "Max Hang Time", unit: "sec", category: "Strength" },
         { name: "90 Degree Bent Leg Hang", unit: "sec", category: "Strength" },
@@ -245,7 +245,7 @@
       running: [
         { name: "Vertical Jump Height", unit: "cm", category: "Performance" },
         { name: "Single Leg Squat Test", unit: "reps", category: "Strength" },
-        { name: "Single Leg Heel Raise Test", unit: "reps", category: "Strength" },
+        { name: "Single Leg Heel Raise", unit: "reps", category: "Strength" },
         { name: "Side Plank with Hip Abduction Hold (Max Time)", unit: "sec", category: "Strength" },
         { name: "Y Balance (Anterior Reach)", unit: "cm", category: "Mobility" }
       ]
@@ -279,7 +279,7 @@
     var presetDefaults = {
       "Countermovement Push-Up (CMPU)": {unit: "reps", category: "Strength"},
       "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)": {unit: "reps", category: "Strength"},
-      "20mm Edge Hang Strength": {unit: "kg", category: "Strength"},
+      "20mm Edge Pull Strength": {unit: "kg", category: "Strength"},
       "Max Pull Ups": {unit: "reps", category: "Strength"},
       "Max Hang Time": {unit: "sec", category: "Strength"},
       "90 Degree Bent Leg Hang": {unit: "sec", category: "Strength"},
@@ -287,7 +287,7 @@
       "Ape Index": {unit: "cm", category: "Performance"},
       "Vertical Jump Height": {unit: "cm", category: "Performance"},
       "Single Leg Squat Test": {unit: "reps", category: "Strength"},
-      "Single Leg Heel Raise Test": {unit: "reps", category: "Strength"},
+      "Single Leg Heel Raise": {unit: "reps", category: "Strength"},
       "Side Plank with Hip Abduction Hold (Max Time)": {unit: "sec", category: "Strength"},
       "Knee to Wall (Ankle DF Test)": {unit: "cm", category: "Mobility"},
       "Y Balance (Anterior Reach)": {unit: "cm", category: "Mobility"},

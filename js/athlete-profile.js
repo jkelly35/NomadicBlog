@@ -39,7 +39,7 @@
     sportOverviewEditor: null,
     sportOverviewSummary: null,
     metricTemplatesBySport: {
-      climbing: ["20mm Edge Hang", "Max Pull Ups", "Weighted Pull Up", "Core Hold Time"],
+      climbing: ["20mm Edge Pull", "Max Pull Ups", "Weighted Pull Up", "Core Hold Time"],
       "trail-running": ["Resting HR", "Max HR", "Vertical Jump", "Anterior Reach", "5k Time"],
       skiing: ["Resting HR", "Max HR", "Countermovement Jump", "Single-Leg Balance"],
       snowboarding: ["Resting HR", "Max HR", "Countermovement Jump", "Lateral Bound"],
@@ -848,6 +848,7 @@
         }
 
          updateYBalanceDraftValue(card);
+         updateEdgePullDraftValue(card);
          updateGrantDraftValue(card);
         updateLegLengthEstimateNote(card);
       });
@@ -1269,6 +1270,80 @@
     return String(value || "").trim().toLowerCase();
   }
 
+  function parseSideVariantMetricName(rawName) {
+    var name = String(rawName || "").trim();
+    var sideMatch = name.match(/^(.*)\((left|right)\)\s*$/i);
+    if (!sideMatch) {
+      return null;
+    }
+
+    return {
+      baseName: String(sideMatch[1] || "").trim(),
+      side: String(sideMatch[2] || "").toLowerCase()
+    };
+  }
+
+  function isPairedSideVariantMetric(metric) {
+    var parsed = parseSideVariantMetricName(metric && metric.metric_name);
+    if (!parsed) {
+      return null;
+    }
+
+    if (isSingleLegSquatMetricName(parsed.baseName)) {
+      parsed.group = "single-leg-squat";
+      return parsed;
+    }
+
+    if (isSingleLegHeelRaiseMetricName(parsed.baseName)) {
+      parsed.group = "single-leg-heel-raise";
+      return parsed;
+    }
+
+    if (isSidePlankMetricName(parsed.baseName)) {
+      parsed.group = "side-plank-hip-abduction";
+      return parsed;
+    }
+
+    if (isYBalanceMetricName(parsed.baseName)) {
+      parsed.group = "y-balance";
+      return parsed;
+    }
+
+    if (isEdgePullMetricName(parsed.baseName)) {
+      parsed.group = "edge-pull";
+      return parsed;
+    }
+
+    return null;
+  }
+
+  function parseSingleLegSquatLegValues(metricValue) {
+    var text = String(metricValue || "").replace(/,/g, " ").trim();
+    if (!text) {
+      return { left: null, right: null };
+    }
+
+    var leftMatch = text.match(/(?:\bL\b|\bleft\b|\bl leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
+    var rightMatch = text.match(/(?:\bR\b|\bright\b|\br leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
+    var left = leftMatch ? Number(leftMatch[1]) : null;
+    var right = rightMatch ? Number(rightMatch[1]) : null;
+
+    if (Number.isFinite(left) && Number.isFinite(right)) {
+      return { left: left, right: right };
+    }
+
+    var numbers = text.match(/-?\d+(?:\.\d+)?/g) || [];
+    if (numbers.length >= 2) {
+      var first = Number(numbers[0]);
+      var second = Number(numbers[1]);
+      if (Number.isFinite(first) && Number.isFinite(second)) {
+        return { left: first, right: second };
+      }
+    }
+
+    return { left: null, right: null };
+  }
+
   function buildLatestMetricsLookup(metrics) {
     var map = {};
     (metrics || []).forEach(function (metric) {
@@ -1292,7 +1367,7 @@
       groups[key].push(metric);
     });
 
-    return Object.keys(groups)
+    var latestMetrics = Object.keys(groups)
       .map(function (key) {
         var history = groups[key]
           .slice()
@@ -1304,6 +1379,66 @@
         latest._history = history;
         latest._previous = history.length > 1 ? history[1] : null;
         return latest;
+      })
+      .sort(function (a, b) {
+        return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+      });
+
+    var displayMap = {};
+    latestMetrics.forEach(function (metric) {
+      var parsed = isPairedSideVariantMetric(metric);
+      if (!parsed) {
+        displayMap[getMetricKey(metric)] = metric;
+        return;
+      }
+
+      var exactBaseKey = normalizeMetricValue(parsed.baseName) + "|" + normalizeMetricValue(metric.metric_unit);
+      if (groups[exactBaseKey]) {
+        return;
+      }
+
+      var combinedKey = exactBaseKey + "|" + parsed.group;
+      if (!displayMap[combinedKey]) {
+        displayMap[combinedKey] = {
+          user_id: metric.user_id,
+          metric_name: parsed.baseName,
+          metric_value: "",
+          metric_unit: metric.metric_unit,
+          metric_category: metric.metric_category,
+          updated_at: metric.updated_at,
+          _history: [],
+          _previous: null,
+          _pairedSideMetrics: { left: null, right: null }
+        };
+      }
+
+      var combinedMetric = displayMap[combinedKey];
+      combinedMetric._pairedSideMetrics[parsed.side] = metric;
+      combinedMetric.updated_at = [combinedMetric.updated_at, metric.updated_at]
+        .filter(function (value) { return !!value; })
+        .sort()
+        .slice(-1)[0] || combinedMetric.updated_at;
+      combinedMetric.metric_category = combinedMetric.metric_category || metric.metric_category;
+      combinedMetric._history = (combinedMetric._history || []).concat(metric);
+
+      if (combinedMetric._pairedSideMetrics.left && combinedMetric._pairedSideMetrics.right) {
+        var leftMetric = combinedMetric._pairedSideMetrics.left;
+        var rightMetric = combinedMetric._pairedSideMetrics.right;
+        combinedMetric.metric_value =
+          "L " + String(leftMetric.metric_value || "").trim() +
+          " | R " + String(rightMetric.metric_value || "").trim();
+      }
+    });
+
+    return Object.keys(displayMap)
+      .map(function (key) {
+        var metric = displayMap[key];
+        if (metric && metric._pairedSideMetrics) {
+          if (!metric._pairedSideMetrics.left || !metric._pairedSideMetrics.right) {
+            return metric._pairedSideMetrics.left || metric._pairedSideMetrics.right || metric;
+          }
+        }
+        return metric;
       })
       .sort(function (a, b) {
         return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
@@ -2772,6 +2907,7 @@
     var categoryInput = card.querySelector('[data-metric-edit="category"]');
     var legLengthNote = card.querySelector("[data-leglength-estimate-note]");
     var isYBalance = isYBalanceMetricName(metric.metric_name || "");
+    var isEdgePull = isEdgePullMetricName(metric.metric_name || "");
     var isGrant = isAdaptedGrantFootRaiseMetricName(metric.metric_name || "");
 
     if (label) {
@@ -2788,6 +2924,13 @@
       categoryInput.value = metric.metric_category || "Performance";
     }
 
+    if (leftInput) {
+      leftInput.placeholder = isEdgePull ? "L Hand" : "L Leg";
+    }
+    if (rightInput) {
+      rightInput.placeholder = isEdgePull ? "R Hand" : "R Leg";
+    }
+
     if (legLengthNote) {
       var metricName = String(metric.metric_name || "");
       var showNote =
@@ -2797,7 +2940,7 @@
     }
 
     if (yBalanceGrid) {
-      yBalanceGrid.hidden = !isYBalance;
+      yBalanceGrid.hidden = !(isYBalance || isEdgePull);
     }
 
     if (grantGrid) {
@@ -2832,6 +2975,44 @@
     }
 
     card.removeAttribute("data-metric-ybalance");
+
+    if (isEdgePull) {
+      card.setAttribute("data-metric-edgepull", "true");
+
+      var leftPairedMetric = metric._pairedSideMetrics && metric._pairedSideMetrics.left;
+      var rightPairedMetric = metric._pairedSideMetrics && metric._pairedSideMetrics.right;
+      var parsedEdgeValue = parseYBalanceLegValues(metric.metric_value || "");
+      var leftParsed = parseNumericMetricValue(leftPairedMetric && leftPairedMetric.metric_value);
+      var rightParsed = parseNumericMetricValue(rightPairedMetric && rightPairedMetric.metric_value);
+      var shouldBlankForTestEdge = modeValue === "test";
+
+      if (leftInput) {
+        leftInput.value = shouldBlankForTestEdge
+          ? ""
+          : (Number.isFinite(leftParsed)
+            ? formatMetricNumber(leftParsed)
+            : (parsedEdgeValue.left === null ? "" : formatMetricNumber(parsedEdgeValue.left)));
+      }
+      if (rightInput) {
+        rightInput.value = shouldBlankForTestEdge
+          ? ""
+          : (Number.isFinite(rightParsed)
+            ? formatMetricNumber(rightParsed)
+            : (parsedEdgeValue.right === null ? "" : formatMetricNumber(parsedEdgeValue.right)));
+      }
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+
+      updateEdgePullDraftValue(card);
+
+      if (leftInput) {
+        leftInput.focus();
+      }
+      return;
+    }
+
+    card.removeAttribute("data-metric-edgepull");
 
     if (isGrant) {
       card.setAttribute("data-metric-grant", "true");
@@ -2910,6 +3091,24 @@
 
     if (isVerticalJumpMetricName(normalizedName)) {
       return buildVerticalJumpBenchmarkSummary(metric, numericValue, valueWithUnit);
+    }
+
+    if (metric && metric._pairedSideMetrics) {
+      if (isSingleLegSquatMetricName(normalizedName)) {
+        return buildSingleLegSquatPairedBenchmarkSummary(metric, valueWithUnit);
+      }
+      if (isSingleLegHeelRaiseMetricName(normalizedName)) {
+        return buildSingleLegHeelRaisePairedBenchmarkSummary(metric, valueWithUnit);
+      }
+      if (isSidePlankMetricName(normalizedName)) {
+        return buildSidePlankPairedBenchmarkSummary(metric, valueWithUnit);
+      }
+      if (isYBalanceMetricName(normalizedName)) {
+        return buildYBalancePairedBenchmarkSummary(metric, valueWithUnit);
+      }
+      if (isEdgePullMetricName(normalizedName)) {
+        return buildEdgePullPairedBenchmarkSummary(metric, valueWithUnit);
+      }
     }
 
     if (isEdgePullMetricName(normalizedName)) {
@@ -3077,14 +3276,18 @@
       return;
     }
 
-    if (!window.jspdf || !window.jspdf.jsPDF) {
+    var JsPdfCtor =
+      (window.jspdf && window.jspdf.jsPDF) ||
+      window.jsPDF ||
+      null;
+
+    if (!JsPdfCtor) {
       setMetricsStatus("PDF library did not load. Refresh and try again.", "error");
       return;
     }
 
     try {
-      var jsPDF = window.jspdf.jsPDF;
-      var doc = new jsPDF({ unit: "pt", format: "letter" });
+      var doc = new JsPdfCtor({ unit: "pt", format: "letter" });
       var report = buildMetricSummaryReport(state.metricsLatest);
       var pageWidth = doc.internal.pageSize.getWidth();
       var pageHeight = doc.internal.pageSize.getHeight();
@@ -3129,15 +3332,6 @@
       writeWrapped("Metrics Included: " + String(report.rows.length), 11);
       y += 4;
 
-      writeWrapped("Flags", 13);
-      if (!report.flagLines.length) {
-        writeWrapped("No high-priority flags detected from current benchmark references.", 10, [34, 102, 34]);
-      } else {
-        report.flagLines.forEach(function (line) {
-          writeWrapped("- " + line, 10, [158, 43, 32]);
-        });
-      }
-
       y += 8;
       writeWrapped("Metric-by-Metric Normative Comparison", 13);
 
@@ -3145,12 +3339,9 @@
         ensureSpace(120);
         writeWrapped(String(index + 1) + ". " + row.name, 12);
         writeWrapped("Result: " + row.result, 10);
-        writeWrapped("Rating: " + row.rating, 10, row.flag ? [158, 43, 32] : [33, 33, 33]);
+        writeWrapped("Rating: " + row.rating, 10);
         writeWrapped("Normative Reference: " + row.reference, 10);
         writeWrapped("Interpretation: " + row.meaning, 10);
-        if (row.flag) {
-          writeWrapped("Flag: " + row.flag, 10, [158, 43, 32]);
-        }
         y += 4;
       });
 
@@ -3178,35 +3369,33 @@
 
   function buildMetricSummaryReport(metrics) {
     var rows = (metrics || []).map(function (metric) {
-      var summary = buildMetricBenchmarkSummary(metric);
-      var rating = extractBenchmarkLabel(summary.rating, "Rating:");
-      var reference = extractBenchmarkLabel(summary.range, "Reference:");
-      var meaning = extractBenchmarkLabel(summary.meaning, "Meaning:");
-      var result = buildMetricResultLabel(metric);
-      var flag = deriveMetricFlag(metric, rating, result);
+      try {
+        var summary = buildMetricBenchmarkSummary(metric);
+        var rating = extractBenchmarkLabel(summary && summary.rating, "Rating:");
+        var reference = extractBenchmarkLabel(summary && summary.range, "Reference:");
+        var meaning = extractBenchmarkLabel(summary && summary.meaning, "Meaning:");
+        var result = buildMetricResultLabel(metric);
 
-      return {
-        name: String(metric.metric_name || "Metric"),
-        result: result,
-        rating: rating,
-        reference: reference,
-        meaning: meaning,
-        flag: flag
-      };
+        return {
+          name: String(metric && metric.metric_name || "Metric"),
+          result: result,
+          rating: rating,
+          reference: reference,
+          meaning: meaning
+        };
+      } catch (error) {
+        return {
+          name: String(metric && metric.metric_name || "Metric"),
+          result: buildMetricResultLabel(metric),
+          rating: "Unable to classify",
+          reference: "Metric-specific benchmark mapping failed.",
+          meaning: error && error.message ? error.message : "Unexpected metric processing error."
+        };
+      }
     });
 
-    var bilateralFlags = buildBilateralMetricFlags(metrics);
-    var metricFlags = rows
-      .filter(function (row) {
-        return !!row.flag;
-      })
-      .map(function (row) {
-        return row.name + ": " + row.flag;
-      });
-
     return {
-      rows: rows,
-      flagLines: metricFlags.concat(bilateralFlags)
+      rows: rows
     };
   }
 
@@ -3289,6 +3478,15 @@
       name.indexOf("single leg squat") !== -1 ||
       name.indexOf("single-leg squat") !== -1 ||
       name.indexOf("sl squat") !== -1
+    );
+  }
+
+  function isSingleLegHeelRaiseMetricName(normalizedName) {
+    var name = normalizeMetricValue(normalizedName);
+    return (
+      name.indexOf("single leg heel raise") !== -1 ||
+      name.indexOf("single-leg heel raise") !== -1 ||
+      name.indexOf("heel raise") !== -1
     );
   }
 
@@ -3424,6 +3622,412 @@
     };
   }
 
+  function buildSingleLegSquatPairedBenchmarkSummary(metric, valueWithUnit) {
+    var pair = metric && metric._pairedSideMetrics ? metric._pairedSideMetrics : null;
+    if (!pair || !pair.left || !pair.right) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add both left and right values to unlock benchmark comparison.",
+        range:
+          "Reference: 30-second Single-Leg Squat uses sex-specific rep bands for Developing to Elite.",
+        meaning:
+          "Meaning: Enter both left and right rep counts so the card can compare each side against the normative table."
+      };
+    }
+
+    var left = parseSingleLegSquatLegValues(pair.left.metric_value || "").left;
+    var right = parseSingleLegSquatLegValues(pair.right.metric_value || "").right;
+    var sex = resolveAthleteSexForBenchmarks();
+    var bands = getSingleLegSquatNormBandForSex(sex);
+
+    if (left === null || right === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add both left and right values to unlock benchmark comparison.",
+        range:
+          "Reference: 30-second Single-Leg Squat uses sex-specific rep bands for Developing to Elite.",
+        meaning:
+          "Meaning: Enter both left and right rep counts so the card can compare each side against the normative table."
+      };
+    }
+
+    if (!bands) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men: Developing <12, Recreational 12-16, Trained 17-21, Advanced 22-26, Elite 27+. " +
+          "Women: Developing <10, Recreational 10-14, Trained 15-19, Advanced 20-24, Elite 25+.",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply Single-Leg Squat normative values."
+      };
+    }
+
+    var leftRating = classifySingleLegSquatReps(left, bands);
+    var rightRating = classifySingleLegSquatReps(right, bands);
+    var lowerLegScore = Math.min(left, right);
+    var combinedRating = classifySingleLegSquatReps(lowerLegScore, bands);
+    var symmetry = calculateSymmetryPercent(left, right);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    return {
+      currentValue:
+        "Current score: L Leg " +
+        formatMetricDisplayValue(left, metric && metric.metric_unit) +
+        " | R Leg " +
+        formatMetricDisplayValue(right, metric && metric.metric_unit) +
+        " | Symmetry " + symmetryText,
+      rating: "Rating: " + combinedRating + " (Left: " + leftRating + ", Right: " + rightRating + ")",
+      range:
+        "Reference: Men: Developing <12, Recreational 12-16, Trained 17-21, Advanced 22-26, Elite 27+. " +
+        "Women: Developing <10, Recreational 10-14, Trained 15-19, Advanced 20-24, Elite 25+.",
+      meaning:
+        "Meaning: Compare left and right squat capacity, then use the lower score for classification. " +
+        (symmetry !== null ? (symmetry >= 95 ? "Symmetry is strong." : "Monitor side-to-side asymmetry.") : "")
+    };
+  }
+
+  function buildSingleLegHeelRaisePairedBenchmarkSummary(metric, valueWithUnit) {
+    var pair = metric && metric._pairedSideMetrics ? metric._pairedSideMetrics : null;
+    if (!pair || !pair.left || !pair.right) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add both left and right values to unlock benchmark comparison.",
+        range:
+          "Reference: Single-leg heel raise uses sex-specific rep bands for Developing to Elite.",
+        meaning:
+          "Meaning: Enter both left and right rep counts so the card can compare each side against the normative table."
+      };
+    }
+
+    var left = parseSingleLegSquatLegValues(pair.left.metric_value || "").left;
+    var right = parseSingleLegSquatLegValues(pair.right.metric_value || "").right;
+    var sex = resolveAthleteSexForBenchmarks();
+    var bands = getSingleLegHeelRaiseNormBandForSex(sex);
+
+    if (left === null || right === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add both left and right values to unlock benchmark comparison.",
+        range:
+          "Reference: Single-leg heel raise uses sex-specific rep bands for Developing to Elite.",
+        meaning:
+          "Meaning: Enter both left and right rep counts so the card can compare each side against the normative table."
+      };
+    }
+
+    if (!bands) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men: Developing <20, Recreational 20-30, Trained 31-40, Advanced 41-50, Elite 51+. " +
+          "Women: Developing <18, Recreational 18-28, Trained 29-38, Advanced 39-48, Elite 49+.",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply Single-Leg Heel Raise normative values."
+      };
+    }
+
+    var leftRating = classifySingleLegHeelRaiseReps(left, bands);
+    var rightRating = classifySingleLegHeelRaiseReps(right, bands);
+    var lowerLegScore = Math.min(left, right);
+    var combinedRating = classifySingleLegHeelRaiseReps(lowerLegScore, bands);
+    var symmetry = calculateSymmetryPercent(left, right);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    return {
+      currentValue:
+        "Current score: L Leg " +
+        formatMetricDisplayValue(left, metric && metric.metric_unit) +
+        " | R Leg " +
+        formatMetricDisplayValue(right, metric && metric.metric_unit) +
+        " | Symmetry " + symmetryText,
+      rating: "Rating: " + combinedRating + " (Left: " + leftRating + ", Right: " + rightRating + ")",
+      range:
+        "Reference: Men: Developing <20, Recreational 20-30, Trained 31-40, Advanced 41-50, Elite 51+. " +
+        "Women: Developing <18, Recreational 18-28, Trained 29-38, Advanced 39-48, Elite 49+.",
+      meaning:
+        "Meaning: Compare left and right heel raise capacity, then use the lower score for classification. " +
+        (symmetry !== null ? (symmetry >= 95 ? "Symmetry is strong." : "Monitor side-to-side asymmetry.") : "")
+    };
+  }
+
+  function buildSidePlankPairedBenchmarkSummary(metric, valueWithUnit) {
+    var pair = metric && metric._pairedSideMetrics ? metric._pairedSideMetrics : null;
+    if (!pair || !pair.left || !pair.right) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add both left and right values to unlock benchmark comparison.",
+        range:
+          "Reference: Side plank with hip abduction uses sex-specific hold-time bands for Developing to Elite.",
+        meaning:
+          "Meaning: Enter both left and right hold times so the card can compare each side against the normative table."
+      };
+    }
+
+    var left = parseNumericMetricValue(pair.left.metric_value || "");
+    var right = parseNumericMetricValue(pair.right.metric_value || "");
+    var sex = resolveAthleteSexForBenchmarks();
+    var bands = getSidePlankNormBandForSex(sex);
+
+    if (left === null || right === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add both left and right values to unlock benchmark comparison.",
+        range:
+          "Reference: Side plank with hip abduction uses sex-specific hold-time bands for Developing to Elite.",
+        meaning:
+          "Meaning: Enter both left and right hold times so the card can compare each side against the normative table."
+      };
+    }
+
+    if (!bands) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men: Developing <20, Recreational 20-35, Trained 35-50, Advanced 50-70, Elite 70+. " +
+          "Women: Developing <15, Recreational 15-30, Trained 30-45, Advanced 45-60, Elite 60+.",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply Side Plank + Hip Abduction normative values."
+      };
+    }
+
+    var leftRating = classifySidePlankHoldTime(left, bands);
+    var rightRating = classifySidePlankHoldTime(right, bands);
+    var lowerHoldTime = Math.min(left, right);
+    var combinedRating = classifySidePlankHoldTime(lowerHoldTime, bands);
+    var symmetry = calculateSymmetryPercent(left, right);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    return {
+      currentValue:
+        "Current score: L Leg " +
+        formatMetricDisplayValue(left, metric && metric.metric_unit) +
+        " | R Leg " +
+        formatMetricDisplayValue(right, metric && metric.metric_unit) +
+        " | Symmetry " + symmetryText,
+      rating: "Rating: " + combinedRating + " (Left: " + leftRating + ", Right: " + rightRating + ")",
+      range:
+        "Reference: Men: Developing <20, Recreational 20-35, Trained 35-50, Advanced 50-70, Elite 70+. " +
+        "Women: Developing <15, Recreational 15-30, Trained 30-45, Advanced 45-60, Elite 60+.",
+      meaning:
+        "Meaning: Compare left and right side plank hold capacity, then use the lower hold time for classification. " +
+        (symmetry !== null ? (symmetry >= 95 ? "Symmetry is strong." : "Monitor side-to-side asymmetry.") : "")
+    };
+  }
+
+  function buildYBalancePairedBenchmarkSummary(metric, valueWithUnit) {
+    var pair = metric && metric._pairedSideMetrics ? metric._pairedSideMetrics : null;
+    if (!pair || !pair.left || !pair.right) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add both left and right values to unlock benchmark comparison.",
+        range:
+          "Reference: Y Balance anterior reach uses sex-specific normalized reach categories (% leg length) for Developing to Elite Control.",
+        meaning:
+          "Meaning: Enter both left and right values to evaluate side-to-side balance and normative level."
+      };
+    }
+
+    var leftRaw = parseNumericMetricValue(pair.left.metric_value || "");
+    var rightRaw = parseNumericMetricValue(pair.right.metric_value || "");
+    var unit = normalizeMetricValue(metric && metric.metric_unit);
+    var sex = resolveAthleteSexForBenchmarks();
+    var band = getYBalanceNormBandForSex(sex);
+    var heightCm = getAthleteHeightCmForBenchmarks();
+    var legLengthCm = heightCm ? calculateLegLengthCm(heightCm) : null;
+
+    function toNormalizedPercent(rawValue) {
+      if (!Number.isFinite(rawValue)) {
+        return null;
+      }
+      if (unit.indexOf("%") !== -1 || !unit) {
+        return rawValue;
+      }
+      if (Number.isFinite(legLengthCm) && legLengthCm > 0) {
+        var reachCm = convertLengthToCm(rawValue, unit);
+        if (Number.isFinite(reachCm)) {
+          return (reachCm / legLengthCm) * 100;
+        }
+      }
+      return null;
+    }
+
+    var leftPercent = toNormalizedPercent(leftRaw);
+    var rightPercent = toNormalizedPercent(rightRaw);
+    if (leftPercent === null || rightPercent === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing data for leg-length normalization.",
+        range:
+          "Reference: Y Balance norms are based on normalized anterior reach (% leg length).",
+        meaning:
+          "Meaning: Enter athlete height so leg length can be estimated (height x 0.53), or store values directly as % leg length."
+      };
+    }
+
+    if (!band) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men: Developing <60%, Recreational 60-65%, Trained 65-72%, Advanced 72-78%, Elite >78%. " +
+          "Women: Developing <65%, Recreational 65-70%, Trained 70-77%, Advanced 77-83%, Elite >83%.",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply Y Balance normative values."
+      };
+    }
+
+    var leftRating = classifyYBalanceReach(leftPercent, band);
+    var rightRating = classifyYBalanceReach(rightPercent, band);
+    var lowerReachPercent = Math.min(leftPercent, rightPercent);
+    var combinedRating = classifyYBalanceReach(lowerReachPercent, band);
+    var symmetry = calculateSymmetryPercent(leftPercent, rightPercent);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    return {
+      currentValue:
+        "Current score: L Leg " +
+        formatMetricDisplayValue(leftRaw, metric && metric.metric_unit) +
+        " | R Leg " +
+        formatMetricDisplayValue(rightRaw, metric && metric.metric_unit) +
+        " | Symmetry " + symmetryText,
+      rating: "Rating: " + combinedRating + " (Left: " + leftRating + ", Right: " + rightRating + ")",
+      range:
+        "Reference: " +
+        (band.sex === "male" ? "Men" : "Women") +
+        " anterior reach norms - Developing <" +
+        band.developingHigh +
+        "%, Recreational " +
+        band.recreationalLow +
+        "-" +
+        band.recreationalHigh +
+        "%, Trained " +
+        band.trainedLow +
+        "-" +
+        band.trainedHigh +
+        "%, Advanced " +
+        band.advancedLow +
+        "-" +
+        band.advancedHigh +
+        "%, Elite >" +
+        band.eliteLow +
+        "%.",
+      meaning:
+        "Meaning: Compare left and right normalized reach, then use the lower side for classification. " +
+        (symmetry !== null ? (symmetry >= 95 ? "Symmetry is strong." : "Monitor side-to-side asymmetry.") : "")
+    };
+  }
+
+  function buildEdgePullPairedBenchmarkSummary(metric, valueWithUnit) {
+    var pair = metric && metric._pairedSideMetrics ? metric._pairedSideMetrics : null;
+    if (!pair || !pair.left || !pair.right) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add both left and right values to unlock benchmark comparison.",
+        range:
+          "Reference: 20mm Edge Pull (single-arm) uses sex-specific relative load ranges (% bodyweight).",
+        meaning:
+          "Meaning: Enter both left and right hand edge pull values so the card can compare each side against the normative table."
+      };
+    }
+
+    var leftRaw = parseNumericMetricValue(pair.left.metric_value || "");
+    var rightRaw = parseNumericMetricValue(pair.right.metric_value || "");
+    var unit = normalizeMetricValue(metric && metric.metric_unit);
+    var sex = resolveAthleteSexForBenchmarks();
+    var band = getEdgePullNormBandForSex(sex);
+    var weightKg = getAthleteWeightKgForBenchmarks();
+
+    if (leftRaw === null || rightRaw === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Add both left and right values to unlock benchmark comparison.",
+        range:
+          "Reference: 20mm Edge Pull (single-arm) uses sex-specific relative load ranges (% bodyweight).",
+        meaning:
+          "Meaning: Enter both left and right hand edge pull values so the card can compare each side against the normative table."
+      };
+    }
+
+    if (!band) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing athlete sex for normative comparison.",
+        range:
+          "Reference: Men - Developing <0.6x BW, Recreational 0.6-0.75x, Trained 0.75-0.9x, Advanced 0.9-1.05x, Elite >1.05x. " +
+          "Women - Developing <0.55x BW, Recreational 0.55-0.7x, Trained 0.7-0.85x, Advanced 0.85-1.0x, Elite >1.0x (single-arm hang).",
+        meaning:
+          "Meaning: Set athlete sex (male/female) in profile data to apply the 20mm Edge Pull normative table."
+      };
+    }
+
+    function toRelativeLoad(value) {
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+
+      if (unit.indexOf("%") !== -1) {
+        return value;
+      }
+
+      if (!Number.isFinite(weightKg) || weightKg <= 0) {
+        return null;
+      }
+
+      var loadKg = convertMassToKg(value, unit);
+      if (!Number.isFinite(loadKg)) {
+        return null;
+      }
+
+      return (loadKg / weightKg) * 100;
+    }
+
+    var leftRelative = toRelativeLoad(leftRaw);
+    var rightRelative = toRelativeLoad(rightRaw);
+
+    if (leftRelative === null || rightRelative === null) {
+      return {
+        currentValue: "Current score: " + valueWithUnit,
+        rating: "Rating: Missing bodyweight for relative-load comparison.",
+        range:
+          "Reference: Relative load is calculated as (edge pull load / bodyweight) x 100.",
+        meaning:
+          "Meaning: Enter athlete weight in profile and record edge pull in kg or lbs (or store values directly as %BW)."
+      };
+    }
+
+    var leftRating = classifyEdgePullRelativeLoad(leftRelative, band);
+    var rightRating = classifyEdgePullRelativeLoad(rightRelative, band);
+    var lowerSideRelative = Math.min(leftRelative, rightRelative);
+    var combinedRating = classifyEdgePullRelativeLoad(lowerSideRelative, band);
+    var symmetry = calculateSymmetryPercent(leftRelative, rightRelative);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    return {
+      currentValue:
+        "Current score: L Hand " +
+        formatMetricDisplayValue(leftRaw, metric && metric.metric_unit) +
+        " | R Hand " +
+        formatMetricDisplayValue(rightRaw, metric && metric.metric_unit) +
+        " | Symmetry " + symmetryText,
+      rating: "Rating: " + combinedRating + " (Left: " + leftRating + ", Right: " + rightRating + ")",
+      range:
+        "Reference: " +
+        (band.sex === "male"
+          ? "Men"
+          : "Women") +
+        " Developing <" + band.developingHigh + "% (" + formatMetricNumber(band.developingHigh / 100) + "x BW) | Recreational " +
+        band.recreationalLow + "-" + band.recreationalHigh + "% (" + formatMetricNumber(band.recreationalLow / 100) + "-" + formatMetricNumber(band.recreationalHigh / 100) + "x) | Trained " +
+        band.trainedLow + "-" + band.trainedHigh + "% (" + formatMetricNumber(band.trainedLow / 100) + "-" + formatMetricNumber(band.trainedHigh / 100) + "x) | Advanced " +
+        band.advancedLow + "-" + band.advancedHigh + "% (" + formatMetricNumber(band.advancedLow / 100) + "-" + formatMetricNumber(band.advancedHigh / 100) + "x) | Elite >" + band.eliteLow + "% (" + formatMetricNumber(band.eliteLow / 100) + "x).",
+      meaning:
+        "Meaning: Compare left and right hand relative edge-force output, then use the lower side for classification. " +
+        (symmetry !== null ? (symmetry >= 95 ? "Symmetry is strong." : "Monitor side-to-side asymmetry.") : "")
+    };
+  }
+
   function classifySingleLegSquatReps(reps, bands) {
     if (!Number.isFinite(reps) || !bands) {
       return "Needs Data";
@@ -3468,6 +4072,56 @@
         advancedLow: 20,
         advancedHigh: 24,
         eliteLow: 25
+      }
+    };
+
+    return table[sex] || null;
+  }
+
+  function classifySingleLegHeelRaiseReps(reps, bands) {
+    if (!Number.isFinite(reps) || !bands) {
+      return "Needs Data";
+    }
+    if (reps < bands.recreationalLow) {
+      return "Developing";
+    }
+    if (reps <= bands.recreationalHigh) {
+      return "Recreational";
+    }
+    if (reps <= bands.trainedHigh) {
+      return "Trained";
+    }
+    if (reps <= bands.advancedHigh) {
+      return "Advanced";
+    }
+    return "Elite";
+  }
+
+  function getSingleLegHeelRaiseNormBandForSex(sex) {
+    if (!sex) {
+      return null;
+    }
+
+    var table = {
+      male: {
+        sex: "male",
+        recreationalLow: 20,
+        recreationalHigh: 30,
+        trainedLow: 31,
+        trainedHigh: 40,
+        advancedLow: 41,
+        advancedHigh: 50,
+        eliteLow: 51
+      },
+      female: {
+        sex: "female",
+        recreationalLow: 18,
+        recreationalHigh: 28,
+        trainedLow: 29,
+        trainedHigh: 38,
+        advancedLow: 39,
+        advancedHigh: 48,
+        eliteLow: 49
       }
     };
 
@@ -4316,7 +4970,7 @@
         currentValue: "Current score: " + valueWithUnit,
         rating: "Rating: Add a numeric score to unlock benchmark comparison.",
         range:
-          "Reference: 20mm Edge Hang (single-arm) uses sex-specific relative load ranges (% bodyweight).",
+          "Reference: 20mm Edge Pull (single-arm) uses sex-specific relative load ranges (% bodyweight).",
         meaning:
           "Meaning: Enter a numeric hang score. If score is in kg, athlete weight is required to calculate % bodyweight."
       };
@@ -4330,7 +4984,7 @@
           "Reference: Men - Developing <0.6x BW, Recreational 0.6-0.75x, Trained 0.75-0.9x, Advanced 0.9-1.05x, Elite >1.05x. " +
           "Women - Developing <0.55x BW, Recreational 0.55-0.7x, Trained 0.7-0.85x, Advanced 0.85-1.0x, Elite >1.0x (single-arm hang).",
         meaning:
-          "Meaning: Set athlete sex (male/female) in profile data to apply the 20mm Edge Hang normative table."
+          "Meaning: Set athlete sex (male/female) in profile data to apply the 20mm Edge Pull normative table."
       };
     }
 
@@ -4745,9 +5399,40 @@
     var metricUnit = String(metric.metric_unit || "").trim();
     var metricValue = String(metric.metric_value || "").trim();
     var normalizedName = normalizeMetricValue(metricName);
+    var pairedSideMetric =
+      metric &&
+      metric._pairedSideMetrics &&
+      (isSingleLegSquatMetricName(metricName) ||
+        isSingleLegHeelRaiseMetricName(metricName) ||
+        isSidePlankMetricName(metricName) ||
+        isYBalanceMetricName(metricName) ||
+        isEdgePullMetricName(metricName));
     var isYBalanceAnterior =
       normalizedName.indexOf("y balance") !== -1 ||
       normalizedName.indexOf("anterior reach") !== -1;
+
+    if (pairedSideMetric) {
+      var leftMetric = metric._pairedSideMetrics.left;
+      var rightMetric = metric._pairedSideMetrics.right;
+      if (leftMetric && rightMetric) {
+        var leftValue = parseNumericMetricValue(leftMetric.metric_value || "");
+        var rightValue = parseNumericMetricValue(rightMetric.metric_value || "");
+        var leftText = escapeHtml(formatMetricDisplayValue(leftValue, metricUnit));
+        var rightText = escapeHtml(formatMetricDisplayValue(rightValue, metricUnit));
+        var symmetry = calculateSymmetryPercent(leftValue, rightValue);
+        var symmetryText = symmetry === null ? "—" : escapeHtml(formatMetricNumber(symmetry) + "%");
+        var leftLabel = isEdgePullMetricName(metricName) ? "L Hand" : "L Leg";
+        var rightLabel = isEdgePullMetricName(metricName) ? "R Hand" : "R Leg";
+
+        return (
+          '<span class="metric-value-split">' +
+          '<span>' + leftLabel + ' ' + leftText + '</span>' +
+          '<span>' + rightLabel + ' ' + rightText + '</span>' +
+          '<span>Symmetry ' + symmetryText + '</span>' +
+          "</span>"
+        );
+      }
+    }
 
     if (!isYBalanceAnterior) {
       var safeValue = escapeHtml(metricValue || "—");
@@ -4963,6 +5648,51 @@
     }
   }
 
+  function updateEdgePullDraftValue(card) {
+    if (!card) {
+      return;
+    }
+
+    var name = String((card.querySelector('[data-metric-edit="name"]') || {}).value || "").trim();
+    if (!isEdgePullMetricName(name)) {
+      card.removeAttribute("data-metric-edgepull");
+      return;
+    }
+
+    card.setAttribute("data-metric-edgepull", "true");
+
+    var leftRaw = String((card.querySelector('[data-metric-edit="left"]') || {}).value || "").trim();
+    var rightRaw = String((card.querySelector('[data-metric-edit="right"]') || {}).value || "").trim();
+    var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
+    var symmetryInput = card.querySelector('[data-metric-edit="symmetry"]');
+    var valueInput = card.querySelector('[data-metric-edit="value"]');
+
+    var left = parseNumericMetricValue(leftRaw);
+    var right = parseNumericMetricValue(rightRaw);
+
+    if (left === null || right === null) {
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+      if (valueInput) {
+        valueInput.value = "";
+      }
+      return;
+    }
+
+    var leftText = formatMetricDisplayValue(left, unit);
+    var rightText = formatMetricDisplayValue(right, unit);
+    var symmetry = calculateSymmetryPercent(left, right);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    if (symmetryInput) {
+      symmetryInput.value = symmetryText;
+    }
+    if (valueInput) {
+      valueInput.value = "L Hand " + leftText + " | R Hand " + rightText + " | Symmetry " + symmetryText;
+    }
+  }
+
     function updateGrantDraftValue(card) {
       if (!card) {
         return;
@@ -5145,86 +5875,98 @@
     var name = String(metric.metric_name || "");
     var unit = String(metric.metric_unit || "").trim();
 
-    if (unit) {
-      state.client
-        .from("athlete_metrics")
-        .delete()
-        .eq("user_id", viewedUserId)
-        .eq("metric_name", name)
-        .eq("metric_unit", unit)
-        .then(function (result) {
-          if (result.error) {
-            setMetricsStatus(result.error.message, "error");
-            return;
-          }
+    function deleteByNameAndUnit(targetName, targetUnit) {
+      var safeName = String(targetName || "").trim();
+      var safeUnit = String(targetUnit || "").trim();
+      if (!safeName) {
+        return Promise.resolve();
+      }
 
-          loadMetricsData();
-          setMetricsStatus("Metric deleted.", "success");
-        })
-        .catch(function (error) {
-          setMetricsStatus(error && error.message ? error.message : "Failed to delete metric.", "error");
-        });
-      return;
-    }
-
-    state.client
-      .from("athlete_metrics")
-      .delete()
-      .eq("user_id", viewedUserId)
-      .eq("metric_name", name)
-      .eq("metric_unit", "")
-      .then(function (resultEmptyUnit) {
-        if (resultEmptyUnit.error) {
-          setMetricsStatus(resultEmptyUnit.error.message, "error");
-          return;
-        }
-
-        state.client
+      if (safeUnit) {
+        return state.client
           .from("athlete_metrics")
           .delete()
           .eq("user_id", viewedUserId)
-          .eq("metric_name", name)
-          .is("metric_unit", null)
-          .then(function (resultNullUnit) {
-            if (resultNullUnit.error) {
-              setMetricsStatus(resultNullUnit.error.message, "error");
-              return;
+          .eq("metric_name", safeName)
+          .eq("metric_unit", safeUnit)
+          .then(function (result) {
+            if (result.error) {
+              throw result.error;
             }
-
-            loadMetricsData();
-            setMetricsStatus("Metric deleted.", "success");
-          })
-          .catch(function (error) {
-            setMetricsStatus(error && error.message ? error.message : "Failed to delete metric.", "error");
           });
+      }
+
+      return state.client
+        .from("athlete_metrics")
+        .delete()
+        .eq("user_id", viewedUserId)
+        .eq("metric_name", safeName)
+        .eq("metric_unit", "")
+        .then(function (resultEmptyUnit) {
+          if (resultEmptyUnit.error) {
+            throw resultEmptyUnit.error;
+          }
+
+          return state.client
+            .from("athlete_metrics")
+            .delete()
+            .eq("user_id", viewedUserId)
+            .eq("metric_name", safeName)
+            .is("metric_unit", null)
+            .then(function (resultNullUnit) {
+              if (resultNullUnit.error) {
+                throw resultNullUnit.error;
+              }
+            });
+        });
+    }
+
+    var pair = metric && metric._pairedSideMetrics ? metric._pairedSideMetrics : null;
+    var deleteTargets = [];
+
+    if (pair && (pair.left || pair.right)) {
+      if (pair.left) {
+        deleteTargets.push({
+          name: String(pair.left.metric_name || "").trim(),
+          unit: String(pair.left.metric_unit || "").trim()
+        });
+      }
+      if (pair.right) {
+        deleteTargets.push({
+          name: String(pair.right.metric_name || "").trim(),
+          unit: String(pair.right.metric_unit || "").trim()
+        });
+      }
+    } else {
+      deleteTargets.push({ name: name, unit: unit });
+    }
+
+    var dedupedTargets = [];
+    var seen = {};
+    deleteTargets.forEach(function (target) {
+      var targetName = String(target && target.name || "").trim();
+      var targetUnit = String(target && target.unit || "").trim();
+      if (!targetName) {
+        return;
+      }
+      var token = normalizeMetricValue(targetName) + "|" + normalizeMetricValue(targetUnit);
+      if (seen[token]) {
+        return;
+      }
+      seen[token] = true;
+      dedupedTargets.push({ name: targetName, unit: targetUnit });
+    });
+
+    Promise.all(
+      dedupedTargets.map(function (target) {
+        return deleteByNameAndUnit(target.name, target.unit);
+      })
+    )
+      .then(function () {
+        loadMetricsData();
+        setMetricsStatus("Metric deleted.", "success");
       })
       .catch(function (error) {
-            function parseGrantLegValues(rawValue) {
-              var text = String(rawValue || "").replace(/,/g, " ").trim();
-              if (!text) {
-                return { left: null, right: null };
-              }
-
-              var leftMatch = text.match(/(?:\bL\b|\bleft\b|\bl leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
-              var rightMatch = text.match(/(?:\bR\b|\bright\b|\br leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
-              var left = leftMatch ? Number(leftMatch[1]) : null;
-              var right = rightMatch ? Number(rightMatch[1]) : null;
-
-              if (Number.isFinite(left) && Number.isFinite(right)) {
-                return { left: left, right: right };
-              }
-
-              var numbers = text.match(/-?\d+(?:\.\d+)?/g) || [];
-              if (numbers.length >= 2) {
-                var first = Number(numbers[0]);
-                var second = Number(numbers[1]);
-                if (Number.isFinite(first) && Number.isFinite(second)) {
-                  return { left: first, right: second };
-                }
-              }
-
-              return { left: null, right: null };
-            }
         setMetricsStatus(error && error.message ? error.message : "Failed to delete metric.", "error");
       });
   }
@@ -5241,6 +5983,103 @@
     var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
     var category = String((card.querySelector('[data-metric-edit="category"]') || {}).value || "").trim() || "Performance";
     var isYBalance = isYBalanceMetricName(name);
+    var isEdgePull = isEdgePullMetricName(name);
+
+    if (isEdgePull) {
+      updateEdgePullDraftValue(card);
+
+      var leftInput = card.querySelector('[data-metric-edit="left"]');
+      var rightInput = card.querySelector('[data-metric-edit="right"]');
+      var leftValueRaw = String((leftInput && leftInput.value) || "").trim();
+      var rightValueRaw = String((rightInput && rightInput.value) || "").trim();
+      var leftValue = parseNumericMetricValue(leftValueRaw);
+      var rightValue = parseNumericMetricValue(rightValueRaw);
+
+      if (!Number.isFinite(leftValue) || !Number.isFinite(rightValue)) {
+        setMetricsStatus("20mm Edge Pull requires both L Hand and R Hand values.", "error");
+        return;
+      }
+
+      var baseName = String(name || "")
+        .replace(/\s*\((left|right)\)\s*$/i, "")
+        .trim();
+      var leftName = baseName + " (Left)";
+      var rightName = baseName + " (Right)";
+      var leftText = formatMetricNumber(leftValue);
+      var rightText = formatMetricNumber(rightValue);
+
+      var payloads = [
+        {
+          user_id: viewedUserId,
+          metric_name: leftName,
+          metric_value: leftText,
+          metric_unit: unit,
+          metric_category: category,
+          updated_at: new Date().toISOString()
+        },
+        {
+          user_id: viewedUserId,
+          metric_name: rightName,
+          metric_value: rightText,
+          metric_unit: unit,
+          metric_category: category,
+          updated_at: new Date().toISOString()
+        }
+      ];
+
+      var metricKey = String(card.getAttribute("data-metric-key") || "");
+      var currentMetric = findLatestMetricByKey(metricKey);
+      var currentPair = currentMetric && currentMetric._pairedSideMetrics ? currentMetric._pairedSideMetrics : null;
+      var currentLeft = parseNumericMetricValue(currentPair && currentPair.left && currentPair.left.metric_value);
+      var currentRight = parseNumericMetricValue(currentPair && currentPair.right && currentPair.right.metric_value);
+      var hasSameValues =
+        Number.isFinite(currentLeft) && Number.isFinite(currentRight) &&
+        currentLeft === leftValue &&
+        currentRight === rightValue &&
+        normalizeMetricValue(currentMetric && currentMetric.metric_unit) === normalizeMetricValue(unit) &&
+        normalizeMetricValue(currentMetric && currentMetric.metric_category) === normalizeMetricValue(category) &&
+        normalizeMetricValue(currentMetric && currentMetric.metric_name) === normalizeMetricValue(baseName);
+
+      if (hasSameValues && mode !== "test") {
+        setMetricsStatus("No metric changes detected.", "info");
+        closeMetricCardEditor(card);
+        return;
+      }
+
+      setMetricsStatus(mode === "test" ? "Logging new side-specific test score..." : "Saving side-specific metric update...", "info");
+
+      state.client
+        .from("athlete_metrics")
+        .insert(payloads)
+        .select("*")
+        .then(function (insertResult) {
+          if (insertResult.error) {
+            if (isMissingRelationError(insertResult.error)) {
+              setMetricsStatus("Metrics table not found. Create athlete_metrics in Supabase before saving metrics.", "error");
+              return;
+            }
+
+            if (isRlsError(insertResult.error)) {
+              setMetricsStatus("Permission denied by database policy while saving metrics. Ask admin to update athlete_metrics RLS policy for coach edits.", "error");
+              return;
+            }
+
+            setMetricsStatus(insertResult.error.message, "error");
+            return;
+          }
+
+          var inserted = Array.isArray(insertResult.data) ? insertResult.data : payloads;
+          state.metrics = inserted.concat(state.metrics || []);
+          state.metricsLatest = getLatestMetrics(state.metrics);
+          renderMetricsCards();
+          renderMetricRowsFromData(state.metricsLatest);
+          setMetricsStatus(mode === "test" ? "New side-specific test score logged." : "Metric updated.", "success");
+        })
+        .catch(function (error) {
+          setMetricsStatus(error && error.message ? error.message : "Failed to save metric.", "error");
+        });
+      return;
+    }
 
     if (isYBalance) {
       updateYBalanceDraftValue(card);
