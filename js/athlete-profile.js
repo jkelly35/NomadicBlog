@@ -849,6 +849,8 @@
 
          updateYBalanceDraftValue(card);
          updateSingleLegSquatDraftValue(card);
+         updateSingleLegHeelRaiseDraftValue(card);
+         updateSidePlankDraftValue(card);
          updateEdgePullDraftValue(card);
          updateGrantDraftValue(card);
         updateLegLengthEstimateNote(card);
@@ -2919,6 +2921,8 @@
     var legLengthNote = card.querySelector("[data-leglength-estimate-note]");
     var isYBalance = isYBalanceMetricName(metric.metric_name || "");
     var isSingleLegSquat = isSingleLegSquatMetricName(metric.metric_name || "");
+    var isSingleLegHeelRaise = isSingleLegHeelRaiseMetricName(metric.metric_name || "");
+    var isSidePlank = isSidePlankMetricName(metric.metric_name || "");
     var isEdgePull = isEdgePullMetricName(metric.metric_name || "");
     var isGrant = isAdaptedGrantFootRaiseMetricName(metric.metric_name || "");
 
@@ -2952,7 +2956,7 @@
     }
 
     if (yBalanceGrid) {
-      yBalanceGrid.hidden = !(isYBalance || isEdgePull || isSingleLegSquat);
+      yBalanceGrid.hidden = !(isYBalance || isEdgePull || isSingleLegSquat || isSingleLegHeelRaise || isSidePlank);
     }
 
     if (grantGrid) {
@@ -3020,6 +3024,72 @@
     }
 
     card.removeAttribute("data-metric-squat");
+
+    if (isSingleLegHeelRaise) {
+      card.setAttribute("data-metric-heelraise", "true");
+
+      var leftHeelRaiseMetric = metric._pairedSideMetrics && metric._pairedSideMetrics.left;
+      var rightHeelRaiseMetric = metric._pairedSideMetrics && metric._pairedSideMetrics.right;
+      var leftHeelRaiseParsed = parseNumericMetricValue(leftHeelRaiseMetric && leftHeelRaiseMetric.metric_value);
+      var rightHeelRaiseParsed = parseNumericMetricValue(rightHeelRaiseMetric && rightHeelRaiseMetric.metric_value);
+      var shouldBlankForTestHeelRaise = modeValue === "test";
+
+      if (leftInput) {
+        leftInput.value = shouldBlankForTestHeelRaise
+          ? ""
+          : (Number.isFinite(leftHeelRaiseParsed) ? formatMetricNumber(leftHeelRaiseParsed) : "");
+      }
+      if (rightInput) {
+        rightInput.value = shouldBlankForTestHeelRaise
+          ? ""
+          : (Number.isFinite(rightHeelRaiseParsed) ? formatMetricNumber(rightHeelRaiseParsed) : "");
+      }
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+
+      updateSingleLegHeelRaiseDraftValue(card);
+
+      if (leftInput) {
+        leftInput.focus();
+      }
+      return;
+    }
+
+    card.removeAttribute("data-metric-heelraise");
+
+    if (isSidePlank) {
+      card.setAttribute("data-metric-sideplank", "true");
+
+      var leftPlankMetric = metric._pairedSideMetrics && metric._pairedSideMetrics.left;
+      var rightPlankMetric = metric._pairedSideMetrics && metric._pairedSideMetrics.right;
+      var leftPlankParsed = parseNumericMetricValue(leftPlankMetric && leftPlankMetric.metric_value);
+      var rightPlankParsed = parseNumericMetricValue(rightPlankMetric && rightPlankMetric.metric_value);
+      var shouldBlankForTestPlank = modeValue === "test";
+
+      if (leftInput) {
+        leftInput.value = shouldBlankForTestPlank
+          ? ""
+          : (Number.isFinite(leftPlankParsed) ? formatMetricNumber(leftPlankParsed) : "");
+      }
+      if (rightInput) {
+        rightInput.value = shouldBlankForTestPlank
+          ? ""
+          : (Number.isFinite(rightPlankParsed) ? formatMetricNumber(rightPlankParsed) : "");
+      }
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+
+      updateSidePlankDraftValue(card);
+
+      if (leftInput) {
+        leftInput.focus();
+      }
+      return;
+    }
+
+    card.removeAttribute("data-metric-sideplank");
 
     if (isEdgePull) {
       card.setAttribute("data-metric-edgepull", "true");
@@ -5738,6 +5808,96 @@
     }
   }
 
+  function updateSingleLegHeelRaiseDraftValue(card) {
+    if (!card) {
+      return;
+    }
+
+    var name = String((card.querySelector('[data-metric-edit="name"]') || {}).value || "").trim();
+    if (!isSingleLegHeelRaiseMetricName(name)) {
+      card.removeAttribute("data-metric-heelraise");
+      return;
+    }
+
+    card.setAttribute("data-metric-heelraise", "true");
+
+    var leftRaw = String((card.querySelector('[data-metric-edit="left"]') || {}).value || "").trim();
+    var rightRaw = String((card.querySelector('[data-metric-edit="right"]') || {}).value || "").trim();
+    var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
+    var symmetryInput = card.querySelector('[data-metric-edit="symmetry"]');
+    var valueInput = card.querySelector('[data-metric-edit="value"]');
+
+    var left = parseNumericMetricValue(leftRaw);
+    var right = parseNumericMetricValue(rightRaw);
+
+    if (left === null || right === null) {
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+      if (valueInput) {
+        valueInput.value = "";
+      }
+      return;
+    }
+
+    var leftText = formatMetricDisplayValue(left, unit);
+    var rightText = formatMetricDisplayValue(right, unit);
+    var symmetry = calculateSymmetryPercent(left, right);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    if (symmetryInput) {
+      symmetryInput.value = symmetryText;
+    }
+    if (valueInput) {
+      valueInput.value = "L Leg " + leftText + " | R Leg " + rightText + " | Symmetry " + symmetryText;
+    }
+  }
+
+  function updateSidePlankDraftValue(card) {
+    if (!card) {
+      return;
+    }
+
+    var name = String((card.querySelector('[data-metric-edit="name"]') || {}).value || "").trim();
+    if (!isSidePlankMetricName(name)) {
+      card.removeAttribute("data-metric-sideplank");
+      return;
+    }
+
+    card.setAttribute("data-metric-sideplank", "true");
+
+    var leftRaw = String((card.querySelector('[data-metric-edit="left"]') || {}).value || "").trim();
+    var rightRaw = String((card.querySelector('[data-metric-edit="right"]') || {}).value || "").trim();
+    var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
+    var symmetryInput = card.querySelector('[data-metric-edit="symmetry"]');
+    var valueInput = card.querySelector('[data-metric-edit="value"]');
+
+    var left = parseNumericMetricValue(leftRaw);
+    var right = parseNumericMetricValue(rightRaw);
+
+    if (left === null || right === null) {
+      if (symmetryInput) {
+        symmetryInput.value = "";
+      }
+      if (valueInput) {
+        valueInput.value = "";
+      }
+      return;
+    }
+
+    var leftText = formatMetricDisplayValue(left, unit);
+    var rightText = formatMetricDisplayValue(right, unit);
+    var symmetry = calculateSymmetryPercent(left, right);
+    var symmetryText = symmetry === null ? "—" : formatMetricNumber(symmetry) + "%";
+
+    if (symmetryInput) {
+      symmetryInput.value = symmetryText;
+    }
+    if (valueInput) {
+      valueInput.value = "L Leg " + leftText + " | R Leg " + rightText + " | Symmetry " + symmetryText;
+    }
+  }
+
   function updateEdgePullDraftValue(card) {
     if (!card) {
       return;
@@ -6074,6 +6234,8 @@
     var category = String((card.querySelector('[data-metric-edit="category"]') || {}).value || "").trim() || "Performance";
     var isYBalance = isYBalanceMetricName(name);
     var isSingleLegSquat = isSingleLegSquatMetricName(name);
+    var isSingleLegHeelRaise = isSingleLegHeelRaiseMetricName(name);
+    var isSidePlank = isSidePlankMetricName(name);
     var isEdgePull = isEdgePullMetricName(name);
 
     if (isSingleLegSquat) {
@@ -6158,6 +6320,194 @@
           }
 
           var inserted = Array.isArray(insertResult.data) ? insertResult.data : squatPayloads;
+          state.metrics = inserted.concat(state.metrics || []);
+          state.metricsLatest = getLatestMetrics(state.metrics);
+          renderMetricsCards();
+          renderMetricRowsFromData(state.metricsLatest);
+          setMetricsStatus(mode === "test" ? "New side-specific test score logged." : "Metric updated.", "success");
+        })
+        .catch(function (error) {
+          setMetricsStatus(error && error.message ? error.message : "Failed to save metric.", "error");
+        });
+      return;
+    }
+
+    if (isSingleLegHeelRaise) {
+      updateSingleLegHeelRaiseDraftValue(card);
+
+      var leftHeelRaiseInput = card.querySelector('[data-metric-edit="left"]');
+      var rightHeelRaiseInput = card.querySelector('[data-metric-edit="right"]');
+      var leftHeelRaiseRaw = String((leftHeelRaiseInput && leftHeelRaiseInput.value) || "").trim();
+      var rightHeelRaiseRaw = String((rightHeelRaiseInput && rightHeelRaiseInput.value) || "").trim();
+      var leftHeelRaiseValue = parseNumericMetricValue(leftHeelRaiseRaw);
+      var rightHeelRaiseValue = parseNumericMetricValue(rightHeelRaiseRaw);
+
+      if (!Number.isFinite(leftHeelRaiseValue) || !Number.isFinite(rightHeelRaiseValue)) {
+        setMetricsStatus("Single Leg Heel Raise requires both L Leg and R Leg values.", "error");
+        return;
+      }
+
+      var heelRaiseBaseName = String(name || "")
+        .replace(/\s*\((left|right)\)\s*$/i, "")
+        .trim();
+      var heelRaiseLeftName = heelRaiseBaseName + " (Left)";
+      var heelRaiseRightName = heelRaiseBaseName + " (Right)";
+
+      var heelRaisePayloads = [
+        {
+          user_id: viewedUserId,
+          metric_name: heelRaiseLeftName,
+          metric_value: formatMetricNumber(leftHeelRaiseValue),
+          metric_unit: unit,
+          metric_category: category,
+          updated_at: new Date().toISOString()
+        },
+        {
+          user_id: viewedUserId,
+          metric_name: heelRaiseRightName,
+          metric_value: formatMetricNumber(rightHeelRaiseValue),
+          metric_unit: unit,
+          metric_category: category,
+          updated_at: new Date().toISOString()
+        }
+      ];
+
+      var heelRaiseMetricKey = String(card.getAttribute("data-metric-key") || "");
+      var currentHeelRaiseMetric = findLatestMetricByKey(heelRaiseMetricKey);
+      var currentHeelRaisePair = currentHeelRaiseMetric && currentHeelRaiseMetric._pairedSideMetrics ? currentHeelRaiseMetric._pairedSideMetrics : null;
+      var currentHeelRaiseLeft = parseNumericMetricValue(currentHeelRaisePair && currentHeelRaisePair.left && currentHeelRaisePair.left.metric_value);
+      var currentHeelRaiseRight = parseNumericMetricValue(currentHeelRaisePair && currentHeelRaisePair.right && currentHeelRaisePair.right.metric_value);
+      var hasSameHeelRaiseValues =
+        Number.isFinite(currentHeelRaiseLeft) && Number.isFinite(currentHeelRaiseRight) &&
+        currentHeelRaiseLeft === leftHeelRaiseValue &&
+        currentHeelRaiseRight === rightHeelRaiseValue &&
+        normalizeMetricValue(currentHeelRaiseMetric && currentHeelRaiseMetric.metric_unit) === normalizeMetricValue(unit) &&
+        normalizeMetricValue(currentHeelRaiseMetric && currentHeelRaiseMetric.metric_category) === normalizeMetricValue(category) &&
+        normalizeMetricValue(currentHeelRaiseMetric && currentHeelRaiseMetric.metric_name) === normalizeMetricValue(heelRaiseBaseName);
+
+      if (hasSameHeelRaiseValues && mode !== "test") {
+        setMetricsStatus("No metric changes detected.", "info");
+        closeMetricCardEditor(card);
+        return;
+      }
+
+      setMetricsStatus(mode === "test" ? "Logging new side-specific test score..." : "Saving side-specific metric update...", "info");
+
+      state.client
+        .from("athlete_metrics")
+        .insert(heelRaisePayloads)
+        .select("*")
+        .then(function (insertResult) {
+          if (insertResult.error) {
+            if (isMissingRelationError(insertResult.error)) {
+              setMetricsStatus("Metrics table not found. Create athlete_metrics in Supabase before saving metrics.", "error");
+              return;
+            }
+
+            if (isRlsError(insertResult.error)) {
+              setMetricsStatus("Permission denied by database policy while saving metrics. Ask admin to update athlete_metrics RLS policy for coach edits.", "error");
+              return;
+            }
+
+            setMetricsStatus(insertResult.error.message, "error");
+            return;
+          }
+
+          var inserted = Array.isArray(insertResult.data) ? insertResult.data : heelRaisePayloads;
+          state.metrics = inserted.concat(state.metrics || []);
+          state.metricsLatest = getLatestMetrics(state.metrics);
+          renderMetricsCards();
+          renderMetricRowsFromData(state.metricsLatest);
+          setMetricsStatus(mode === "test" ? "New side-specific test score logged." : "Metric updated.", "success");
+        })
+        .catch(function (error) {
+          setMetricsStatus(error && error.message ? error.message : "Failed to save metric.", "error");
+        });
+      return;
+    }
+
+    if (isSidePlank) {
+      updateSidePlankDraftValue(card);
+
+      var leftPlankInput = card.querySelector('[data-metric-edit="left"]');
+      var rightPlankInput = card.querySelector('[data-metric-edit="right"]');
+      var leftPlankRaw = String((leftPlankInput && leftPlankInput.value) || "").trim();
+      var rightPlankRaw = String((rightPlankInput && rightPlankInput.value) || "").trim();
+      var leftPlankValue = parseNumericMetricValue(leftPlankRaw);
+      var rightPlankValue = parseNumericMetricValue(rightPlankRaw);
+
+      if (!Number.isFinite(leftPlankValue) || !Number.isFinite(rightPlankValue)) {
+        setMetricsStatus("Side Plank with Hip Abduction requires both L Leg and R Leg values.", "error");
+        return;
+      }
+
+      var plankBaseName = String(name || "")
+        .replace(/\s*\((left|right)\)\s*$/i, "")
+        .trim();
+      var plankLeftName = plankBaseName + " (Left)";
+      var plankRightName = plankBaseName + " (Right)";
+
+      var plankPayloads = [
+        {
+          user_id: viewedUserId,
+          metric_name: plankLeftName,
+          metric_value: formatMetricNumber(leftPlankValue),
+          metric_unit: unit,
+          metric_category: category,
+          updated_at: new Date().toISOString()
+        },
+        {
+          user_id: viewedUserId,
+          metric_name: plankRightName,
+          metric_value: formatMetricNumber(rightPlankValue),
+          metric_unit: unit,
+          metric_category: category,
+          updated_at: new Date().toISOString()
+        }
+      ];
+
+      var plankMetricKey = String(card.getAttribute("data-metric-key") || "");
+      var currentPlankMetric = findLatestMetricByKey(plankMetricKey);
+      var currentPlankPair = currentPlankMetric && currentPlankMetric._pairedSideMetrics ? currentPlankMetric._pairedSideMetrics : null;
+      var currentPlankLeft = parseNumericMetricValue(currentPlankPair && currentPlankPair.left && currentPlankPair.left.metric_value);
+      var currentPlankRight = parseNumericMetricValue(currentPlankPair && currentPlankPair.right && currentPlankPair.right.metric_value);
+      var hasSamePlankValues =
+        Number.isFinite(currentPlankLeft) && Number.isFinite(currentPlankRight) &&
+        currentPlankLeft === leftPlankValue &&
+        currentPlankRight === rightPlankValue &&
+        normalizeMetricValue(currentPlankMetric && currentPlankMetric.metric_unit) === normalizeMetricValue(unit) &&
+        normalizeMetricValue(currentPlankMetric && currentPlankMetric.metric_category) === normalizeMetricValue(category) &&
+        normalizeMetricValue(currentPlankMetric && currentPlankMetric.metric_name) === normalizeMetricValue(plankBaseName);
+
+      if (hasSamePlankValues && mode !== "test") {
+        setMetricsStatus("No metric changes detected.", "info");
+        closeMetricCardEditor(card);
+        return;
+      }
+
+      setMetricsStatus(mode === "test" ? "Logging new side-specific test score..." : "Saving side-specific metric update...", "info");
+
+      state.client
+        .from("athlete_metrics")
+        .insert(plankPayloads)
+        .select("*")
+        .then(function (insertResult) {
+          if (insertResult.error) {
+            if (isMissingRelationError(insertResult.error)) {
+              setMetricsStatus("Metrics table not found. Create athlete_metrics in Supabase before saving metrics.", "error");
+              return;
+            }
+
+            if (isRlsError(insertResult.error)) {
+              setMetricsStatus("Permission denied by database policy while saving metrics. Ask admin to update athlete_metrics RLS policy for coach edits.", "error");
+              return;
+            }
+
+            setMetricsStatus(insertResult.error.message, "error");
+            return;
+          }
+
+          var inserted = Array.isArray(insertResult.data) ? insertResult.data : plankPayloads;
           state.metrics = inserted.concat(state.metrics || []);
           state.metricsLatest = getLatestMetrics(state.metrics);
           renderMetricsCards();
