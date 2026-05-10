@@ -235,7 +235,7 @@
       climbing: [
         { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
         { name: "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)", unit: "reps", category: "Strength" },
-        { name: "20mm Edge Pull Strength", unit: "kg", category: "Strength" },
+        { name: "20mm Edge Hang Strength", unit: "kg", category: "Strength" },
         { name: "Max Pull Ups", unit: "reps", category: "Strength" },
         { name: "Max Hang Time", unit: "sec", category: "Strength" },
         { name: "90 Degree Bent Leg Hang", unit: "sec", category: "Strength" },
@@ -279,7 +279,7 @@
     var presetDefaults = {
       "Countermovement Push-Up (CMPU)": {unit: "reps", category: "Strength"},
       "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)": {unit: "reps", category: "Strength"},
-      "20mm Edge Pull Strength": {unit: "kg", category: "Strength"},
+      "20mm Edge Hang Strength": {unit: "kg", category: "Strength"},
       "Max Pull Ups": {unit: "reps", category: "Strength"},
       "Max Hang Time": {unit: "sec", category: "Strength"},
       "90 Degree Bent Leg Hang": {unit: "sec", category: "Strength"},

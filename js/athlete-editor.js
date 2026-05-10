@@ -117,7 +117,11 @@
       state.form.addEventListener("change", function (event) {
         var target = event && event.target;
         if (target && target.name === "dob") {
-          updateCalculatedAgeDisplay(String(target.value || ""));
+          updateCalculatedAgeDisplay(String(target.value || ""), getAgeInputValue());
+          return;
+        }
+        if (target && target.name === "age") {
+          updateCalculatedAgeDisplay(getDobInputValue(), String(target.value || ""));
           return;
         }
         if (!target || target.name !== "sports[]") {
@@ -198,13 +202,14 @@
 
     setInputValue("name", athlete.name);
     setInputValue("dob", getDobFromProfile(athlete));
+    setInputValue("age", athlete.age);
     setInputValue("bio", athlete.bio);
     setInputValue("location", athlete.location);
     setInputValue("height_cm", athlete.height_cm);
     setInputValue("weight_kg", athlete.weight_kg);
     setInputValue("sex", getProfileSexForFormValue(athlete));
 
-    updateCalculatedAgeDisplay(getDobFromProfile(athlete));
+    updateCalculatedAgeDisplay(getDobFromProfile(athlete), athlete.age);
 
     var sports = getProfileSports(athlete);
     setSelectedSportsInForm(sports);
@@ -220,6 +225,24 @@
     if (input) {
       input.value = value == null ? "" : String(value);
     }
+  }
+
+  function getDobInputValue() {
+    var input = document.querySelector("[data-athlete-editor-input='dob']");
+    return input ? String(input.value || "") : "";
+  }
+
+  function getAgeInputValue() {
+    var input = document.querySelector("[data-athlete-editor-input='age']");
+    return input ? String(input.value || "") : "";
+  }
+
+  function parseAgeValue(value) {
+    var age = parseInt(String(value || "").trim(), 10);
+    if (!Number.isFinite(age) || age <= 0 || age > 120) {
+      return null;
+    }
+    return age;
   }
 
   function onSaveChanges(event) {
@@ -238,6 +261,7 @@
     }
 
     var dobValue = normalizeDob(String(formData.get("dob") || "").trim());
+    var ageValue = parseAgeValue(formData.get("age"));
     var sportOverview = collectSportOverviewFromForm();
     var generalProfile = collectGeneralProfileFromForm();
     if (dobValue) {
@@ -255,7 +279,7 @@
       sports: selectedSports,
       sport_overview: sportOverview,
       bio: String(formData.get("bio") || "").trim(),
-      age: calculateAgeFromDob(dobValue),
+      age: ageValue != null ? ageValue : calculateAgeFromDob(dobValue),
       location: String(formData.get("location") || "").trim(),
       height_cm: parseFloat(formData.get("height_cm") || "") || null,
       weight_kg: parseFloat(formData.get("weight_kg") || "") || null,
@@ -458,13 +482,16 @@
     return age;
   }
 
-  function updateCalculatedAgeDisplay(dobText) {
+  function updateCalculatedAgeDisplay(dobText, ageText) {
     var ageEl = document.querySelector("[data-athlete-editor-calculated-age]");
     if (!ageEl) {
       return;
     }
 
     var age = calculateAgeFromDob(dobText);
+    if (age == null) {
+      age = parseAgeValue(ageText);
+    }
     ageEl.textContent = age == null ? "—" : String(age);
   }
 

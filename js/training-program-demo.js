@@ -2006,7 +2006,7 @@
           ]
         },
         {
-          name: "20mm Edge Pull",
+          name: "20mm Edge Hang",
           section: "B Block",
           mode: "time",
           superset_group: null,

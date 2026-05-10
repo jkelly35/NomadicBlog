@@ -39,7 +39,7 @@
     sportOverviewEditor: null,
     sportOverviewSummary: null,
     metricTemplatesBySport: {
-      climbing: ["20mm Edge Pull", "Max Pull Ups", "Weighted Pull Up", "Core Hold Time"],
+      climbing: ["20mm Edge Hang", "Max Pull Ups", "Weighted Pull Up", "Core Hold Time"],
       "trail-running": ["Resting HR", "Max HR", "Vertical Jump", "Anterior Reach", "5k Time"],
       skiing: ["Resting HR", "Max HR", "Countermovement Jump", "Single-Leg Balance"],
       snowboarding: ["Resting HR", "Max HR", "Countermovement Jump", "Lateral Bound"],
@@ -50,7 +50,8 @@
       climbing: [
         { key: "climbing_type", label: "Climbing Type", placeholder: "Bouldering, Sport, Trad, Ice", type: "text" },
         { key: "climbing_grade", label: "Current Climbing Level", placeholder: "5.11a, V4", type: "text" },
-        { key: "climbing_focus", label: "Current Focus", placeholder: "Power endurance, technique, projecting", type: "text" }
+        { key: "climbing_focus", label: "Current Focus", placeholder: "Power endurance, technique, projecting", type: "text" },
+        { key: "arm_span", label: "Arm Span (cm)", placeholder: "For ape index calculation", type: "text" }
       ],
       skiing: [
         { key: "ski_discipline", label: "Ski Discipline", placeholder: "Alpine, Touring, Freeride, Nordic", type: "text" },
@@ -336,6 +337,7 @@
     var ageField = state.form.querySelector("[name='age']");
     var locationField = state.form.querySelector("[name='location']");
     var heightField = state.form.querySelector("[name='height_cm']");
+    var armSpanField = state.form.querySelector("[name='arm_span_cm']");
     var weightField = state.form.querySelector("[name='weight_kg']");
     var sexField = state.form.querySelector("[name='sex']");
 
@@ -345,6 +347,7 @@
     if (ageField) ageField.value = profile && profile.age ? profile.age : "";
     if (locationField) locationField.value = profile && profile.location ? profile.location : "";
     if (heightField) heightField.value = profile && profile.height_cm ? profile.height_cm : "";
+    if (armSpanField) armSpanField.value = profile && profile.arm_span_cm ? profile.arm_span_cm : "";
     if (weightField) weightField.value = profile && profile.weight_kg ? profile.weight_kg : "";
     if (sexField) sexField.value = getProfileSexForFormValue(profile);
 
@@ -582,6 +585,10 @@
           '<input type="text" data-metric-edit="right" placeholder="R Leg" />' +
           '<input type="text" data-metric-edit="symmetry" placeholder="Symmetry" readonly />' +
           '</div>' +
+           '<div class="metric-grant-grid" data-metric-grant-grid hidden>' +
+           '<input type="text" data-metric-edit="left" placeholder="L Leg" />' +
+           '<input type="text" data-metric-edit="right" placeholder="R Leg" />' +
+           '</div>' +
           '<input type="text" data-metric-edit="unit" placeholder="Unit" value="' + escapeAttribute(metric.metric_unit || "") + '" />' +
           '<input type="text" data-metric-edit="category" placeholder="Category" value="' + escapeAttribute(metric.metric_category || "Performance") + '" />' +
           '<p class="metric-input-note" data-leglength-estimate-note hidden>Norm note: For Y Balance and Adapted Grant Foot Raise, leg length is estimated as height x 0.53 when direct leg length is not provided.</p>' +
@@ -840,7 +847,8 @@
           return;
         }
 
-        updateYBalanceDraftValue(card);
+         updateYBalanceDraftValue(card);
+         updateGrantDraftValue(card);
         updateLegLengthEstimateNote(card);
       });
     }
@@ -977,6 +985,7 @@
     var sportOverview = collectSportOverviewFromForm();
     var desiredEmail = String(formData.get("email") || "").trim();
     var desiredHeight = parseFloat(formData.get("height_cm") || "") || null;
+    var desiredArmSpan = parseFloat(formData.get("arm_span_cm") || "") || null;
     var desiredWeight = parseFloat(formData.get("weight_kg") || "") || null;
     var desiredSex = String(formData.get("sex") || "").trim() || null;
     var profileData = {
@@ -989,6 +998,7 @@
       age: parseInt(formData.get("age") || 0, 10) || null,
       location: String(formData.get("location") || "").trim(),
       height_cm: desiredHeight,
+      arm_span_cm: desiredArmSpan,
       weight_kg: desiredWeight,
       sex: desiredSex,
       updated_at: new Date().toISOString()
@@ -1034,6 +1044,7 @@
     var optionalColumnsFallbackOrder = [
       "sport_overview",
       "sports",
+      "arm_span_cm",
       "height_cm",
       "weight_kg",
       "sex",
@@ -2200,7 +2211,38 @@
     var query = String(searchTerm || "").trim().toLowerCase();
     var filtered = state.trainingTemplates.filter(function (template) {
       if (!query) {
-        return true;
+   var isGrant = isAdaptedGrantFootRaiseMetricName(metric.metric_name || "");
+   var grantGrid = card.querySelector("[data-metric-grant-grid]");
+
+   if (grantGrid) {
+     grantGrid.hidden = !isGrant;
+   }
+
+   if (isGrant) {
+     card.setAttribute("data-metric-grant", "true");
+
+     var parsedGrant = parseGrantLegValues(metric.metric_value || "");
+     var shouldBlankForTestGrant = modeValue === "test";
+     if (leftInput) {
+       leftInput.value = shouldBlankForTestGrant
+         ? ""
+         : (parsedGrant.left === null ? "" : formatMetricNumber(parsedGrant.left));
+     }
+     if (rightInput) {
+       rightInput.value = shouldBlankForTestGrant
+         ? ""
+         : (parsedGrant.right === null ? "" : formatMetricNumber(parsedGrant.right));
+     }
+
+     updateGrantDraftValue(card);
+
+     if (leftInput) {
+       leftInput.focus();
+     }
+     return;
+   }
+
+   card.removeAttribute("data-metric-grant");
       }
       return String(template.name || "").toLowerCase().indexOf(query) > -1;
     });
@@ -2725,10 +2767,12 @@
     var rightInput = card.querySelector('[data-metric-edit="right"]');
     var symmetryInput = card.querySelector('[data-metric-edit="symmetry"]');
     var yBalanceGrid = card.querySelector("[data-metric-ybalance-grid]");
+    var grantGrid = card.querySelector("[data-metric-grant-grid]");
     var unitInput = card.querySelector('[data-metric-edit="unit"]');
     var categoryInput = card.querySelector('[data-metric-edit="category"]');
     var legLengthNote = card.querySelector("[data-leglength-estimate-note]");
     var isYBalance = isYBalanceMetricName(metric.metric_name || "");
+    var isGrant = isAdaptedGrantFootRaiseMetricName(metric.metric_name || "");
 
     if (label) {
       label.textContent = modeValue === "test" ? "Log New Test" : "Edit Metric";
@@ -2754,6 +2798,10 @@
 
     if (yBalanceGrid) {
       yBalanceGrid.hidden = !isYBalance;
+    }
+
+    if (grantGrid) {
+      grantGrid.hidden = !isGrant;
     }
 
     if (isYBalance) {
@@ -2784,6 +2832,32 @@
     }
 
     card.removeAttribute("data-metric-ybalance");
+
+    if (isGrant) {
+      card.setAttribute("data-metric-grant", "true");
+
+      var parsedGrant = parseGrantLegValues(metric.metric_value || "");
+      var shouldBlankForTestGrant = modeValue === "test";
+      if (leftInput) {
+        leftInput.value = shouldBlankForTestGrant
+          ? ""
+          : (parsedGrant.left === null ? "" : formatMetricNumber(parsedGrant.left));
+      }
+      if (rightInput) {
+        rightInput.value = shouldBlankForTestGrant
+          ? ""
+          : (parsedGrant.right === null ? "" : formatMetricNumber(parsedGrant.right));
+      }
+
+      updateGrantDraftValue(card);
+
+      if (leftInput) {
+        leftInput.focus();
+      }
+      return;
+    }
+
+    card.removeAttribute("data-metric-grant");
 
     if (valueInput) {
       valueInput.value = modeValue === "test" ? "" : (metric.metric_value || "");
@@ -3201,7 +3275,12 @@
 
   function isEdgePullMetricName(normalizedName) {
     var name = normalizeMetricValue(normalizedName);
-    return name.indexOf("20mm edge pull") !== -1 || name.indexOf("edge pull") !== -1;
+    return (
+      name.indexOf("20mm edge pull") !== -1 || 
+      name.indexOf("20mm edge hang") !== -1 ||
+      name.indexOf("edge pull") !== -1 ||
+      name.indexOf("edge hang") !== -1
+    );
   }
 
   function isSingleLegSquatMetricName(normalizedName) {
@@ -3906,8 +3985,52 @@
     var reachCm = numericValue === null ? null : convertLengthToCm(numericValue, unit);
     var normalizedScore = null;
 
-    if (reachCm !== null && legLengthCm !== null) {
-      normalizedScore = reachCm / legLengthCm;
+     var metricValue = String(metric && metric.metric_value || "").trim();
+     var isBilateral = metricValue.indexOf("|") !== -1;
+     var parsedGrant = isBilateral ? parseGrantLegValues(metricValue) : { left: null, right: null };
+
+     if (isBilateral && (parsedGrant.left !== null || parsedGrant.right !== null)) {
+       // Handle bilateral leg values
+       var leftReachCm = parsedGrant.left !== null ? convertLengthToCm(parsedGrant.left, unit) : null;
+       var rightReachCm = parsedGrant.right !== null ? convertLengthToCm(parsedGrant.right, unit) : null;
+
+       if (legLengthCm === null) {
+         return {
+           currentValue: "Current score: " + valueWithUnit,
+           rating: "Rating: Missing athlete height for normalization.",
+           range:
+             "Reference: Climbing norms (normalized): Novice ~104cm, Intermediate ~108-110cm, Advanced ~111-113cm, Elite ~114cm. " +
+             "Normalized using leg length (height × 0.53).",
+           meaning:
+             "Meaning: Set athlete height (height_cm) in profile. Normalized score = Foot Raise Height ÷ Leg Length. Taller athletes naturally reach higher but normalized values compare fairly."
+         };
+       }
+
+       var leftNormalized = leftReachCm !== null ? leftReachCm / legLengthCm : null;
+       var rightNormalized = rightReachCm !== null ? rightReachCm / legLengthCm : null;
+       var leftRating = leftNormalized !== null ? classifyAdaptedGrantFootRaise(leftNormalized) : "—";
+       var rightRating = rightNormalized !== null ? classifyAdaptedGrantFootRaise(rightNormalized) : "—";
+
+       return {
+         currentValue:
+           "Current score: " +
+           valueWithUnit +
+           " | L Normalized: " +
+           (leftNormalized ? formatMetricNumber(leftNormalized) : "—") +
+           " | R Normalized: " +
+           (rightNormalized ? formatMetricNumber(rightNormalized) : "—"),
+         rating: "Ratings - Left: " + leftRating + ", Right: " + rightRating,
+         range:
+           "Reference: Climbing norms (normalized by leg length) - Novice <0.90, Intermediate 0.90-0.97, Advanced 0.97-1.00, Elite 1.00+. " +
+           "Raw norms: Novice ~104cm, Intermediate ~108-110cm, Advanced ~111-113cm, Elite 114cm.",
+         meaning:
+           "Meaning: Bilateral tracking reveals leg asymmetry. Compare L vs R normalized scores to identify imbalances. " +
+           "Use trend over time and asymmetry data to guide training."
+       };
+     }
+
+     if (reachCm !== null && legLengthCm !== null) {
+       normalizedScore = reachCm / legLengthCm;
     }
 
     if (reachCm === null) {
@@ -4193,9 +4316,9 @@
         currentValue: "Current score: " + valueWithUnit,
         rating: "Rating: Add a numeric score to unlock benchmark comparison.",
         range:
-          "Reference: 20mm Edge Pull uses sex-specific relative load ranges (% bodyweight).",
+          "Reference: 20mm Edge Hang (single-arm) uses sex-specific relative load ranges (% bodyweight).",
         meaning:
-          "Meaning: Enter a numeric pull score. If score is in kg, athlete weight is required to calculate % bodyweight."
+          "Meaning: Enter a numeric hang score. If score is in kg, athlete weight is required to calculate % bodyweight."
       };
     }
 
@@ -4204,10 +4327,10 @@
         currentValue: "Current score: " + valueWithUnit,
         rating: "Rating: Missing athlete sex for normative comparison.",
         range:
-          "Reference: Men - Developing <1.2x BW, Recreational 1.2-1.5x, Trained 1.5-1.8x, Advanced 1.8-2.1x, Elite >2.1x. " +
-          "Women - Developing <1.1x BW, Recreational 1.1-1.4x, Trained 1.4-1.7x, Advanced 1.7-2.0x, Elite >2.0x.",
+          "Reference: Men - Developing <0.6x BW, Recreational 0.6-0.75x, Trained 0.75-0.9x, Advanced 0.9-1.05x, Elite >1.05x. " +
+          "Women - Developing <0.55x BW, Recreational 0.55-0.7x, Trained 0.7-0.85x, Advanced 0.85-1.0x, Elite >1.0x (single-arm hang).",
         meaning:
-          "Meaning: Set athlete sex (male/female) in profile data to apply the 20mm Edge Pull normative table."
+          "Meaning: Set athlete sex (male/female) in profile data to apply the 20mm Edge Hang normative table."
       };
     }
 
@@ -4340,25 +4463,25 @@
     var table = {
       male: {
         sex: "male",
-        developingHigh: 120,
-        recreationalLow: 120,
-        recreationalHigh: 150,
-        trainedLow: 150,
-        trainedHigh: 180,
-        advancedLow: 180,
-        advancedHigh: 210,
-        eliteLow: 210
+        developingHigh: 60,
+        recreationalLow: 60,
+        recreationalHigh: 75,
+        trainedLow: 75,
+        trainedHigh: 90,
+        advancedLow: 90,
+        advancedHigh: 105,
+        eliteLow: 105
       },
       female: {
         sex: "female",
-        developingHigh: 110,
-        recreationalLow: 110,
-        recreationalHigh: 140,
-        trainedLow: 140,
-        trainedHigh: 170,
-        advancedLow: 170,
-        advancedHigh: 200,
-        eliteLow: 200
+        developingHigh: 55,
+        recreationalLow: 55,
+        recreationalHigh: 70,
+        trainedLow: 70,
+        trainedHigh: 85,
+        advancedLow: 85,
+        advancedHigh: 100,
+        eliteLow: 100
       }
     };
 
@@ -4840,6 +4963,42 @@
     }
   }
 
+    function updateGrantDraftValue(card) {
+      if (!card) {
+        return;
+      }
+
+      var name = String((card.querySelector('[data-metric-edit="name"]') || {}).value || "").trim();
+      if (!isAdaptedGrantFootRaiseMetricName(name)) {
+        card.removeAttribute("data-metric-grant");
+        return;
+      }
+
+      card.setAttribute("data-metric-grant", "true");
+
+      var leftRaw = String((card.querySelector('[data-metric-edit="left"]') || {}).value || "").trim();
+      var rightRaw = String((card.querySelector('[data-metric-edit="right"]') || {}).value || "").trim();
+      var unit = String((card.querySelector('[data-metric-edit="unit"]') || {}).value || "").trim();
+      var valueInput = card.querySelector('[data-metric-edit="value"]');
+
+      var left = parseNumericMetricValue(leftRaw);
+      var right = parseNumericMetricValue(rightRaw);
+
+      if (left === null || right === null) {
+        if (valueInput) {
+          valueInput.value = "";
+        }
+        return;
+      }
+
+      var leftText = formatMetricDisplayValue(left, unit);
+      var rightText = formatMetricDisplayValue(right, unit);
+
+      if (valueInput) {
+        valueInput.value = "L " + leftText + " | R " + rightText;
+      }
+    }
+
   function updateLegLengthEstimateNote(card) {
     if (!card) {
       return;
@@ -4861,6 +5020,33 @@
   }
 
   function parseYBalanceLegValues(rawValue) {
+    var text = String(rawValue || "").replace(/,/g, " ").trim();
+    if (!text) {
+      return { left: null, right: null };
+    }
+
+    var leftMatch = text.match(/(?:\bL\b|\bleft\b|\bl leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
+    var rightMatch = text.match(/(?:\bR\b|\bright\b|\br leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
+    var left = leftMatch ? Number(leftMatch[1]) : null;
+    var right = rightMatch ? Number(rightMatch[1]) : null;
+
+    if (Number.isFinite(left) && Number.isFinite(right)) {
+      return { left: left, right: right };
+    }
+
+    var numbers = text.match(/-?\d+(?:\.\d+)?/g) || [];
+    if (numbers.length >= 2) {
+      var first = Number(numbers[0]);
+      var second = Number(numbers[1]);
+      if (Number.isFinite(first) && Number.isFinite(second)) {
+        return { left: first, right: second };
+      }
+    }
+
+    return { left: null, right: null };
+  }
+
+  function parseGrantLegValues(rawValue) {
     var text = String(rawValue || "").replace(/,/g, " ").trim();
     if (!text) {
       return { left: null, right: null };
@@ -5013,10 +5199,35 @@
           });
       })
       .catch(function (error) {
+            function parseGrantLegValues(rawValue) {
+              var text = String(rawValue || "").replace(/,/g, " ").trim();
+              if (!text) {
+                return { left: null, right: null };
+              }
+
+              var leftMatch = text.match(/(?:\bL\b|\bleft\b|\bl leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
+              var rightMatch = text.match(/(?:\bR\b|\bright\b|\br leg\b)[^\d-]*(-?\d+(?:\.\d+)?)/i);
+              var left = leftMatch ? Number(leftMatch[1]) : null;
+              var right = rightMatch ? Number(rightMatch[1]) : null;
+
+              if (Number.isFinite(left) && Number.isFinite(right)) {
+                return { left: left, right: right };
+              }
+
+              var numbers = text.match(/-?\d+(?:\.\d+)?/g) || [];
+              if (numbers.length >= 2) {
+                var first = Number(numbers[0]);
+                var second = Number(numbers[1]);
+                if (Number.isFinite(first) && Number.isFinite(second)) {
+                  return { left: first, right: second };
+                }
+              }
+
+              return { left: null, right: null };
+            }
         setMetricsStatus(error && error.message ? error.message : "Failed to delete metric.", "error");
       });
   }
-
   function saveMetricFromFlippedCard(card) {
     var viewedUserId = getViewedUserId();
     if (!viewedUserId || !state.client || !card) {
@@ -5346,9 +5557,16 @@
       var details = overview && overview[sport] && typeof overview[sport] === "object"
         ? overview[sport]
         : {};
-      var detailEntries = Object.keys(details || {}).map(function (key) {
-        return '<li><strong>' + escapeHtml(prettifyOverviewKey(key)) + ':</strong> ' + escapeHtml(details[key]) + "</li>";
-      }).join("");
+      
+      // Special handling for climbing to include ape index calculation
+      var detailEntries;
+      if (sport === "climbing") {
+        detailEntries = buildClimbingDetailEntries(details, profile);
+      } else {
+        detailEntries = Object.keys(details || {}).map(function (key) {
+          return '<li><strong>' + escapeHtml(prettifyOverviewKey(key)) + ':</strong> ' + escapeHtml(details[key]) + "</li>";
+        }).join("");
+      }
 
       return (
         '<article class="profile-sport-summary-card">' +
@@ -5362,6 +5580,38 @@
 
     state.sportOverviewSummary.hidden = false;
     state.sportOverviewSummary.innerHTML = '<div class="profile-sport-summary-grid">' + summaryCards + "</div>";
+  }
+
+  function buildClimbingDetailEntries(details, profile) {
+    var entries = [];
+    
+    // Add climbing-specific detail entries
+    var climbingKeys = ["climbing_type", "climbing_grade", "climbing_focus"];
+    climbingKeys.forEach(function (key) {
+      if (details[key]) {
+        entries.push(
+          '<li><strong>' + escapeHtml(prettifyOverviewKey(key)) + ':</strong> ' + 
+          escapeHtml(details[key]) + "</li>"
+        );
+      }
+    });
+
+    // Add ape index calculation if we have arm_span or height
+    var armSpan = details.arm_span ? parseFloat(details.arm_span) : (profile && profile.arm_span_cm ? profile.arm_span_cm : null);
+    var height = profile && profile.height_cm ? profile.height_cm : null;
+    
+    if (armSpan && height && typeof ApeIndexUtil !== "undefined") {
+      var apeResult = ApeIndexUtil.calculateApeIndex(armSpan, height);
+      if (apeResult.valid) {
+        entries.push(
+          '<li><strong>Ape Index:</strong> ' + 
+          escapeHtml(ApeIndexUtil.formatForDisplay(apeResult, "short")) + 
+          ' (' + escapeHtml(apeResult.classification) + ')</li>'
+        );
+      }
+    }
+
+    return entries.join("");
   }
 
   function prettifyOverviewKey(key) {

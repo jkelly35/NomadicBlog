@@ -8,7 +8,9 @@
   <script defer src="js/analytics.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/ape-index.js"></script>
   <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/climbing-assessment.js"></script>
   <style>
     .assessment-content,
     .assessment-content * {
@@ -62,10 +64,10 @@
         </div>
 
         <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
-          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">20mm Edge Pull</div>
-          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Finger flexor and pulling force capacity on a standardized edge.</div>
-          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Edge-specific pulling strength is highly relevant to route difficulty and sustained grip output.</div>
-          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Using a 20mm edge, perform a controlled pull or isometric effort under standardized setup and record best valid attempt.</div>
+          <div style="font-size:1.18em;font-weight:600;color:#1f5555;margin-bottom:0.5em;">20mm Edge Hang (Single-Arm)</div>
+          <div style="margin-bottom:0.45em;"><strong>What This Test Measures:</strong> Single-arm finger flexor and hanging strength capacity on a standardized edge.</div>
+          <div style="margin-bottom:0.45em;"><strong>Why It Matters:</strong> Single-arm edge-specific hanging strength is highly relevant to boulder problem difficulty, dynamic movement, and sustained grip output on single-limb intensive climbing.</div>
+          <div style="margin-bottom:0.2em;"><strong>How to Perform:</strong> Using a 20mm edge, perform a controlled single-arm hang or isometric effort under standardized setup and record best valid attempt (time or load).</div>
         </div>
 
         <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(31,85,85,0.08);padding:1.5em 2em;max-width:370px;min-width:270px;flex:1 1 320px;">
@@ -101,6 +103,42 @@
         <h3 style="margin-top:0;margin-bottom:0.8em;color:#1f5555;font-size:1.3em;letter-spacing:-0.01em;">Assessment Overview</h3>
         <p style="margin-bottom:0.9em;"><strong>Climbing Fitness Assessment</strong> combines six key tests to profile pushing power, edge-specific pulling strength, shoulder stability, foot endurance, and leverage characteristics.</p>
         <p style="margin-bottom:0;">Use this battery to set baselines, identify limiting factors, and guide targeted climbing performance development.</p>
+      </div>
+
+      <div id="apeIndexCalculator" class="assessment-content" style="background:#fff;border-left:5px solid #1f5555;padding:1.7rem 2.2rem;margin:2.2rem 0 1.2rem 0;border-radius:10px;max-width:900px;margin-left:auto;margin-right:auto;box-shadow:0 4px 18px rgba(31,85,85,0.08);color:#111;">
+        <h3 style="margin-top:0;margin-bottom:0.8em;color:#1f5555;font-size:1.3em;letter-spacing:-0.01em;">Ape Index Calculator</h3>
+        <p style="margin-bottom:1.2em;"><strong>Calculate your ape index:</strong> Enter your height and arm span measurements to determine your wingspan-to-height ratio and see how it may influence your climbing reach and positioning.</p>
+        
+        <form id="apeIndexForm" style="max-width:500px;">
+          <div style="margin-bottom:1em;">
+            <label for="heightInput" style="display:block;margin-bottom:0.4em;font-weight:600;color:#1f5555;">Height (cm)</label>
+            <input type="number" id="heightInput" name="height" placeholder="e.g., 178" min="50" max="300" step="0.1" style="width:100%;padding:0.6em;border:1px solid #ccc;border-radius:6px;font-size:1em;" />
+          </div>
+          
+          <div style="margin-bottom:1em;">
+            <label for="armSpanInput" style="display:block;margin-bottom:0.4em;font-weight:600;color:#1f5555;">Arm Span (cm)</label>
+            <input type="number" id="armSpanInput" name="armSpan" placeholder="e.g., 180" min="50" max="300" step="0.1" style="width:100%;padding:0.6em;border:1px solid #ccc;border-radius:6px;font-size:1em;" />
+          </div>
+          
+          <button type="submit" style="background:#1f5555;color:#fff;border:none;padding:0.7em 1.5em;border-radius:6px;font-size:1em;font-weight:600;cursor:pointer;width:100%;">Calculate Ape Index</button>
+        </form>
+
+        <div id="apeIndexResults" style="display:none;margin-top:1.5em;padding:1.2em;background:#f0f8f8;border-radius:6px;border-left:4px solid #1f5555;">
+          <div style="margin-bottom:0.8em;">
+            <strong style="color:#1f5555;">Ape Index Result:</strong>
+            <p id="apeIndexDifference" style="font-size:1.3em;margin:0.4em 0 0 0;color:#1f5555;"></p>
+          </div>
+          <div style="margin-bottom:0.8em;">
+            <strong style="color:#1f5555;">Classification:</strong>
+            <p id="apeIndexClassification" style="margin:0.4em 0 0 0;"></p>
+          </div>
+          <div>
+            <strong style="color:#1f5555;">Guidance:</strong>
+            <p id="apeIndexGuidance" style="margin:0.4em 0 0 0;"></p>
+          </div>
+        </div>
+
+        <div id="apeIndexError" style="display:none;margin-top:1.5em;padding:1.2em;background:#fff3cd;border-radius:6px;border-left:4px solid #ffc107;color:#856404;"></div>
       </div>
     </section>
   </main>

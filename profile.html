@@ -9,6 +9,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/ape-index.js"></script>
   <script defer src="js/auth-ui.js"></script>
   <script defer src="js/athlete-profile.js"></script>
 </head>
@@ -132,6 +133,11 @@
               <div class="form-group">
                 <label for="profile-height">Height (cm)</label>
                 <input id="profile-height" name="height_cm" type="number" placeholder="e.g. 178" min="1" max="300" />
+              </div>
+
+              <div class="form-group">
+                <label for="profile-arm-span">Arm Span (cm)</label>
+                <input id="profile-arm-span" name="arm_span_cm" type="number" placeholder="e.g. 180" min="1" max="300" />
               </div>
 
               <div class="form-group">
