@@ -3434,6 +3434,176 @@ footer a:hover {
   background: #f9f6f1;
 }
 
+.athlete-mobile-log {
+  display: none;
+  gap: 1rem;
+}
+
+.athlete-mobile-section {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.athlete-mobile-section-title {
+  margin: 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #4e635f;
+}
+
+.athlete-mobile-exercise {
+  border: 1px solid #e5ddd1;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(15, 45, 45, 0.08);
+  overflow: hidden;
+}
+
+.athlete-mobile-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(180deg, #fbf8f4 0%, #f3ece2 100%);
+}
+
+.athlete-mobile-summary::-webkit-details-marker {
+  display: none;
+}
+
+.athlete-mobile-name {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #163636;
+}
+
+.athlete-mobile-mode {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a25420;
+  font-weight: 700;
+  margin-top: 0.2rem;
+}
+
+.athlete-mobile-progress {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #395854;
+  background: #dcebe8;
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  white-space: nowrap;
+}
+
+.athlete-mobile-sets {
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.athlete-mobile-set {
+  border: 1px solid #eee5db;
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: #fffcf8;
+}
+
+.athlete-mobile-set-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.athlete-mobile-set-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: #e8f3f0;
+  color: #1e4e49;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.athlete-mobile-done-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #244f36;
+}
+
+.athlete-mobile-done-toggle input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+}
+
+.athlete-mobile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.athlete-mobile-input {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.athlete-mobile-input span {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4d6661;
+  font-weight: 700;
+}
+
+.athlete-mobile-input input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cfc0ad;
+  border-radius: 9px;
+  padding: 0.55rem 0.7rem;
+  font-size: 1rem;
+  color: #1f2f2d;
+  background: #fff;
+}
+
+.athlete-mobile-input input:focus {
+  outline: 2px solid rgba(197, 106, 44, 0.25);
+  border-color: #c56a2c;
+}
+
+.athlete-mobile-input-notes {
+  grid-column: 1 / -1;
+}
+
+.athlete-mobile-input-off {
+  border: 1px dashed #d7cab8;
+  border-radius: 9px;
+  padding: 0.45rem 0.55rem;
+  align-content: center;
+  background: #f8f3ec;
+}
+
+.athlete-mobile-input-off em {
+  font-style: normal;
+  color: #7e8d88;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 /* Actions Section */
 .program-demo-actions-section {
   display: flex;
@@ -3765,7 +3935,111 @@ footer a:hover {
   }
 
   body.athlete-locked-view .program-demo-main {
+    margin-top: 0.85rem;
     padding-bottom: 7.5rem;
+  }
+
+  body.athlete-locked-view header {
+    padding: 0.65rem 0.9rem;
+    min-height: auto;
+  }
+
+  body.athlete-locked-view header .brand {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 0.6rem;
+    row-gap: 0;
+  }
+
+  body.athlete-locked-view header .brand .logo-img {
+    width: 42px;
+    height: 42px;
+    margin: 0;
+  }
+
+  body.athlete-locked-view header .brand h1 {
+    margin: 0;
+    font-size: 0.95rem;
+    letter-spacing: 0.03em;
+  }
+
+  body.athlete-locked-view header .brand p {
+    display: none;
+  }
+
+  body.athlete-locked-view header nav {
+    display: none;
+  }
+
+  body.athlete-locked-view .program-demo-container {
+    padding-top: 1.1rem;
+  }
+
+  body.athlete-locked-view .program-demo-header {
+    margin-bottom: 1rem;
+    gap: 0.7rem;
+  }
+
+  body.athlete-locked-view .program-demo-kicker {
+    margin-bottom: 0.35rem;
+    font-size: 0.68rem;
+    padding: 0.28rem 0.62rem;
+  }
+
+  body.athlete-locked-view .program-demo-header h1 {
+    font-size: 1.42rem;
+    line-height: 1.22;
+  }
+
+  body.athlete-locked-view .program-demo-subtitle {
+    font-size: 0.95rem;
+    margin-top: 0.35rem;
+  }
+
+  body.athlete-locked-view [data-program-back-link] {
+    width: 100%;
+    justify-content: center;
+    padding: 0.58rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  body.athlete-locked-view .program-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+    margin-bottom: 0.95rem;
+  }
+
+  body.athlete-locked-view .program-stat-card {
+    padding: 0.55rem 0.35rem;
+    border-radius: 10px;
+  }
+
+  body.athlete-locked-view .program-stat-card .stat-value {
+    font-size: 1.25rem;
+    margin-bottom: 0.2rem;
+  }
+
+  body.athlete-locked-view .program-stat-card .stat-label {
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
+    line-height: 1.15;
+  }
+
+  body.athlete-locked-view .program-demo-day-selector {
+    margin-bottom: 0.9rem;
+    padding: 0.8rem;
+  }
+
+  body.athlete-locked-view .day-selector-title {
+    margin-bottom: 0.45rem;
+    font-size: 0.95rem;
+  }
+
+  body.athlete-locked-view .day-info {
+    margin-top: 0.4rem;
+    font-size: 0.82rem;
+    padding: 0.4rem 0.55rem;
   }
 
   body.athlete-locked-view .program-demo-progress-card {
@@ -3779,89 +4053,6 @@ footer a:hover {
     border: none;
     box-shadow: none;
     background: transparent;
-    overflow-x: visible;
-  }
-
-  body.athlete-locked-view .program-demo-table {
-    border-collapse: separate;
-    border-spacing: 0 0.75rem;
-  }
-
-  body.athlete-locked-view .program-demo-table thead {
-    display: none;
-  }
-
-  body.athlete-locked-view .program-demo-table tbody tr.section-header-row {
-    display: table-row;
-  }
-
-  body.athlete-locked-view .program-demo-table tbody tr:not(.section-header-row) {
-    display: block;
-    background: #fff;
-    border: 1px solid #e6dfd7;
-    border-radius: 12px;
-    box-shadow: 0 6px 16px rgba(15, 45, 45, 0.08);
-    overflow: hidden;
-  }
-
-  body.athlete-locked-view .program-demo-table tbody tr:not(.section-header-row) td {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.65rem;
-    padding: 0.7rem 0.85rem;
-    border-bottom: 1px solid #f0ebe2;
-  }
-
-  body.athlete-locked-view .program-demo-table tbody tr:not(.section-header-row) td:last-child {
-    border-bottom: none;
-  }
-
-  body.athlete-locked-view .program-demo-table tbody tr:not(.section-header-row) td::before {
-    content: attr(data-mobile-label);
-    color: #5e716d;
-    font-size: 0.74rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    font-weight: 700;
-    flex: 0 0 40%;
-  }
-
-  body.athlete-locked-view .program-demo-table td.exercise-cell {
-    display: block !important;
-    border-right: none;
-    border-bottom: 2px solid #d7cbb9;
-    border-radius: 0;
-    padding: 0.85rem !important;
-  }
-
-  body.athlete-locked-view .program-demo-table td.exercise-cell::before {
-    content: none;
-  }
-
-  body.athlete-locked-view .program-demo-table td.exercise-cell .exercise-name {
-    font-size: 1.02rem;
-    margin-bottom: 0.25rem;
-  }
-
-  body.athlete-locked-view .program-demo-table input[type="text"],
-  body.athlete-locked-view .program-demo-table input[type="number"] {
-    min-height: 44px;
-    font-size: 0.98rem;
-    border-radius: 10px;
-    flex: 1;
-    max-width: 62%;
-  }
-
-  body.athlete-locked-view .program-demo-table input[type="checkbox"] {
-    width: 28px;
-    height: 28px;
-  }
-
-  body.athlete-locked-view .program-demo-table .program-field-off {
-    flex: 1;
-    max-width: 62%;
-    text-align: center;
   }
 
   body.athlete-locked-view .program-demo-actions-section {
@@ -3909,6 +4100,37 @@ footer a:hover {
 
   .exercise-editor-actions .btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  body.athlete-locked-view header .brand .logo-img {
+    width: 36px;
+    height: 36px;
+  }
+
+  body.athlete-locked-view header .brand h1 {
+    font-size: 0.85rem;
+  }
+
+  body.athlete-locked-view .program-demo-header h1 {
+    font-size: 1.28rem;
+  }
+
+  body.athlete-locked-view .program-stats {
+    gap: 0.45rem;
+  }
+
+  body.athlete-locked-view .program-stat-card .stat-value {
+    font-size: 1.05rem;
+  }
+
+  body.athlete-locked-view .program-stat-card .stat-label {
+    font-size: 0.58rem;
+  }
+
+  .athlete-mobile-grid {
+    grid-template-columns: 1fr;
   }
 }
 

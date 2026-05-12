@@ -339,6 +339,14 @@
     } catch (e) {
       // Ignore malformed query parameters.
     }
+
+      if (typeof window !== "undefined") {
+        window.addEventListener("resize", function () {
+          if (state.isAthleteLockedView) {
+            renderRows();
+          }
+        });
+      }
   }
 
   function updateDayInfo() {
@@ -1453,15 +1461,26 @@
   function renderRows() {
     var tbody = document.querySelector("[data-workout-rows]");
     var emptyState = document.querySelector("[data-empty-state]");
+    var tableWrap = document.querySelector(".program-demo-table-wrap");
+    var mobileLog = document.querySelector("[data-athlete-mobile-log]");
     
     if (!tbody) {
       return;
     }
 
     tbody.innerHTML = "";
+    if (mobileLog) {
+      mobileLog.innerHTML = "";
+    }
 
     if (!state.exercises || state.exercises.length === 0) {
       updateTableHeaders();
+      if (tableWrap) {
+        tableWrap.style.display = "block";
+      }
+      if (mobileLog) {
+        mobileLog.style.display = "none";
+      }
       if (emptyState) {
         emptyState.style.display = "block";
       }
@@ -1470,6 +1489,27 @@
 
     if (emptyState) {
       emptyState.style.display = "none";
+    }
+
+    if (isAthleteMobileUi()) {
+      if (tableWrap) {
+        tableWrap.style.display = "none";
+      }
+      if (mobileLog) {
+        mobileLog.style.display = "grid";
+      }
+
+      renderAthleteMobileCards(mobileLog);
+      attachEventListeners();
+      renderCompletionSummary();
+      return;
+    }
+
+    if (tableWrap) {
+      tableWrap.style.display = "block";
+    }
+    if (mobileLog) {
+      mobileLog.style.display = "none";
     }
 
     updateTableHeaders();
@@ -1529,6 +1569,177 @@
 
     attachEventListeners();
     renderCompletionSummary();
+  }
+
+  function isAthleteMobileUi() {
+    return (
+      state.isAthleteLockedView &&
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 768px)").matches
+    );
+  }
+
+  function renderAthleteMobileCards(container) {
+    if (!container) {
+      return;
+    }
+
+    var firstOpenExerciseIdx = null;
+    state.exercises.forEach(function (exercise, idx) {
+      if (firstOpenExerciseIdx !== null) {
+        return;
+      }
+
+      var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
+      var hasIncomplete = sets.some(function (set) {
+        return !set.done;
+      });
+
+      if (hasIncomplete || !sets.length) {
+        firstOpenExerciseIdx = idx;
+      }
+    });
+
+    if (firstOpenExerciseIdx === null && state.exercises.length) {
+      firstOpenExerciseIdx = 0;
+    }
+
+    var sections = {};
+    defaultSections.forEach(function (section) {
+      sections[section] = [];
+    });
+
+    state.exercises.forEach(function (exercise, idx) {
+      var section = exercise.section || "A Block";
+      if (!sections[section]) {
+        sections[section] = [];
+      }
+      sections[section].push({ exercise: exercise, originalIdx: idx });
+    });
+
+    defaultSections.forEach(function (section) {
+      var items = sections[section] || [];
+      if (!items.length) {
+        return;
+      }
+
+      var sectionEl = document.createElement("section");
+      sectionEl.className = "athlete-mobile-section";
+      sectionEl.innerHTML = '<h3 class="athlete-mobile-section-title">' + escapeHtml(section) + "</h3>";
+
+      items.forEach(function (item, idx) {
+        var exercise = item.exercise;
+        var exerciseIdx = item.originalIdx;
+        var sets = Array.isArray(exercise.sets) ? exercise.sets : [];
+        var completed = sets.filter(function (set) {
+          return !!set.done;
+        }).length;
+        var fieldToggles = normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode);
+        var details = document.createElement("details");
+        details.className = "athlete-mobile-exercise";
+        if (exerciseIdx === firstOpenExerciseIdx) {
+          details.open = true;
+        }
+
+        var setsHtml = sets
+          .map(function (set, setIdx) {
+            return (
+              '<div class="athlete-mobile-set">' +
+              '<div class="athlete-mobile-set-top">' +
+              '<span class="athlete-mobile-set-badge">Set ' +
+              (setIdx + 1) +
+              '</span>' +
+              '<label class="athlete-mobile-done-toggle">' +
+              '<input type="checkbox" data-field="done" data-exercise="' +
+              exerciseIdx +
+              '" data-set="' +
+              setIdx +
+              '" ' +
+              (set.done ? "checked" : "") +
+              ' /> Done' +
+              '</label>' +
+              '</div>' +
+              '<div class="athlete-mobile-grid">' +
+              '<label class="athlete-mobile-input"><span>Reps</span><input type="text" data-field="reps" data-exercise="' +
+              exerciseIdx +
+              '" data-set="' +
+              setIdx +
+              '" value="' +
+              escapeAttribute(set.reps) +
+              '" placeholder="' +
+              escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) +
+              '" /></label>' +
+              (fieldToggles.showWeight
+                ? '<label class="athlete-mobile-input"><span>Weight / Time</span><input type="text" data-field="weight" data-exercise="' +
+                  exerciseIdx +
+                  '" data-set="' +
+                  setIdx +
+                  '" value="' +
+                  escapeAttribute(set.weight) +
+                  '" placeholder="' +
+                  escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
+                  '" /></label>'
+                : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>Weight / Time</span><em>Off</em></div>') +
+              (fieldToggles.showRpe
+                ? '<label class="athlete-mobile-input"><span>RPE / Zone</span><input type="text" data-field="rpe" data-exercise="' +
+                  exerciseIdx +
+                  '" data-set="' +
+                  setIdx +
+                  '" value="' +
+                  escapeAttribute(set.rpe) +
+                  '" placeholder="' +
+                  escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) +
+                  '" /></label>'
+                : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>RPE / Zone</span><em>Off</em></div>') +
+              (fieldToggles.showRest
+                ? '<label class="athlete-mobile-input"><span>Rest</span><input type="text" data-field="rest" data-exercise="' +
+                  exerciseIdx +
+                  '" data-set="' +
+                  setIdx +
+                  '" value="' +
+                  escapeAttribute(set.rest) +
+                  '" placeholder="' +
+                  escapeAttribute(set.target_rest || "e.g. 90s") +
+                  '" /></label>'
+                : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>Rest</span><em>Off</em></div>') +
+              '<label class="athlete-mobile-input athlete-mobile-input-notes"><span>Notes</span><input type="text" data-field="notes" data-exercise="' +
+              exerciseIdx +
+              '" data-set="' +
+              setIdx +
+              '" value="' +
+              escapeAttribute(set.notes) +
+              '" placeholder="' +
+              escapeAttribute(set.target_notes || "Notes") +
+              '" /></label>' +
+              '</div>' +
+              '</div>'
+            );
+          })
+          .join("");
+
+        details.innerHTML =
+          '<summary class="athlete-mobile-summary">' +
+          '<div><div class="athlete-mobile-name">' +
+          escapeHtml(exercise.name || "Exercise") +
+          '</div><div class="athlete-mobile-mode">' +
+          escapeHtml(modeLabel(exercise.mode)) +
+          "</div></div>" +
+          '<div class="athlete-mobile-progress">' +
+          completed +
+          " / " +
+          sets.length +
+          " done</div>" +
+          "</summary>" +
+          '<div class="athlete-mobile-sets">' +
+          setsHtml +
+          "</div>";
+
+        sectionEl.appendChild(details);
+      });
+
+      container.appendChild(sectionEl);
+    });
   }
 
   function renderSectionHeader(tbody, section) {
@@ -1686,20 +1897,17 @@
 
   function attachEventListeners() {
     var tbody = document.querySelector("[data-workout-rows]");
-    if (!tbody) return;
+    var mobileLog = document.querySelector("[data-athlete-mobile-log]");
 
-    tbody.querySelectorAll('input[type="text"], input[type="number"]').forEach(function (input) {
-      if (!input.disabled) {
-        input.addEventListener("input", onSetInput);
-        input.addEventListener("change", onSetInput);
-      }
-    });
+    if (tbody) {
+      bindSetInputListeners(tbody);
+    }
 
-    tbody.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
-      input.addEventListener("change", onSetInput);
-    });
+    if (mobileLog) {
+      bindSetInputListeners(mobileLog);
+    }
 
-    if (!state.isAthleteLockedView) {
+    if (!state.isAthleteLockedView && tbody) {
       tbody.querySelectorAll(".exercise-add-set").forEach(function (btn) {
         btn.addEventListener("click", onAddSetToExercise);
       });
@@ -1731,6 +1939,19 @@
         btn.addEventListener("click", onRemoveSet);
       });
     }
+  }
+
+  function bindSetInputListeners(container) {
+    container.querySelectorAll('input[type="text"], input[type="number"]').forEach(function (input) {
+      if (!input.disabled) {
+        input.addEventListener("input", onSetInput);
+        input.addEventListener("change", onSetInput);
+      }
+    });
+
+    container.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
+      input.addEventListener("change", onSetInput);
+    });
   }
 
   function onSetInput(event) {
