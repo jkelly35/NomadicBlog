@@ -98,6 +98,16 @@
           <select id="workout-day-select" class="day-select-dropdown" data-workout-day></select>
           <div class="day-info" data-day-info>Select a workout day to begin logging</div>
         </div>
+        <div class="program-day-tools" data-template-day-tools hidden>
+          <input
+            type="text"
+            class="program-day-name-input"
+            placeholder="Rename this workout day"
+            data-template-day-name
+          />
+          <button type="button" class="btn admin-btn-small" data-template-day-rename>Rename Day</button>
+          <button type="button" class="btn admin-btn-small" data-template-day-copy-forward>Copy Day Forward</button>
+        </div>
         <div class="program-day-type-controls" data-template-day-type-controls hidden>
           <p class="program-day-type-label">Day Type</p>
           <div class="program-day-type-actions">
@@ -113,7 +123,10 @@
         <div class="progress-icon">✓</div>
         <div class="progress-content">
           <div class="progress-title">Daily Progress</div>
-          <div class="progress-text">Completion: 0 / 0 sets marked done</div>
+          <div class="progress-text">Completion: 0 / 0 sets marked done (0%)</div>
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 0%"></div>
+          </div>
         </div>
       </div>
 
@@ -129,6 +142,7 @@
                 <th data-workout-header-primary>Reps</th>
                 <th data-workout-header-secondary>Weight (lbs)</th>
                 <th data-workout-header-tertiary>RPE</th>
+                <th data-workout-header-rest>Rest</th>
                 <th>Notes</th>
                 <th class="col-checkbox">Done</th>
                 <th class="col-action"></th>
@@ -159,6 +173,68 @@
       <p class="profile-status" role="status" aria-live="polite" data-workout-status></p>
     </section>
   </main>
+
+  <!-- Exercise Editor Modal -->
+  <div class="exercise-editor-modal" data-exercise-editor-modal hidden>
+    <div class="exercise-editor-overlay" data-exercise-editor-close></div>
+    <div class="exercise-editor-dialog">
+      <div class="exercise-editor-header">
+        <h3 data-exercise-editor-title>Add Exercise</h3>
+        <button type="button" class="exercise-editor-close-btn" data-exercise-editor-close aria-label="Close">×</button>
+      </div>
+        <div class="exercise-editor-form" data-exercise-editor-form>
+        <div class="form-group">
+          <label for="exercise-name-input">Exercise Name *</label>
+          <input type="text" id="exercise-name-input" placeholder="e.g., Back Squat" required data-exercise-name-input />
+        </div>
+        <div class="form-group">
+          <label for="exercise-section-select">Section *</label>
+          <select id="exercise-section-select" required data-exercise-section-select>
+            <option value="">Select a section...</option>
+            <option value="Warm Up">Warm Up</option>
+            <option value="A Block">A Block</option>
+            <option value="B Block">B Block</option>
+            <option value="C Block">C Block</option>
+            <option value="Cool Down">Cool Down</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="exercise-mode-select">Tracking Mode *</label>
+          <select id="exercise-mode-select" required data-exercise-mode-select>
+            <option value="reps">Reps-based (e.g., 5, 8, 10)</option>
+            <option value="time">Time-based (e.g., 45s, 2:00)</option>
+            <option value="endurance">Endurance (duration, distance, zone)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="exercise-sets-input">Initial Set Count</label>
+          <input type="number" id="exercise-sets-input" min="1" max="10" value="3" data-exercise-sets-input />
+        </div>
+        <div class="exercise-editor-toggles">
+          <label class="checkbox-label">
+            <input type="checkbox" checked data-exercise-toggle-weight />
+            <span>Show Weight/Time field</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" checked data-exercise-toggle-rpe />
+            <span>Show RPE/Zone field</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" data-exercise-toggle-rest />
+            <span>Show Rest field</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="exercise-notes-input">Notes</label>
+          <textarea id="exercise-notes-input" placeholder="Optional notes about this exercise..." data-exercise-notes-input></textarea>
+        </div>
+        <div class="exercise-editor-actions">
+          <button type="button" class="btn btn-secondary" data-exercise-editor-cancel>Cancel</button>
+             <button type="button" class="btn btn-primary" data-exercise-editor-submit>Save Exercise</button>
+        </div>
+        </div>
+    </div>
+  </div>
 
   <footer style="background: #0e4749; color: #fff; padding: 32px 0 16px 0; text-align: center; margin-top: 48px;">
     <div style="margin-bottom: 16px;">

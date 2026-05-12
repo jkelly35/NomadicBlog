@@ -3057,6 +3057,31 @@ footer a:hover {
   font-style: italic;
 }
 
+.program-day-tools {
+  margin-top: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.program-day-name-input {
+  min-width: 220px;
+  flex: 1;
+  border: 1px solid #c9beb0;
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #163636;
+}
+
+.program-day-name-input:focus {
+  outline: 2px solid rgba(197, 106, 44, 0.33);
+  outline-offset: 1px;
+  border-color: #c56a2c;
+}
+
 /* Progress Card */
 .program-demo-progress-card {
   display: flex;
@@ -3085,6 +3110,35 @@ footer a:hover {
 
 .progress-content {
   flex: 1;
+}
+
+.progress-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #0f2d2d;
+  margin-bottom: 0.4rem;
+}
+
+.progress-text {
+  font-size: 0.95rem;
+  color: #555;
+  margin-bottom: 0.75rem;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #1b6f2d 0%, #2a9d45 100%);
+  transition: width 0.3s ease;
+  border-radius: 999px;
 }
 
 .progress-title {
@@ -3223,6 +3277,7 @@ footer a:hover {
 .exercise-superset,
 .exercise-toggle-mode,
 .exercise-change-section,
+.exercise-field-toggles,
 .exercise-remove {
   padding: 0.4rem 0.6rem;
   font-size: 0.7rem;
@@ -3265,6 +3320,17 @@ footer a:hover {
 .exercise-change-section:hover {
   background: #b2dfdb;
   box-shadow: 0 2px 6px rgba(0, 105, 92, 0.2);
+}
+
+.exercise-field-toggles {
+  background: #ede7f6;
+  color: #4c3f81;
+  border: 1px solid #d7ccef;
+}
+
+.exercise-field-toggles:hover {
+  background: #d7ccef;
+  box-shadow: 0 2px 6px rgba(76, 63, 129, 0.2);
 }
 
 .exercise-superset {
@@ -3330,6 +3396,17 @@ footer a:hover {
   height: 20px;
   cursor: pointer;
   accent-color: #1b6f2d;
+}
+
+.program-field-off {
+  display: inline-block;
+  padding: 0.45rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #6c7d7d;
+  background: #f2efea;
+  border: 1px solid #ddd4c8;
 }
 
 .program-row-remove {
@@ -3412,6 +3489,163 @@ footer a:hover {
   box-shadow: 0 4px 12px rgba(159, 45, 32, 0.25);
 }
 
+/* Exercise Editor Modal */
+.exercise-editor-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.exercise-editor-modal[hidden] {
+  display: none;
+}
+
+.exercise-editor-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.exercise-editor-dialog {
+  position: relative;
+  z-index: 1001;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 520px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.exercise-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e6dfd7;
+  background: linear-gradient(135deg, #f9f6f1 0%, #ede7e0 100%);
+}
+
+.exercise-editor-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #0f2d2d;
+  font-weight: 700;
+}
+
+.exercise-editor-close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.exercise-editor-close-btn:hover {
+  background: rgba(197, 106, 44, 0.1);
+  color: #c56a2c;
+}
+
+.exercise-editor-form {
+  padding: 1.5rem;
+}
+
+.form-group {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 1.2rem;
+}
+
+.form-group label {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #163636;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="email"],
+.form-group select,
+.form-group textarea {
+  border: 1px solid #c9beb0;
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  color: #333;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group input[type="email"]:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #c56a2c;
+  box-shadow: 0 0 0 3px rgba(197, 106, 44, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.exercise-editor-toggles {
+  background: #f9f6f1;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #1b6f2d;
+}
+
+.exercise-editor-actions {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid #e6dfd7;
+}
+
+.exercise-editor-actions .btn {
+  min-width: 120px;
+}
+
 /* Responsive Training Program */
 @media (max-width: 1024px) {
   .program-stats {
@@ -3475,6 +3709,16 @@ footer a:hover {
     text-align: center;
   }
 
+  .program-day-tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .program-day-name-input {
+    min-width: 100%;
+    width: 100%;
+  }
+
   .program-demo-progress-card {
     padding: 1.25rem;
     gap: 1rem;
@@ -3520,10 +3764,151 @@ footer a:hover {
     flex-direction: column;
   }
 
+  body.athlete-locked-view .program-demo-main {
+    padding-bottom: 7.5rem;
+  }
+
+  body.athlete-locked-view .program-demo-progress-card {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 20;
+    box-shadow: 0 8px 24px rgba(15, 45, 45, 0.18);
+  }
+
+  body.athlete-locked-view .program-demo-table-wrap {
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    overflow-x: visible;
+  }
+
+  body.athlete-locked-view .program-demo-table {
+    border-collapse: separate;
+    border-spacing: 0 0.75rem;
+  }
+
+  body.athlete-locked-view .program-demo-table thead {
+    display: none;
+  }
+
+  body.athlete-locked-view .program-demo-table tbody tr.section-header-row {
+    display: table-row;
+  }
+
+  body.athlete-locked-view .program-demo-table tbody tr:not(.section-header-row) {
+    display: block;
+    background: #fff;
+    border: 1px solid #e6dfd7;
+    border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(15, 45, 45, 0.08);
+    overflow: hidden;
+  }
+
+  body.athlete-locked-view .program-demo-table tbody tr:not(.section-header-row) td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid #f0ebe2;
+  }
+
+  body.athlete-locked-view .program-demo-table tbody tr:not(.section-header-row) td:last-child {
+    border-bottom: none;
+  }
+
+  body.athlete-locked-view .program-demo-table tbody tr:not(.section-header-row) td::before {
+    content: attr(data-mobile-label);
+    color: #5e716d;
+    font-size: 0.74rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 700;
+    flex: 0 0 40%;
+  }
+
+  body.athlete-locked-view .program-demo-table td.exercise-cell {
+    display: block !important;
+    border-right: none;
+    border-bottom: 2px solid #d7cbb9;
+    border-radius: 0;
+    padding: 0.85rem !important;
+  }
+
+  body.athlete-locked-view .program-demo-table td.exercise-cell::before {
+    content: none;
+  }
+
+  body.athlete-locked-view .program-demo-table td.exercise-cell .exercise-name {
+    font-size: 1.02rem;
+    margin-bottom: 0.25rem;
+  }
+
+  body.athlete-locked-view .program-demo-table input[type="text"],
+  body.athlete-locked-view .program-demo-table input[type="number"] {
+    min-height: 44px;
+    font-size: 0.98rem;
+    border-radius: 10px;
+    flex: 1;
+    max-width: 62%;
+  }
+
+  body.athlete-locked-view .program-demo-table input[type="checkbox"] {
+    width: 28px;
+    height: 28px;
+  }
+
+  body.athlete-locked-view .program-demo-table .program-field-off {
+    flex: 1;
+    max-width: 62%;
+    text-align: center;
+  }
+
+  body.athlete-locked-view .program-demo-actions-section {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    margin: 0;
+    padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(245, 240, 232, 0.98), rgba(245, 240, 232, 0.9));
+    border-top: 1px solid #e6dfd7;
+    box-shadow: 0 -6px 18px rgba(15, 45, 45, 0.12);
+  }
+
+  body.athlete-locked-view .program-demo-actions-section .btn {
+    width: 100%;
+    min-height: 50px;
+    font-size: 1rem;
+    border-radius: 12px;
+  }
+
   .btn {
     width: 100%;
     justify-content: center;
     padding: 0.75rem 1.25rem;
+  }
+
+  .exercise-editor-dialog {
+    width: 95%;
+    max-height: 85vh;
+  }
+
+  .exercise-editor-header {
+    padding: 1rem;
+  }
+
+  .exercise-editor-form {
+    padding: 1rem;
+  }
+
+  .exercise-editor-actions {
+    flex-direction: column;
+  }
+
+  .exercise-editor-actions .btn {
+    width: 100%;
   }
 }
 

@@ -15,7 +15,9 @@
       workoutsPerWeek: 3
     },
     templateFocus: "strength",
-    daySessionTypes: {}
+    daySessionTypes: {},
+    customDayNames: {},
+    editingExerciseIdx: null
   };
 
   var TEMPLATE_DRAFT_PREFIX = "nomadic_training_program_template_builder_draft_";
@@ -48,6 +50,9 @@
     var addExerciseBtn = document.querySelector("[data-add-exercise]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
+    var dayNameInput = document.querySelector("[data-template-day-name]");
+    var dayRenameBtn = document.querySelector("[data-template-day-rename]");
+    var dayCopyForwardBtn = document.querySelector("[data-template-day-copy-forward]");
 
     if (!daySelect) {
       return;
@@ -69,12 +74,36 @@
       loadExercisesForDay();
       renderRows();
       updateDayInfo();
+      refreshTemplateDayTools();
       setStatus("");
     });
 
+    if (dayRenameBtn) {
+      dayRenameBtn.addEventListener("click", function () {
+        renameCurrentDay(dayNameInput ? dayNameInput.value : "");
+      });
+    }
+
+    if (dayCopyForwardBtn) {
+      dayCopyForwardBtn.addEventListener("click", function () {
+        copyCurrentDayForward();
+      });
+    }
+
+    if (dayNameInput) {
+      dayNameInput.addEventListener("keydown", function (event) {
+        if (event && event.key === "Enter") {
+          event.preventDefault();
+          renameCurrentDay(dayNameInput.value);
+        }
+      });
+    }
+
+    setupExerciseEditorModal();
+
     if (addExerciseBtn) {
       addExerciseBtn.addEventListener("click", function () {
-        addNewExercise();
+        openExerciseEditor(null);
       });
     }
 
@@ -110,6 +139,7 @@
     loadExercisesForDay();
     renderRows();
     updateDayInfo();
+    refreshTemplateDayTools();
     updateStats();
   }
 
@@ -174,6 +204,10 @@
     var saveBtn = document.querySelector("[data-save-workout]");
     var subtitle = document.querySelector(".program-demo-subtitle");
 
+    if (document.body) {
+      document.body.classList.add("athlete-locked-view");
+    }
+
     if (addExerciseBtn) {
       addExerciseBtn.style.display = "none";
     }
@@ -200,6 +234,7 @@
     var applyStructureBtn = document.querySelector("[data-template-structure-apply]");
     var seedSkeletonBtn = document.querySelector("[data-template-seed-skeleton]");
     var dayTypeControls = document.querySelector("[data-template-day-type-controls]");
+    var dayTools = document.querySelector("[data-template-day-tools]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var backLink = document.querySelector("[data-program-back-link]");
@@ -212,6 +247,10 @@
 
     if (dayTypeControls) {
       dayTypeControls.hidden = false;
+    }
+
+    if (dayTools) {
+      dayTools.hidden = false;
     }
 
     if (saveBtn) {
@@ -314,6 +353,254 @@
     dayInfo.textContent = "📅 " + label + dayTypeLabel;
   }
 
+  function refreshTemplateDayTools() {
+    var dayTools = document.querySelector("[data-template-day-tools]");
+    var dayNameInput = document.querySelector("[data-template-day-name]");
+    if (!dayTools || !dayNameInput) {
+      return;
+    }
+
+    if (!state.isTemplateBuilder) {
+      dayTools.hidden = true;
+      return;
+    }
+
+    dayTools.hidden = false;
+    dayNameInput.value = String((state.customDayNames && state.customDayNames[state.day]) || "");
+  }
+
+  function renameCurrentDay(nextName) {
+    if (!state.isTemplateBuilder || !state.day) {
+      return;
+    }
+
+    var cleaned = String(nextName || "").trim();
+    if (!state.customDayNames) {
+      state.customDayNames = {};
+    }
+
+    if (!cleaned) {
+      delete state.customDayNames[state.day];
+      setStatus("Day name reset to default label.", "info");
+    } else {
+      state.customDayNames[state.day] = cleaned;
+      setStatus("Renamed day to '" + cleaned + "'.", "success");
+    }
+
+    var daySelect = document.querySelector("[data-workout-day]");
+    if (daySelect) {
+      refreshWorkoutDaySelect(daySelect);
+      daySelect.value = state.day;
+    }
+
+    updateDayInfo();
+    refreshTemplateDayTools();
+  }
+
+  function copyCurrentDayForward() {
+    if (!state.isTemplateBuilder || !state.day) {
+      return;
+    }
+
+    saveExercisesForDay(true);
+
+    var slotKeys = getAllSlotKeys();
+    var currentIndex = slotKeys.indexOf(state.day);
+    if (currentIndex === -1 || currentIndex >= slotKeys.length - 1) {
+      setStatus("No later workout slots available to copy into.", "info");
+      return;
+    }
+
+    var sourceExercises = cloneExercises(state.exercises);
+    var copied = 0;
+
+    for (var i = currentIndex + 1; i < slotKeys.length; i++) {
+      var slotKey = slotKeys[i];
+      writeToStorage(state.storagePrefix + slotKey, {
+        exercises: cloneExercises(sourceExercises),
+        saved_at: new Date().toISOString()
+      });
+
+      if (state.daySessionTypes && state.daySessionTypes[state.day]) {
+        state.daySessionTypes[slotKey] = state.daySessionTypes[state.day];
+      }
+
+      if (state.customDayNames && state.customDayNames[state.day]) {
+        state.customDayNames[slotKey] = state.customDayNames[state.day];
+      }
+
+      copied++;
+    }
+
+    var daySelect = document.querySelector("[data-workout-day]");
+    if (daySelect) {
+      refreshWorkoutDaySelect(daySelect);
+      daySelect.value = state.day;
+    }
+
+    setStatus("Copied this day forward to " + copied + " future slot(s).", "success");
+  }
+
+  function setupExerciseEditorModal() {
+    var modal = document.querySelector("[data-exercise-editor-modal]");
+    var overlay = document.querySelector(".exercise-editor-overlay[data-exercise-editor-close]");
+    var closeBtn = document.querySelector(".exercise-editor-close-btn");
+    var cancelBtn = document.querySelector("[data-exercise-editor-cancel]");
+    var submitBtn = document.querySelector("[data-exercise-editor-submit]");
+
+    if (!modal || !overlay || !closeBtn || !cancelBtn || !submitBtn) {
+      console.warn("Exercise editor modal elements not found");
+      return;
+    }
+
+    overlay.addEventListener("click", closeExerciseEditor);
+    closeBtn.addEventListener("click", closeExerciseEditor);
+    cancelBtn.addEventListener("click", closeExerciseEditor);
+    submitBtn.addEventListener("click", submitExerciseEditor);
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !modal.hasAttribute("hidden")) {
+        closeExerciseEditor();
+      }
+    });
+  }
+
+  function openExerciseEditor(exerciseIdx) {
+    var modal = document.querySelector("[data-exercise-editor-modal]");
+    var title = document.querySelector("[data-exercise-editor-title]");
+    var nameInput = document.querySelector("[data-exercise-name-input]");
+    var sectionSelect = document.querySelector("[data-exercise-section-select]");
+    var modeSelect = document.querySelector("[data-exercise-mode-select]");
+    var setsInput = document.querySelector("[data-exercise-sets-input]");
+    var weightToggle = document.querySelector("[data-exercise-toggle-weight]");
+    var rpeToggle = document.querySelector("[data-exercise-toggle-rpe]");
+    var restToggle = document.querySelector("[data-exercise-toggle-rest]");
+    var notesInput = document.querySelector("[data-exercise-notes-input]");
+
+    if (!modal) return;
+
+    state.editingExerciseIdx = exerciseIdx;
+
+    // Reset form
+    nameInput.value = "";
+    sectionSelect.value = "A Block";
+    modeSelect.value = "reps";
+    setsInput.value = "3";
+    weightToggle.checked = true;
+    rpeToggle.checked = true;
+    restToggle.checked = false;
+    notesInput.value = "";
+
+    if (exerciseIdx !== null && state.exercises[exerciseIdx]) {
+      // Edit mode
+      var exercise = state.exercises[exerciseIdx];
+      title.textContent = "Edit Exercise";
+      nameInput.value = exercise.name || "";
+      sectionSelect.value = exercise.section || "A Block";
+      modeSelect.value = exercise.mode || "reps";
+      setsInput.value = String((exercise.sets && exercise.sets.length) || 3);
+
+      var toggles = normalizeExerciseFieldToggles(exercise.field_toggles, exercise.mode);
+      weightToggle.checked = toggles.showWeight;
+      rpeToggle.checked = toggles.showRpe;
+      restToggle.checked = toggles.showRest;
+
+      notesInput.value = exercise.notes || "";
+    } else {
+      // Add mode
+      title.textContent = "Add Exercise";
+    }
+
+    modal.style.display = "flex";
+    nameInput.focus();
+    modal.removeAttribute("hidden");
+  }
+
+  function closeExerciseEditor() {
+    var modal = document.querySelector("[data-exercise-editor-modal]");
+    if (modal) {
+      modal.style.display = "none";
+       modal.setAttribute("hidden", "");
+    }
+    state.editingExerciseIdx = null;
+  }
+
+  function submitExerciseEditor(event) {
+    event.preventDefault();
+
+    var nameInput = document.querySelector("[data-exercise-name-input]");
+    var sectionSelect = document.querySelector("[data-exercise-section-select]");
+    var modeSelect = document.querySelector("[data-exercise-mode-select]");
+    var setsInput = document.querySelector("[data-exercise-sets-input]");
+    var weightToggle = document.querySelector("[data-exercise-toggle-weight]");
+    var rpeToggle = document.querySelector("[data-exercise-toggle-rpe]");
+    var restToggle = document.querySelector("[data-exercise-toggle-rest]");
+    var notesInput = document.querySelector("[data-exercise-notes-input]");
+
+    var name = String(nameInput.value || "").trim();
+    if (!name) {
+      setStatus("Exercise name is required.", "error");
+      nameInput.focus();
+      return;
+    }
+
+    var section = String(sectionSelect.value || "A Block");
+    var mode = String(modeSelect.value || "reps");
+    var numSets = Math.max(1, Math.min(10, parseInt(setsInput.value, 10) || 3));
+    var notes = String(notesInput.value || "").trim();
+
+    var fieldToggles = {
+      showWeight: !!weightToggle.checked,
+      secondaryMetric: "weight",
+      showRpe: !!rpeToggle.checked,
+      showRest: !!restToggle.checked
+    };
+
+    if (state.editingExerciseIdx !== null && state.exercises[state.editingExerciseIdx]) {
+      // Update existing
+      var exercise = state.exercises[state.editingExerciseIdx];
+      exercise.name = name;
+      exercise.section = section;
+      exercise.mode = mode;
+      exercise.field_toggles = fieldToggles;
+      exercise.notes = notes;
+      // Keep existing sets, just update metadata
+
+      setStatus("Updated " + name + ".", "success");
+    } else {
+      // Add new
+      var newExercise = {
+        name: name,
+        section: section,
+        mode: mode,
+        superset_group: null,
+        field_toggles: fieldToggles,
+        notes: notes,
+        sets: []
+      };
+
+      for (var i = 0; i < numSets; i++) {
+        newExercise.sets.push({
+          reps: "",
+          weight: "",
+          rpe: "",
+          rest: "",
+          notes: "",
+          done: false
+        });
+      }
+
+      state.exercises.push(newExercise);
+      setStatus("Added " + name + ".", "success");
+    }
+
+    // CRITICAL: Save to storage immediately
+    saveExercisesForDay(true);
+
+    closeExerciseEditor();
+    renderRows();
+  }
+
   function updateTemplateStructure(weeks, workoutsPerWeek) {
     if (!state.isTemplateBuilder) {
       return;
@@ -341,6 +628,7 @@
     loadExercisesForDay();
     renderRows();
     updateDayInfo();
+    refreshTemplateDayTools();
     setStatus(
       "Template structure updated to " + state.structure.weeks + " week(s) with " + state.structure.workoutsPerWeek + " workout(s) per week.",
       "info"
@@ -376,6 +664,7 @@
     loadExercisesForDay();
     renderRows();
     updateDayInfo();
+    refreshTemplateDayTools();
 
     if (seededCount === 0) {
       setStatus("No empty workout slots found. Existing slots were left untouched.", "info");
@@ -568,6 +857,7 @@
       section: section,
       mode: mode,
       superset_group: null,
+      field_toggles: normalizeExerciseFieldToggles(null, mode),
       sets: []
     };
 
@@ -576,6 +866,7 @@
         reps: "",
         weight: "",
         rpe: "",
+        rest: "",
         notes: "",
         done: false
       });
@@ -592,23 +883,28 @@
       state.exercises = state.isAthleteLockedView
         ? normalizeAthleteLogExercises(stored.exercises)
         : stored.exercises;
+      state.exercises = normalizeExercisesArray(state.exercises);
       return;
     }
 
     if (state.isTemplateBuilder) {
       state.exercises = [];
+      state.exercises = normalizeExercisesArray(state.exercises);
       return;
     }
 
     if (state.assignedTemplateDays && Array.isArray(state.assignedTemplateDays[state.day])) {
       state.exercises = cloneExercises(state.assignedTemplateDays[state.day]);
+      state.exercises = normalizeExercisesArray(state.exercises);
       return;
     }
 
     state.exercises = defaultExercisesForDay(state.day);
+    state.exercises = normalizeExercisesArray(state.exercises);
   }
 
   function saveExercisesForDay(silent) {
+    state.exercises = normalizeExercisesArray(state.exercises);
     var payload = {
       exercises: state.exercises,
       saved_at: new Date().toISOString()
@@ -644,6 +940,7 @@
       archived: false,
       focus: state.templateFocus,
       day_session_types: state.daySessionTypes || {},
+      custom_day_names: state.customDayNames || {},
       structure: state.structure,
       days: {
         
@@ -767,6 +1064,7 @@
         state.structure = normalizeStructure(payload.structure || deriveStructureFromDays(payload.days));
         state.templateFocus = normalizeTemplateFocus(payload.focus);
         state.daySessionTypes = normalizeDaySessionTypes(payload.day_session_types);
+        state.customDayNames = normalizeCustomDayNames(payload.custom_day_names);
         ensureDaySessionTypesForStructure();
         var normalizedDays = normalizeTemplateDays(payload.days);
         var daySelect = document.querySelector("[data-workout-day]");
@@ -805,6 +1103,7 @@
         loadExercisesForDay();
         renderRows();
         updateDayInfo();
+        refreshTemplateDayTools();
       })
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Failed to load template.", "error");
@@ -853,6 +1152,7 @@
         state.structure = normalizeStructure(payload.structure || deriveStructureFromDays(payload.days));
         state.templateFocus = normalizeTemplateFocus(payload.focus);
         state.daySessionTypes = normalizeDaySessionTypes(payload.day_session_types);
+        state.customDayNames = normalizeCustomDayNames(payload.custom_day_names);
         ensureDaySessionTypesForStructure();
         var daySelect = document.querySelector("[data-workout-day]");
         if (daySelect) {
@@ -868,6 +1168,7 @@
         loadExercisesForDay();
         renderRows();
         updateDayInfo();
+        refreshTemplateDayTools();
         updateStats();
       })
       .catch(function () {
@@ -906,17 +1207,20 @@
         section: exercise && exercise.section ? exercise.section : "A Block",
         mode: exercise && exercise.mode ? exercise.mode : "reps",
         superset_group: exercise ? exercise.superset_group || null : null,
+        field_toggles: normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode),
         sets: sets.map(function (set) {
           var source = set || {};
           return {
             reps: "",
             weight: "",
             rpe: "",
+            rest: "",
             notes: "",
             done: false,
             target_reps: source.target_reps != null ? source.target_reps : source.reps || "",
             target_weight: source.target_weight != null ? source.target_weight : source.weight || "",
             target_rpe: source.target_rpe != null ? source.target_rpe : source.rpe || "",
+            target_rest: source.target_rest != null ? source.target_rest : source.rest || "",
             target_notes: source.target_notes != null ? source.target_notes : source.notes || ""
           };
         })
@@ -936,17 +1240,20 @@
         section: exercise && exercise.section ? exercise.section : "A Block",
         mode: exercise && exercise.mode ? exercise.mode : "reps",
         superset_group: exercise ? exercise.superset_group || null : null,
+        field_toggles: normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode),
         sets: sets.map(function (set) {
           var source = set || {};
           return {
             reps: source.reps != null ? source.reps : "",
             weight: source.weight != null ? source.weight : "",
             rpe: source.rpe != null ? source.rpe : "",
+            rest: source.rest != null ? source.rest : "",
             notes: source.notes != null ? source.notes : "",
             done: !!source.done,
             target_reps: source.target_reps || "",
             target_weight: source.target_weight || "",
             target_rpe: source.target_rpe || "",
+            target_rest: source.target_rest || "",
             target_notes: source.target_notes || ""
           };
         })
@@ -995,6 +1302,7 @@
       archived: !!(payload && payload.archived),
       focus: normalizeTemplateFocus(payload && payload.focus),
       day_session_types: normalizeDaySessionTypes(payload && payload.day_session_types),
+      custom_day_names: normalizeCustomDayNames(payload && payload.custom_day_names),
       structure: normalizeStructure(payload && payload.structure),
       days: payload && payload.days ? payload.days : {}
     };
@@ -1060,10 +1368,32 @@
     }
 
     var base = "Week " + parsed.week + " - Workout " + parsed.workout;
+    var customLabel = state.customDayNames && state.customDayNames[slotKey];
+    if (customLabel) {
+      return base + " - " + customLabel;
+    }
     if (dayLabels[slotKey]) {
       return base + " - " + dayLabels[slotKey];
     }
     return base;
+  }
+
+  function normalizeCustomDayNames(map) {
+    var source = map && typeof map === "object" ? map : {};
+    var normalized = {};
+
+    Object.keys(source).forEach(function (slotKey) {
+      if (!/^w\d+d\d+$/i.test(slotKey)) {
+        return;
+      }
+
+      var label = String(source[slotKey] || "").trim();
+      if (label) {
+        normalized[slotKey] = label;
+      }
+    });
+
+    return normalized;
   }
 
   function normalizeTemplateDays(days) {
@@ -1212,14 +1542,21 @@
     var tbody = document.querySelector("[data-workout-rows]");
     if (!tbody) return;
 
+    var fieldToggles = normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode);
+    var useAthleteRowLayout =
+      state.isAthleteLockedView &&
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 768px)").matches;
+
     exercise.sets.forEach(function (set, setIdx) {
       var tr = document.createElement("tr");
       var isFirstSet = setIdx === 0;
       var isFirstInSuperset = isFirstSet && groupPosition === 0;
       var cells = "";
 
-      // Exercise name cell with rowspan on first set
-      if (isFirstSet) {
+      // Exercise name cell with rowspan on first set (or per-row in athlete locked view)
+      if (isFirstSet || useAthleteRowLayout) {
         var rowspan = exercise.sets.length;
         var cellClass = supersetLabel ? "exercise-cell superset-member" : "exercise-cell";
         var actionsHtml = "";
@@ -1228,25 +1565,26 @@
           actionsHtml =
             '<div class="exercise-actions"><button type="button" class="exercise-add-set" data-exercise="' +
             exerciseIdx +
-            '">+ Set</button><button type="button" class="exercise-toggle-mode" data-exercise="' +
+            '">+ Set</button><button type="button" class="exercise-edit" data-exercise="' +
+            exerciseIdx +
+            '">Edit</button><button type="button" class="exercise-toggle-mode" data-exercise="' +
             exerciseIdx +
             '">Toggle Mode</button><button type="button" class="exercise-change-section" data-exercise="' +
             exerciseIdx +
-            '">Change Section</button><button type="button" class="exercise-superset" data-exercise="' +
+            '">Section</button><button type="button" class="exercise-field-toggles" data-exercise="' +
+            exerciseIdx +
+            '">Fields</button><button type="button" class="exercise-superset" data-exercise="' +
             exerciseIdx +
             '">' +
-            (exercise.superset_group ? "Remove from Superset" : "Make Superset") +
-            '</button><button type="button" class="exercise-remove" data-exercise="' +
+            (exercise.superset_group ? "Remove Superset" : "Superset") +
+            '</button><button type="button" class="exercise-copy-next" data-exercise="' +
+            exerciseIdx +
+            '">Copy to Next</button><button type="button" class="exercise-remove" data-exercise="' +
             exerciseIdx +
             '">Remove</button></div>';
         }
         
-        cells +=
-          '<td rowspan="' +
-          rowspan +
-          '" class="' +
-          cellClass +
-          '"><div class="exercise-header">';
+        cells += '<td class="' + cellClass + '" data-mobile-label="Exercise"' + (useAthleteRowLayout ? "" : ' rowspan="' + rowspan + '"') + '><div class="exercise-header">';
 
         if (isFirstInSuperset && supersetLabel) {
           cells += '<div class="superset-label">' + supersetLabel + " - Set " + (groupPosition + 1) + '</div>';
@@ -1261,14 +1599,14 @@
       }
 
       cells +=
-        '<td><input type="number" min="1" class="set-number" data-exercise="' +
+        '<td data-mobile-label="Set"><input type="number" min="1" class="set-number" data-exercise="' +
         exerciseIdx +
         '" data-set="' +
         setIdx +
         '" value="' +
         (setIdx + 1) +
         '" disabled /></td>' +
-        '<td><input type="text" data-field="reps" data-exercise="' +
+        '<td data-mobile-label="Reps"><input type="text" data-field="reps" data-exercise="' +
         exerciseIdx +
         '" data-set="' +
         setIdx +
@@ -1277,28 +1615,49 @@
         '" placeholder="' +
         escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) +
         '" /></td>' +
-        '<td><input type="text" data-field="weight" data-exercise="' +
-        exerciseIdx +
-        '" data-set="' +
-        setIdx +
-        '" value="' +
-        escapeAttribute(set.weight) +
-        '" placeholder="' + escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode)) + '" /></td>' +
-        '<td><input type="text" data-field="rpe" data-exercise="' +
-        exerciseIdx +
-        '" data-set="' +
-        setIdx +
-        '" value="' +
-        escapeAttribute(set.rpe) +
-        '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" /></td>' +
-        '<td><input type="text" data-field="notes" data-exercise="' +
+        '<td data-mobile-label="Weight / Time">' +
+        (fieldToggles.showWeight
+          ? '<input type="text" data-field="weight" data-exercise="' +
+            exerciseIdx +
+            '" data-set="' +
+            setIdx +
+            '" value="' +
+            escapeAttribute(set.weight) +
+            '" placeholder="' +
+            escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
+            '" />'
+          : '<span class="program-field-off">Off</span>') +
+        '</td>' +
+        '<td data-mobile-label="RPE / Zone">' +
+        (fieldToggles.showRpe
+          ? '<input type="text" data-field="rpe" data-exercise="' +
+            exerciseIdx +
+            '" data-set="' +
+            setIdx +
+            '" value="' +
+            escapeAttribute(set.rpe) +
+            '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" />'
+          : '<span class="program-field-off">Off</span>') +
+        '</td>' +
+        '<td data-mobile-label="Rest">' +
+        (fieldToggles.showRest
+          ? '<input type="text" data-field="rest" data-exercise="' +
+            exerciseIdx +
+            '" data-set="' +
+            setIdx +
+            '" value="' +
+            escapeAttribute(set.rest) +
+            '" placeholder="' + escapeAttribute(set.target_rest || "e.g. 90s") + '" />'
+          : '<span class="program-field-off">Off</span>') +
+        '</td>' +
+        '<td data-mobile-label="Notes"><input type="text" data-field="notes" data-exercise="' +
         exerciseIdx +
         '" data-set="' +
         setIdx +
         '" value="' +
         escapeAttribute(set.notes) +
         '" placeholder="' + escapeAttribute(set.target_notes || "Notes") + '" /></td>' +
-        '<td><input type="checkbox" data-field="done" data-exercise="' +
+        '<td data-mobile-label="Done"><input type="checkbox" data-field="done" data-exercise="' +
         exerciseIdx +
         '" data-set="' +
         setIdx +
@@ -1308,13 +1667,13 @@
 
       if (!state.isAthleteLockedView && (setIdx > 0 || exercise.sets.length > 1)) {
         cells +=
-          '<td><button type="button" class="program-row-remove" data-exercise="' +
+          '<td data-mobile-label="Actions"><button type="button" class="program-row-remove" data-exercise="' +
           exerciseIdx +
           '" data-set="' +
           setIdx +
           '">Remove</button></td>';
       } else {
-        cells += '<td></td>';
+        cells += '<td data-mobile-label="Actions"></td>';
       }
 
       tr.innerHTML = cells;
@@ -1344,8 +1703,17 @@
       tbody.querySelectorAll(".exercise-add-set").forEach(function (btn) {
         btn.addEventListener("click", onAddSetToExercise);
       });
+      tbody.querySelectorAll(".exercise-edit").forEach(function (btn) {
+        btn.addEventListener("click", onEditExercise);
+      });
       tbody.querySelectorAll(".exercise-change-section").forEach(function (btn) {
         btn.addEventListener("click", onChangeExerciseSection);
+      });
+      tbody.querySelectorAll(".exercise-field-toggles").forEach(function (btn) {
+        btn.addEventListener("click", onConfigureExerciseFields);
+      });
+      tbody.querySelectorAll(".exercise-copy-next").forEach(function (btn) {
+        btn.addEventListener("click", onCopyExerciseToNextDay);
       });
       tbody.querySelectorAll(".exercise-superset").forEach(function (btn) {
         btn.addEventListener("click", onToggleSupersetMembership);
@@ -1395,7 +1763,37 @@
   }
 
   function isAthleteLogField(field) {
-    return field === "reps" || field === "weight" || field === "rpe" || field === "notes" || field === "done";
+    return field === "reps" || field === "weight" || field === "rpe" || field === "rest" || field === "notes" || field === "done";
+  }
+
+  function onConfigureExerciseFields(event) {
+    var btn = event.target;
+    var exerciseIdx = parseInt(btn.getAttribute("data-exercise"), 10);
+
+    if (isNaN(exerciseIdx) || !state.exercises[exerciseIdx]) {
+      return;
+    }
+
+    var exercise = state.exercises[exerciseIdx];
+    var showWeight = confirm("Show Weight/Time field for " + exercise.name + "?\n(OK = Show, Cancel = Hide)");
+    var secondaryMetric = "weight";
+    if (showWeight) {
+      secondaryMetric = confirm("Track the secondary field as TIME instead of WEIGHT?\n(OK = Time, Cancel = Weight)")
+        ? "time"
+        : "weight";
+    }
+    var showRpe = confirm("Show RPE/Zone field?\n(OK = Show, Cancel = Hide)");
+    var showRest = confirm("Show Rest field?\n(OK = Show, Cancel = Hide)");
+
+    exercise.field_toggles = {
+      showWeight: showWeight,
+      secondaryMetric: secondaryMetric,
+      showRpe: showRpe,
+      showRest: showRest
+    };
+
+    renderRows();
+    setStatus("Updated tracking fields for " + exercise.name + ".", "success");
   }
 
   function onAddSetToExercise(event) {
@@ -1410,6 +1808,7 @@
       reps: "",
       weight: "",
       rpe: "",
+      rest: "",
       notes: "",
       done: false
     });
@@ -1692,6 +2091,58 @@
     }
   }
 
+  function onEditExercise(event) {
+    var btn = event.target;
+    var exerciseIdx = parseInt(btn.getAttribute("data-exercise"), 10);
+
+    if (isNaN(exerciseIdx) || !state.exercises[exerciseIdx]) {
+      return;
+    }
+
+    openExerciseEditor(exerciseIdx);
+  }
+
+  function onCopyExerciseToNextDay(event) {
+    var btn = event.target;
+    var exerciseIdx = parseInt(btn.getAttribute("data-exercise"), 10);
+
+    if (isNaN(exerciseIdx) || !state.exercises[exerciseIdx]) {
+      return;
+    }
+
+    if (!state.isTemplateBuilder) {
+      setStatus("Copy exercise is only available in template builder mode.", "info");
+      return;
+    }
+
+    saveExercisesForDay(true);
+
+    var slotKeys = getAllSlotKeys();
+    var currentIndex = slotKeys.indexOf(state.day);
+    if (currentIndex === -1 || currentIndex >= slotKeys.length - 1) {
+      setStatus("No later workout slots available.", "info");
+      return;
+    }
+
+    var exercise = cloneExercises([state.exercises[exerciseIdx]])[0];
+    var nextDayKey = slotKeys[currentIndex + 1];
+
+    var dayData = readFromStorage(state.storagePrefix + nextDayKey) || {
+      exercises: [],
+      saved_at: new Date().toISOString()
+    };
+
+    if (!Array.isArray(dayData.exercises)) {
+      dayData.exercises = [];
+    }
+
+    dayData.exercises.push(exercise);
+
+    writeToStorage(state.storagePrefix + nextDayKey, dayData);
+
+    setStatus("Copied " + exercise.name + " to " + nextDayKey + ".", "success");
+  }
+
   function onRemoveExercise(event) {
     var btn = event.target;
     var exerciseIdx = parseInt(btn.getAttribute("data-exercise"), 10);
@@ -1774,8 +2225,15 @@
       });
     });
 
+    var percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     var progressText = completed + " / " + total + " sets marked done";
-    summary.querySelector(".progress-text").textContent = "Completion: " + progressText;
+    summary.querySelector(".progress-text").textContent = "Completion: " + progressText + " (" + percentage + "%)";
+
+    // Update progress bar if it exists
+    var progressBar = summary.querySelector(".progress-bar");
+    if (progressBar) {
+      progressBar.style.width = percentage + "%";
+    }
   }
 
   function updateStats() {
@@ -1856,12 +2314,13 @@
         section: section,
         mode: normalizeModeForDayType(exercise && exercise.mode, normalizedType, section),
         superset_group: exercise ? exercise.superset_group || null : null,
+        field_toggles: normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode),
         sets: []
       };
 
       var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
       if (!sets.length) {
-        sets = [{ reps: "", weight: "", rpe: "", notes: "", done: false }];
+        sets = [{ reps: "", weight: "", rpe: "", rest: "", notes: "", done: false }];
       }
 
       converted.sets = sets.map(function (set) {
@@ -1878,6 +2337,7 @@
       reps: source.reps != null ? source.reps : "",
       weight: source.weight != null ? source.weight : "",
       rpe: source.rpe != null ? source.rpe : "",
+      rest: source.rest != null ? source.rest : "",
       notes: source.notes != null ? source.notes : "",
       done: !!source.done
     };
@@ -2161,7 +2621,10 @@
     return "e.g. 5";
   }
 
-  function modeSecondaryPlaceholder(mode) {
+  function modeSecondaryPlaceholder(mode, secondaryMetric) {
+    if (secondaryMetric === "time") {
+      return "e.g. 60s";
+    }
     if (mode === "endurance") {
       return "e.g. 3.0 mi / 25 km";
     }
@@ -2179,8 +2642,9 @@
     var primary = document.querySelector("[data-workout-header-primary]");
     var secondary = document.querySelector("[data-workout-header-secondary]");
     var tertiary = document.querySelector("[data-workout-header-tertiary]");
+    var rest = document.querySelector("[data-workout-header-rest]");
 
-    if (!primary || !secondary || !tertiary) {
+    if (!primary || !secondary || !tertiary || !rest) {
       return;
     }
 
@@ -2195,14 +2659,61 @@
 
     if (hasEndurance) {
       primary.textContent = "Duration";
-      secondary.textContent = "Distance";
-      tertiary.textContent = "Zone / Power / Effort";
+      secondary.textContent = "Weight / Time / Distance";
+      tertiary.textContent = "RPE / Zone / Effort";
+      rest.textContent = "Rest";
       return;
     }
 
     primary.textContent = "Reps";
-    secondary.textContent = "Weight (lbs)";
+    secondary.textContent = "Weight / Time";
     tertiary.textContent = "RPE";
+    rest.textContent = "Rest";
+  }
+
+  function normalizeExerciseFieldToggles(toggles, mode) {
+    var source = toggles && typeof toggles === "object" ? toggles : {};
+    return {
+      showWeight: source.showWeight !== false,
+      secondaryMetric: normalizeSecondaryMetric(source.secondaryMetric || (mode === "time" ? "time" : "weight")),
+      showRpe: source.showRpe !== false,
+      showRest: !!source.showRest
+    };
+  }
+
+  function normalizeSecondaryMetric(value) {
+    return String(value || "").toLowerCase() === "time" ? "time" : "weight";
+  }
+
+  function normalizeExercisesArray(exercises) {
+    return (Array.isArray(exercises) ? exercises : []).map(function (exercise) {
+      var safeExercise = exercise && typeof exercise === "object" ? exercise : {};
+      var sets = Array.isArray(safeExercise.sets) ? safeExercise.sets : [];
+
+      return {
+        name: safeExercise.name || "Exercise",
+        section: safeExercise.section || "A Block",
+        mode: safeExercise.mode || "reps",
+        superset_group: safeExercise.superset_group || null,
+        field_toggles: normalizeExerciseFieldToggles(safeExercise.field_toggles, safeExercise.mode),
+        sets: sets.map(function (set) {
+          var source = set && typeof set === "object" ? set : {};
+          return {
+            reps: source.reps != null ? source.reps : "",
+            weight: source.weight != null ? source.weight : "",
+            rpe: source.rpe != null ? source.rpe : "",
+            rest: source.rest != null ? source.rest : "",
+            notes: source.notes != null ? source.notes : "",
+            done: !!source.done,
+            target_reps: source.target_reps != null ? source.target_reps : "",
+            target_weight: source.target_weight != null ? source.target_weight : "",
+            target_rpe: source.target_rpe != null ? source.target_rpe : "",
+            target_rest: source.target_rest != null ? source.target_rest : "",
+            target_notes: source.target_notes != null ? source.target_notes : ""
+          };
+        })
+      };
+    });
   }
 
   function storageKeyForDay() {
