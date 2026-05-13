@@ -17,7 +17,10 @@
     templateFocus: "strength",
     daySessionTypes: {},
     customDayNames: {},
-    editingExerciseIdx: null
+    editingExerciseIdx: null,
+    athleteMobileOpenByDay: {},
+    lastViewportWidth: null,
+    lastIsAthleteMobileUi: false
   };
 
   var TEMPLATE_DRAFT_PREFIX = "nomadic_training_program_template_builder_draft_";
@@ -341,9 +344,23 @@
     }
 
       if (typeof window !== "undefined") {
+        state.lastViewportWidth = window.innerWidth || null;
+        state.lastIsAthleteMobileUi = isAthleteMobileUi();
+
         window.addEventListener("resize", function () {
           if (state.isAthleteLockedView) {
-            renderRows();
+            var nextWidth = window.innerWidth || 0;
+            var nextIsMobileUi = isAthleteMobileUi();
+            var widthChanged =
+              state.lastViewportWidth === null ||
+              Math.abs(nextWidth - state.lastViewportWidth) >= 24;
+            var modeChanged = nextIsMobileUi !== state.lastIsAthleteMobileUi;
+
+            if (widthChanged || modeChanged) {
+              state.lastViewportWidth = nextWidth;
+              state.lastIsAthleteMobileUi = nextIsMobileUi;
+              renderRows();
+            }
           }
         });
       }
@@ -1469,6 +1486,11 @@
     }
 
     tbody.innerHTML = "";
+
+    if (mobileLog && state.isAthleteLockedView) {
+      persistAthleteMobileOpenState(mobileLog);
+    }
+
     if (mobileLog) {
       mobileLog.innerHTML = "";
     }
@@ -1605,6 +1627,8 @@
       firstOpenExerciseIdx = 0;
     }
 
+    var savedOpen = getAthleteMobileOpenForDay();
+
     var sections = {};
     defaultSections.forEach(function (section) {
       sections[section] = [];
@@ -1638,7 +1662,11 @@
         var fieldToggles = normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode);
         var details = document.createElement("details");
         details.className = "athlete-mobile-exercise";
-        if (exerciseIdx === firstOpenExerciseIdx) {
+        details.setAttribute("data-exercise-idx", String(exerciseIdx));
+
+        if (savedOpen.length) {
+          details.open = savedOpen.indexOf(exerciseIdx) !== -1;
+        } else if (exerciseIdx === firstOpenExerciseIdx) {
           details.open = true;
         }
 
@@ -1905,6 +1933,7 @@
 
     if (mobileLog) {
       bindSetInputListeners(mobileLog);
+      bindAthleteMobileDisclosureListeners(mobileLog);
     }
 
     if (!state.isAthleteLockedView && tbody) {
@@ -1952,6 +1981,50 @@
     container.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
       input.addEventListener("change", onSetInput);
     });
+  }
+
+  function bindAthleteMobileDisclosureListeners(container) {
+    if (!container) {
+      return;
+    }
+
+    container.querySelectorAll("details.athlete-mobile-exercise").forEach(function (details) {
+      details.addEventListener("toggle", function () {
+        persistAthleteMobileOpenState(container);
+      });
+    });
+  }
+
+  function getAthleteMobileOpenForDay() {
+    var dayKey = String(state.day || "");
+    var saved = state.athleteMobileOpenByDay[dayKey];
+
+    if (!Array.isArray(saved)) {
+      return [];
+    }
+
+    return saved.slice();
+  }
+
+  function persistAthleteMobileOpenState(container) {
+    if (!container) {
+      return;
+    }
+
+    var openIndexes = [];
+
+    container.querySelectorAll("details.athlete-mobile-exercise").forEach(function (details) {
+      if (!details.open) {
+        return;
+      }
+
+      var value = parseInt(details.getAttribute("data-exercise-idx"), 10);
+      if (!isNaN(value)) {
+        openIndexes.push(value);
+      }
+    });
+
+    state.athleteMobileOpenByDay[String(state.day || "")] = openIndexes;
   }
 
   function onSetInput(event) {
