@@ -3065,6 +3065,11 @@ footer a:hover {
   align-items: center;
 }
 
+.program-day-tools[hidden],
+.program-day-type-controls[hidden] {
+  display: none !important;
+}
+
 .program-day-name-input {
   min-width: 220px;
   flex: 1;

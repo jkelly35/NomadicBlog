@@ -238,6 +238,8 @@
     var clearBtn = document.querySelector("[data-clear-workout]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var subtitle = document.querySelector(".program-demo-subtitle");
+    var dayTools = document.querySelector("[data-template-day-tools]");
+    var dayTypeControls = document.querySelector("[data-template-day-type-controls]");
 
     if (document.body) {
       document.body.classList.add("athlete-locked-view");
@@ -257,6 +259,16 @@
 
     if (subtitle) {
       subtitle.textContent = "Log reps performed, weights used, notes, and completed sets.";
+    }
+
+    if (dayTools) {
+      dayTools.hidden = true;
+      dayTools.style.display = "none";
+    }
+
+    if (dayTypeControls) {
+      dayTypeControls.hidden = true;
+      dayTypeControls.style.display = "none";
     }
   }
 
