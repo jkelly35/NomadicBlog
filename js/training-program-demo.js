@@ -1,4 +1,6 @@
 (function () {
+  var ADMIN_EMAIL = "joe@nomadicperformance.com";
+
   var state = {
     exercises: [],
     day: "w1d1",
@@ -149,7 +151,7 @@
   function configureBuilderMode() {
     try {
       var params = new URLSearchParams(window.location.search);
-      state.isTemplateBuilder = params.get("builder") === "1";
+      var wantsTemplateBuilder = params.get("builder") === "1";
       state.templateId = params.get("templateId") || null;
 
       if (state.templateId && !isUuid(state.templateId)) {
@@ -157,19 +159,49 @@
         state.templateId = null;
       }
 
-      if (!state.isTemplateBuilder) {
+      if (!wantsTemplateBuilder) {
         return;
       }
 
-      state.storagePrefix = TEMPLATE_DRAFT_PREFIX;
-      state.client = createSupabaseClient();
-      clearBuilderDrafts();
-
-      if (state.templateId) {
-        hydrateDraftFromTemplate(state.templateId);
+      if (!state.client) {
+        state.client = createSupabaseClient();
       }
 
-      applyBuilderModeUi();
+      if (!state.client) {
+        setStatus("Template editing is coach-only and requires an authenticated session.", "info");
+        return;
+      }
+
+      state.client.auth.getSession().then(function (result) {
+        var session = result && result.data && result.data.session;
+        var user = session && session.user;
+        var email = String(user && user.email || "").toLowerCase();
+        var isCoach = !!email && email === ADMIN_EMAIL;
+
+        if (!isCoach) {
+          state.isTemplateBuilder = false;
+          refreshTemplateDayTools();
+          setStatus("Template editing tools are available to coach accounts only.", "info");
+          return;
+        }
+
+        state.isTemplateBuilder = true;
+        state.storagePrefix = TEMPLATE_DRAFT_PREFIX;
+        clearBuilderDrafts();
+
+        if (state.templateId) {
+          hydrateDraftFromTemplate(state.templateId);
+        }
+
+        applyBuilderModeUi();
+        ensureDaySessionTypesForStructure();
+        refreshTemplateDayTools();
+        updateDayInfo();
+      }).catch(function () {
+        state.isTemplateBuilder = false;
+        refreshTemplateDayTools();
+        setStatus("Could not verify coach access. Template editing was disabled.", "info");
+      });
     } catch (e) {
       // Ignore malformed query parameters.
     }
