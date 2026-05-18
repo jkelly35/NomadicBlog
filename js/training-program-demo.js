@@ -1319,15 +1319,27 @@
             rest: source.rest != null ? source.rest : "",
             notes: source.notes != null ? source.notes : "",
             done: !!source.done,
-            target_reps: source.target_reps || "",
-            target_weight: source.target_weight || "",
-            target_rpe: source.target_rpe || "",
-            target_rest: source.target_rest || "",
-            target_notes: source.target_notes || ""
+            // Backfill targets from legacy template fields when explicit target_* fields are missing.
+            target_reps: source.target_reps != null ? source.target_reps : source.reps || "",
+            target_weight: source.target_weight != null ? source.target_weight : source.weight || "",
+            target_rpe: source.target_rpe != null ? source.target_rpe : source.rpe || "",
+            target_rest: source.target_rest != null ? source.target_rest : source.rest || "",
+            target_notes: source.target_notes != null ? source.target_notes : source.notes || ""
           };
         })
       };
     });
+  }
+
+  function displayAthleteInputValue(value, target, done) {
+    var current = String(value != null ? value : "");
+    var planned = String(target != null ? target : "");
+
+    if (state.isAthleteLockedView && !done && planned && current === planned) {
+      return "";
+    }
+
+    return current;
   }
 
   function isUuid(value) {
@@ -1738,7 +1750,7 @@
               '" data-set="' +
               setIdx +
               '" value="' +
-              escapeAttribute(set.reps) +
+              escapeAttribute(displayAthleteInputValue(set.reps, set.target_reps, set.done)) +
               '" placeholder="' +
               escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) +
               '" /></label>' +
@@ -1748,7 +1760,7 @@
                   '" data-set="' +
                   setIdx +
                   '" value="' +
-                  escapeAttribute(set.weight) +
+                  escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) +
                   '" placeholder="' +
                   escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
                   '" /></label>'
@@ -1759,7 +1771,7 @@
                   '" data-set="' +
                   setIdx +
                   '" value="' +
-                  escapeAttribute(set.rpe) +
+                  escapeAttribute(displayAthleteInputValue(set.rpe, set.target_rpe, set.done)) +
                   '" placeholder="' +
                   escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) +
                   '" /></label>'
@@ -1770,7 +1782,7 @@
                   '" data-set="' +
                   setIdx +
                   '" value="' +
-                  escapeAttribute(set.rest) +
+                  escapeAttribute(displayAthleteInputValue(set.rest, set.target_rest, set.done)) +
                   '" placeholder="' +
                   escapeAttribute(set.target_rest || "e.g. 90s") +
                   '" /></label>'
@@ -1780,7 +1792,7 @@
               '" data-set="' +
               setIdx +
               '" value="' +
-              escapeAttribute(set.notes) +
+              escapeAttribute(displayAthleteInputValue(set.notes, set.target_notes, set.done)) +
               '" placeholder="' +
               escapeAttribute(set.target_notes || "Notes") +
               '" /></label>' +
@@ -1894,7 +1906,7 @@
         '" data-set="' +
         setIdx +
         '" value="' +
-        escapeAttribute(set.reps) +
+        escapeAttribute(displayAthleteInputValue(set.reps, set.target_reps, set.done)) +
         '" placeholder="' +
         escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) +
         '" /></td>' +
@@ -1905,7 +1917,7 @@
             '" data-set="' +
             setIdx +
             '" value="' +
-            escapeAttribute(set.weight) +
+            escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) +
             '" placeholder="' +
             escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
             '" />'
@@ -1918,7 +1930,7 @@
             '" data-set="' +
             setIdx +
             '" value="' +
-            escapeAttribute(set.rpe) +
+            escapeAttribute(displayAthleteInputValue(set.rpe, set.target_rpe, set.done)) +
             '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" />'
           : '<span class="program-field-off">Off</span>') +
         '</td>' +
@@ -1929,7 +1941,7 @@
             '" data-set="' +
             setIdx +
             '" value="' +
-            escapeAttribute(set.rest) +
+            escapeAttribute(displayAthleteInputValue(set.rest, set.target_rest, set.done)) +
             '" placeholder="' + escapeAttribute(set.target_rest || "e.g. 90s") + '" />'
           : '<span class="program-field-off">Off</span>') +
         '</td>' +
@@ -1938,7 +1950,7 @@
         '" data-set="' +
         setIdx +
         '" value="' +
-        escapeAttribute(set.notes) +
+        escapeAttribute(displayAthleteInputValue(set.notes, set.target_notes, set.done)) +
         '" placeholder="' + escapeAttribute(set.target_notes || "Notes") + '" /></td>' +
         '<td data-mobile-label="Done"><input type="checkbox" data-field="done" data-exercise="' +
         exerciseIdx +
