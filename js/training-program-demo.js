@@ -1385,7 +1385,27 @@
       day_session_types: normalizeDaySessionTypes(payload && payload.day_session_types),
       custom_day_names: normalizeCustomDayNames(payload && payload.custom_day_names),
       structure: normalizeStructure(payload && payload.structure),
-      days: payload && payload.days ? payload.days : {}
+      days: payload && payload.days
+        ? Object.fromEntries(
+            Object.entries(payload.days).map(([dayKey, dayData]) => [
+              dayKey,
+              {
+                ...dayData,
+                exercises: dayData.exercises.map((exercise) => ({
+                  ...exercise,
+                  sets: exercise.sets.map((set) => ({
+                    ...set,
+                    target_reps: set.reps || set.target_reps || "",
+                    target_weight: set.weight || set.target_weight || "",
+                    target_rpe: set.rpe || set.target_rpe || "",
+                    target_rest: set.rest || set.target_rest || "",
+                    target_notes: set.notes || set.target_notes || ""
+                  }))
+                }))
+              }
+            ])
+          )
+        : {}
     };
     return TEMPLATE_MARKER + JSON.stringify(safePayload);
   }
