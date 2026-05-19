@@ -53,6 +53,7 @@
 
     var daySelect = document.querySelector("[data-workout-day]");
     var addExerciseBtn = document.querySelector("[data-add-exercise]");
+    var printBtn = document.querySelector("[data-print-workout]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var dayNameInput = document.querySelector("[data-template-day-name]");
@@ -109,6 +110,12 @@
     if (addExerciseBtn) {
       addExerciseBtn.addEventListener("click", function () {
         openExerciseEditor(null);
+      });
+    }
+
+    if (printBtn) {
+      printBtn.addEventListener("click", function () {
+        openWorkoutPrintPreview();
       });
     }
 
@@ -235,6 +242,7 @@
 
   function applyAthleteLockedUi() {
     var addExerciseBtn = document.querySelector("[data-add-exercise]");
+    var printBtn = document.querySelector("[data-print-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var subtitle = document.querySelector(".program-demo-subtitle");
@@ -247,6 +255,10 @@
 
     if (addExerciseBtn) {
       addExerciseBtn.style.display = "none";
+    }
+
+    if (printBtn) {
+      printBtn.style.display = "inline-flex";
     }
 
     if (clearBtn) {
@@ -282,6 +294,7 @@
     var seedSkeletonBtn = document.querySelector("[data-template-seed-skeleton]");
     var dayTypeControls = document.querySelector("[data-template-day-type-controls]");
     var dayTools = document.querySelector("[data-template-day-tools]");
+    var printBtn = document.querySelector("[data-print-workout]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var backLink = document.querySelector("[data-program-back-link]");
@@ -298,6 +311,10 @@
 
     if (dayTools) {
       dayTools.hidden = false;
+    }
+
+    if (printBtn) {
+      printBtn.style.display = "none";
     }
 
     if (saveBtn) {
@@ -947,7 +964,26 @@
   }
 
   function loadExercisesForDay() {
+    if (state.isTemplateBuilder) {
+      state.exercises = [];
+      state.exercises = normalizeExercisesArray(state.exercises);
+      return;
+    }
+
     var stored = readFromStorage(storageKeyForDay());
+    var assignedExercises = state.assignedTemplateDays && Array.isArray(state.assignedTemplateDays[state.day])
+      ? cloneExercises(state.assignedTemplateDays[state.day])
+      : null;
+
+    if (state.isAthleteLockedView && assignedExercises) {
+      state.exercises = assignedExercises;
+      if (stored && Array.isArray(stored.exercises)) {
+        state.exercises = mergeAthleteProgressIntoTemplate(state.exercises, stored.exercises);
+      }
+      state.exercises = normalizeExercisesArray(state.exercises);
+      return;
+    }
+
     if (stored && Array.isArray(stored.exercises)) {
       state.exercises = state.isAthleteLockedView
         ? normalizeAthleteLogExercises(stored.exercises)
@@ -956,15 +992,8 @@
       return;
     }
 
-    if (state.isTemplateBuilder) {
-      state.exercises = [];
-      state.exercises = normalizeExercisesArray(state.exercises);
-      return;
-    }
-
-    if (state.assignedTemplateDays && Array.isArray(state.assignedTemplateDays[state.day])) {
-      state.exercises = cloneExercises(state.assignedTemplateDays[state.day]);
-      state.exercises = normalizeExercisesArray(state.exercises);
+    if (assignedExercises) {
+      state.exercises = normalizeExercisesArray(assignedExercises);
       return;
     }
 
@@ -1265,11 +1294,34 @@
   }
 
   function createAthleteLogExercises(exercises) {
-    if (!Array.isArray(exercises)) {
+    var exercisesArray;
+    
+    // Handle both array and object-with-numeric-keys formats
+    if (Array.isArray(exercises)) {
+      exercisesArray = exercises;
+    } else if (exercises && typeof exercises === "object") {
+      // Convert object with numeric keys to array
+      exercisesArray = [];
+      for (var i = 0; i < 1000; i++) {
+        if (exercises.hasOwnProperty(i)) {
+          exercisesArray.push(exercises[i]);
+        } else {
+          break;
+        }
+      }
+      // If no numeric keys found but has an exercises property, use that
+      if (exercisesArray.length === 0 && Array.isArray(exercises.exercises)) {
+        exercisesArray = exercises.exercises;
+      }
+    } else {
       return [];
     }
 
-    return exercises.map(function (exercise) {
+    if (!Array.isArray(exercisesArray)) {
+      return [];
+    }
+
+    return exercisesArray.map(function (exercise) {
       var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
       return {
         name: exercise && exercise.name ? exercise.name : "Exercise",
@@ -1291,6 +1343,47 @@
             target_rpe: source.target_rpe != null ? source.target_rpe : source.rpe || "",
             target_rest: source.target_rest != null ? source.target_rest : source.rest || "",
             target_notes: source.target_notes != null ? source.target_notes : source.notes || ""
+          };
+        })
+      };
+    });
+  }
+
+  function mergeAthleteProgressIntoTemplate(templateExercises, storedExercises) {
+    var templateList = Array.isArray(templateExercises) ? templateExercises : [];
+    var storedList = Array.isArray(storedExercises) ? storedExercises : [];
+
+    return templateList.map(function (templateExercise, exerciseIdx) {
+      var storedExercise = storedList[exerciseIdx] && typeof storedList[exerciseIdx] === "object" ? storedList[exerciseIdx] : {};
+      var templateSets = Array.isArray(templateExercise && templateExercise.sets) ? templateExercise.sets : [];
+      var storedSets = Array.isArray(storedExercise.sets) ? storedExercise.sets : [];
+
+      return {
+        name: templateExercise && templateExercise.name ? templateExercise.name : "Exercise",
+        section: templateExercise && templateExercise.section ? templateExercise.section : "A Block",
+        mode: templateExercise && templateExercise.mode ? templateExercise.mode : "reps",
+        superset_group: templateExercise ? templateExercise.superset_group || null : null,
+        field_toggles: normalizeExerciseFieldToggles(templateExercise && templateExercise.field_toggles, templateExercise && templateExercise.mode),
+        sets: templateSets.map(function (templateSet, setIdx) {
+          var storedSet = storedSets[setIdx] && typeof storedSets[setIdx] === "object" ? storedSets[setIdx] : {};
+          var targetReps = templateSet && templateSet.target_reps != null ? templateSet.target_reps : templateSet && templateSet.reps || "";
+          var targetWeight = templateSet && templateSet.target_weight != null ? templateSet.target_weight : templateSet && templateSet.weight || "";
+          var targetRpe = templateSet && templateSet.target_rpe != null ? templateSet.target_rpe : templateSet && templateSet.rpe || "";
+          var targetRest = templateSet && templateSet.target_rest != null ? templateSet.target_rest : templateSet && templateSet.rest || "";
+          var targetNotes = templateSet && templateSet.target_notes != null ? templateSet.target_notes : templateSet && templateSet.notes || "";
+
+          return {
+            reps: storedSet.reps != null ? storedSet.reps : "",
+            weight: storedSet.weight != null ? storedSet.weight : "",
+            rpe: storedSet.rpe != null ? storedSet.rpe : "",
+            rest: storedSet.rest != null ? storedSet.rest : "",
+            notes: storedSet.notes != null ? storedSet.notes : "",
+            done: !!storedSet.done,
+            target_reps: targetReps,
+            target_weight: targetWeight,
+            target_rpe: targetRpe,
+            target_rest: targetRest,
+            target_notes: targetNotes
           };
         })
       };
@@ -1342,6 +1435,281 @@
     return current;
   }
 
+  function buildPrintTargetMarkup(target) {
+    var text = String(target != null ? target : "").trim();
+    if (!text) {
+      return "";
+    }
+
+    return '<span class="program-print-target">' + escapeHtml(text) + '</span>';
+  }
+
+  function openWorkoutPrintPreview() {
+    var previewWindow = window.open("", "nomadic-workout-print-preview", "width=1200,height=900");
+    if (!previewWindow) {
+      setStatus("Please allow pop-ups to open the print preview.", "error");
+      return;
+    }
+
+    previewWindow.document.open();
+    previewWindow.document.write(buildWorkoutPrintDocument());
+    previewWindow.document.close();
+    previewWindow.focus();
+  }
+
+  function buildWorkoutPrintDocument() {
+    var exercises = Array.isArray(state.exercises) ? state.exercises : [];
+    var programTitle = String(state.templateName || "Workout Program").trim();
+    var dayTitle = String(labelForSlot(state.day) || "Workout Day").trim();
+    var generatedAt = new Date().toLocaleDateString();
+
+    var sectionOrder = [];
+    defaultSections.forEach(function (section) {
+      sectionOrder.push(section);
+    });
+
+    exercises.forEach(function (exercise) {
+      var sectionName = String((exercise && exercise.section) || "Workout").trim() || "Workout";
+      if (sectionOrder.indexOf(sectionName) === -1) {
+        sectionOrder.push(sectionName);
+      }
+    });
+
+    var groupedExercises = sectionOrder.reduce(function (accumulator, sectionName) {
+      accumulator[sectionName] = [];
+      return accumulator;
+    }, {});
+
+    exercises.forEach(function (exercise) {
+      var sectionName = String((exercise && exercise.section) || "Workout").trim() || "Workout";
+      if (!groupedExercises[sectionName]) {
+        groupedExercises[sectionName] = [];
+      }
+      groupedExercises[sectionName].push(exercise);
+    });
+
+    var sectionEntries = sectionOrder
+      .map(function (sectionName) {
+        var exercisesInSection = groupedExercises[sectionName] || [];
+        if (!exercisesInSection.length) {
+          return null;
+        }
+
+        var sectionScore = 0;
+        var cardsHtml = exercisesInSection
+          .map(function (exerciseItem) {
+            var fieldToggles = normalizeExerciseFieldToggles(exerciseItem && exerciseItem.field_toggles, exerciseItem && exerciseItem.mode);
+            var sets = Array.isArray(exerciseItem && exerciseItem.sets) ? exerciseItem.sets : [];
+            var columns = [{ key: "reps", label: "Reps", value: function (set) { return set.target_reps || set.reps || ""; } }];
+
+            if (fieldToggles.showWeight) {
+              columns.push({ key: "weight", label: fieldToggles.secondaryLabel || "Weight / Time", value: function (set) { return set.target_weight || set.weight || ""; } });
+            }
+
+            if (fieldToggles.showRpe) {
+              columns.push({ key: "rpe", label: "RPE / Zone", value: function (set) { return set.target_rpe || set.rpe || ""; } });
+            }
+
+            if (fieldToggles.showRest) {
+              columns.push({ key: "rest", label: "Rest", value: function (set) { return set.target_rest || set.rest || ""; } });
+            }
+
+            sectionScore += Math.max(1, sets.length) * Math.max(2, columns.length);
+
+            var headerCells = ['<th class="print-col-set">Set</th>'];
+            columns.forEach(function (column) {
+              headerCells.push('<th>' + escapeHtml(column.label) + '</th>');
+            });
+
+            var rowsHtml = sets
+              .map(function (set, setIdx) {
+                var cells = ['<td class="print-col-set">' + (setIdx + 1) + '</td>'];
+                columns.forEach(function (column) {
+                  var value = column.value(set);
+                  cells.push('<td>' + escapeHtml(String(value != null ? value : "").trim() || "—") + '</td>');
+                });
+                return '<tr>' + cells.join("") + '</tr>';
+              })
+              .join("");
+
+            return [
+              '<article class="print-card">',
+              '<div class="print-card-head">',
+              '<div>',
+              '<h2 class="print-exercise-name">' + escapeHtml(exerciseItem.name || "Exercise") + '</h2>',
+              '<div class="print-exercise-mode">' + escapeHtml(modeLabel(exerciseItem.mode)) + '</div>',
+              '</div>',
+              '</div>',
+              '<table class="print-set-table">',
+              '<thead><tr>' + headerCells.join("") + '</tr></thead>',
+              '<tbody>' + rowsHtml + '</tbody>',
+              '</table>',
+              '</article>'
+            ].join("");
+          })
+          .join("");
+
+        return {
+          sectionName: sectionName,
+          cardsCount: exercisesInSection.length,
+          score: Math.max(1, sectionScore),
+          html: [
+            '<section class="print-section-block">',
+            '<div class="print-section-header">',
+            '<div class="print-section-title">' + escapeHtml(sectionName) + '</div>',
+            '<div class="print-section-count">' + exercisesInSection.length + ' exercise' + (exercisesInSection.length === 1 ? '' : 's') + '</div>',
+            '</div>',
+            '<div class="print-cards-grid">' + cardsHtml + '</div>',
+            '</section>'
+          ].join("")
+        };
+      })
+      .filter(function (entry) {
+        return !!entry;
+      });
+
+    var totalScore = sectionEntries.reduce(function (sum, entry) {
+      return sum + entry.score;
+    }, 0);
+
+    var frontScore = 0;
+    var backScore = 0;
+    var frontCards = 0;
+    var backCards = 0;
+    var frontHtmlParts = [];
+    var backHtmlParts = [];
+    var splitTarget = Math.ceil(totalScore / 2);
+
+    sectionEntries.forEach(function (entry, index) {
+      var isLast = index === sectionEntries.length - 1;
+      var shouldGoFront = frontScore < splitTarget || backHtmlParts.length === 0;
+
+      if (shouldGoFront && !isLast) {
+        frontHtmlParts.push(entry.html);
+        frontScore += entry.score;
+        frontCards += entry.cardsCount;
+      } else {
+        backHtmlParts.push(entry.html);
+        backScore += entry.score;
+        backCards += entry.cardsCount;
+      }
+    });
+
+    if (!backHtmlParts.length && frontHtmlParts.length > 1) {
+      var moved = frontHtmlParts.pop();
+      backHtmlParts.push(moved);
+      var movedEntry = sectionEntries[sectionEntries.length - 1];
+      if (movedEntry) {
+        frontScore -= movedEntry.score;
+        frontCards -= movedEntry.cardsCount;
+        backScore += movedEntry.score;
+        backCards += movedEntry.cardsCount;
+      }
+    }
+
+    function sideDensityClass(score, cards) {
+      if (score > 185 || cards > 16) {
+        return " print-side-ultra";
+      }
+      if (score > 130 || cards > 11) {
+        return " print-side-dense";
+      }
+      return "";
+    }
+
+    var frontSideClass = "print-side print-front" + sideDensityClass(frontScore, frontCards);
+    var backSideClass = "print-side print-back" + sideDensityClass(backScore, backCards);
+    var frontSectionsHtml = frontHtmlParts.join("");
+    var backSectionsHtml = backHtmlParts.join("");
+
+    return [
+      '<!DOCTYPE html>',
+      '<html lang="en">',
+      '<head>',
+      '<meta charset="UTF-8" />',
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+      '<title>' + escapeHtml(programTitle + " - " + dayTitle + " Print") + '</title>',
+      '<style>',
+      '@page { size: landscape; margin: 0.3in; }',
+      'html, body { margin: 0; padding: 0; }',
+      'body { font-family: Arial, Helvetica, sans-serif; color: #111; background: #fff; }',
+      '.sheet { padding: 0; }',
+      '.sheet-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; margin-bottom: 0.18in; }',
+      '.sheet-title { font-size: 18px; font-weight: 800; line-height: 1.1; margin: 0; }',
+      '.sheet-meta { text-align: right; font-size: 9px; color: #555; line-height: 1.35; }',
+      '.sheet-subtitle { font-size: 10px; color: #666; margin-top: 3px; }',
+      '.print-side + .print-side { break-before: page; page-break-before: always; }',
+      '.print-side-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.12em; color: #7a7268; margin-bottom: 0.05in; }',
+      '.print-sections { display: block; }',
+      '.print-section-block { border: 1px solid #cfc6b9; border-radius: 12px; padding: 0.12in 0.12in 0.1in; margin-bottom: 0.1in; background: linear-gradient(180deg, #fffdf9 0%, #fbf7f1 100%); break-inside: avoid; page-break-inside: avoid; }',
+      '.print-section-header { display: flex; justify-content: space-between; align-items: baseline; gap: 0.12in; margin-bottom: 0.08in; border-bottom: 1px solid #e4dbcf; padding-bottom: 0.05in; }',
+      '.print-section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.09em; color: #0f2d2d; }',
+      '.print-section-count { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: #7a7268; white-space: nowrap; }',
+      '.print-cards-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.08in; }',
+      '.print-card { border: 1px solid #d7cec3; border-radius: 10px; padding: 0.075in 0.085in 0.085in; break-inside: avoid; page-break-inside: avoid; background: #fff; }',
+      '.print-card-head { display: flex; justify-content: space-between; gap: 0.12in; align-items: flex-start; margin-bottom: 0.06in; }',
+      '.print-exercise-name { margin: 0; font-size: 11px; line-height: 1.12; }',
+      '.print-exercise-mode { font-size: 7px; color: #6f665e; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.03in; }',
+      '.print-set-table { width: 100%; border-collapse: collapse; table-layout: fixed; }',
+      '.print-set-table th, .print-set-table td { border: 1px solid #ded6cc; padding: 0.04in 0.045in; font-size: 7.5px; line-height: 1.18; text-align: left; vertical-align: top; }',
+      '.print-set-table th { background: #f7f3ed; font-size: 6.8px; text-transform: uppercase; letter-spacing: 0.08em; }',
+      '.print-set-table td { min-height: 0.2in; }',
+      '.print-col-set { width: 0.38in; text-align: center; font-weight: 700; }',
+      '.print-col-empty { width: 0.4in; }',
+      '.print-side-dense .print-cards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.06in; }',
+      '.print-side-dense .print-section-block { padding: 0.09in 0.09in 0.08in; margin-bottom: 0.075in; }',
+      '.print-side-dense .print-exercise-name { font-size: 10px; }',
+      '.print-side-dense .print-set-table th, .print-side-dense .print-set-table td { padding: 0.03in 0.034in; font-size: 6.6px; }',
+      '.print-side-ultra .print-cards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.045in; }',
+      '.print-side-ultra .print-section-block { padding: 0.07in 0.07in 0.06in; margin-bottom: 0.055in; border-radius: 8px; }',
+      '.print-side-ultra .print-section-header { margin-bottom: 0.04in; padding-bottom: 0.03in; }',
+      '.print-side-ultra .print-section-title { font-size: 9px; letter-spacing: 0.08em; }',
+      '.print-side-ultra .print-section-count { font-size: 6.5px; }',
+      '.print-side-ultra .print-card { padding: 0.05in 0.055in; border-radius: 7px; }',
+      '.print-side-ultra .print-exercise-name { font-size: 8.5px; line-height: 1.08; }',
+      '.print-side-ultra .print-exercise-mode { font-size: 5.6px; margin-top: 0.016in; }',
+      '.print-side-ultra .print-set-table th, .print-side-ultra .print-set-table td { padding: 0.02in 0.025in; font-size: 5.6px; line-height: 1.05; }',
+      '.print-side-ultra .print-col-set { width: 0.28in; }',
+      '.print-signoff { margin-top: 0.08in; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.2in; font-size: 8px; color: #555; }',
+      '.print-sign-line { border-top: 1px solid #888; padding-top: 0.03in; min-height: 0.18in; }',
+      '.print-footer { margin-top: 0.08in; font-size: 8px; color: #666; display: flex; justify-content: space-between; gap: 0.2in; }',
+      '</style>',
+      '<script>',
+      'window.addEventListener("load", function () {',
+      '  window.focus();',
+      '  setTimeout(function () { window.print(); }, 150);',
+      '});',
+      'window.addEventListener("afterprint", function () { window.close(); });',
+      '</script>',
+      '</head>',
+      '<body>',
+      '<div class="sheet">',
+      '<div class="sheet-header">',
+      '<div>',
+      '<h1 class="sheet-title">' + escapeHtml(programTitle) + '</h1>',
+      '<div class="sheet-subtitle">' + escapeHtml(dayTitle) + ' - exercises only</div>',
+      '</div>',
+      '<div class="sheet-meta">Printed ' + escapeHtml(generatedAt) + '<br />Target values shown for paper tracking</div>',
+      '</div>',
+      '<section class="' + frontSideClass + '">',
+      '<div class="print-side-label">Front</div>',
+      '<div class="print-sections">' + frontSectionsHtml + '</div>',
+      '</section>',
+      '<section class="' + backSideClass + '">',
+      '<div class="print-side-label">Back</div>',
+      '<div class="print-sections">' + backSectionsHtml + '</div>',
+      '<div class="print-signoff">',
+      '<div class="print-sign-line">Athlete Signature</div>',
+      '<div class="print-sign-line">Date</div>',
+      '</div>',
+      '<div class="print-footer"><span>Use this sheet to track reps, loads, and notes by hand.</span><span>' + escapeHtml(dayTitle) + '</span></div>',
+      '</div>',
+      '</section>',
+      '</body>',
+      '</html>'
+    ].join("");
+  }
+
   function isUuid(value) {
     var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidPattern.test(String(value || ""));
@@ -1385,29 +1753,7 @@
       day_session_types: normalizeDaySessionTypes(payload && payload.day_session_types),
       custom_day_names: normalizeCustomDayNames(payload && payload.custom_day_names),
       structure: normalizeStructure(payload && payload.structure),
-      days: payload && payload.days
-        ? Object.fromEntries(
-            Object.entries(payload.days).map(([dayKey, dayData]) => [
-              dayKey,
-              {
-                ...dayData,
-                exercises: Array.isArray(dayData.exercises)
-                  ? dayData.exercises.map((exercise) => ({
-                      ...exercise,
-                      sets: exercise.sets.map((set) => ({
-                        ...set,
-                        target_reps: set.reps || set.target_reps || "",
-                        target_weight: set.weight || set.target_weight || "",
-                        target_rpe: set.rpe || set.target_rpe || "",
-                        target_rest: set.rest || set.target_rest || "",
-                        target_notes: set.notes || set.target_notes || ""
-                      }))
-                    }))
-                  : []
-              }
-            ])
-          )
-        : {}
+      days: payload && payload.days ? payload.days : {}
     };
     return TEMPLATE_MARKER + JSON.stringify(safePayload);
   }
@@ -1775,7 +2121,9 @@
               escapeAttribute(displayAthleteInputValue(set.reps, set.target_reps, set.done)) +
               '" placeholder="' +
               escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) +
-              '" /></label>' +
+              '" />' +
+              buildPrintTargetMarkup(set.target_reps || modePrimaryPlaceholder(exercise.mode)) +
+              '</label>' +
               (fieldToggles.showWeight
                 ? '<label class="athlete-mobile-input"><span>Weight / Time</span><input type="text" data-field="weight" data-exercise="' +
                   exerciseIdx +
@@ -1785,7 +2133,9 @@
                   escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) +
                   '" placeholder="' +
                   escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
-                  '" /></label>'
+                  '" />' +
+                  buildPrintTargetMarkup(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
+                  '</label>'
                 : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>Weight / Time</span><em>Off</em></div>') +
               (fieldToggles.showRpe
                 ? '<label class="athlete-mobile-input"><span>RPE / Zone</span><input type="text" data-field="rpe" data-exercise="' +
@@ -1796,7 +2146,9 @@
                   escapeAttribute(displayAthleteInputValue(set.rpe, set.target_rpe, set.done)) +
                   '" placeholder="' +
                   escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) +
-                  '" /></label>'
+                  '" />' +
+                  buildPrintTargetMarkup(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) +
+                  '</label>'
                 : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>RPE / Zone</span><em>Off</em></div>') +
               (fieldToggles.showRest
                 ? '<label class="athlete-mobile-input"><span>Rest</span><input type="text" data-field="rest" data-exercise="' +
@@ -1807,7 +2159,9 @@
                   escapeAttribute(displayAthleteInputValue(set.rest, set.target_rest, set.done)) +
                   '" placeholder="' +
                   escapeAttribute(set.target_rest || "e.g. 90s") +
-                  '" /></label>'
+                  '" />' +
+                  buildPrintTargetMarkup(set.target_rest || "e.g. 90s") +
+                  '</label>'
                 : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>Rest</span><em>Off</em></div>') +
               '<label class="athlete-mobile-input athlete-mobile-input-notes"><span>Notes</span><input type="text" data-field="notes" data-exercise="' +
               exerciseIdx +
@@ -1817,7 +2171,9 @@
               escapeAttribute(displayAthleteInputValue(set.notes, set.target_notes, set.done)) +
               '" placeholder="' +
               escapeAttribute(set.target_notes || "Notes") +
-              '" /></label>' +
+              '" />' +
+              buildPrintTargetMarkup(set.target_notes || "Notes") +
+              '</label>' +
               '</div>' +
               '</div>'
             );
@@ -1931,7 +2287,9 @@
         escapeAttribute(displayAthleteInputValue(set.reps, set.target_reps, set.done)) +
         '" placeholder="' +
         escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) +
-        '" /></td>' +
+        '" />' +
+        buildPrintTargetMarkup(set.target_reps || modePrimaryPlaceholder(exercise.mode)) +
+        '</td>' +
         '<td data-mobile-label="Weight / Time">' +
         (fieldToggles.showWeight
           ? '<input type="text" data-field="weight" data-exercise="' +
@@ -1942,7 +2300,8 @@
             escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) +
             '" placeholder="' +
             escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
-            '" />'
+            '" />' +
+            buildPrintTargetMarkup(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric))
           : '<span class="program-field-off">Off</span>') +
         '</td>' +
         '<td data-mobile-label="RPE / Zone">' +
@@ -1953,7 +2312,8 @@
             setIdx +
             '" value="' +
             escapeAttribute(displayAthleteInputValue(set.rpe, set.target_rpe, set.done)) +
-            '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" />'
+            '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" />' +
+            buildPrintTargetMarkup(set.target_rpe || modeTertiaryPlaceholder(exercise.mode))
           : '<span class="program-field-off">Off</span>') +
         '</td>' +
         '<td data-mobile-label="Rest">' +
@@ -1964,7 +2324,8 @@
             setIdx +
             '" value="' +
             escapeAttribute(displayAthleteInputValue(set.rest, set.target_rest, set.done)) +
-            '" placeholder="' + escapeAttribute(set.target_rest || "e.g. 90s") + '" />'
+            '" placeholder="' + escapeAttribute(set.target_rest || "e.g. 90s") + '" />' +
+            buildPrintTargetMarkup(set.target_rest || "e.g. 90s")
           : '<span class="program-field-off">Off</span>') +
         '</td>' +
         '<td data-mobile-label="Notes"><input type="text" data-field="notes" data-exercise="' +
@@ -1973,7 +2334,9 @@
         setIdx +
         '" value="' +
         escapeAttribute(displayAthleteInputValue(set.notes, set.target_notes, set.done)) +
-        '" placeholder="' + escapeAttribute(set.target_notes || "Notes") + '" /></td>' +
+        '" placeholder="' + escapeAttribute(set.target_notes || "Notes") + '" />' +
+        buildPrintTargetMarkup(set.target_notes || "Notes") +
+        '</td>' +
         '<td data-mobile-label="Done"><input type="checkbox" data-field="done" data-exercise="' +
         exerciseIdx +
         '" data-set="' +
@@ -3077,11 +3440,11 @@
             rest: source.rest != null ? source.rest : "",
             notes: source.notes != null ? source.notes : "",
             done: !!source.done,
-            target_reps: source.target_reps != null ? source.target_reps : "",
-            target_weight: source.target_weight != null ? source.target_weight : "",
-            target_rpe: source.target_rpe != null ? source.target_rpe : "",
-            target_rest: source.target_rest != null ? source.target_rest : "",
-            target_notes: source.target_notes != null ? source.target_notes : ""
+            target_reps: source.target_reps != null ? source.target_reps : source.reps || "",
+            target_weight: source.target_weight != null ? source.target_weight : source.weight || "",
+            target_rpe: source.target_rpe != null ? source.target_rpe : source.rpe || "",
+            target_rest: source.target_rest != null ? source.target_rest : source.rest || "",
+            target_notes: source.target_notes != null ? source.target_notes : source.notes || ""
           };
         })
       };

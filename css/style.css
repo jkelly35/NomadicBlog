@@ -3664,6 +3664,20 @@ footer a:hover {
   box-shadow: 0 4px 12px rgba(159, 45, 32, 0.25);
 }
 
+.btn-print {
+  background: linear-gradient(135deg, #f5f0e8 0%, #efe5d7 100%);
+  color: #0f2d2d;
+  border: 2px solid #0f2d2d;
+}
+
+.btn-print:hover {
+  background: #fff;
+}
+
+.program-print-target {
+  display: none;
+}
+
 /* Exercise Editor Modal */
 .exercise-editor-modal {
   position: fixed;
@@ -4086,6 +4100,10 @@ footer a:hover {
     padding: 0.75rem 1.25rem;
   }
 
+  .btn-print {
+    border-width: 2px;
+  }
+
   .exercise-editor-dialog {
     width: 95%;
     max-height: 85vh;
@@ -4095,6 +4113,122 @@ footer a:hover {
     padding: 1rem;
   }
 
+
+@media print {
+  @page {
+    margin: 0.45in;
+  }
+
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  header,
+  nav,
+  .program-demo-actions-section,
+  .exercise-editor-modal,
+  .program-builder-panel,
+  [data-program-back-link],
+  [data-template-day-tools],
+  [data-template-day-type-controls],
+  .program-stats,
+  .program-demo-progress-card,
+  .athlete-mobile-log,
+  .day-select-dropdown,
+  .day-selector-title,
+  .program-demo-subtitle,
+  .profile-status {
+    display: none !important;
+  }
+
+  .program-demo-main,
+  .program-demo-container,
+  .program-demo-section,
+  .program-demo-table-wrap,
+  .program-demo-table {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  .program-demo-container {
+    padding: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .program-demo-header {
+    margin-bottom: 0.4rem !important;
+  }
+
+  .program-demo-header h1 {
+    color: #111 !important;
+    -webkit-text-fill-color: #111 !important;
+    text-shadow: none !important;
+  }
+
+  .program-demo-table-wrap {
+    display: block !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .program-demo-table {
+    border-collapse: collapse !important;
+  }
+
+  .program-demo-table th,
+  .program-demo-table td,
+  .program-demo-table input,
+  .program-demo-table .program-field-off,
+  .program-demo-table .exercise-name,
+  .program-demo-table .exercise-mode-label,
+  .program-demo-table .section-header {
+    color: #111 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .program-demo-table input[type="text"],
+  .program-demo-table input[type="number"] {
+    border: 1px solid #999 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    padding: 0.35rem 0.45rem !important;
+  }
+
+  .program-demo-table input[type="checkbox"] {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+
+  .program-demo-table .program-row-remove,
+  .program-demo-table .exercise-actions {
+    display: none !important;
+  }
+
+  .program-print-target {
+    display: block !important;
+    margin-top: 0.18rem;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    color: #6c6c6c !important;
+  }
+
+  .program-demo-table td,
+  .program-demo-table th,
+  .program-demo-section,
+  .program-demo-table-wrap,
+  .program-demo-header,
+  .section-header-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
   .exercise-editor-form {
     padding: 1rem;
   }
