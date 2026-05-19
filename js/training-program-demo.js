@@ -221,6 +221,9 @@
 
     try {
       var params = new URLSearchParams(window.location.search);
+      if (params.get("builder") === "1") {
+        return;
+      }
       var templateId = params.get("templateId");
       if (!templateId) {
         return;
@@ -294,12 +297,18 @@
     var seedSkeletonBtn = document.querySelector("[data-template-seed-skeleton]");
     var dayTypeControls = document.querySelector("[data-template-day-type-controls]");
     var dayTools = document.querySelector("[data-template-day-tools]");
+    var addExerciseBtn = document.querySelector("[data-add-exercise]");
     var printBtn = document.querySelector("[data-print-workout]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var backLink = document.querySelector("[data-program-back-link]");
     var subtitle = document.querySelector(".program-demo-subtitle");
     var kicker = document.querySelector(".program-demo-kicker");
+
+    state.isAthleteLockedView = false;
+    if (document.body) {
+      document.body.classList.remove("athlete-locked-view");
+    }
 
     if (panel) {
       panel.hidden = false;
@@ -313,15 +322,21 @@
       dayTools.hidden = false;
     }
 
+    if (addExerciseBtn) {
+      addExerciseBtn.style.display = "inline-flex";
+    }
+
     if (printBtn) {
       printBtn.style.display = "none";
     }
 
     if (saveBtn) {
+      saveBtn.style.display = "inline-flex";
       saveBtn.innerHTML = "<span>💾</span> Save Template";
     }
 
     if (clearBtn) {
+      clearBtn.style.display = "inline-flex";
       clearBtn.innerHTML = "<span>🧹</span> Clear Day";
     }
 
@@ -964,12 +979,6 @@
   }
 
   function loadExercisesForDay() {
-    if (state.isTemplateBuilder) {
-      state.exercises = [];
-      state.exercises = normalizeExercisesArray(state.exercises);
-      return;
-    }
-
     var stored = readFromStorage(storageKeyForDay());
     var assignedExercises = state.assignedTemplateDays && Array.isArray(state.assignedTemplateDays[state.day])
       ? cloneExercises(state.assignedTemplateDays[state.day])
@@ -992,6 +1001,12 @@
       return;
     }
 
+    if (state.isTemplateBuilder) {
+      state.exercises = [];
+      state.exercises = normalizeExercisesArray(state.exercises);
+      return;
+    }
+
     if (assignedExercises) {
       state.exercises = normalizeExercisesArray(assignedExercises);
       return;
@@ -1002,6 +1017,10 @@
   }
 
   function saveExercisesForDay(silent) {
+    if (state.isTemplateBuilder) {
+      syncTemplateTargetsFromPlannerValues(state.exercises);
+    }
+
     state.exercises = normalizeExercisesArray(state.exercises);
     var payload = {
       exercises: state.exercises,
@@ -1046,7 +1065,7 @@
     };
 
     getAllSlotKeys().forEach(function (slotKey) {
-      payload.days[slotKey] = readExercisesForDayFromStorage(slotKey);
+      payload.days[slotKey] = syncTemplateTargetsFromPlannerValues(readExercisesForDayFromStorage(slotKey));
     });
 
     if (!state.client) {
@@ -1134,6 +1153,47 @@
       return payload.exercises;
     }
     return [];
+  }
+
+  function syncTemplateTargetsFromPlannerValues(exercises) {
+    if (!Array.isArray(exercises)) {
+      return [];
+    }
+
+    return exercises.map(function (exercise) {
+      var safeExercise = exercise && typeof exercise === "object" ? exercise : {};
+      var sets = Array.isArray(safeExercise.sets) ? safeExercise.sets : [];
+
+      return {
+        name: safeExercise.name || "Exercise",
+        section: safeExercise.section || "A Block",
+        mode: safeExercise.mode || "reps",
+        superset_group: safeExercise.superset_group || null,
+        field_toggles: normalizeExerciseFieldToggles(safeExercise.field_toggles, safeExercise.mode),
+        sets: sets.map(function (set) {
+          var source = set && typeof set === "object" ? set : {};
+          var reps = source.reps != null ? source.reps : "";
+          var weight = source.weight != null ? source.weight : "";
+          var rpe = source.rpe != null ? source.rpe : "";
+          var rest = source.rest != null ? source.rest : "";
+          var notes = source.notes != null ? source.notes : "";
+
+          return {
+            reps: reps,
+            weight: weight,
+            rpe: rpe,
+            rest: rest,
+            notes: notes,
+            done: !!source.done,
+            target_reps: reps,
+            target_weight: weight,
+            target_rpe: rpe,
+            target_rest: rest,
+            target_notes: notes
+          };
+        })
+      };
+    });
   }
 
   function hydrateDraftFromTemplate(templateId) {
@@ -1338,15 +1398,33 @@
             rest: "",
             notes: "",
             done: false,
-            target_reps: source.target_reps != null ? source.target_reps : source.reps || "",
-            target_weight: source.target_weight != null ? source.target_weight : source.weight || "",
-            target_rpe: source.target_rpe != null ? source.target_rpe : source.rpe || "",
-            target_rest: source.target_rest != null ? source.target_rest : source.rest || "",
-            target_notes: source.target_notes != null ? source.target_notes : source.notes || ""
+            target_reps: resolveTemplateTarget(source.target_reps, source.reps),
+            target_weight: resolveTemplateTarget(source.target_weight, source.weight),
+            target_rpe: resolveTemplateTarget(source.target_rpe, source.rpe),
+            target_rest: resolveTemplateTarget(source.target_rest, source.rest),
+            target_notes: resolveTemplateTarget(source.target_notes, source.notes)
           };
         })
       };
     });
+  }
+
+  function resolveTemplateTarget(explicitValue, fallbackValue) {
+    if (explicitValue != null) {
+      if (typeof explicitValue !== "string") {
+        return explicitValue;
+      }
+
+      if (explicitValue.trim() !== "") {
+        return explicitValue;
+      }
+    }
+
+    if (fallbackValue == null) {
+      return "";
+    }
+
+    return fallbackValue;
   }
 
   function mergeAthleteProgressIntoTemplate(templateExercises, storedExercises) {
@@ -1366,11 +1444,11 @@
         field_toggles: normalizeExerciseFieldToggles(templateExercise && templateExercise.field_toggles, templateExercise && templateExercise.mode),
         sets: templateSets.map(function (templateSet, setIdx) {
           var storedSet = storedSets[setIdx] && typeof storedSets[setIdx] === "object" ? storedSets[setIdx] : {};
-          var targetReps = templateSet && templateSet.target_reps != null ? templateSet.target_reps : templateSet && templateSet.reps || "";
-          var targetWeight = templateSet && templateSet.target_weight != null ? templateSet.target_weight : templateSet && templateSet.weight || "";
-          var targetRpe = templateSet && templateSet.target_rpe != null ? templateSet.target_rpe : templateSet && templateSet.rpe || "";
-          var targetRest = templateSet && templateSet.target_rest != null ? templateSet.target_rest : templateSet && templateSet.rest || "";
-          var targetNotes = templateSet && templateSet.target_notes != null ? templateSet.target_notes : templateSet && templateSet.notes || "";
+          var targetReps = resolveTemplateTarget(templateSet && templateSet.target_reps, templateSet && templateSet.reps);
+          var targetWeight = resolveTemplateTarget(templateSet && templateSet.target_weight, templateSet && templateSet.weight);
+          var targetRpe = resolveTemplateTarget(templateSet && templateSet.target_rpe, templateSet && templateSet.rpe);
+          var targetRest = resolveTemplateTarget(templateSet && templateSet.target_rest, templateSet && templateSet.rest);
+          var targetNotes = resolveTemplateTarget(templateSet && templateSet.target_notes, templateSet && templateSet.notes);
 
           return {
             reps: storedSet.reps != null ? storedSet.reps : "",
@@ -2492,6 +2570,20 @@
       set[field] = !!input.checked;
     } else {
       set[field] = input.value;
+
+      if (state.isTemplateBuilder) {
+        var targetFieldMap = {
+          reps: "target_reps",
+          weight: "target_weight",
+          rpe: "target_rpe",
+          rest: "target_rest",
+          notes: "target_notes"
+        };
+        var targetField = targetFieldMap[field];
+        if (targetField) {
+          set[targetField] = input.value;
+        }
+      }
     }
 
     renderCompletionSummary();

@@ -1,3 +1,570 @@
+// Climbing metrics and level estimation
+const climbingMetrics = [
+  {
+    name: "Max Hang Str: Wt., 20mm, 10sec",
+    levels: {
+      "≤ V3": [1.06, 1.32],
+      "V4": [1.09, 1.31],
+      "V5": [1.19, 1.44],
+      "V6": [1.27, 1.48],
+      "V7": [1.24, 1.57],
+      "V8": [1.27, 1.60],
+      "V9": [1.32, 1.61],
+      "V10": [1.41, 1.74]
+    }
+  },
+  {
+    name: "Weighted Pull-Up Str:Wt, 1 Rep Max",
+    levels: {
+      "≤ V3": [1.14, 1.42],
+      "V4": [1.32, 1.53],
+      "V5": [1.37, 1.64],
+      "V6": [1.35, 1.64],
+      "V7": [1.37, 1.63],
+      "V8": [1.42, 1.69],
+      "V9": [1.39, 1.73],
+      "V10": [1.51, 1.80]
+    }
+  },
+  {
+    name: "Campus Max Reach, inches",
+    levels: {
+      "≤ V3": [20, 31],
+      "V4": [27, 32],
+      "V5": [27, 32],
+      "V6": [28, 36],
+      "V7": [28, 37],
+      "V8": [31, 38],
+      "V9": [30, 40],
+      "V10": [31, 40]
+    }
+  },
+  {
+    name: "7:3 Repeaters at Bodyweight, 20mm, sec",
+    levels: {
+      "≤ V3": [54, 106],
+      "V4": [43, 124],
+      "V5": [52, 141],
+      "V6": [65, 151],
+      "V7": [73, 178],
+      "V8": [83, 178],
+      "V9": [76, 183],
+      "V10": [85, 194]
+    }
+  },
+  {
+    name: "Continuous Hang Time, 20mm, sec",
+    levels: {
+      "≤ V3": [13, 41],
+      "V4": [15, 43],
+      "V5": [23, 51],
+      "V6": [28, 54],
+      "V7": [24, 65],
+      "V8": [33, 64],
+      "V9": [34, 67],
+      "V10": [36, 76]
+    }
+  },
+  {
+    name: "Max Pull-Ups, reps",
+    levels: {
+      "≤ V3": [6, 15],
+      "V4": [10, 18],
+      "V5": [11, 20],
+      "V6": [11, 20],
+      "V7": [12, 20],
+      "V8": [12, 21],
+      "V9": [11, 22],
+      "V10": [14, 24]
+    }
+  },
+  {
+    name: "Max Push-Ups, reps",
+    levels: {
+      "≤ V3": [14, 38],
+      "V4": [20, 45],
+      "V5": [21, 45],
+      "V6": [22, 39],
+      "V7": [21, 42],
+      "V8": [20, 49],
+      "V9": [20, 40],
+      "V10": [22, 42]
+    }
+  }
+];
+
+const climbingMetricsMale = [
+  {
+    name: "Max Hang Str: Wt., 20mm, 10sec",
+    levels: {
+      "5.11a/b": [1.10, 1.38],
+      "5.11c/d": [1.09, 1.42],
+      "5.12a/b": [1.19, 1.54],
+      "5.12c/d": [1.25, 1.58],
+      "5.13a/b": [1.27, 1.60],
+      "5.13c/d": [1.33, 1.68]
+    }
+  },
+  {
+    name: "Weighted Pull-Up Str:Wt, 1 Rep Max",
+    levels: {
+      "5.11a/b": [1.19, 1.61],
+      "5.11c/d": [1.30, 1.58],
+      "5.12a/b": [1.33, 1.64],
+      "5.12c/d": [1.37, 1.67],
+      "5.13a/b": [1.42, 1.73],
+      "5.13c/d": [1.47, 1.78]
+    }
+  },
+  {
+    name: "Campus Max Reach, inches",
+    levels: {
+      "5.11a/b": [20, 38],
+      "5.11c/d": [19, 37],
+      "5.12a/b": [27, 37],
+      "5.12c/d": [28, 37],
+      "5.13a/b": [30, 38],
+      "5.13c/d": [28, 40]
+    }
+  },
+  {
+    name: "Long Reach Foot-On Campus Time, sec",
+    levels: {
+      "5.11a/b": [26, 57],
+      "5.11c/d": [22, 98],
+      "5.12a/b": [41, 109],
+      "5.12c/d": [51, 141],
+      "5.13a/b": [61, 141],
+      "5.13c/d": [52, 139]
+    }
+  },
+  {
+    name: "Short Reach Foot-On Campus Time, sec",
+    levels: {
+      "5.11a/b": [40, 83],
+      "5.11c/d": [51, 138],
+      "5.12a/b": [41, 183],
+      "5.12c/d": [70, 254],
+      "5.13a/b": [84, 275],
+      "5.13c/d": [126, 316]
+    }
+  },
+  {
+    name: "7:3 Repeaters at Bodyweight, 20mm, sec",
+    levels: {
+      "5.11a/b": [40, 123],
+      "5.11c/d": [47, 130],
+      "5.12a/b": [59, 161],
+      "5.12c/d": [86, 183],
+      "5.13a/b": [100, 209],
+      "5.13c/d": [107, 214]
+    }
+  },
+  {
+    name: "Continuous Hang Time, 20mm, sec",
+    levels: {
+      "5.11a/b": [16, 40],
+      "5.11c/d": [16, 48],
+      "5.12a/b": [25, 57],
+      "5.12c/d": [29, 69],
+      "5.13a/b": [32, 64],
+      "5.13c/d": [46, 74]
+    }
+  },
+  {
+    name: "Max Pull-Ups, reps",
+    levels: {
+      "5.11a/b": [7, 18],
+      "5.11c/d": [10, 19],
+      "5.12a/b": [10, 20],
+      "5.12c/d": [12, 20],
+      "5.13a/b": [12, 23],
+      "5.13c/d": [14, 26]
+    }
+  },
+  {
+    name: "Max Push-Ups, reps",
+    levels: {
+      "5.11a/b": [14, 46],
+      "5.11c/d": [19, 46],
+      "5.12a/b": [20, 42],
+      "5.12c/d": [21, 37],
+      "5.13a/b": [20, 51],
+      "5.13c/d": [20, 46]
+    }
+  }
+];
+
+const climbingMetricsFemale = [
+  {
+    name: "Max Hang Str: Wt., 20mm, 10sec",
+    levels: {
+      "≤ V3": [1.00, 1.19],
+      "V4": [1.07, 1.31],
+      "V5": [1.09, 1.42],
+      "V6": [1.11, 1.46],
+      "V7": [1.19, 1.52],
+      "V8": [1.20, 1.50],
+      "V9": [1.31, 1.69],
+      "V10": [1.44, 1.83]
+    }
+  },
+  {
+    name: "Weighted Pull-Up Str:Wt, 1 Rep Max",
+    levels: {
+      "≤ V3": [1.01, 1.22],
+      "V4": [1.06, 1.38],
+      "V5": [1.14, 1.40],
+      "V6": [1.15, 1.39],
+      "V7": [1.25, 1.48],
+      "V8": [1.25, 1.54],
+      "V9": [1.35, 1.63],
+      "V10": [1.40, 1.63]
+    }
+  },
+  {
+    name: "Campus Max Reach, inches",
+    levels: {
+      "≤ V3": [8, 23],
+      "V4": [15, 28],
+      "V5": [17, 32],
+      "V6": [24, 31],
+      "V7": [25, 33],
+      "V8": [23, 31],
+      "V9": [27, 32],
+      "V10": [27, 32]
+    }
+  },
+  {
+    name: "7:3 Repeaters at Bodyweight, 20mm, sec",
+    levels: {
+      "≤ V3": [18, 75],
+      "V4": [30, 99],
+      "V5": [47, 132],
+      "V6": [55, 138],
+      "V7": [69, 170],
+      "V8": [52, 173],
+      "V9": [66, 198],
+      "V10": [73, 220]
+    }
+  },
+  {
+    name: "Continuous Hang Time, 20mm, sec",
+    levels: {
+      "≤ V3": [8, 27],
+      "V4": [14, 45],
+      "V5": [17, 53],
+      "V6": [22, 52],
+      "V7": [31, 60],
+      "V8": [31, 62],
+      "V9": [35, 76],
+      "V10": [50, 71]
+    }
+  },
+  {
+    name: "Max Pull-Ups, reps",
+    levels: {
+      "≤ V3": [1, 8],
+      "V4": [2, 12],
+      "V5": [6, 12],
+      "V6": [6, 12],
+      "V7": [8, 16],
+      "V8": [8, 14],
+      "V9": [9, 18],
+      "V10": [13, 18]
+    }
+  },
+  {
+    name: "Max Push-Ups, reps",
+    levels: {
+      "≤ V3": [9, 18],
+      "V4": [5, 28],
+      "V5": [13, 30],
+      "V6": [10, 30],
+      "V7": [12, 32],
+      "V8": [9, 30],
+      "V9": [14, 40],
+      "V10": [21, 33]
+    }
+  }
+];
+
+const sportClimbingMetricsFemale = [
+  {
+    name: "Max Hang Str: Wt., 20mm, 10sec",
+    levels: {
+      "5.11a/b": [0.99, 1.37],
+      "5.11c/d": [1.00, 1.35],
+      "5.12a/b": [1.14, 1.49],
+      "5.12c/d": [1.07, 1.63],
+      "5.13a/b": [1.17, 1.59],
+      "5.13c/d": [1.24, 1.58]
+    }
+  },
+  {
+    name: "Weighted Pull-Up Str:Wt, 1 Rep Max",
+    levels: {
+      "5.11a/b": [1.05, 1.42],
+      "5.11c/d": [1.05, 1.36],
+      "5.12a/b": [1.14, 1.45],
+      "5.12c/d": [1.16, 1.50],
+      "5.13a/b": [1.24, 1.47],
+      "5.13c/d": [1.41, 1.66]
+    }
+  },
+  {
+    name: "Campus Max Reach, inches",
+    levels: {
+      "5.11a/b": [18, 32],
+      "5.11c/d": [13, 26],
+      "5.12a/b": [16, 35],
+      "5.12c/d": [20, 28],
+      "5.13a/b": [24, 33],
+      "5.13c/d": [30, 35]
+    }
+  },
+  {
+    name: "Long Reach Foot-On Campus Time, sec",
+    levels: {
+      "5.11a/b": [27, 73],
+      "5.11c/d": [33, 87],
+      "5.12a/b": [57, 103],
+      "5.12c/d": [57, 146],
+      "5.13a/b": [51, 164],
+      "5.13c/d": [47, 194]
+    }
+  },
+  {
+    name: "Short Reach Foot-On Campus Time, sec",
+    levels: {
+      "5.11a/b": [31, 121],
+      "5.11c/d": [40, 126],
+      "5.12a/b": [79, 169],
+      "5.12c/d": [60, 223],
+      "5.13a/b": [69, 249],
+      "5.13c/d": [89, 417]
+    }
+  },
+  {
+    name: "7:3 Repeaters at Bodyweight, 20mm, sec",
+    levels: {
+      "5.11a/b": [34, 115],
+      "5.11c/d": [25, 91],
+      "5.12a/b": [41, 151],
+      "5.12c/d": [59, 195],
+      "5.13a/b": [58, 195],
+      "5.13c/d": [50, 185]
+    }
+  },
+  {
+    name: "Continuous Hang Time, 20mm, sec",
+    levels: {
+      "5.11a/b": [11, 38],
+      "5.11c/d": [7, 37],
+      "5.12a/b": [22, 54],
+      "5.12c/d": [19, 62],
+      "5.13a/b": [31, 63],
+      "5.13c/d": [33, 73]
+    }
+  },
+  {
+    name: "Max Pull-Ups, reps",
+    levels: {
+      "5.11a/b": [2, 12],
+      "5.11c/d": [2, 11],
+      "5.12a/b": [5, 14],
+      "5.12c/d": [6, 15],
+      "5.13a/b": [8, 14],
+      "5.13c/d": [12, 24]
+    }
+  },
+  {
+    name: "Max Push-Ups, reps",
+    levels: {
+      "5.11a/b": [6, 30],
+      "5.11c/d": [7, 27],
+      "5.12a/b": [12, 28],
+      "5.12c/d": [12, 34],
+      "5.13a/b": [10, 27],
+      "5.13c/d": [18, 51]
+    }
+  }
+];
+
+// Sport climbing metrics for males (structure matches sportClimbingMetricsFemale)
+const sportClimbingMetricsMale = [
+  {
+    name: "Max Hang Str: Wt., 20mm, 10sec",
+    levels: {
+      "5.11a/b": [1.10, 1.38],
+      "5.11c/d": [1.09, 1.42],
+      "5.12a/b": [1.19, 1.54],
+      "5.12c/d": [1.25, 1.58],
+      "5.13a/b": [1.27, 1.60],
+      "5.13c/d": [1.33, 1.68]
+    }
+  },
+  {
+    name: "Weighted Pull-Up Str:Wt, 1 Rep Max",
+    levels: {
+      "5.11a/b": [1.19, 1.61],
+      "5.11c/d": [1.30, 1.58],
+      "5.12a/b": [1.33, 1.64],
+      "5.12c/d": [1.37, 1.67],
+      "5.13a/b": [1.42, 1.73],
+      "5.13c/d": [1.47, 1.78]
+    }
+  },
+  {
+    name: "Campus Max Reach, inches",
+    levels: {
+      "5.11a/b": [20, 38],
+      "5.11c/d": [19, 37],
+      "5.12a/b": [27, 37],
+      "5.12c/d": [28, 37],
+      "5.13a/b": [30, 38],
+      "5.13c/d": [28, 40]
+    }
+  },
+  {
+    name: "Long Reach Foot-On Campus Time, sec",
+    levels: {
+      "5.11a/b": [26, 57],
+      "5.11c/d": [22, 98],
+      "5.12a/b": [41, 109],
+      "5.12c/d": [51, 141],
+      "5.13a/b": [61, 141],
+      "5.13c/d": [52, 139]
+    }
+  },
+  {
+    name: "Short Reach Foot-On Campus Time, sec",
+    levels: {
+      "5.11a/b": [40, 83],
+      "5.11c/d": [51, 138],
+      "5.12a/b": [41, 183],
+      "5.12c/d": [70, 254],
+      "5.13a/b": [84, 275],
+      "5.13c/d": [126, 316]
+    }
+  },
+  {
+    name: "7:3 Repeaters at Bodyweight, 20mm, sec",
+    levels: {
+      "5.11a/b": [40, 123],
+      "5.11c/d": [47, 130],
+      "5.12a/b": [59, 161],
+      "5.12c/d": [86, 183],
+      "5.13a/b": [100, 209],
+      "5.13c/d": [107, 214]
+    }
+  },
+  {
+    name: "Continuous Hang Time, 20mm, sec",
+    levels: {
+      "5.11a/b": [16, 40],
+      "5.11c/d": [16, 48],
+      "5.12a/b": [25, 57],
+      "5.12c/d": [29, 69],
+      "5.13a/b": [32, 64],
+      "5.13c/d": [46, 74]
+    }
+  },
+  {
+    name: "Max Pull-Ups, reps",
+    levels: {
+      "5.11a/b": [7, 18],
+      "5.11c/d": [10, 19],
+      "5.12a/b": [10, 20],
+      "5.12c/d": [12, 20],
+      "5.13a/b": [12, 23],
+      "5.13c/d": [14, 26]
+    }
+  },
+  {
+    name: "Max Push-Ups, reps",
+    levels: {
+      "5.11a/b": [14, 46],
+      "5.11c/d": [19, 46],
+      "5.12a/b": [20, 42],
+      "5.12c/d": [21, 37],
+      "5.13a/b": [20, 51],
+      "5.13c/d": [20, 46]
+    }
+  }
+];
+
+function estimateClimbingLevel(metricName, result) {
+  var metric = climbingMetrics.find(function (m) {
+    return m.name === metricName;
+  });
+
+  if (!metric || result === "Not recorded") {
+    return "Unknown";
+  }
+
+  var levels = metric.levels;
+  for (var level in levels) {
+    var range = levels[level];
+    if (result >= range[0] && result <= range[1]) {
+      return level;
+    }
+  }
+
+  return "Unknown";
+}
+
+// Estimate sport climbing level based on scores and gender
+function estimateSportClimbingLevel(scores, gender) {
+  const metrics = gender === "male" ? sportClimbingMetricsMale : sportClimbingMetricsFemale;
+  const levelScores = {};
+
+  metrics.forEach((metric) => {
+    const score = scores[metric.name];
+    if (score !== undefined) {
+      for (const [level, range] of Object.entries(metric.levels)) {
+        if (score >= range[0] && score <= range[1]) {
+          levelScores[level] = (levelScores[level] || 0) + 1;
+          break;
+        }
+      }
+    }
+  });
+
+  // Determine the most frequent level
+  let estimatedLevel = null;
+  let maxCount = 0;
+  for (const [level, count] of Object.entries(levelScores)) {
+    if (count > maxCount) {
+      maxCount = count;
+      estimatedLevel = level;
+    }
+  }
+
+  return estimatedLevel || "No level estimated";
+}
+
+function estimateClimbingLevelForGender(metricName, result, gender) {
+  var metrics = gender === "female" ? climbingMetricsFemale : climbingMetrics;
+  var metric = metrics.find(function (m) {
+    return m.name === metricName;
+  });
+
+  if (!metric || result === "Not recorded") {
+    return "Unknown";
+  }
+
+  var levels = metric.levels;
+  for (var level in levels) {
+    var range = levels[level];
+    if (result >= range[0] && result <= range[1]) {
+      return level;
+    }
+  }
+
+  return "Unknown";
+}
+
 (function () {
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
   var METRICS_COLLAPSE_KEY = "nomadic.metricsSectionCollapsed";
@@ -3404,16 +3971,28 @@
     try {
       var doc = new JsPdfCtor({ unit: "pt", format: "letter" });
       var report = buildMetricSummaryReport(state.metricsLatest);
+      var boulderingEstimate = estimateBoulderingLevelFromMetrics(state.metricsLatest);
+      var boulderingBoxplotSignal = estimateBoulderingBoxplotSignal(state.metricsLatest);
+      var sportClimbingEstimate = estimateSportClimbingLevelFromMetrics(state.metricsLatest);
+      var sportBoxplotSignal = estimateSportBoxplotSignal(state.metricsLatest);
+      var quadrantInsight = estimateClimbingStrengthQuadrant(state.metricsLatest);
+      var gradeAdvice = buildClimbingGradeAdvice(
+        state.metricsLatest,
+        boulderingBoxplotSignal,
+        sportBoxplotSignal
+      );
       var pageWidth = doc.internal.pageSize.getWidth();
       var pageHeight = doc.internal.pageSize.getHeight();
       var margin = 40;
       var maxWidth = pageWidth - margin * 2;
-      var y = 48;
+      var y = margin;
       var lineHeight = 14;
       var athleteLabel =
         (state.profile && state.profile.name) ||
         (state.viewUser && state.viewUser.email) ||
         "Athlete";
+      var sports = (state.profile && state.profile.sports) || [];
+      var sportOverview = (state.profile && state.profile.sport_overview) || {};
 
       function ensureSpace(requiredHeight) {
         if (y + requiredHeight <= pageHeight - margin) {
@@ -3423,9 +4002,12 @@
         y = margin;
       }
 
-      function writeWrapped(text, fontSize, color) {
+      function writeWrapped(text, fontSize, color, bold) {
         var safeText = String(text || "");
         doc.setFontSize(fontSize || 10);
+        if (bold) {
+          doc.setFont(undefined, "bold");
+        }
         if (Array.isArray(color) && color.length === 3) {
           doc.setTextColor(color[0], color[1], color[2]);
         } else {
@@ -3435,51 +4017,934 @@
         ensureSpace(lines.length * lineHeight + 2);
         doc.text(lines, margin, y);
         y += lines.length * lineHeight;
+        if (bold) {
+          doc.setFont(undefined, "normal");
+        }
       }
 
-      doc.setFontSize(18);
-      doc.setTextColor(20, 20, 20);
-      doc.text("Athlete Testing Summary", margin, y);
-      y += 20;
+      function drawSeparator() {
+        ensureSpace(10);
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, y + 4, pageWidth - margin, y + 4);
+        y += 10;
+      }
 
-      writeWrapped("Athlete: " + athleteLabel, 11);
-      writeWrapped("Generated: " + formatDate(new Date().toISOString()), 11);
-      writeWrapped("Metrics Included: " + String(report.rows.length), 11);
+      // Header
+      doc.setFontSize(22);
+      doc.setTextColor(20, 100, 180);
+      doc.setFont(undefined, "bold");
+      doc.text("PERFORMANCE REPORT", margin, y);
+      y += 25;
+      doc.setFont(undefined, "normal");
+
+      // Athlete Information Section
+      doc.setFontSize(11);
+      doc.setTextColor(33, 33, 33);
+      writeWrapped("Athlete: " + athleteLabel, 12, [33, 33, 33], true);
+      
+      if (sports && sports.length) {
+        writeWrapped("Sports: " + sports.join(", "), 11);
+      }
+
+      writeWrapped("Report Date: " + formatDate(new Date().toISOString()), 11);
+      writeWrapped("Metrics Assessed: " + String(report.rows.length), 11);
+      writeWrapped("Estimated Bouldering Level: " + boulderingEstimate.estimatedLevel, 11, [33, 33, 33], true);
+      writeWrapped("Bouldering Estimate Details: " + boulderingEstimate.message, 9, [85, 85, 85]);
+      writeWrapped("Bouldering Boxplot Signal: " + boulderingBoxplotSignal.band, 11, [33, 33, 33], true);
+      writeWrapped("Boxplot Signal Details: " + boulderingBoxplotSignal.message, 9, [85, 85, 85]);
+      writeWrapped("Estimated Sport Climbing Level: " + sportClimbingEstimate.estimatedLevel, 11, [33, 33, 33], true);
+      writeWrapped("Sport Estimate Details: " + sportClimbingEstimate.message, 9, [85, 85, 85]);
+      writeWrapped("Sport Boxplot Signal: " + sportBoxplotSignal.band, 11, [33, 33, 33], true);
+      writeWrapped("Sport Boxplot Details: " + sportBoxplotSignal.message, 9, [85, 85, 85]);
+      writeWrapped("Pull/Finger Strength Profile: " + quadrantInsight.quadrant, 11, [33, 33, 33], true);
+      writeWrapped("Quadrant Interpretation: " + quadrantInsight.message, 9, [85, 85, 85]);
+      y += 8;
+
+      drawSeparator();
+
+      // Performance Summary Section
+      writeWrapped("PERFORMANCE SUMMARY", 13, [20, 100, 180], true);
       y += 4;
 
+      var ratingCounts = categorizeRatings(report.rows);
+      if (ratingCounts.excellent > 0) {
+        writeWrapped("• Excellent Performance: " + ratingCounts.excellent + " metric(s)", 10);
+      }
+      if (ratingCounts.good > 0) {
+        writeWrapped("• Good Performance: " + ratingCounts.good + " metric(s)", 10);
+      }
+      if (ratingCounts.average > 0) {
+        writeWrapped("• Average Performance: " + ratingCounts.average + " metric(s)", 10);
+      }
+      if (ratingCounts.developing > 0) {
+        writeWrapped("• Areas for Development: " + ratingCounts.developing + " metric(s)", 10);
+      }
       y += 8;
-      writeWrapped("Metric-by-Metric Normative Comparison", 13);
+
+      if (gradeAdvice && gradeAdvice.lines && gradeAdvice.lines.length) {
+        drawSeparator();
+        writeWrapped("GOAL-GRADE TRAINING ADVICE", 13, [20, 100, 180], true);
+        y += 4;
+        writeWrapped("Grade Context: " + gradeAdvice.context, 10, [85, 85, 85]);
+        gradeAdvice.lines.forEach(function (line) {
+          writeWrapped("• " + line, 10);
+          y += 4;
+        });
+        y += 6;
+      }
+
+      // Sport-Specific Context
+      if (sports && sports.length) {
+        drawSeparator();
+        writeWrapped("SPORT-SPECIFIC ANALYSIS", 13, [20, 100, 180], true);
+        y += 4;
+
+        sports.forEach(function (sport) {
+          var sportAnalysis = getSportSpecificRecommendations(sport, report.rows, sportOverview);
+          writeWrapped(sportAnalysis.title, 11, [60, 60, 60], true);
+          writeWrapped(sportAnalysis.description, 10);
+          y += 6;
+        });
+      }
+
+      y += 4;
+      drawSeparator();
+
+      // Detailed Metrics Section
+      writeWrapped("DETAILED METRIC ANALYSIS", 13, [20, 100, 180], true);
+      y += 8;
 
       report.rows.forEach(function (row, index) {
-        ensureSpace(120);
-        writeWrapped(String(index + 1) + ". " + row.name, 12);
+        ensureSpace(100);
+        writeWrapped(String(index + 1) + ". " + row.name, 11, [33, 33, 33], true);
         writeWrapped("Result: " + row.result, 10);
-        writeWrapped("Rating: " + row.rating, 10);
-        writeWrapped("Normative Reference: " + row.reference, 10);
-        writeWrapped("Interpretation: " + row.meaning, 10);
-        y += 4;
+        writeWrapped("Performance Level: " + row.rating, 10, getRatingColor(row.rating));
+        writeWrapped("Reference Range: " + row.reference, 9, [85, 85, 85]);
+        writeWrapped(row.meaning, 9);
+        y += 8;
       });
 
       y += 8;
+      drawSeparator();
+
+      // Key Takeaways
+      writeWrapped("KEY TAKEAWAYS & RECOMMENDATIONS", 13, [20, 100, 180], true);
+      y += 4;
+
+      var takeaways = generateKeyTakeaways(report.rows, sports);
+      takeaways.forEach(function (takeaway) {
+        writeWrapped("• " + takeaway, 10);
+        y += 6;
+      });
+
+      y += 8;
+      drawSeparator();
+
+      // Footer Note
       writeWrapped(
-        "Note: Normative values are guideposts and should be interpreted with sport demands, injury history, and coaching judgment.",
-        9,
-        [85, 85, 85]
+        "This performance report compares individual metrics against research-based normative standards. Results should be interpreted in context of sport demands, training history, injury status, and coaching judgment. Trends over time are more meaningful than single data points. Consult with your coach to develop targeted training interventions.",
+        8,
+        [100, 100, 100]
       );
 
-      var safeAthlete = String(athleteLabel || "athlete")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "") || "athlete";
-      var fileName = "metric-summary-" + safeAthlete + ".pdf";
-      doc.save(fileName);
-      setMetricsStatus("Metric summary PDF generated.", "success");
+      var pdfBlob = doc.output('blob');
+      var pdfUrl = URL.createObjectURL(pdfBlob);
+      window.open(pdfUrl, '_blank');
+      setMetricsStatus("Performance Report opened in new page.", "success");
     } catch (error) {
       setMetricsStatus(
-        error && error.message ? error.message : "Failed to generate metric summary PDF.",
+        error && error.message ? error.message : "Failed to generate performance report.",
         "error"
       );
     }
+  }
+
+  function estimateBoulderingLevelFromMetrics(metrics) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var table = sex === "female" ? climbingMetricsFemale : sex === "male" ? climbingMetrics : null;
+    if (!table) {
+      return {
+        estimatedLevel: "Not enough information",
+        message: "Athlete sex is not set to male/female, so sex-specific bouldering norms cannot be applied yet."
+      };
+    }
+
+    var normEstimate = estimateClimbingLevelFromNormTable(metrics, table, "bouldering");
+    var boxplotSignal = estimateBoulderingBoxplotSignal(metrics);
+
+    if (boxplotSignal.band === "Not enough information") {
+      return normEstimate;
+    }
+
+    if (normEstimate.estimatedLevel === "Not enough information") {
+      return {
+        estimatedLevel: boxplotSignal.band,
+        message:
+          "Norm-table estimate unavailable. Using boxplot trend estimate from sex-specific bouldering data: " +
+          boxplotSignal.message
+      };
+    }
+
+    return {
+      estimatedLevel: normEstimate.estimatedLevel,
+      message:
+        normEstimate.message +
+        " Boxplot trend signal: " +
+        boxplotSignal.band +
+        ". " +
+        boxplotSignal.message
+    };
+  }
+
+  function estimateSportClimbingLevelFromMetrics(metrics) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var table = sex === "male" ? sportClimbingMetricsMale : sex === "female" ? sportClimbingMetricsFemale : null;
+    if (!table) {
+      return {
+        estimatedLevel: "Not enough information",
+        message: "Athlete sex is not set to male/female, so sex-specific sport climbing norms cannot be applied yet."
+      };
+    }
+
+    return estimateClimbingLevelFromNormTable(metrics, table, "sport");
+  }
+
+  function estimateClimbingLevelFromNormTable(metrics, table, label) {
+    var metricMap = buildNumericMetricMap(metrics);
+    var levelVotes = {};
+    var matched = 0;
+
+    table.forEach(function (normMetric) {
+      var canonicalName = String(normMetric && normMetric.name || "");
+      var matchedValue = findMetricValueByCanonicalName(metricMap, canonicalName);
+      if (matchedValue === null) {
+        return;
+      }
+
+      matched += 1;
+      var levels = normMetric.levels || {};
+      Object.keys(levels).forEach(function (level) {
+        var range = levels[level];
+        if (!Array.isArray(range) || range.length < 2) {
+          return;
+        }
+        var low = Number(range[0]);
+        var high = Number(range[1]);
+        if (Number.isFinite(low) && Number.isFinite(high) && matchedValue >= low && matchedValue <= high) {
+          levelVotes[level] = (levelVotes[level] || 0) + 1;
+        }
+      });
+    });
+
+    if (matched === 0) {
+      return {
+        estimatedLevel: "Not enough information",
+        message: "No compatible " + label + " metric values were found in this athlete profile yet."
+      };
+    }
+
+    var bestLevel = "";
+    var bestVotes = 0;
+    Object.keys(levelVotes).forEach(function (level) {
+      var votes = levelVotes[level] || 0;
+      if (votes > bestVotes) {
+        bestVotes = votes;
+        bestLevel = level;
+      }
+    });
+
+    if (!bestLevel) {
+      return {
+        estimatedLevel: "Not enough information",
+        message: "Metrics were found, but values did not align with current " + label + " norm bands."
+      };
+    }
+
+    return {
+      estimatedLevel: bestLevel,
+      message: "Estimated from " + String(matched) + " matched " + label + " metric(s) using sex-specific normative bands."
+    };
+  }
+
+  function estimateClimbingStrengthQuadrant(metrics) {
+    var metricMap = buildNumericMetricMap(metrics);
+    var hang = findMetricValueByCanonicalName(metricMap, "Max Hang Str: Wt., 20mm, 10sec");
+    var pull = findMetricValueByCanonicalName(metricMap, "Weighted Pull-Up Str:Wt, 1 Rep Max");
+
+    if (hang === null || pull === null) {
+      var missing = [];
+      if (hang === null) {
+        missing.push("Max Hang strength");
+      }
+      if (pull === null) {
+        missing.push("Weighted Pull-Up strength");
+      }
+      return {
+        quadrant: "Not enough information",
+        message: "Need " + missing.join(" and ") + " to classify Q1-Q4 pull/finger profile."
+      };
+    }
+
+    var highThreshold = 1.5;
+    var fingerHigh = hang >= highThreshold;
+    var pullHigh = pull >= highThreshold;
+
+    if (fingerHigh && pullHigh) {
+      return {
+        quadrant: "Q1 (High Pull + High Finger)",
+        message: "Common in high performers. This supports stronger grade potential, while actual performance still depends on access, tactics, and technical execution."
+      };
+    }
+    if (!fingerHigh && pullHigh) {
+      return {
+        quadrant: "Q2 (High Pull + Lower Finger)",
+        message: "Pulling capacity is strong, but finger strength is likely the current limiter. In bouldering this can cap top-end performance until finger force catches up."
+      };
+    }
+    if (!fingerHigh && !pullHigh) {
+      return {
+        quadrant: "Q3 (Lower Pull + Lower Finger)",
+        message: "Typical of easier-to-moderate grades where movement, positioning, and tactics can drive progress while strength base is developed."
+      };
+    }
+
+    return {
+      quadrant: "Q4 (Lower Pull + High Finger)",
+      message: "Rare profile in climbers. Prioritize pulling strength development so high finger force can be expressed on steeper and more powerful terrain."
+    };
+  }
+
+  function estimateBoulderingBoxplotSignal(metrics) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var metricBands = getBoulderingBoxplotBandsBySex(sex);
+    if (!metricBands) {
+      return {
+        band: "Not enough information",
+        message: "Athlete sex is not set to male/female, so bouldering boxplot bands cannot be applied."
+      };
+    }
+
+    var metricMap = buildNumericMetricMap(metrics);
+    return estimateGradeBandSignalFromBoxplotTable(metricMap, metricBands, "bouldering");
+  }
+
+  function estimateSportBoxplotSignal(metrics) {
+    var sex = resolveAthleteSexForBenchmarks();
+    var metricBands = getSportBoxplotBandsBySex(sex);
+    if (!metricBands) {
+      return {
+        band: "Not enough information",
+        message: "Athlete sex is not set to male/female, so sport boxplot bands cannot be applied."
+      };
+    }
+
+    var metricMap = buildNumericMetricMap(metrics);
+    return estimateGradeBandSignalFromBoxplotTable(metricMap, metricBands, "sport");
+  }
+
+  function estimateGradeBandSignalFromBoxplotTable(metricMap, metricBands, label) {
+    var votes = {};
+    var matchedMetrics = 0;
+
+    Object.keys(metricBands).forEach(function (metricName) {
+      var value = findMetricValueByCanonicalName(metricMap, metricName);
+      if (value === null) {
+        return;
+      }
+
+      matchedMetrics += 1;
+      var bands = metricBands[metricName];
+      Object.keys(bands).forEach(function (band) {
+        var range = bands[band];
+        var low = Number(range[0]);
+        var high = Number(range[1]);
+        if (Number.isFinite(low) && Number.isFinite(high) && value >= low && value <= high) {
+          votes[band] = (votes[band] || 0) + 1;
+        }
+      });
+    });
+
+    if (matchedMetrics === 0) {
+      return {
+        band: "Not enough information",
+        message: "Need at least one of: max hang ratio, weighted pull-up ratio, max pull-ups, or 7:3 repeaters."
+      };
+    }
+
+    var bestBand = "";
+    var bestVotes = 0;
+    Object.keys(votes).forEach(function (band) {
+      var count = votes[band] || 0;
+      if (count > bestVotes) {
+        bestVotes = count;
+        bestBand = band;
+      }
+    });
+
+    if (!bestBand) {
+      return {
+        band: "Not enough information",
+        message: "Compatible metrics were found, but values did not overlap with the " + label + " boxplot trend bands."
+      };
+    }
+
+    var confidence = "Low";
+    if (bestVotes >= 3) {
+      confidence = "High";
+    } else if (bestVotes >= 2) {
+      confidence = "Moderate";
+    }
+
+    return {
+      band: bestBand,
+      message:
+        "Derived from " + String(matchedMetrics) + " matched metric(s) with " + confidence + " confidence (" +
+        String(bestVotes) + " supporting vote(s))."
+    };
+  }
+
+  function getBoulderingBoxplotBandsBySex(sex) {
+    var male = {
+      "Max Hang Str: Wt., 20mm, 10sec": {
+        "Less Than V4": [1.0, 1.25],
+        "V4 - V6": [1.2, 1.45],
+        "V7 - V9": [1.33, 1.6],
+        "V10 - V12": [1.45, 1.75],
+        "V13+": [1.6, 2.05]
+      },
+      "Weighted Pull-Up Str:Wt, 1 Rep Max": {
+        "Less Than V4": [1.1, 1.35],
+        "V4 - V6": [1.35, 1.6],
+        "V7 - V9": [1.4, 1.7],
+        "V10 - V12": [1.5, 1.85],
+        "V13+": [1.65, 1.95]
+      },
+      "Max Pull-Ups, reps": {
+        "Less Than V4": [6, 13],
+        "V4 - V6": [11, 19],
+        "V7 - V9": [13, 20],
+        "V10 - V12": [15, 24],
+        "V13+": [19, 23]
+      },
+      "7:3 Repeaters at Bodyweight, 20mm, sec": {
+        "Less Than V4": [45, 95],
+        "V4 - V6": [70, 130],
+        "V7 - V9": [100, 160],
+        "V10 - V12": [120, 220],
+        "V13+": [150, 230]
+      }
+    };
+
+    var female = {
+      "Max Hang Str: Wt., 20mm, 10sec": {
+        "Less Than V4": [1.0, 1.15],
+        "V4 - V6": [1.1, 1.35],
+        "V7 - V9": [1.27, 1.56],
+        "V10 - V12": [1.46, 1.78],
+        "V13+": [1.58, 1.78]
+      },
+      "Weighted Pull-Up Str:Wt, 1 Rep Max": {
+        "Less Than V4": [1.0, 1.23],
+        "V4 - V6": [1.15, 1.38],
+        "V7 - V9": [1.31, 1.5],
+        "V10 - V12": [1.42, 1.56],
+        "V13+": [1.52, 1.6]
+      },
+      "Max Pull-Ups, reps": {
+        "Less Than V4": [2, 8],
+        "V4 - V6": [6, 11],
+        "V7 - V9": [10, 15],
+        "V10 - V12": [14, 16],
+        "V13+": [16, 20]
+      },
+      "7:3 Repeaters at Bodyweight, 20mm, sec": {
+        "Less Than V4": [25, 55],
+        "V4 - V6": [60, 120],
+        "V7 - V9": [90, 190],
+        "V10 - V12": [95, 165],
+        "V13+": [160, 230]
+      }
+    };
+
+    if (sex === "male") {
+      return male;
+    }
+    if (sex === "female") {
+      return female;
+    }
+    return null;
+  }
+
+  function getSportBoxplotBandsBySex(sex) {
+    var male = {
+      "Max Hang Str: Wt., 20mm, 10sec": {
+        "5.10a-d": [1.1, 1.45],
+        "5.11a-d": [1.14, 1.36],
+        "5.12a-d": [1.25, 1.51],
+        "5.13a-d": [1.35, 1.56],
+        "5.14a-d": [1.45, 1.66]
+      },
+      "Weighted Pull-Up Str:Wt, 1 Rep Max": {
+        "5.10a-d": [1.35, 1.52],
+        "5.11a-d": [1.34, 1.57],
+        "5.12a-d": [1.36, 1.61],
+        "5.13a-d": [1.47, 1.7],
+        "5.14a-d": [1.58, 1.74]
+      },
+      "Max Pull-Ups, reps": {
+        "5.10a-d": [11, 17],
+        "5.11a-d": [12, 19],
+        "5.12a-d": [13, 18],
+        "5.13a-d": [15, 20],
+        "5.14a-d": [16, 23]
+      },
+      "7:3 Repeaters at Bodyweight, 20mm, sec": {
+        "5.10a-d": [50, 90],
+        "5.11a-d": [65, 120],
+        "5.12a-d": [90, 145],
+        "5.13a-d": [120, 190],
+        "5.14a-d": [150, 205]
+      }
+    };
+
+    var female = {
+      "Max Hang Str: Wt., 20mm, 10sec": {
+        "5.10a-d": [1.0, 1.24],
+        "5.11a-d": [1.04, 1.26],
+        "5.12a-d": [1.17, 1.43],
+        "5.13a-d": [1.25, 1.54],
+        "5.14a-d": [1.35, 1.55]
+      },
+      "Weighted Pull-Up Str:Wt, 1 Rep Max": {
+        "5.10a-d": [1.08, 1.26],
+        "5.11a-d": [1.11, 1.34],
+        "5.12a-d": [1.17, 1.42],
+        "5.13a-d": [1.31, 1.49],
+        "5.14a-d": [1.36, 1.5]
+      },
+      "Max Pull-Ups, reps": {
+        "5.10a-d": [3, 10],
+        "5.11a-d": [4, 10],
+        "5.12a-d": [6, 13],
+        "5.13a-d": [10, 15],
+        "5.14a-d": [8, 14]
+      },
+      "7:3 Repeaters at Bodyweight, 20mm, sec": {
+        "5.10a-d": [35, 60],
+        "5.11a-d": [35, 105],
+        "5.12a-d": [75, 125],
+        "5.13a-d": [90, 200],
+        "5.14a-d": [180, 220]
+      }
+    };
+
+    if (sex === "male") {
+      return male;
+    }
+    if (sex === "female") {
+      return female;
+    }
+    return null;
+  }
+
+  function buildClimbingGradeAdvice(metrics, boulderingSignal, sportSignal) {
+    var sex = resolveAthleteSexForBenchmarks();
+    if (!sex) {
+      return {
+        context: "Unknown (sex not set)",
+        lines: ["Set athlete sex in profile so grade-based training advice can use the correct boxplot bands."]
+      };
+    }
+
+    var goalContext = resolveClimbingGoalContext(boulderingSignal, sportSignal);
+    var discipline = goalContext.discipline;
+    var targetBand = goalContext.band;
+    if (!discipline || !targetBand) {
+      return {
+        context: "Unknown target grade",
+        lines: ["Add a climbing goal grade (for example V7 or 5.12a) in the profile to unlock goal-grade advice."]
+      };
+    }
+
+    var table = discipline === "sport"
+      ? getSportBoxplotBandsBySex(sex)
+      : getBoulderingBoxplotBandsBySex(sex);
+
+    if (!table) {
+      return {
+        context: discipline + " " + targetBand,
+        lines: ["No grade-band table available for this athlete context yet."]
+      };
+    }
+
+    var metricMap = buildNumericMetricMap(metrics);
+    var lines = [];
+
+    Object.keys(table).forEach(function (metricName) {
+      var bandRange = (table[metricName] || {})[targetBand];
+      if (!bandRange) {
+        return;
+      }
+
+      var value = findMetricValueByCanonicalName(metricMap, metricName);
+      if (value === null) {
+        return;
+      }
+
+      var position = classifyBoxplotPosition(value, bandRange);
+      var advice = getBoxplotAdvice(position.key);
+      lines.push(shortMetricLabel(metricName) + ": " + position.label + ". " + advice);
+    });
+
+    if (!lines.length) {
+      lines.push("Not enough compatible metric values were found to generate boxplot-zone training advice.");
+    }
+
+    return {
+      context: discipline.charAt(0).toUpperCase() + discipline.slice(1) + " target " + targetBand + " (" + goalContext.source + ")",
+      lines: lines
+    };
+  }
+
+  function resolveClimbingGoalContext(boulderingSignal, sportSignal) {
+    var overview = getProfileSportOverview(state.profile) || {};
+    var general = overview && overview.general && typeof overview.general === "object"
+      ? overview.general
+      : {};
+
+    var rawGradeCandidates = [
+      overview.climbing_goal_grade,
+      overview.goal_climbing_grade,
+      overview.goal_grade,
+      general.climbing_goal_grade,
+      general.goal_climbing_grade,
+      general.goal_grade,
+      overview.climbing_grade,
+      general.climbing_grade
+    ];
+
+    var rawGrade = rawGradeCandidates.find(function (value) {
+      return String(value || "").trim().length > 0;
+    });
+
+    var gradeText = String(rawGrade || "").trim();
+    var boulderBand = parseBoulderingBandFromGrade(gradeText);
+    if (boulderBand) {
+      return { discipline: "bouldering", band: boulderBand, source: "profile grade" };
+    }
+
+    var sportBand = parseSportBandFromGrade(gradeText);
+    if (sportBand) {
+      return { discipline: "sport", band: sportBand, source: "profile grade" };
+    }
+
+    if (boulderingSignal && boulderingSignal.band && boulderingSignal.band !== "Not enough information") {
+      return { discipline: "bouldering", band: boulderingSignal.band, source: "boxplot signal" };
+    }
+
+    if (sportSignal && sportSignal.band && sportSignal.band !== "Not enough information") {
+      return { discipline: "sport", band: sportSignal.band, source: "boxplot signal" };
+    }
+
+    return { discipline: "", band: "", source: "" };
+  }
+
+  function parseBoulderingBandFromGrade(rawGrade) {
+    var text = String(rawGrade || "").toUpperCase();
+    var match = text.match(/V\s*(\d{1,2})/i);
+    if (!match) {
+      return "";
+    }
+
+    var v = parseInt(match[1], 10);
+    if (!Number.isFinite(v)) {
+      return "";
+    }
+    if (v < 4) {
+      return "Less Than V4";
+    }
+    if (v <= 6) {
+      return "V4 - V6";
+    }
+    if (v <= 9) {
+      return "V7 - V9";
+    }
+    if (v <= 12) {
+      return "V10 - V12";
+    }
+    return "V13+";
+  }
+
+  function parseSportBandFromGrade(rawGrade) {
+    var text = String(rawGrade || "").toLowerCase();
+    var match = text.match(/5\.(10|11|12|13|14)/);
+    if (!match) {
+      return "";
+    }
+    var major = parseInt(match[1], 10);
+    if (major === 10) {
+      return "5.10a-d";
+    }
+    if (major === 11) {
+      return "5.11a-d";
+    }
+    if (major === 12) {
+      return "5.12a-d";
+    }
+    if (major === 13) {
+      return "5.13a-d";
+    }
+    if (major === 14) {
+      return "5.14a-d";
+    }
+    return "";
+  }
+
+  function classifyBoxplotPosition(value, bandRange) {
+    var q1 = Number(Array.isArray(bandRange) ? bandRange[0] : NaN);
+    var q3 = Number(Array.isArray(bandRange) ? bandRange[1] : NaN);
+    if (!Number.isFinite(q1) || !Number.isFinite(q3)) {
+      return { key: "box-below-median", label: "Box Below Median" };
+    }
+
+    var low = Math.min(q1, q3);
+    var high = Math.max(q1, q3);
+    var iqr = Math.max(high - low, 0.05);
+    var median = low + iqr / 2;
+    var lowerWhisker = low - iqr * 0.4;
+    var upperWhisker = high + iqr * 0.4;
+
+    if (value < lowerWhisker) {
+      return { key: "lower-outlier-space", label: "Lower Outlier Space" };
+    }
+    if (value < low) {
+      return { key: "lower-whisker", label: "Lower Whisker" };
+    }
+    if (value < median) {
+      return { key: "box-below-median", label: "Box Below Median" };
+    }
+    if (value <= high) {
+      return { key: "box-beyond-median", label: "Box Beyond Median" };
+    }
+    if (value <= upperWhisker) {
+      return { key: "upper-whisker", label: "Upper Whisker" };
+    }
+    return { key: "upper-outlier-space", label: "Upper Outlier Space" };
+  }
+
+  function getBoxplotAdvice(positionKey) {
+    if (positionKey === "upper-whisker") {
+      return "You are likely more than good here. Keep this at maintenance and train it every 7-10 days.";
+    }
+    if (positionKey === "box-beyond-median") {
+      return "You are likely in a good place for this goal variable. Train it about once per week.";
+    }
+    if (positionKey === "box-below-median") {
+      return "This may not block your goals, but training it 1-2x/week for a few weeks can move you toward the median.";
+    }
+    if (positionKey === "lower-whisker") {
+      return "This is low-hanging fruit. Train it 2-3x/week early in session, after warm-up, with full focus.";
+    }
+    if (positionKey === "upper-outlier-space") {
+      return "This is already very high. Look for limiting factors elsewhere and reduce direct work on this system.";
+    }
+    if (positionKey === "lower-outlier-space") {
+      return "There is a clear path forward. Train this variable 2-3x/week with structured focus.";
+    }
+    return "Maintain balanced development while monitoring trend over repeated tests.";
+  }
+
+  function shortMetricLabel(metricName) {
+    var normalized = normalizeMetricValue(metricName);
+    if (normalized.indexOf("max hang") !== -1 || normalized.indexOf("edge pull") !== -1) {
+      return "Max Hang Ratio";
+    }
+    if (normalized.indexOf("weighted pull") !== -1) {
+      return "Weighted Pull-Up Ratio";
+    }
+    if (normalized.indexOf("max pull") !== -1) {
+      return "Max Pull-Ups";
+    }
+    if (normalized.indexOf("7:3") !== -1 || normalized.indexOf("repeaters") !== -1) {
+      return "7:3 Repeaters";
+    }
+    return String(metricName || "Metric");
+  }
+
+  function buildNumericMetricMap(metrics) {
+    var metricList = Array.isArray(metrics) ? metrics : [];
+    var metricMap = {};
+    metricList.forEach(function (metric) {
+      var name = normalizeMetricValue(metric && metric.metric_name);
+      var value = extractFirstNumericValue(metric && metric.metric_value);
+      if (!name || value === null) {
+        return;
+      }
+      metricMap[name] = value;
+    });
+    return metricMap;
+  }
+
+  function findMetricValueByCanonicalName(metricMap, canonicalName) {
+    var aliases = {
+      "Max Hang Str: Wt., 20mm, 10sec": [
+        "max hang str: wt., 20mm, 10sec",
+        "max hang strength",
+        "20mm edge hang",
+        "20mm edge pull",
+        "edge pull",
+        "20mm edge pull (single-arm)"
+      ],
+      "Weighted Pull-Up Str:Wt, 1 Rep Max": [
+        "weighted pull-up str:wt, 1 rep max",
+        "weighted pull up",
+        "weighted pull-up"
+      ],
+      "Campus Max Reach, inches": [
+        "campus max reach, inches",
+        "campus max reach"
+      ],
+      "Long Reach Foot-On Campus Time, sec": [
+        "long reach foot-on campus time, sec",
+        "long reach foot on campus time"
+      ],
+      "Short Reach Foot-On Campus Time, sec": [
+        "short reach foot-on campus time, sec",
+        "short reach foot on campus time"
+      ],
+      "7:3 Repeaters at Bodyweight, 20mm, sec": [
+        "7:3 repeaters at bodyweight, 20mm, sec",
+        "7:3 repeaters",
+        "repeaters"
+      ],
+      "Continuous Hang Time, 20mm, sec": [
+        "continuous hang time, 20mm, sec",
+        "continuous hang time",
+        "core hold time"
+      ],
+      "Max Pull-Ups, reps": [
+        "max pull-ups, reps",
+        "max pull ups",
+        "pull ups",
+        "max pull up"
+      ],
+      "Max Push-Ups, reps": [
+        "max push-ups, reps",
+        "max push ups",
+        "push ups"
+      ]
+    };
+
+    var aliasList = aliases[canonicalName] || [normalizeMetricValue(canonicalName)];
+    for (var i = 0; i < aliasList.length; i++) {
+      var candidate = metricMap[normalizeMetricValue(aliasList[i])];
+      if (Number.isFinite(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  function extractFirstNumericValue(rawValue) {
+    var text = String(rawValue || "").trim();
+    if (!text) {
+      return null;
+    }
+    var parsed = parseFloat(text);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+    var match = text.match(/-?\d+(?:\.\d+)?/);
+    if (!match) {
+      return null;
+    }
+    var fallback = Number(match[0]);
+    return Number.isFinite(fallback) ? fallback : null;
+  }
+
+  function categorizeRatings(rows) {
+    var counts = { excellent: 0, good: 0, average: 0, developing: 0 };
+    
+    rows.forEach(function (row) {
+      var rating = String(row.rating || "").toLowerCase();
+      if (rating.indexOf("excellent") !== -1 || rating.indexOf("highly trained") !== -1) {
+        counts.excellent++;
+      } else if (rating.indexOf("good") !== -1 || rating.indexOf("trained") !== -1) {
+        counts.good++;
+      } else if (rating.indexOf("average") !== -1 || rating.indexOf("moderate") !== -1) {
+        counts.average++;
+      } else if (rating.indexOf("developing") !== -1 || rating.indexOf("below") !== -1 || rating.indexOf("beginner") !== -1) {
+        counts.developing++;
+      }
+    });
+    
+    return counts;
+  }
+
+  function getRatingColor(rating) {
+    var ratingLower = String(rating || "").toLowerCase();
+    if (ratingLower.indexOf("excellent") !== -1 || ratingLower.indexOf("highly trained") !== -1) {
+      return [34, 139, 34]; // Green
+    } else if (ratingLower.indexOf("good") !== -1 || ratingLower.indexOf("trained") !== -1) {
+      return [70, 130, 180]; // Blue
+    } else if (ratingLower.indexOf("average") !== -1 || ratingLower.indexOf("moderate") !== -1) {
+      return [184, 134, 11]; // Gold
+    } else if (ratingLower.indexOf("developing") !== -1 || ratingLower.indexOf("below") !== -1) {
+      return [220, 20, 60]; // Crimson
+    }
+    return [33, 33, 33]; // Default
+  }
+
+  function getSportSpecificRecommendations(sport, rows, sportOverview) {
+    var sportLower = String(sport || "").toLowerCase();
+    var title = sport.charAt(0).toUpperCase() + sport.slice(1);
+    var description = "";
+
+    if (sportLower.indexOf("climb") !== -1) {
+      description = "Climbing performance depends on finger strength, pulling power, core stability, and body awareness. Focus on grip endurance (edge pull tests), power endurance, and antagonist strength to prevent injury.";
+    } else if (sportLower.indexOf("ski") !== -1 || sportLower.indexOf("snowboard") !== -1) {
+      description = "Ski/snowboard performance requires strong legs (single-leg balance, squat strength), aerobic capacity, and shock absorption. Lower body asymmetries should be addressed to prevent injury on variable terrain.";
+    } else if (sportLower.indexOf("run") !== -1 || sportLower.indexOf("trail") !== -1) {
+      description = "Running performance depends on aerobic capacity (resting/max HR), power generation (vertical jump, broad jump), and muscular endurance. Efficient movement patterns and consistent power output prevent injury during distance activities.";
+    } else if (sportLower.indexOf("mtb") !== -1 || sportLower.indexOf("mountain bike") !== -1) {
+      description = "Mountain biking requires anaerobic capacity (FTP), core stability, leg strength, and aerobic base. Balance and body control are critical on technical terrain.";
+    } else {
+      description = "Assess metrics relative to your primary training demands and injury history. Work with your coach to prioritize training interventions.";
+    }
+
+    return { title: title, description: description };
+  }
+
+  function generateKeyTakeaways(rows, sports) {
+    var takeaways = [];
+    var ratingCounts = categorizeRatings(rows);
+
+    if (ratingCounts.developing > 0) {
+      var developmentAreas = rows
+        .filter(function (row) {
+          var rating = String(row.rating || "").toLowerCase();
+          return rating.indexOf("developing") !== -1 || rating.indexOf("below") !== -1;
+        })
+        .map(function (row) { return row.name; })
+        .slice(0, 2);
+
+      if (developmentAreas.length) {
+        takeaways.push("Prioritize improving " + developmentAreas.join(" and ") + " through targeted training.");
+      }
+    }
+
+    if (ratingCounts.excellent + ratingCounts.good > ratingCounts.developing) {
+      takeaways.push("Strong baseline fitness. Focus on maintaining strengths while addressing development areas.");
+    }
+
+    takeaways.push("Track these metrics regularly (monthly or quarterly) to monitor progress and adjust training.");
+    takeaways.push("Compare results to previous assessments to identify trends—single data points are less meaningful than trajectory.");
+
+    if (sports && sports.length) {
+      takeaways.push("All interpretations are tailored to your " + sports[0] + " activity demands.");
+    }
+
+    return takeaways.length ? takeaways : ["Review metrics with your coach to develop a targeted training plan."];
   }
 
   function buildMetricSummaryReport(metrics) {
