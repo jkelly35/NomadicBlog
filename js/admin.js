@@ -139,6 +139,7 @@
     athletes: [],
     currentAthlete: null,
     currentMetrics: [],
+    currentStravaDailyMetrics: [],
     templates: [],
     exerciseLibrary: [],
     assignmentTemplateId: null,
@@ -354,6 +355,18 @@
     var tableBody = document.querySelector("[data-admin-table-body]");
     if (tableBody) {
       tableBody.addEventListener("click", function (event) {
+        var insightsBtn = event.target && event.target.closest("[data-admin-open-insights]");
+        if (insightsBtn) {
+          var insightsAthleteId = String(insightsBtn.getAttribute("data-athlete-id") || "").trim();
+          if (!insightsAthleteId) {
+            setStatus("Could not find athlete id.", "error");
+            return;
+          }
+
+          openAthleteModal(insightsAthleteId);
+          return;
+        }
+
         var deleteBtn = event.target && event.target.closest("[data-admin-delete-athlete]");
         if (!deleteBtn) {
           return;
@@ -1237,7 +1250,9 @@
           "<td>" + (athlete.sport ? escapeHtml(athlete.sport) : "—") + "</td>" +
           "<td>" + (athlete.level ? escapeHtml(athlete.level) : "—") + "</td>" +
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
-          "<td><div class='admin-program-item-actions'><a class='btn admin-btn-small' href='" +
+          "<td><div class='admin-program-item-actions'><button type='button' class='btn admin-btn-small' data-admin-open-insights='1' data-athlete-id='" +
+          escapeAttribute(athlete.user_id || "") +
+          "'>Insights</button><a class='btn admin-btn-small' href='" +
           viewUrl +
           "'>View</a><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
           escapeAttribute(athlete.user_id || "") +
@@ -1298,9 +1313,12 @@
     }
 
     state.currentAthlete = athlete;
+    state.currentMetrics = [];
+    state.currentStravaDailyMetrics = [];
 
     populateModal(athlete);
     loadAthleteMetrics(userId);
+    loadAthleteStravaProgress(userId);
     showModal();
   }
 
@@ -1326,21 +1344,30 @@
     document.querySelector("[data-admin-modal-info-location]").textContent =
       athlete.location || "—";
 
+    var coachViewLink = document.querySelector("[data-admin-coach-view-link]");
+    if (coachViewLink) {
+      coachViewLink.href = "profile.html?coachView=1&athleteId=" + encodeURIComponent(athlete.user_id || "");
+    }
+
     var metricRows = document.querySelector("[data-admin-metric-rows]");
     if (metricRows) {
       metricRows.innerHTML = '<p class="admin-loading">Loading metrics...</p>';
     }
+
+    renderCoachInsightsLoading();
 
     clearModalStatus();
   }
 
   function loadAthleteMetrics(userId) {
     var metricRows = document.querySelector("[data-admin-metric-rows]");
-    if (!metricRows || !state.client || !userId) {
+    if (!state.client || !userId) {
       return;
     }
 
-    metricRows.innerHTML = '<p class="admin-loading">Loading metrics...</p>';
+    if (metricRows) {
+      metricRows.innerHTML = '<p class="admin-loading">Loading metrics...</p>';
+    }
 
     state.client
       .from("athlete_metrics")
@@ -1352,6 +1379,8 @@
           if (isMissingTableError(result.error)) {
             state.currentMetrics = [];
             renderMetricRows([]);
+            renderMetricProgressions([]);
+            renderCoachInsightCards([], state.currentStravaDailyMetrics);
             setModalStatus(
               "Metrics table not found yet. Create athlete_metrics in Supabase to enable coach metric editing.",
               "info"
@@ -1359,19 +1388,185 @@
             return;
           }
 
+          renderMetricProgressions([]);
+          renderCoachInsightCards([], state.currentStravaDailyMetrics);
           setModalStatus(result.error.message, "error");
           return;
         }
 
         state.currentMetrics = result.data || [];
         renderMetricRows(state.currentMetrics);
+        renderMetricProgressions(state.currentMetrics);
       })
       .catch(function (error) {
+        renderMetricProgressions([]);
+        renderCoachInsightCards([], state.currentStravaDailyMetrics);
         setModalStatus(
           error && error.message ? error.message : "Failed to load metrics.",
           "error"
         );
       });
+  }
+
+  function loadAthleteStravaProgress(userId) {
+    if (!state.client || !userId) {
+      return;
+    }
+
+    state.client
+      .from("athlete_strava_daily_metrics")
+      .select("metric_date,activity_count,distance_m,moving_time_sec,elevation_gain_m,training_load,resting_hr,hrv_ms,sleep_hours,recovery_score")
+      .eq("user_id", userId)
+      .order("metric_date", { ascending: false })
+      .limit(30)
+      .then(function (result) {
+        if (result.error) {
+          state.currentStravaDailyMetrics = [];
+          renderLoadSummary([]);
+          renderCoachInsightCards(state.currentMetrics, []);
+          return;
+        }
+
+        state.currentStravaDailyMetrics = Array.isArray(result.data) ? result.data : [];
+        renderLoadSummary(state.currentStravaDailyMetrics);
+        renderCoachInsightCards(state.currentMetrics, state.currentStravaDailyMetrics);
+      })
+      .catch(function () {
+        state.currentStravaDailyMetrics = [];
+        renderLoadSummary([]);
+        renderCoachInsightCards(state.currentMetrics, []);
+      });
+  }
+
+  function renderCoachInsightsLoading() {
+    var cardsEl = document.querySelector("[data-admin-insight-cards]");
+    var progressionsEl = document.querySelector("[data-admin-metric-progressions]");
+    var loadEl = document.querySelector("[data-admin-load-summary]");
+
+    if (cardsEl) {
+      cardsEl.innerHTML = '<article class="admin-insight-card is-loading"><span>Loading athlete progress...</span></article>';
+    }
+    if (progressionsEl) {
+      progressionsEl.innerHTML = '<p class="admin-loading">Loading metric progress...</p>';
+    }
+    if (loadEl) {
+      loadEl.innerHTML = '<p class="admin-loading">Loading load summary...</p>';
+    }
+  }
+
+  function renderCoachInsightCards(metrics, stravaRows) {
+    var cardsEl = document.querySelector("[data-admin-insight-cards]");
+    if (!cardsEl) {
+      return;
+    }
+
+    var metricHistory = buildMetricHistoryMap(metrics);
+    var trackedCount = Object.keys(metricHistory).length;
+    var progressionCount = Object.keys(metricHistory).filter(function (key) {
+      return metricHistory[key] && metricHistory[key].length > 1;
+    }).length;
+    var recentSeven = (Array.isArray(stravaRows) ? stravaRows : []).slice(0, 7);
+    var recentThirty = Array.isArray(stravaRows) ? stravaRows : [];
+    var weeklyLoad = sumNumeric(recentSeven, "training_load");
+    var monthlyLoad = sumNumeric(recentThirty, "training_load");
+
+    var cards = [
+      {
+        label: "Tracked Metrics",
+        value: trackedCount ? String(trackedCount) : "0",
+        note: progressionCount ? String(progressionCount) + " with history" : "No progression history yet"
+      },
+      {
+        label: "7-Day Load",
+        value: recentSeven.length ? formatInteger(weeklyLoad) : "—",
+        note: recentSeven.length ? String(recentSeven.length) + " days synced" : "No recent Strava data"
+      },
+      {
+        label: "30-Day Load",
+        value: recentThirty.length ? formatInteger(monthlyLoad) : "—",
+        note: recentThirty.length ? String(recentThirty.length) + " days synced" : "No 30-day dataset yet"
+      },
+      {
+        label: "Latest Recovery",
+        value: formatNullableValue(findLatestDefined(stravaRows, "recovery_score")),
+        note: "Recovery score"
+      }
+    ];
+
+    cardsEl.innerHTML = cards.map(function (card) {
+      return '<article class="admin-insight-card"><span class="admin-insight-card-label">' + escapeHtml(card.label) + '</span><strong class="admin-insight-card-value">' + escapeHtml(card.value) + '</strong><span class="admin-insight-card-note">' + escapeHtml(card.note) + '</span></article>';
+    }).join("");
+  }
+
+  function renderMetricProgressions(metrics) {
+    var container = document.querySelector("[data-admin-metric-progressions]");
+    if (!container) {
+      return;
+    }
+
+    var historyMap = buildMetricHistoryMap(metrics);
+    var items = Object.keys(historyMap)
+      .map(function (metricName) {
+        var history = historyMap[metricName] || [];
+        if (!history.length) {
+          return null;
+        }
+
+        var latest = history[0];
+        var previous = history[1] || null;
+        return {
+          name: metricName,
+          latest: formatMetricEntryValue(latest),
+          delta: formatMetricDelta(latest, previous),
+          updated: formatDate(latest.updated_at || latest.created_at || "")
+        };
+      })
+      .filter(function (item) {
+        return !!item;
+      })
+      .slice(0, 8);
+
+    if (!items.length) {
+      container.innerHTML = '<p class="admin-empty-copy">No metric history yet. Add repeated tests over time to unlock progression tracking.</p>';
+      renderCoachInsightCards(metrics, state.currentStravaDailyMetrics);
+      return;
+    }
+
+    container.innerHTML = items.map(function (item) {
+      return '<article class="admin-insight-row"><div><strong>' + escapeHtml(item.name) + '</strong><span>' + escapeHtml(item.updated) + '</span></div><div><strong>' + escapeHtml(item.latest) + '</strong><span>' + escapeHtml(item.delta) + '</span></div></article>';
+    }).join("");
+
+    renderCoachInsightCards(metrics, state.currentStravaDailyMetrics);
+  }
+
+  function renderLoadSummary(rows) {
+    var container = document.querySelector("[data-admin-load-summary]");
+    if (!container) {
+      return;
+    }
+
+    var data = Array.isArray(rows) ? rows : [];
+    if (!data.length) {
+      container.innerHTML = '<p class="admin-empty-copy">No Strava daily metrics synced yet. Connect and sync Strava from the athlete dashboard to unlock daily and weekly load tracking.</p>';
+      return;
+    }
+
+    var recentSeven = data.slice(0, 7);
+    var recentThirty = data.slice(0, 30);
+    var items = [
+      { label: "Today's Load", value: formatNullableValue(data[0] && data[0].training_load) },
+      { label: "7-Day Distance", value: formatDecimal(sumNumeric(recentSeven, "distance_m") / 1000, 1) + " km" },
+      { label: "7-Day Moving Time", value: formatDecimal(sumNumeric(recentSeven, "moving_time_sec") / 3600, 1) + " h" },
+      { label: "7-Day Elevation", value: formatInteger(sumNumeric(recentSeven, "elevation_gain_m")) + " m" },
+      { label: "7-Day Activities", value: formatInteger(sumNumeric(recentSeven, "activity_count")) },
+      { label: "30-Day Load", value: formatInteger(sumNumeric(recentThirty, "training_load")) },
+      { label: "Resting HR", value: formatNullableValue(findLatestDefined(data, "resting_hr"), " bpm") },
+      { label: "HRV", value: formatNullableValue(findLatestDefined(data, "hrv_ms"), " ms") }
+    ];
+
+    container.innerHTML = items.map(function (item) {
+      return '<article class="admin-insight-row"><div><strong>' + escapeHtml(item.label) + '</strong></div><div><strong>' + escapeHtml(item.value) + '</strong></div></article>';
+    }).join("");
   }
 
   function renderMetricRows(metrics) {
@@ -2616,9 +2811,107 @@
     }
   }
 
+  function buildMetricHistoryMap(metrics) {
+    var map = {};
+
+    (Array.isArray(metrics) ? metrics : []).forEach(function (metric) {
+      var name = String(metric && metric.metric_name || "").trim();
+      if (!name) {
+        return;
+      }
+
+      if (!map[name]) {
+        map[name] = [];
+      }
+
+      map[name].push(metric);
+    });
+
+    Object.keys(map).forEach(function (name) {
+      map[name].sort(function (left, right) {
+        return new Date(right.updated_at || right.created_at || 0).getTime() - new Date(left.updated_at || left.created_at || 0).getTime();
+      });
+    });
+
+    return map;
+  }
+
+  function formatMetricEntryValue(metric) {
+    var value = String(metric && metric.metric_value || "").trim();
+    var unit = String(metric && metric.metric_unit || "").trim();
+
+    if (!value) {
+      return "Not recorded";
+    }
+
+    return unit ? value + " " + unit : value;
+  }
+
+  function formatMetricDelta(latest, previous) {
+    if (!latest || !previous) {
+      return "First data point";
+    }
+
+    var latestValue = parseFloat(latest.metric_value);
+    var previousValue = parseFloat(previous.metric_value);
+    if (!Number.isFinite(latestValue) || !Number.isFinite(previousValue)) {
+      return "Compare manually";
+    }
+
+    var delta = latestValue - previousValue;
+    if (delta === 0) {
+      return "No change";
+    }
+
+    var prefix = delta > 0 ? "+" : "";
+    var unit = String(latest.metric_unit || previous.metric_unit || "").trim();
+    return prefix + formatDecimal(delta, Math.abs(delta) < 10 ? 1 : 0) + (unit ? " " + unit : "");
+  }
+
+  function sumNumeric(rows, field) {
+    return (Array.isArray(rows) ? rows : []).reduce(function (sum, row) {
+      var value = Number(row && row[field]);
+      return Number.isFinite(value) ? sum + value : sum;
+    }, 0);
+  }
+
+  function findLatestDefined(rows, field) {
+    var match = (Array.isArray(rows) ? rows : []).find(function (row) {
+      return row && row[field] != null;
+    });
+    return match ? match[field] : null;
+  }
+
+  function formatInteger(value) {
+    var numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return "—";
+    }
+    return Math.round(numeric).toString();
+  }
+
+  function formatDecimal(value, digits) {
+    var numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return "—";
+    }
+    return numeric.toFixed(typeof digits === "number" ? digits : 1);
+  }
+
+  function formatNullableValue(value, suffix) {
+    var numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return "—";
+    }
+    return formatInteger(numeric) + String(suffix || "");
+  }
+
   function formatDate(dateString) {
     try {
       var date = new Date(dateString);
+      if (Number.isNaN(date.getTime())) {
+        return dateString || "N/A";
+      }
       return date.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",

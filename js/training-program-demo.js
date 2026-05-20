@@ -54,6 +54,7 @@
     var daySelect = document.querySelector("[data-workout-day]");
     var addExerciseBtn = document.querySelector("[data-add-exercise]");
     var printBtn = document.querySelector("[data-print-workout]");
+    var fullPlanPrintBtn = document.querySelector("[data-print-full-plan]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var dayNameInput = document.querySelector("[data-template-day-name]");
@@ -115,7 +116,19 @@
 
     if (printBtn) {
       printBtn.addEventListener("click", function () {
+        if (!state.isTemplateBuilder) {
+          saveExercisesForDay(true);
+        }
         openWorkoutPrintPreview();
+      });
+    }
+
+    if (fullPlanPrintBtn) {
+      fullPlanPrintBtn.addEventListener("click", function () {
+        if (!state.isTemplateBuilder) {
+          saveExercisesForDay(true);
+        }
+        openFullPlanPrintPreview();
       });
     }
 
@@ -246,6 +259,7 @@
   function applyAthleteLockedUi() {
     var addExerciseBtn = document.querySelector("[data-add-exercise]");
     var printBtn = document.querySelector("[data-print-workout]");
+    var fullPlanPrintBtn = document.querySelector("[data-print-full-plan]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var subtitle = document.querySelector(".program-demo-subtitle");
@@ -262,6 +276,10 @@
 
     if (printBtn) {
       printBtn.style.display = "inline-flex";
+    }
+
+    if (fullPlanPrintBtn) {
+      fullPlanPrintBtn.style.display = "inline-flex";
     }
 
     if (clearBtn) {
@@ -299,6 +317,7 @@
     var dayTools = document.querySelector("[data-template-day-tools]");
     var addExerciseBtn = document.querySelector("[data-add-exercise]");
     var printBtn = document.querySelector("[data-print-workout]");
+    var fullPlanPrintBtn = document.querySelector("[data-print-full-plan]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var backLink = document.querySelector("[data-program-back-link]");
@@ -328,6 +347,10 @@
 
     if (printBtn) {
       printBtn.style.display = "none";
+    }
+
+    if (fullPlanPrintBtn) {
+      fullPlanPrintBtn.style.display = "none";
     }
 
     if (saveBtn) {
@@ -1535,6 +1558,19 @@
     previewWindow.focus();
   }
 
+  function openFullPlanPrintPreview() {
+    var previewWindow = window.open("", "nomadic-full-plan-print-preview", "width=1400,height=960");
+    if (!previewWindow) {
+      setStatus("Please allow pop-ups to open the full-plan print preview.", "error");
+      return;
+    }
+
+    previewWindow.document.open();
+    previewWindow.document.write(buildFullPlanPrintDocument());
+    previewWindow.document.close();
+    previewWindow.focus();
+  }
+
   function buildWorkoutPrintDocument() {
     var exercises = Array.isArray(state.exercises) ? state.exercises : [];
     var programTitle = String(state.templateName || "Workout Program").trim();
@@ -1786,6 +1822,344 @@
       '</body>',
       '</html>'
     ].join("");
+  }
+
+  function buildFullPlanPrintDocument() {
+    var slotKeys = getAllSlotKeys();
+    var programTitle = String(state.templateName || "Training Plan").trim();
+    var generatedAt = new Date().toLocaleDateString();
+    var dayEntries = slotKeys
+      .map(function (slotKey) {
+        var exercises = getExercisesForPrintForDay(slotKey);
+        if (!exercises.length) {
+          return null;
+        }
+
+        return {
+          overviewScore: Math.max(1, countFullPlanOverviewRows(exercises)),
+          trackingScore: Math.max(1, countFullPlanPrintRows(exercises)),
+          overviewHtml: buildFullPlanOverviewCard(slotKey, exercises),
+          trackingHtml: [
+            '<article class="plan-day-card">',
+            '<div class="plan-day-head">',
+            '<div class="plan-day-label">' + escapeHtml(labelForSlot(slotKey)) + '</div>',
+            '<div class="plan-day-count">' + exercises.length + ' exercise' + (exercises.length === 1 ? '' : 's') + '</div>',
+            '</div>',
+            '<table class="plan-day-table">',
+            '<thead><tr><th>Exercise</th><th>Target</th><th>Tracking</th><th>Notes</th></tr></thead>',
+            '<tbody>' + buildFullPlanDayRows(exercises) + '</tbody>',
+            '</table>',
+            '</article>'
+          ].join("")
+        };
+      })
+      .filter(function (entry) {
+        return !!entry;
+      });
+
+    var frontHtmlParts = dayEntries.map(function (entry) {
+      return entry.overviewHtml;
+    });
+    var backHtmlParts = dayEntries.map(function (entry) {
+      return entry.trackingHtml;
+    });
+    var frontScore = dayEntries.reduce(function (sum, entry) {
+      return sum + entry.overviewScore;
+    }, 0);
+    var backScore = dayEntries.reduce(function (sum, entry) {
+      return sum + entry.trackingScore;
+    }, 0);
+
+    function densityClass(score, count) {
+      if (score > 72 || count > 6) {
+        return ' plan-page-micro';
+      }
+      if (score > 42 || count > 5) {
+        return ' plan-page-ultra';
+      }
+      if (score > 26 || count > 3) {
+        return ' plan-page-dense';
+      }
+      return '';
+    }
+
+    var frontPageClass = 'plan-page' + densityClass(frontScore, frontHtmlParts.length);
+    var backPageClass = 'plan-page' + densityClass(backScore, backHtmlParts.length);
+
+    return [
+      '<!DOCTYPE html>',
+      '<html lang="en">',
+      '<head>',
+      '<meta charset="UTF-8" />',
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+      '<title>' + escapeHtml(programTitle + ' - Full Plan Print') + '</title>',
+      '<style>',
+      '@page { size: landscape; margin: 0.18in; }',
+      'html, body { margin: 0; padding: 0; }',
+      'body { font-family: Arial, Helvetica, sans-serif; color: #151515; background: #fff; }',
+      '.plan-sheet { padding: 0; }',
+      '.plan-page + .plan-page { break-before: page; page-break-before: always; }',
+      '.plan-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 0.45rem; margin-bottom: 0.06in; padding-bottom: 0.03in; border-bottom: 1px solid #d9d1c6; }',
+      '.plan-title-wrap { display: flex; flex-direction: column; gap: 0.014in; }',
+      '.plan-kicker { font-size: 5.5px; text-transform: uppercase; letter-spacing: 0.12em; color: #7b6f61; }',
+      '.plan-title { margin: 0; font-size: 14px; font-weight: 800; line-height: 1.02; color: #102b2b; }',
+      '.plan-subtitle { margin-top: 0; font-size: 6.5px; color: #666; }',
+      '.plan-meta { text-align: right; font-size: 6px; color: #666; line-height: 1.18; }',
+      '.plan-side-label { font-size: 6px; text-transform: uppercase; letter-spacing: 0.12em; color: #7a7268; margin-bottom: 0.03in; }',
+      '.plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.042in; }',
+      '.plan-page-dense .plan-grid, .plan-page-ultra .plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.04in; }',
+      '.plan-page-micro .plan-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.03in; }',
+      '.plan-overview-card { border: 1px solid #d8d0c4; border-radius: 8px; padding: 0.035in; background: linear-gradient(180deg, #fffefb 0%, #f8f4ed 100%); break-inside: avoid; page-break-inside: avoid; }',
+      '.plan-overview-head { display: flex; justify-content: space-between; gap: 0.05in; align-items: baseline; margin-bottom: 0.022in; padding-bottom: 0.016in; border-bottom: 1px solid #e4dbcf; }',
+      '.plan-overview-title { font-size: 7.5px; font-weight: 800; color: #102b2b; line-height: 1.08; }',
+      '.plan-overview-meta { font-size: 5px; color: #7a7268; text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }',
+      '.plan-overview-section { margin-top: 0.022in; }',
+      '.plan-overview-section:first-child { margin-top: 0; }',
+      '.plan-overview-section-label { font-size: 4.8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #6b6157; margin-bottom: 0.012in; }',
+      '.plan-overview-list { margin: 0; padding: 0 0 0 0.08in; }',
+      '.plan-overview-list li { margin: 0 0 0.01in; padding: 0; font-size: 5px; line-height: 1.08; color: #2f2b28; }',
+      '.plan-overview-list li:last-child { margin-bottom: 0; }',
+      '.plan-day-card { border: 1px solid #d8d0c4; border-radius: 8px; padding: 0.035in; background: linear-gradient(180deg, #fffdfa 0%, #fbf7f1 100%); break-inside: avoid; page-break-inside: avoid; box-shadow: inset 0 0 0 0.5px #f5efe7; }',
+      '.plan-day-head { display: flex; justify-content: space-between; gap: 0.05in; align-items: baseline; margin-bottom: 0.025in; padding-bottom: 0.018in; border-bottom: 1px solid #e4dbcf; }',
+      '.plan-day-label { font-size: 7.6px; font-weight: 800; color: #0f2d2d; line-height: 1.1; }',
+      '.plan-day-count { font-size: 5.4px; color: #7a7268; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }',
+      '.plan-day-table { width: 100%; border-collapse: collapse; table-layout: fixed; }',
+      '.plan-day-table th, .plan-day-table td { border: 1px solid #dfd6cb; padding: 0.016in 0.018in; font-size: 5.25px; line-height: 1.01; vertical-align: top; text-align: left; }',
+      '.plan-day-table th { background: #f4efe7; font-size: 4.8px; text-transform: uppercase; letter-spacing: 0.05em; color: #655d54; }',
+      '.plan-day-table tbody tr:nth-child(even):not(.plan-section-row) td { background: rgba(248, 244, 238, 0.45); }',
+      '.plan-section-row td { background: #efe7db; font-size: 4.8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #5f564d; border-top: 1px solid #cdbfae; border-bottom: 1px solid #d8cabb; }',
+      '.plan-exercise-col { width: 31%; }',
+      '.plan-target-col { width: 33%; }',
+      '.plan-track-col { width: 18%; min-height: 0.14in; }',
+      '.plan-note-col { width: 18%; min-height: 0.14in; }',
+      '.plan-track-boxes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.008in; min-height: 0.13in; }',
+      '.plan-track-box { border: 1px solid #d8d0c4; border-radius: 4px; min-height: 0.13in; padding: 0.008in 0.01in; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }',
+      '.plan-track-box-label { font-size: 3.9px; text-transform: uppercase; letter-spacing: 0.05em; color: #7a7268; line-height: 1; }',
+      '.plan-track-box-line { border-top: 1px solid #cfc6b9; margin-top: 0.016in; flex: 1; }',
+      '.plan-note-lines { min-height: 0.13in; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 0.038in, #dcd2c6 0.038in, #dcd2c6 0.04in); }',
+      '.plan-page-dense .plan-day-card { padding: 0.032in; }',
+      '.plan-page-dense .plan-overview-card { padding: 0.03in; }',
+      '.plan-page-dense .plan-overview-title { font-size: 6.8px; }',
+      '.plan-page-dense .plan-overview-meta { font-size: 4.5px; }',
+      '.plan-page-dense .plan-overview-section-label { font-size: 4.3px; }',
+      '.plan-page-dense .plan-overview-list li { font-size: 4.5px; margin-bottom: 0.008in; }',
+      '.plan-page-dense .plan-day-label { font-size: 7.2px; }',
+      '.plan-page-dense .plan-day-table th, .plan-page-dense .plan-day-table td { font-size: 5px; padding: 0.015in 0.017in; }',
+      '.plan-page-dense .plan-track-boxes { gap: 0.008in; min-height: 0.11in; }',
+      '.plan-page-dense .plan-track-box { min-height: 0.11in; padding: 0.007in 0.008in; }',
+      '.plan-page-dense .plan-track-box-label { font-size: 3.8px; }',
+      '.plan-page-dense .plan-track-box-line { margin-top: 0.014in; }',
+      '.plan-page-dense .plan-note-lines { min-height: 0.11in; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 0.032in, #dcd2c6 0.032in, #dcd2c6 0.034in); }',
+      '.plan-page-ultra .plan-day-card { padding: 0.026in; border-radius: 7px; }',
+      '.plan-page-ultra .plan-overview-card { padding: 0.024in; border-radius: 7px; }',
+      '.plan-page-ultra .plan-overview-title { font-size: 6.1px; }',
+      '.plan-page-ultra .plan-overview-meta { font-size: 4.1px; }',
+      '.plan-page-ultra .plan-overview-section-label { font-size: 3.9px; margin-bottom: 0.009in; }',
+      '.plan-page-ultra .plan-overview-list { padding-left: 0.055in; }',
+      '.plan-page-ultra .plan-overview-list li { font-size: 4px; margin-bottom: 0.006in; line-height: 1.02; }',
+      '.plan-page-ultra .plan-day-head { margin-bottom: 0.024in; padding-bottom: 0.015in; }',
+      '.plan-page-ultra .plan-day-label { font-size: 6.6px; }',
+      '.plan-page-ultra .plan-day-count { font-size: 4.8px; }',
+      '.plan-page-ultra .plan-day-table th, .plan-page-ultra .plan-day-table td { font-size: 4.6px; padding: 0.012in 0.013in; line-height: 1; }',
+      '.plan-page-ultra .plan-track-boxes { gap: 0.006in; min-height: 0.09in; }',
+      '.plan-page-ultra .plan-track-box { min-height: 0.09in; padding: 0.005in 0.006in; }',
+      '.plan-page-ultra .plan-track-box-label { font-size: 3.4px; }',
+      '.plan-page-ultra .plan-track-box-line { margin-top: 0.01in; }',
+      '.plan-page-ultra .plan-note-lines { min-height: 0.09in; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 0.026in, #dcd2c6 0.026in, #dcd2c6 0.027in); }',
+      '.plan-page-micro .plan-header { margin-bottom: 0.05in; }',
+      '.plan-page-micro .plan-title { font-size: 12px; }',
+      '.plan-page-micro .plan-subtitle { display: none; }',
+      '.plan-page-micro .plan-meta { font-size: 5.5px; line-height: 1.1; }',
+      '.plan-page-micro .plan-overview-card { padding: 0.018in; border-radius: 5px; }',
+      '.plan-page-micro .plan-overview-head { margin-bottom: 0.014in; padding-bottom: 0.009in; }',
+      '.plan-page-micro .plan-overview-title { font-size: 5.2px; }',
+      '.plan-page-micro .plan-overview-meta { font-size: 3.6px; }',
+      '.plan-page-micro .plan-overview-section { margin-top: 0.014in; }',
+      '.plan-page-micro .plan-overview-section-label { font-size: 3.4px; margin-bottom: 0.006in; }',
+      '.plan-page-micro .plan-overview-list { padding-left: 0.045in; }',
+      '.plan-page-micro .plan-overview-list li { font-size: 3.5px; margin-bottom: 0.004in; line-height: 1; }',
+      '.plan-page-micro .plan-day-card { padding: 0.02in; border-radius: 6px; }',
+      '.plan-page-micro .plan-day-head { margin-bottom: 0.018in; padding-bottom: 0.01in; }',
+      '.plan-page-micro .plan-day-label { font-size: 5.8px; line-height: 1; }',
+      '.plan-page-micro .plan-day-count { font-size: 4.2px; }',
+      '.plan-page-micro .plan-day-table th, .plan-page-micro .plan-day-table td { font-size: 4px; padding: 0.009in 0.01in; line-height: 0.98; }',
+      '.plan-page-micro .plan-day-table th { font-size: 3.8px; }',
+      '.plan-page-micro .plan-section-row td { font-size: 3.8px; }',
+      '.plan-page-micro .plan-track-boxes { gap: 0.004in; min-height: 0.072in; }',
+      '.plan-page-micro .plan-track-box { min-height: 0.072in; padding: 0.004in 0.005in; }',
+      '.plan-page-micro .plan-track-box-label { font-size: 2.9px; }',
+      '.plan-page-micro .plan-track-box-line { margin-top: 0.007in; }',
+      '.plan-page-micro .plan-note-lines { min-height: 0.072in; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 0.02in, #dcd2c6 0.02in, #dcd2c6 0.021in); }',
+      '.plan-page-micro .plan-footer { display: none; }',
+      '.plan-footer { margin-top: 0.04in; font-size: 5.8px; color: #666; display: flex; justify-content: space-between; gap: 0.12in; }',
+      '</style>',
+      '<script>',
+      'window.addEventListener("load", function () {',
+      '  window.focus();',
+      '  setTimeout(function () { window.print(); }, 150);',
+      '});',
+      'window.addEventListener("afterprint", function () { window.close(); });',
+      '</script>',
+      '</head>',
+      '<body>',
+      '<div class="plan-sheet">',
+      '<section class="' + frontPageClass + '">',
+      '<div class="plan-header"><div class="plan-title-wrap"><div class="plan-kicker">Nomadic Performance</div><h1 class="plan-title">' + escapeHtml(programTitle) + '</h1><div class="plan-subtitle">Front: weekly plan overview</div></div><div class="plan-meta">Printed ' + escapeHtml(generatedAt) + '<br />Optimized for front/back printing</div></div>',
+      '<div class="plan-side-label">Front</div>',
+      '<div class="plan-grid">' + frontHtmlParts.join('') + '</div>',
+      '<div class="plan-footer"><span>Use this side as the quick-reference overview for every training day.</span><span>Front</span></div>',
+      '</section>',
+      '<section class="' + backPageClass + '">',
+      '<div class="plan-header"><div class="plan-title-wrap"><div class="plan-kicker">Nomadic Performance</div><h1 class="plan-title">' + escapeHtml(programTitle) + '</h1><div class="plan-subtitle">Back: athlete tracking sheet</div></div><div class="plan-meta">Load, reps, and note boxes for every training day</div></div>',
+      '<div class="plan-side-label">Back</div>',
+      '<div class="plan-grid">' + backHtmlParts.join('') + '</div>',
+      '<div class="plan-footer"><span>Record actual loads, completed work, and progress notes by hand.</span><span>Back</span></div>',
+      '</section>',
+      '</div>',
+      '</body>',
+      '</html>'
+    ].join('');
+  }
+
+  function buildFullPlanOverviewCard(slotKey, exercises) {
+    var grouped = groupExercisesForFullPlanPrint(exercises);
+    var sectionsHtml = grouped
+      .map(function (group) {
+        var itemsHtml = group.exercises
+          .map(function (exercise) {
+            return '<li><strong>' + escapeHtml(exercise.name || 'Exercise') + '</strong> <span>' + escapeHtml(summarizeExerciseTargetsForPrint(exercise, exercise && exercise.sets)) + '</span></li>';
+          })
+          .join('');
+
+        return [
+          '<section class="plan-overview-section">',
+          '<div class="plan-overview-section-label">' + escapeHtml(group.section) + '</div>',
+          '<ul class="plan-overview-list">' + itemsHtml + '</ul>',
+          '</section>'
+        ].join('');
+      })
+      .join('');
+
+    return [
+      '<article class="plan-overview-card">',
+      '<div class="plan-overview-head">',
+      '<div class="plan-overview-title">' + escapeHtml(labelForSlot(slotKey)) + '</div>',
+      '<div class="plan-overview-meta">' + exercises.length + ' exercise' + (exercises.length === 1 ? '' : 's') + '</div>',
+      '</div>',
+      sectionsHtml,
+      '</article>'
+    ].join('');
+  }
+
+  function countFullPlanOverviewRows(exercises) {
+    return groupExercisesForFullPlanPrint(exercises).reduce(function (sum, group) {
+      return sum + 1 + group.exercises.length;
+    }, 0);
+  }
+
+  function getExercisesForPrintForDay(slotKey) {
+    var payload = readFromStorage(state.storagePrefix + slotKey);
+    var storedExercises = payload && Array.isArray(payload.exercises) ? cloneExercises(payload.exercises) : null;
+    var assignedExercises = state.assignedTemplateDays && Array.isArray(state.assignedTemplateDays[slotKey])
+      ? cloneExercises(state.assignedTemplateDays[slotKey])
+      : null;
+
+    if (state.isAthleteLockedView && assignedExercises) {
+      var merged = storedExercises
+        ? mergeAthleteProgressIntoTemplate(assignedExercises, storedExercises)
+        : assignedExercises;
+      return normalizeExercisesArray(merged);
+    }
+
+    if (storedExercises) {
+      return normalizeExercisesArray(storedExercises);
+    }
+
+    if (assignedExercises) {
+      return normalizeExercisesArray(assignedExercises);
+    }
+
+    return [];
+  }
+
+  function buildFullPlanDayRows(exercises) {
+    var grouped = groupExercisesForFullPlanPrint(exercises);
+    var rows = [];
+
+    grouped.forEach(function (group) {
+      rows.push('<tr class="plan-section-row"><td colspan="4">' + escapeHtml(group.section) + '</td></tr>');
+
+      group.exercises.forEach(function (exercise) {
+        rows.push([
+          '<tr>',
+          '<td class="plan-exercise-col"><strong>' + escapeHtml(exercise.name || 'Exercise') + '</strong></td>',
+          '<td class="plan-target-col">' + escapeHtml(summarizeExerciseTargetsForPrint(exercise, exercise && exercise.sets)) + '</td>',
+          '<td class="plan-track-col"><div class="plan-track-boxes"><div class="plan-track-box"><span class="plan-track-box-label">Load</span><span class="plan-track-box-line"></span></div><div class="plan-track-box"><span class="plan-track-box-label">Reps</span><span class="plan-track-box-line"></span></div></div></td>',
+          '<td class="plan-note-col"><div class="plan-note-lines"></div></td>',
+          '</tr>'
+        ].join(''));
+      });
+    });
+
+    return rows.join('');
+  }
+
+  function countFullPlanPrintRows(exercises) {
+    return groupExercisesForFullPlanPrint(exercises).reduce(function (sum, group) {
+      var exerciseRows = group.exercises.length;
+      return sum + 1 + exerciseRows;
+    }, 0);
+  }
+
+  function groupExercisesForFullPlanPrint(exercises) {
+    var sectionOrder = defaultSections.slice();
+    var grouped = {};
+
+    sectionOrder.forEach(function (section) {
+      grouped[section] = [];
+    });
+
+    (Array.isArray(exercises) ? exercises : []).forEach(function (exercise) {
+      var section = String((exercise && exercise.section) || 'Workout').trim() || 'Workout';
+      if (!grouped[section]) {
+        grouped[section] = [];
+        sectionOrder.push(section);
+      }
+      grouped[section].push(exercise);
+    });
+
+    return sectionOrder
+      .map(function (section) {
+        return {
+          section: section,
+          exercises: grouped[section] || []
+        };
+      })
+      .filter(function (group) {
+        return group.exercises.length > 0;
+      });
+  }
+
+  function summarizeExerciseTargetsForPrint(exercise, sets) {
+    var safeSets = Array.isArray(sets) ? sets : [];
+    if (!safeSets.length) {
+      return 'No sets assigned';
+    }
+
+    var first = safeSets[0] || {};
+    var reps = resolveTemplateTarget(first.target_reps, first.reps) || modePrimaryPlaceholder(exercise && exercise.mode);
+    var weight = resolveTemplateTarget(first.target_weight, first.weight);
+    var rpe = resolveTemplateTarget(first.target_rpe, first.rpe);
+    var summary = String(safeSets.length) + ' set' + (safeSets.length === 1 ? '' : 's') + ' x ' + String(reps || '');
+
+    if (weight) {
+      summary += ' @ ' + String(weight);
+    }
+    if (rpe) {
+      summary += ' | ' + String(rpe);
+    }
+
+    return summary;
   }
 
   function isUuid(value) {

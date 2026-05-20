@@ -5442,6 +5442,105 @@ footer a:hover {
   font-size: 1rem;
 }
 
+.admin-insights-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-insight-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+}
+
+.admin-insight-card {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.8rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid #e3d7c9;
+  background: linear-gradient(180deg, #fff 0%, #f8f3ec 100%);
+}
+
+.admin-insight-card.is-loading {
+  grid-column: 1 / -1;
+  color: #5e5a54;
+}
+
+.admin-insight-card-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7a7268;
+}
+
+.admin-insight-card-value {
+  font-size: 1.35rem;
+  line-height: 1;
+  color: #103232;
+}
+
+.admin-insight-card-note {
+  font-size: 0.8rem;
+  color: #5d5a55;
+}
+
+.admin-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.admin-insight-subheading {
+  margin: 0 0 0.45rem;
+  font-size: 0.84rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6a6259;
+}
+
+.admin-insight-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.admin-insight-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #eadfce;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.admin-insight-row > div {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.admin-insight-row strong {
+  color: #123434;
+  font-size: 0.88rem;
+}
+
+.admin-insight-row span {
+  color: #6a635a;
+  font-size: 0.76rem;
+}
+
+.admin-empty-copy {
+  margin: 0;
+  color: #675f56;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 .admin-modal-info-row input,
 .admin-modal-info-row select,
 .admin-modal-info-row textarea {
@@ -5468,6 +5567,17 @@ footer a:hover {
   .admin-controls .btn,
   .admin-search {
     width: 100%;
+  }
+
+  .admin-insights-header-row,
+  .admin-insight-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-insight-cards,
+  .admin-insights-grid {
+    grid-template-columns: 1fr;
   }
 }
 
