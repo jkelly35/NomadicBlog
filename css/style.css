@@ -6139,3 +6139,761 @@ footer a:hover {
 +    grid-template-columns: 1fr;
 +  }
 }
+
+
+/* ============================================================
+   Athlete Insight Page
+   ============================================================ */
+
+.insight-main {
+  padding: 2rem 1rem 3rem;
+  background: #f7f4ef;
+  min-height: 80vh;
+}
+
+.insight-container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Guard / loading */
+.insight-loading { color: #4d5f5f; padding: 1.5rem 0; }
+.insight-error   { color: #c0392b; padding: 1.5rem 0; }
+.insight-empty   { color: #6b7d7d; font-style: italic; font-size: 0.9rem; }
+
+.insight-status { margin-top: 0.75rem; font-size: 0.88rem; }
+.insight-status.is-error   { color: #c0392b; }
+.insight-status.is-success { color: #1e7e34; }
+
+/* ---- Page header ---- */
+.insight-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.insight-back-btn {
+  font-size: 0.88rem;
+  background: transparent;
+  border: 1px solid #0e4749;
+  color: #0e4749;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  text-decoration: none;
+  line-height: 1.4;
+}
+.insight-back-btn:hover { background: #0e4749; color: #fff; }
+
+.insight-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.insight-action-btn {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  text-decoration: none;
+  background: #0e4749;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+.insight-action-btn:hover { background: #0a3335; }
+
+.insight-action-btn-sm {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 7px;
+  text-decoration: none;
+  background: #0e4749;
+  color: #fff;
+  display: inline-block;
+}
+.insight-action-btn-sm:hover { background: #0a3335; }
+
+/* ---- Hero ---- */
+.insight-hero {
+  background: #fff;
+  border: 1px solid #e2d8ca;
+  border-radius: 14px;
+  padding: 1.5rem 1.5rem 1.2rem;
+  margin-bottom: 1.25rem;
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 1rem 1.1rem;
+  align-items: start;
+  box-shadow: 0 4px 14px rgba(20, 52, 52, 0.07);
+}
+
+.insight-hero-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #0e4749;
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.insight-hero-name  { margin: 0 0 0.15rem; font-size: 1.45rem; color: #0f2d2d; }
+.insight-hero-email { margin: 0 0 0.5rem;  font-size: 0.88rem; color: #4d5f5f; }
+
+.insight-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.insight-chip {
+  font-size: 0.78rem;
+  background: #e8f3f0;
+  color: #0e4749;
+  padding: 0.22rem 0.65rem;
+  border-radius: 99px;
+  font-weight: 600;
+}
+
+.insight-chip-sport { background: #0e4749; color: #fff; }
+
+.insight-hero-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+}
+
+.insight-stat-card {
+  background: #f7f4ef;
+  border: 1px solid #e2d8ca;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.insight-stat-label { font-size: 0.72rem; color: #6b7d7d; text-transform: uppercase; letter-spacing: 0.05em; }
+.insight-stat-value { font-size: 1.25rem; color: #0e4749; font-weight: 700; }
+
+/* ---- Tabs ---- */
+.insight-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: #fff;
+  border: 1px solid #e2d8ca;
+  border-radius: 10px;
+  padding: 0.3rem;
+  margin-bottom: 1.1rem;
+  box-shadow: 0 2px 8px rgba(20, 52, 52, 0.05);
+}
+
+.insight-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #4d5f5f;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.insight-tab:hover   { background: #f0ede8; color: #0e4749; }
+.insight-tab.is-active {
+  background: #0e4749;
+  color: #fff;
+}
+
+/* ---- Panels ---- */
+.insight-panel {
+  animation: insightFadeIn 0.18s ease;
+}
+
+@keyframes insightFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.insight-panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.insight-panel-toolbar-label {
+  font-size: 0.88rem;
+  color: #4d5f5f;
+  font-weight: 600;
+}
+
+/* ---- Overview panel grid ---- */
+.insight-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.insight-section {
+  background: #fff;
+  border: 1px solid #e2d8ca;
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem;
+  box-shadow: 0 2px 8px rgba(20, 52, 52, 0.04);
+}
+
+.insight-section-full { grid-column: 1 / -1; }
+
+.insight-section-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0e4749;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid #e2d8ca;
+  padding-bottom: 0.4rem;
+}
+
+/* ---- Definition list ---- */
+.insight-dl { display: grid; gap: 0.4rem; }
+.insight-dl-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+.insight-dl-row dt { color: #4d5f5f; font-weight: 600; }
+.insight-dl-row dd { margin: 0; color: #0f2d2d; }
+
+/* Bio */
+.insight-bio { font-size: 0.9rem; color: #1e3a3a; line-height: 1.65; white-space: pre-wrap; }
+
+/* ---- Metrics panel ---- */
+.insight-metrics-grid { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.insight-metric-category {}
+
+.insight-metric-cat-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #6b7d7d;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin: 0 0 0.6rem;
+}
+
+.insight-metric-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.7rem;
+}
+
+.insight-metric-card {
+  background: #fff;
+  border: 1px solid #e2d8ca;
+  border-radius: 11px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 5px rgba(20, 52, 52, 0.04);
+}
+
+.insight-metric-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4d5f5f;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3rem;
+}
+
+.insight-metric-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.insight-metric-value {
+  font-size: 1.35rem;
+  color: #0e4749;
+  font-weight: 700;
+}
+
+.insight-metric-unit {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #6b7d7d;
+}
+
+.insight-delta {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+}
+.insight-delta-up      { background: #d4edda; color: #155724; }
+.insight-delta-down    { background: #f8d7da; color: #721c24; }
+.insight-delta-neutral { background: #e9ecef; color: #495057; }
+
+.insight-metric-meta {
+  font-size: 0.74rem;
+  color: #8a9a9a;
+  margin-top: 0.35rem;
+}
+
+.insight-metric-history-btn {
+  margin-top: 0.4rem;
+  background: none;
+  border: none;
+  color: #0e4749;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+.insight-metric-history-btn:hover { color: #c56a2c; }
+
+.insight-metric-history-list {
+  margin-top: 0.4rem;
+  border-top: 1px dashed #e2d8ca;
+  padding-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.insight-history-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  color: #4d5f5f;
+  padding: 0.15rem 0;
+}
+
+/* ---- Training panel ---- */
+.insight-program-card {
+  background: #fff;
+  border: 1px solid #e2d8ca;
+  border-radius: 11px;
+  padding: 0.9rem 1rem 0.85rem;
+  margin-bottom: 0.7rem;
+  box-shadow: 0 1px 5px rgba(20, 52, 52, 0.04);
+}
+
+.insight-program-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.insight-program-name  { font-size: 1rem; color: #0e4749; }
+.insight-program-summary { font-size: 0.84rem; color: #4d5f5f; margin: 0 0 0.3rem; }
+.insight-program-meta  { font-size: 0.78rem; color: #8a9a9a; }
+
+.insight-training-tabs {
+  width: 100%;
+  margin: 0 0 0.85rem;
+}
+
+.insight-training-tab {
+  font-size: 0.98rem;
+  font-weight: 700;
+  padding: 0.78rem 0.8rem;
+}
+
+.insight-program-past-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.insight-program-delete-btn {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 7px;
+  border: 1px solid #c0392b;
+  background: #fff;
+  color: #c0392b;
+  cursor: pointer;
+}
+
+.insight-program-delete-btn:hover {
+  background: #fdf0ee;
+}
+
+.insight-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.insight-badge-active   { background: #d4edda; color: #155724; }
+.insight-badge-inactive { background: #e9ecef; color: #495057; }
+
+/* ---- Load panel ---- */
+.insight-load-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 0.5rem;
+}
+
+.insight-load-card {
+  background: #fff;
+  border: 1px solid #e2d8ca;
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  box-shadow: 0 1px 4px rgba(20, 52, 52, 0.05);
+}
+.insight-load-label { font-size: 0.72rem; color: #6b7d7d; text-transform: uppercase; letter-spacing: 0.05em; }
+.insight-load-value { font-size: 1.3rem; font-weight: 700; color: #0e4749; }
+
+/* Bar chart */
+.insight-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 80px;
+  padding-bottom: 1.4rem;
+  border-bottom: 2px solid #e2d8ca;
+  overflow-x: auto;
+}
+
+.insight-bar-wrap {
+  flex: 1;
+  min-width: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+
+.insight-bar {
+  width: 100%;
+  min-height: 2px;
+  background: #0e4749;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.2s;
+}
+
+.insight-bar-label {
+  font-size: 0.6rem;
+  color: #8a9a9a;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  line-height: 1;
+  width: 14px;
+  text-align: center;
+  position: absolute;
+  bottom: 0;
+}
+
+.insight-chart-note { font-size: 0.74rem; color: #8a9a9a; margin-top: 0.35rem; }
+
+/* Recovery table */
+.insight-recovery-table { display: grid; gap: 0; }
+.insight-recovery-row {
+  display: grid;
+  grid-template-columns: 70px repeat(4, 1fr);
+  gap: 0.5rem;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.82rem;
+  border-bottom: 1px solid #f0ece6;
+  color: #0f2d2d;
+}
+.insight-recovery-row:last-child { border-bottom: none; }
+.insight-recovery-header {
+  background: #f7f4ef;
+  border-radius: 7px 7px 0 0;
+  font-weight: 700;
+  font-size: 0.74rem;
+  color: #4d5f5f;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 900px) {
+  .insight-hero {
+    grid-template-columns: 52px 1fr;
+  }
+  .insight-hero-summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .insight-panel-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .insight-header-bar { flex-direction: column; align-items: flex-start; }
+  .insight-tabs { flex-direction: column; }
+  .insight-hero { grid-template-columns: 1fr; }
+  .insight-hero-avatar { display: none; }
+  .insight-hero-summary-cards { grid-template-columns: repeat(2, 1fr); }
+  .insight-dl-row { grid-template-columns: 1fr; }
+  .insight-dl-row dt { color: #4d5f5f; font-size: 0.74rem; margin-bottom: 0; }
+  .insight-recovery-row { grid-template-columns: 60px repeat(4, 1fr); font-size: 0.7rem; }
+}
+
+/* ---- Coach Notes Panel ---- */
+.insight-notes-compose { margin-bottom: 0; }
+
+.insight-notes-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: #0f2d2d;
+  border: 1px solid #ccbfae;
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  resize: vertical;
+  line-height: 1.6;
+  background: #fdfaf7;
+  transition: border-color 0.15s;
+}
+.insight-notes-textarea:focus {
+  outline: 2px solid rgba(14, 71, 73, 0.25);
+  outline-offset: 1px;
+  border-color: #0e4749;
+}
+
+.insight-notes-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.insight-notes-char-count {
+  font-size: 0.74rem;
+  color: #8a9a9a;
+}
+
+.insight-notes-form-status {
+  margin-top: 0.4rem;
+  font-size: 0.82rem;
+  min-height: 1.1em;
+}
+.insight-notes-form-status.is-error   { color: #c0392b; }
+.insight-notes-form-status.is-success { color: #1e7e34; }
+
+.insight-notes-count {
+  font-size: 0.82rem;
+  color: #6b7d7d;
+  font-weight: 400;
+}
+
+.insight-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.insight-note-card {
+  background: #fdfaf7;
+  border: 1px solid #e2d8ca;
+  border-radius: 10px;
+  padding: 0.9rem 1rem 0.75rem;
+  transition: box-shadow 0.12s;
+}
+.insight-note-card:hover { box-shadow: 0 2px 10px rgba(20, 52, 52, 0.08); }
+
+.insight-note-body {
+  font-size: 0.9rem;
+  color: #1e3a3a;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.insight-note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.insight-note-meta {
+  font-size: 0.74rem;
+  color: #8a9a9a;
+}
+
+.insight-note-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.insight-note-btn {
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: 5px;
+  transition: background 0.12s, color 0.12s;
+}
+.insight-note-edit-btn   { color: #0e4749; }
+.insight-note-edit-btn:hover { background: #e8f3f0; }
+.insight-note-delete-btn { color: #c0392b; }
+.insight-note-delete-btn:hover { background: #fdf0ee; }
+
+.insight-note-edit-area { margin-top: 0.6rem; }
+.insight-note-edit-textarea { margin-bottom: 0; }
+
+/* ---------- Training Programs: multi-active dashboard ---------- */
+.training-program-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.training-program-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: #fff;
+  border: 1px solid #d7c7b2;
+  border-radius: 12px;
+  padding: 0.35rem;
+  margin: 0 0 1rem;
+}
+
+.training-program-tab {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #4d5f5f;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.78rem 0.7rem;
+  cursor: pointer;
+}
+
+.training-program-tab:hover {
+  background: #f0ede8;
+  color: #0e4749;
+}
+
+.training-program-tab.is-active {
+  background: #0e4749;
+  color: #fff;
+}
+
+.training-program-tab-panel {
+  margin-bottom: 0.35rem;
+}
+
+.training-program-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.85rem;
+}
+
+.training-program-card {
+  background: #fff;
+  border: 1px solid #e2d8ca;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(20, 52, 52, 0.05);
+}
+
+.training-program-card.is-active {
+  border-color: #0e4749;
+  box-shadow: 0 4px 14px rgba(14, 71, 73, 0.08);
+}
+
+.training-program-card.is-past {
+  background: #fdfaf7;
+}
+
+.training-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.85rem;
+}
+
+.training-card-actions-past {
+  margin-top: 0.75rem;
+}
+
+.training-make-current-btn {
+  background: #0e4749;
+  border-color: #0e4749;
+  color: #fff;
+}
+
+.training-make-current-btn:hover {
+  background: #0a3335;
+  border-color: #0a3335;
+}
+
+.training-delete-past-btn {
+  background: #fff;
+}
+
+.training-complete-btn {
+  background: #c56a2c;
+  border-color: #c56a2c;
+}
+
+.training-complete-btn:hover {
+  background: #a9531d;
+  border-color: #a9531d;
+}
+
+.training-program-history-section {
+  margin-top: 1.2rem;
+}
+
+.training-program-history-title {
+  margin: 0 0 0.75rem;
+  color: #0f2d2d;
+  font-size: 1rem;
+}
+
+.training-history-empty {
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 760px) {
+  .training-program-tabs {
+    flex-direction: column;
+  }
+}

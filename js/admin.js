@@ -355,18 +355,6 @@
     var tableBody = document.querySelector("[data-admin-table-body]");
     if (tableBody) {
       tableBody.addEventListener("click", function (event) {
-        var insightsBtn = event.target && event.target.closest("[data-admin-open-insights]");
-        if (insightsBtn) {
-          var insightsAthleteId = String(insightsBtn.getAttribute("data-athlete-id") || "").trim();
-          if (!insightsAthleteId) {
-            setStatus("Could not find athlete id.", "error");
-            return;
-          }
-
-          openAthleteModal(insightsAthleteId);
-          return;
-        }
-
         var deleteBtn = event.target && event.target.closest("[data-admin-delete-athlete]");
         if (!deleteBtn) {
           return;
@@ -979,33 +967,18 @@
 
     state.client
       .from("user_training_programs")
-      .update({ is_active: false })
-      .in("user_id", selectedIds)
-      .eq("is_active", true)
-      .then(function (deactivateResult) {
-        if (deactivateResult.error) {
-          setAssignStatus(deactivateResult.error.message, "error");
+      .insert(rows)
+      .then(function (insertResult) {
+        if (insertResult.error) {
+          setAssignStatus(insertResult.error.message, "error");
           return;
         }
 
-        state.client
-          .from("user_training_programs")
-          .insert(rows)
-          .then(function (insertResult) {
-            if (insertResult.error) {
-              setAssignStatus(insertResult.error.message, "error");
-              return;
-            }
-
-            setAssignStatus("Assigned template to " + selectedIds.length + " athlete(s).", "success");
-            setStatus("Assigned '" + (template.name || "Template") + "' to " + selectedIds.length + " athlete(s).", "success");
-            setTimeout(function () {
-              closeAssignModal();
-            }, 700);
-          })
-          .catch(function (error) {
-            setAssignStatus(error && error.message ? error.message : "Failed to assign template.", "error");
-          });
+        setAssignStatus("Assigned template to " + selectedIds.length + " athlete(s).", "success");
+        setStatus("Assigned '" + (template.name || "Template") + "' to " + selectedIds.length + " athlete(s).", "success");
+        setTimeout(function () {
+          closeAssignModal();
+        }, 700);
       })
       .catch(function (error) {
         setAssignStatus(error && error.message ? error.message : "Failed to assign template.", "error");
@@ -1250,9 +1223,9 @@
           "<td>" + (athlete.sport ? escapeHtml(athlete.sport) : "—") + "</td>" +
           "<td>" + (athlete.level ? escapeHtml(athlete.level) : "—") + "</td>" +
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
-          "<td><div class='admin-program-item-actions'><button type='button' class='btn admin-btn-small' data-admin-open-insights='1' data-athlete-id='" +
-          escapeAttribute(athlete.user_id || "") +
-          "'>Insights</button><a class='btn admin-btn-small' href='" +
+          "<td><div class='admin-program-item-actions'><a class='btn admin-btn-small' href='athlete-insight.html?athleteId=" +
+          encodeURIComponent(athlete.user_id || "") +
+          "' target='_blank'>Insights</a><a class='btn admin-btn-small' href='" +
           viewUrl +
           "'>View</a><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
           escapeAttribute(athlete.user_id || "") +

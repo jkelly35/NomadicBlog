@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Athlete Insight – Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/athlete-insight.js"></script>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="services.html">Services</a>
+    </nav>
+  </header>
+
+  <main class="insight-main">
+    <div class="insight-container">
+
+      <!-- Auth guard -->
+      <div data-insight-guard>
+        <p class="insight-loading">Verifying access...</p>
+      </div>
+
+      <!-- Main content -->
+      <div class="insight-content" hidden data-insight-content>
+
+        <!-- Page header bar -->
+        <div class="insight-header-bar">
+          <a href="admin.html" class="btn insight-back-btn">← Coaching Dashboard</a>
+          <div class="insight-header-actions">
+            <a href="#" class="btn insight-action-btn" data-insight-edit-link>Edit Full Profile</a>
+            <a href="#" class="btn insight-action-btn" data-insight-metrics-link>Manage Metrics</a>
+            <a href="#" class="btn insight-action-btn" data-insight-programs-link>Manage Programs</a>
+          </div>
+        </div>
+
+        <!-- Athlete hero -->
+        <div class="insight-hero">
+          <div class="insight-hero-avatar" data-insight-avatar>?</div>
+          <div class="insight-hero-info">
+            <h1 class="insight-hero-name" data-insight-name>Loading…</h1>
+            <p class="insight-hero-email" data-insight-email></p>
+            <div class="insight-hero-chips">
+              <span class="insight-chip insight-chip-sport" data-insight-sport hidden></span>
+              <span class="insight-chip" data-insight-level hidden></span>
+              <span class="insight-chip" data-insight-age hidden></span>
+              <span class="insight-chip" data-insight-sex hidden></span>
+              <span class="insight-chip" data-insight-location hidden></span>
+            </div>
+          </div>
+          <div class="insight-hero-summary-cards">
+            <article class="insight-stat-card">
+              <span class="insight-stat-label">Tracked Metrics</span>
+              <strong class="insight-stat-value" data-stat-metrics>—</strong>
+            </article>
+            <article class="insight-stat-card">
+              <span class="insight-stat-label">Active Program</span>
+              <strong class="insight-stat-value" data-stat-program>—</strong>
+            </article>
+            <article class="insight-stat-card">
+              <span class="insight-stat-label">7-Day Load</span>
+              <strong class="insight-stat-value" data-stat-load>—</strong>
+            </article>
+            <article class="insight-stat-card">
+              <span class="insight-stat-label">Recovery Score</span>
+              <strong class="insight-stat-value" data-stat-recovery>—</strong>
+            </article>
+          </div>
+        </div>
+
+        <!-- Tab navigation -->
+        <nav class="insight-tabs" role="tablist" aria-label="Athlete sections">
+          <button class="insight-tab is-active" role="tab" aria-selected="true" aria-controls="panel-overview" data-tab="overview">Overview</button>
+          <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-metrics" data-tab="metrics">Metrics &amp; Testing</button>
+          <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-training" data-tab="training">Training Programs</button>
+          <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-load" data-tab="load">Load &amp; Activity</button>
+          <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-notes" data-tab="notes">Coach Notes</button>
+        </nav>
+
+        <!-- ====== OVERVIEW PANEL ====== -->
+        <div id="panel-overview" class="insight-panel" role="tabpanel" data-panel="overview">
+          <div class="insight-panel-grid">
+
+            <!-- Profile info -->
+            <section class="insight-section">
+              <h2 class="insight-section-title">Profile</h2>
+              <dl class="insight-dl" data-overview-profile>
+                <div class="insight-dl-row"><dt>Name</dt><dd data-ov-name>—</dd></div>
+                <div class="insight-dl-row"><dt>Email</dt><dd data-ov-email>—</dd></div>
+                <div class="insight-dl-row"><dt>Age</dt><dd data-ov-age>—</dd></div>
+                <div class="insight-dl-row"><dt>Sex</dt><dd data-ov-sex>—</dd></div>
+                <div class="insight-dl-row"><dt>Location</dt><dd data-ov-location>—</dd></div>
+                <div class="insight-dl-row"><dt>Height</dt><dd data-ov-height>—</dd></div>
+                <div class="insight-dl-row"><dt>Weight</dt><dd data-ov-weight>—</dd></div>
+                <div class="insight-dl-row"><dt>Arm Span</dt><dd data-ov-armspan>—</dd></div>
+              </dl>
+            </section>
+
+            <!-- Bio -->
+            <section class="insight-section">
+              <h2 class="insight-section-title">Bio &amp; Background</h2>
+              <p class="insight-bio" data-ov-bio>No bio provided.</p>
+            </section>
+
+            <!-- Sport overview -->
+            <section class="insight-section insight-section-full">
+              <h2 class="insight-section-title">Sport Details</h2>
+              <div class="insight-sport-overview" data-ov-sport-overview>
+                <p class="insight-empty">No sport-specific details have been filled in yet.</p>
+              </div>
+            </section>
+
+          </div>
+        </div>
+
+        <!-- ====== METRICS PANEL ====== -->
+        <div id="panel-metrics" class="insight-panel" role="tabpanel" data-panel="metrics" hidden>
+          <div class="insight-panel-toolbar">
+            <span class="insight-panel-toolbar-label" data-metrics-count>Loading metrics…</span>
+            <a href="#" class="btn insight-action-btn-sm" data-insight-metrics-link2>Open Metrics Editor</a>
+          </div>
+          <div class="insight-metrics-grid" data-metrics-grid>
+            <p class="insight-loading">Loading metrics…</p>
+          </div>
+        </div>
+
+        <!-- ====== TRAINING PROGRAMS PANEL ====== -->
+        <div id="panel-training" class="insight-panel" role="tabpanel" data-panel="training" hidden>
+          <div class="insight-panel-toolbar">
+            <span class="insight-panel-toolbar-label">Training Programs</span>
+            <a href="#" class="btn insight-action-btn-sm" data-insight-programs-link2>Assign / Manage Programs</a>
+          </div>
+
+          <div class="insight-tabs insight-training-tabs" role="tablist" aria-label="Training program sections">
+            <button
+              type="button"
+              class="insight-tab insight-training-tab is-active"
+              role="tab"
+              aria-selected="true"
+              data-training-tab="current"
+            >
+              Current
+            </button>
+            <button
+              type="button"
+              class="insight-tab insight-training-tab"
+              role="tab"
+              aria-selected="false"
+              data-training-tab="past"
+            >
+              Past
+            </button>
+          </div>
+
+          <section class="insight-section" data-training-panel="current">
+            <h2 class="insight-section-title">Current Programs</h2>
+            <div data-training-active>
+              <p class="insight-loading">Loading current programs…</p>
+            </div>
+          </section>
+
+          <section class="insight-section" data-training-panel="past" hidden>
+            <h2 class="insight-section-title">Past Programs</h2>
+            <div data-training-history>
+              <p class="insight-loading">Loading past programs…</p>
+            </div>
+          </section>
+        </div>
+
+        <!-- ====== LOAD & ACTIVITY PANEL ====== -->
+        <div id="panel-load" class="insight-panel" role="tabpanel" data-panel="load" hidden>
+          <div class="insight-panel-toolbar">
+            <span class="insight-panel-toolbar-label">Strava Activity &amp; Training Load (last 30 days)</span>
+          </div>
+
+          <div class="insight-load-summary-cards" data-load-cards>
+            <p class="insight-loading">Loading activity data…</p>
+          </div>
+
+          <section class="insight-section" style="margin-top:1.5rem;">
+            <h2 class="insight-section-title">Daily Load (last 30 days)</h2>
+            <div class="insight-load-chart" data-load-chart>
+              <p class="insight-empty">No daily load data available.</p>
+            </div>
+          </section>
+
+          <section class="insight-section" style="margin-top:1.5rem;">
+            <h2 class="insight-section-title">Recovery &amp; Wellness</h2>
+            <div class="insight-recovery-grid" data-recovery-grid>
+              <p class="insight-empty">No recovery data available.</p>
+            </div>
+          </section>
+        </div>
+
+        <!-- ====== COACH NOTES PANEL ====== -->
+        <div id="panel-notes" class="insight-panel" role="tabpanel" data-panel="notes" hidden>
+          <div class="insight-panel-toolbar">
+            <span class="insight-panel-toolbar-label">Private coach notes — not visible to the athlete</span>
+          </div>
+
+          <!-- Add note form -->
+          <section class="insight-section insight-notes-compose">
+            <h2 class="insight-section-title">Add Note</h2>
+            <form data-notes-form autocomplete="off">
+              <textarea
+                class="insight-notes-textarea"
+                data-notes-textarea
+                placeholder="Add a note about this athlete…"
+                rows="4"
+                maxlength="4000"
+                required
+              ></textarea>
+              <div class="insight-notes-form-footer">
+                <span class="insight-notes-char-count" data-notes-char-count>0 / 4000</span>
+                <button type="submit" class="btn insight-action-btn" data-notes-submit>Save Note</button>
+              </div>
+            </form>
+            <p class="insight-notes-form-status" data-notes-form-status role="status" aria-live="polite"></p>
+          </section>
+
+          <!-- Notes list -->
+          <section class="insight-section" style="margin-top:1rem;">
+            <h2 class="insight-section-title">Notes <span class="insight-notes-count" data-notes-count></span></h2>
+            <div class="insight-notes-list" data-notes-list>
+              <p class="insight-loading">Loading notes…</p>
+            </div>
+          </section>
+        </div>
+
+        <!-- Global status message -->
+        <p class="insight-status" role="status" aria-live="polite" data-insight-status></p>
+
+      </div><!-- /insight-content -->
+    </div><!-- /insight-container -->
+  </main>
+
+  <footer style="background: #0e4749; color: #fff; padding: 32px 0 16px 0; text-align: center; margin-top: 48px;">
+    <p style="font-size: 1rem; opacity: 0.8;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>

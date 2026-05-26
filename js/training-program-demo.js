@@ -10,8 +10,11 @@
     templateName: "",
     client: null,
     assignedTemplateId: null,
+    assignedProgramInstanceId: null,
     assignedTemplateDays: null,
+    legacyStoragePrefix: null,
     isAthleteLockedView: false,
+    isProgramReadOnly: false,
     structure: {
       weeks: 1,
       workoutsPerWeek: 3
@@ -19,6 +22,7 @@
     templateFocus: "strength",
     daySessionTypes: {},
     customDayNames: {},
+    customDayNameMode: "legacy-suffix",
     editingExerciseIdx: null,
     athleteMobileOpenByDay: {},
     lastViewportWidth: null,
@@ -237,13 +241,19 @@
       if (params.get("builder") === "1") {
         return;
       }
+      state.isProgramReadOnly = params.get("view") === "1";
       var templateId = params.get("templateId");
       if (!templateId) {
         return;
       }
 
+      var assignmentId = String(params.get("assignmentId") || "").trim();
       state.assignedTemplateId = templateId;
-      state.storagePrefix = "nomadic_training_program_log_" + String(templateId) + "_";
+      state.assignedProgramInstanceId = assignmentId || null;
+      state.legacyStoragePrefix = "nomadic_training_program_log_" + String(templateId) + "_";
+      state.storagePrefix = state.assignedProgramInstanceId
+        ? "nomadic_training_program_assignment_log_" + state.assignedProgramInstanceId + "_"
+        : state.legacyStoragePrefix;
       state.isAthleteLockedView = true;
       if (!state.client) {
         state.client = createSupabaseClient();
@@ -287,11 +297,18 @@
     }
 
     if (saveBtn) {
-      saveBtn.innerHTML = "<span>💾</span> Save Workout Log";
+      if (state.isProgramReadOnly) {
+        saveBtn.style.display = "none";
+      } else {
+        saveBtn.style.display = "inline-flex";
+        saveBtn.innerHTML = "<span>💾</span> Save Workout Log";
+      }
     }
 
     if (subtitle) {
-      subtitle.textContent = "Log reps performed, weights used, notes, and completed sets.";
+      subtitle.textContent = state.isProgramReadOnly
+        ? "View this past program and your logged workout history (read-only)."
+        : "Log reps performed, weights used, notes, and completed sets.";
     }
 
     if (dayTools) {
@@ -490,7 +507,7 @@
     }
 
     dayTools.hidden = false;
-    dayNameInput.value = String((state.customDayNames && state.customDayNames[state.day]) || "");
+    dayNameInput.value = String(labelForSlot(state.day) || "");
   }
 
   function renameCurrentDay(nextName) {
@@ -507,6 +524,7 @@
       delete state.customDayNames[state.day];
       setStatus("Day name reset to default label.", "info");
     } else {
+      state.customDayNameMode = "full-label";
       state.customDayNames[state.day] = cleaned;
       setStatus("Renamed day to '" + cleaned + "'.", "success");
     }
@@ -1002,7 +1020,7 @@
   }
 
   function loadExercisesForDay() {
-    var stored = readFromStorage(storageKeyForDay());
+    var stored = readWorkoutLogForDay();
     var assignedExercises = state.assignedTemplateDays && Array.isArray(state.assignedTemplateDays[state.day])
       ? cloneExercises(state.assignedTemplateDays[state.day])
       : null;
@@ -1081,6 +1099,7 @@
       focus: state.templateFocus,
       day_session_types: state.daySessionTypes || {},
       custom_day_names: state.customDayNames || {},
+      custom_day_name_mode: state.customDayNameMode,
       structure: state.structure,
       days: {
         
@@ -1246,6 +1265,7 @@
         state.templateFocus = normalizeTemplateFocus(payload.focus);
         state.daySessionTypes = normalizeDaySessionTypes(payload.day_session_types);
         state.customDayNames = normalizeCustomDayNames(payload.custom_day_names);
+        state.customDayNameMode = normalizeCustomDayNameMode(payload.custom_day_name_mode);
         ensureDaySessionTypesForStructure();
         var normalizedDays = normalizeTemplateDays(payload.days);
         var daySelect = document.querySelector("[data-workout-day]");
@@ -1334,6 +1354,7 @@
         state.templateFocus = normalizeTemplateFocus(payload.focus);
         state.daySessionTypes = normalizeDaySessionTypes(payload.day_session_types);
         state.customDayNames = normalizeCustomDayNames(payload.custom_day_names);
+        state.customDayNameMode = normalizeCustomDayNameMode(payload.custom_day_name_mode);
         ensureDaySessionTypesForStructure();
         var daySelect = document.querySelector("[data-workout-day]");
         if (daySelect) {
@@ -2204,10 +2225,15 @@
       focus: normalizeTemplateFocus(payload && payload.focus),
       day_session_types: normalizeDaySessionTypes(payload && payload.day_session_types),
       custom_day_names: normalizeCustomDayNames(payload && payload.custom_day_names),
+      custom_day_name_mode: normalizeCustomDayNameMode(payload && payload.custom_day_name_mode),
       structure: normalizeStructure(payload && payload.structure),
       days: payload && payload.days ? payload.days : {}
     };
     return TEMPLATE_MARKER + JSON.stringify(safePayload);
+  }
+
+  function normalizeCustomDayNameMode(mode) {
+    return String(mode || "").toLowerCase() === "full-label" ? "full-label" : "legacy-suffix";
   }
 
   function normalizeStructure(structure) {
@@ -2271,6 +2297,9 @@
     var base = "Week " + parsed.week + " - Workout " + parsed.workout;
     var customLabel = state.customDayNames && state.customDayNames[slotKey];
     if (customLabel) {
+      if (state.customDayNameMode === "full-label") {
+        return customLabel;
+      }
       return base + " - " + customLabel;
     }
     if (dayLabels[slotKey]) {
@@ -2466,7 +2495,19 @@
     });
 
     attachEventListeners();
+    applyReadOnlyFieldState();
     renderCompletionSummary();
+  }
+
+  function applyReadOnlyFieldState() {
+    if (!state.isProgramReadOnly) {
+      return;
+    }
+
+    document.querySelectorAll('[data-workout-rows] input, [data-athlete-mobile-log] input').forEach(function (input) {
+      input.disabled = true;
+      input.readOnly = true;
+    });
   }
 
   function isAthleteMobileUi() {
@@ -2921,6 +2962,10 @@
   }
 
   function onSetInput(event) {
+    if (state.isProgramReadOnly) {
+      return;
+    }
+
     var input = event.target;
     var field = input.getAttribute("data-field");
     var exerciseIdx = parseInt(input.getAttribute("data-exercise"), 10);
@@ -3919,6 +3964,32 @@
 
   function storageKeyForDay() {
     return state.storagePrefix + state.day;
+  }
+
+  function legacyStorageKeyForDay() {
+    if (!state.legacyStoragePrefix) {
+      return "";
+    }
+    return state.legacyStoragePrefix + state.day;
+  }
+
+  function readWorkoutLogForDay() {
+    var currentKey = storageKeyForDay();
+    var current = readFromStorage(currentKey);
+    if (current) {
+      return current;
+    }
+
+    if (!state.assignedProgramInstanceId) {
+      return null;
+    }
+
+    var legacyKey = legacyStorageKeyForDay();
+    if (!legacyKey || legacyKey === currentKey) {
+      return null;
+    }
+
+    return readFromStorage(legacyKey);
   }
 
   function readFromStorage(key) {

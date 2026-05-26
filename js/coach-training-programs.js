@@ -400,33 +400,18 @@
 
     state.client
       .from("user_training_programs")
-      .update({ is_active: false })
-      .in("user_id", selectedIds)
-      .eq("is_active", true)
-      .then(function (deactivateResult) {
-        if (deactivateResult.error) {
-          setAssignStatus(deactivateResult.error.message, "error");
+      .insert(rows)
+      .then(function (insertResult) {
+        if (insertResult.error) {
+          setAssignStatus(insertResult.error.message, "error");
           return;
         }
 
-        state.client
-          .from("user_training_programs")
-          .insert(rows)
-          .then(function (insertResult) {
-            if (insertResult.error) {
-              setAssignStatus(insertResult.error.message, "error");
-              return;
-            }
-
-            setAssignStatus("Assigned template to " + selectedIds.length + " athlete(s).", "success");
-            setStatus("Assigned '" + (template.name || "Template") + "' to " + selectedIds.length + " athlete(s).", "success");
-            setTimeout(function () {
-              closeAssignModal();
-            }, 700);
-          })
-          .catch(function (error) {
-            setAssignStatus(error && error.message ? error.message : "Failed to assign template.", "error");
-          });
+        setAssignStatus("Assigned template to " + selectedIds.length + " athlete(s).", "success");
+        setStatus("Assigned '" + (template.name || "Template") + "' to " + selectedIds.length + " athlete(s).", "success");
+        setTimeout(function () {
+          closeAssignModal();
+        }, 700);
       })
       .catch(function (error) {
         setAssignStatus(error && error.message ? error.message : "Failed to assign template.", "error");

@@ -1461,9 +1461,32 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var trainingProgramContent = document.getElementById("profile-training-program-content");
     if (trainingProgramContent) {
       trainingProgramContent.addEventListener("click", function (event) {
-        var removeBtn = event.target && event.target.closest("[data-remove-active-program]");
+        var completeBtn = event.target && event.target.closest("[data-complete-program]");
+        var makeCurrentBtn = event.target && event.target.closest("[data-make-current-program]");
+        var deletePastBtn = event.target && event.target.closest("[data-delete-past-program]");
         var changeBtn = event.target && event.target.closest("[data-change-active-program]");
         var assignBtn = event.target && event.target.closest("[data-assign-active-program]");
+        var tabBtn = event.target && event.target.closest("[data-training-program-tab]");
+
+        if (tabBtn) {
+          setTrainingProgramsTab(trainingProgramContent, String(tabBtn.getAttribute("data-training-program-tab") || "current"));
+          return;
+        }
+
+        if (completeBtn) {
+          onCompleteProgram(String(completeBtn.getAttribute("data-complete-program") || ""));
+          return;
+        }
+
+        if (makeCurrentBtn) {
+          onMakeProgramCurrent(String(makeCurrentBtn.getAttribute("data-make-current-program") || ""));
+          return;
+        }
+
+        if (deletePastBtn) {
+          onDeletePastProgram(String(deletePastBtn.getAttribute("data-delete-past-program") || ""));
+          return;
+        }
 
         if (changeBtn) {
           onCustomizeProgramForAthlete();
@@ -1474,12 +1497,6 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           openCoachProgramModal();
           return;
         }
-
-        if (!removeBtn) {
-          return;
-        }
-
-        onRemoveActiveProgram();
       });
     }
 
@@ -2058,7 +2075,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
-    content.innerHTML = '<p class="profile-training-loading">Loading your training program...</p>';
+    content.innerHTML = '<p class="profile-training-loading">Loading your training programs...</p>';
 
     // Always use the non-join version to avoid ambiguous relationship embeds.
     loadCurrentTrainingProgramWithoutJoin(content);
@@ -2578,43 +2595,60 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       .from("user_training_programs")
       .select("*")
       .eq("user_id", getViewedUserId())
-      .eq("is_active", true)
       .order("assigned_at", { ascending: false })
-      .limit(1)
       .then(function (result) {
         if (result.error) {
           contentElement.innerHTML = '<p class="profile-training-error">' + escapeHtml(result.error.message) + "</p>";
           return;
         }
 
-        var program = result.data && result.data[0];
-        if (!program) {
-          renderTrainingProgram(contentElement, null);
+        var programs = result.data || [];
+        if (!programs.length) {
+          renderTrainingPrograms(contentElement, []);
           return;
         }
 
-        if (program.program_name || !program.program_id) {
-          renderTrainingProgram(contentElement, program);
+        var missingProgramIds = [];
+        var seenProgramIds = {};
+        programs.forEach(function (program) {
+          if (program && program.program_id && !program.program_name && !seenProgramIds[program.program_id]) {
+            seenProgramIds[program.program_id] = true;
+            missingProgramIds.push(program.program_id);
+          }
+        });
+
+        if (!missingProgramIds.length) {
+          renderTrainingPrograms(contentElement, programs);
           return;
         }
 
         state.client
           .from("training_programs")
-          .select("name,description")
-          .eq("id", program.program_id)
-          .single()
+          .select("id,name,description")
+          .in("id", missingProgramIds)
           .then(function (programResult) {
+            var templateMap = {};
             if (!programResult.error && programResult.data) {
-              program.training_program = {
-                name: programResult.data.name,
-                description: programResult.data.description
-              };
+              programResult.data.forEach(function (templateRow) {
+                templateMap[templateRow.id] = templateRow;
+              });
             }
 
-            renderTrainingProgram(contentElement, program);
+            var enrichedPrograms = programs.map(function (program) {
+              var copy = Object.assign({}, program);
+              if (!copy.program_name && copy.program_id && templateMap[copy.program_id]) {
+                copy.training_program = {
+                  name: templateMap[copy.program_id].name,
+                  description: templateMap[copy.program_id].description
+                };
+              }
+              return copy;
+            });
+
+            renderTrainingPrograms(contentElement, enrichedPrograms);
           })
           .catch(function () {
-            renderTrainingProgram(contentElement, program);
+            renderTrainingPrograms(contentElement, programs);
           });
       })
       .catch(function (error) {
@@ -2625,50 +2659,102 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
   }
 
-  function renderTrainingProgram(contentElement, program) {
-    if (!program) {
-      contentElement.innerHTML =
-        '<p class="profile-training-none">You have no active training program assigned yet.</p>' +
-        (state.isCoachView
-          ? '<div class="training-coach-actions"><button type="button" class="btn profile-btn-edit-profile training-change-btn" data-assign-active-program>Assign Program to Athlete</button></div>' +
-            '<p class="profile-status training-program-status" role="status" aria-live="polite" data-training-program-status></p>'
-          : "");
+  function renderTrainingPrograms(contentElement, programs) {
+    var activePrograms = (programs || []).filter(function (program) {
+      return !!program.is_active;
+    });
+    var pastPrograms = (programs || []).filter(function (program) {
+      return !program.is_active;
+    });
+
+    var html = '';
+
+    html += '<div class="training-program-section-header">';
+    html += '<p class="training-note">Multiple programs can be active at once. Mark a program completed when it moves into your past history.</p>';
+    html += (state.isCoachView
+      ? '<div class="training-coach-actions"><button type="button" class="btn profile-btn-edit-profile training-change-btn" data-assign-active-program>Assign Program to Athlete</button><button type="button" class="btn profile-btn-edit-profile training-change-btn" data-change-active-program>Edit Program for Athlete</button></div>'
+      : '');
+    html += '</div>';
+
+    html += '<div class="training-program-tabs" role="tablist" aria-label="Training program sections">';
+    html += '<button type="button" class="training-program-tab is-active" role="tab" aria-selected="true" data-training-program-tab="current">Current Training Programs</button>';
+    html += '<button type="button" class="training-program-tab" role="tab" aria-selected="false" data-training-program-tab="past">Past Training Programs</button>';
+    html += '</div>';
+
+    html += '<div class="training-program-tab-panel" data-training-program-panel="current">';
+    if (!activePrograms.length) {
+      html += '<p class="profile-training-none">You have no active training programs assigned right now.</p>';
+    } else {
+      html += '<div class="training-program-grid training-program-grid-active">';
+      activePrograms.forEach(function (program) {
+        html += buildTrainingProgramCard(program, true);
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    html += '<div class="training-program-tab-panel" data-training-program-panel="past" hidden>';
+    if (!pastPrograms.length) {
+      html += '<p class="profile-training-none training-history-empty">No past programs yet.</p>';
+    } else {
+      html += '<div class="training-program-grid training-program-grid-past">';
+      pastPrograms.forEach(function (program) {
+        html += buildTrainingProgramCard(program, false);
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    html += '<p class="profile-status training-program-status" role="status" aria-live="polite" data-training-program-status></p>';
+
+    contentElement.innerHTML = html;
+  }
+
+  function setTrainingProgramsTab(contentElement, tab) {
+    if (!contentElement) {
       return;
     }
 
+    var selectedTab = tab === "past" ? "past" : "current";
+
+    contentElement.querySelectorAll("[data-training-program-tab]").forEach(function (btn) {
+      var isActive = btn.getAttribute("data-training-program-tab") === selectedTab;
+      btn.classList.toggle("is-active", isActive);
+      btn.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+
+    contentElement.querySelectorAll("[data-training-program-panel]").forEach(function (panel) {
+      panel.hidden = panel.getAttribute("data-training-program-panel") !== selectedTab;
+    });
+  }
+
+  function buildTrainingProgramCard(program, isActive) {
     var programName =
       (program.training_program && program.training_program.name) ||
       program.program_name ||
       (program.program_id ? "Program " + String(program.program_id).slice(0, 8) : "Assigned Program");
 
     var startDate = program.assigned_at ? formatDate(program.assigned_at) : "—";
+    var assignmentQuery = program.id ? "&assignmentId=" + encodeURIComponent(program.id) : "";
     var programUrl =
       "training-program-example.html?program=" + encodeURIComponent(programName) +
-      (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "");
+      (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "") +
+      assignmentQuery;
+    var viewUrl = programUrl + "&view=1";
 
-    contentElement.innerHTML =
-      '<div class="profile-training-details">' +
-      '<div class="training-row"><span>Program</span><strong><a class="training-program-link" href="' +
-      programUrl +
-      '">' +
-      escapeHtml(programName) +
-      "</a></strong></div>" +
-      '<div class="training-row"><span>Start Date</span><strong>' +
-      escapeHtml(startDate) +
-      "</strong></div>" +
-      '<p class="training-note">Your coach assigns and updates this program from the Coaching Dashboard.</p>' +
-      '<a class="btn training-open-btn" href="' +
-      programUrl +
-      '">Open Program + Log Workout</a>' +
-      (state.isCoachView
-        ? '<div class="training-coach-actions">' +
-          '<button type="button" class="btn profile-btn-edit-profile training-change-btn" data-change-active-program>Edit Program for Athlete</button>' +
-          '<button type="button" class="btn profile-btn-edit-profile training-change-btn" data-assign-active-program>Assign Different Template</button>' +
-          '<button type="button" class="btn profile-btn-delete training-remove-btn" data-remove-active-program>Remove Program from Athlete</button>' +
-          "</div>"
-        : "") +
-      '<p class="profile-status training-program-status" role="status" aria-live="polite" data-training-program-status></p>' +
-      "</div>";
+    return [
+      '<div class="profile-training-details training-program-card' + (isActive ? ' is-active' : ' is-past') + '" data-training-program-id="' + escapeAttribute(program.id || "") + '">',
+      '<div class="training-row"><span>Program</span><strong><a class="training-program-link" href="' + programUrl + '">' + escapeHtml(programName) + '</a></strong></div>',
+      '<div class="training-row"><span>Start Date</span><strong>' + escapeHtml(startDate) + '</strong></div>',
+      isActive
+        ? '<p class="training-note">This program is currently active. Use the button below when it is complete.</p>'
+        : '<p class="training-note">This program has been moved to your past training history.</p>',
+      '<a class="btn training-open-btn" href="' + (isActive ? programUrl : viewUrl) + '">' + (isActive ? 'Open Program + Log Workout' : 'View Program') + '</a>',
+      isActive
+        ? '<div class="training-card-actions"><button type="button" class="btn profile-btn-edit-profile training-complete-btn" data-complete-program="' + escapeAttribute(program.id || "") + '">Completed Training Program</button></div>'
+        : '<div class="training-card-actions training-card-actions-past"><button type="button" class="btn profile-btn-edit-profile training-make-current-btn" data-make-current-program="' + escapeAttribute(program.id || "") + '">Make Current</button><button type="button" class="btn profile-btn-delete training-delete-past-btn" data-delete-past-program="' + escapeAttribute(program.id || "") + '">Delete</button></div>',
+      '</div>'
+    ].join("");
   }
 
   function onCustomizeProgramForAthlete() {
@@ -2759,46 +2845,28 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
                 state.client
                   .from("user_training_programs")
-                  .update({ is_active: false })
-                  .eq("user_id", viewedUserId)
-                  .eq("is_active", true)
-                  .then(function (deactivateResult) {
-                    if (deactivateResult.error) {
-                      setTrainingProgramStatus(deactivateResult.error.message, "error");
+                  .insert({
+                    user_id: viewedUserId,
+                    program_id: customProgram.id,
+                    program_name: customProgram.name,
+                    is_active: true,
+                    assigned_at: now,
+                    assigned_by: state.user ? state.user.id : null
+                  })
+                  .then(function (assignResult) {
+                    if (assignResult.error) {
+                      setTrainingProgramStatus(assignResult.error.message, "error");
                       return;
                     }
 
-                    state.client
-                      .from("user_training_programs")
-                      .insert({
-                        user_id: viewedUserId,
-                        program_id: customProgram.id,
-                        program_name: customProgram.name,
-                        is_active: true,
-                        assigned_at: now,
-                        assigned_by: state.user ? state.user.id : null
-                      })
-                      .then(function (assignResult) {
-                        if (assignResult.error) {
-                          setTrainingProgramStatus(assignResult.error.message, "error");
-                          return;
-                        }
-
-                        setTrainingProgramStatus("Opened athlete-specific program editor.", "success");
-                        window.location.href =
-                          "training-program-example.html?builder=1&templateId=" +
-                          encodeURIComponent(customProgram.id);
-                      })
-                      .catch(function (error) {
-                        setTrainingProgramStatus(
-                          error && error.message ? error.message : "Failed to assign custom program.",
-                          "error"
-                        );
-                      });
+                    setTrainingProgramStatus("Opened athlete-specific program editor.", "success");
+                    window.location.href =
+                      "training-program-example.html?builder=1&templateId=" +
+                      encodeURIComponent(customProgram.id);
                   })
                   .catch(function (error) {
                     setTrainingProgramStatus(
-                      error && error.message ? error.message : "Failed to update active assignment.",
+                      error && error.message ? error.message : "Failed to assign custom program.",
                       "error"
                     );
                   });
@@ -2924,41 +2992,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     var query = String(searchTerm || "").trim().toLowerCase();
-    var filtered = state.trainingTemplates.filter(function (template) {
+    var filtered = (state.trainingTemplates || []).filter(function (template) {
       if (!query) {
-   var isGrant = isAdaptedGrantFootRaiseMetricName(metric.metric_name || "");
-   var grantGrid = card.querySelector("[data-metric-grant-grid]");
-
-   if (grantGrid) {
-     grantGrid.hidden = !isGrant;
-   }
-
-   if (isGrant) {
-     card.setAttribute("data-metric-grant", "true");
-
-     var parsedGrant = parseGrantLegValues(metric.metric_value || "");
-     var shouldBlankForTestGrant = modeValue === "test";
-     if (leftInput) {
-       leftInput.value = shouldBlankForTestGrant
-         ? ""
-         : (parsedGrant.left === null ? "" : formatMetricNumber(parsedGrant.left));
-     }
-     if (rightInput) {
-       rightInput.value = shouldBlankForTestGrant
-         ? ""
-         : (parsedGrant.right === null ? "" : formatMetricNumber(parsedGrant.right));
-     }
-
-     updateGrantDraftValue(card);
-
-     if (leftInput) {
-       leftInput.focus();
-     }
-     return;
-   }
-
-   card.removeAttribute("data-metric-grant");
+        return true;
       }
+
       return String(template.name || "").toLowerCase().indexOf(query) > -1;
     });
 
@@ -3023,41 +3061,26 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     state.client
       .from("user_training_programs")
-      .update({ is_active: false })
-      .eq("user_id", viewedUserId)
-      .eq("is_active", true)
-      .then(function (deactivateResult) {
-        if (deactivateResult.error) {
-          setCoachProgramStatus(deactivateResult.error.message, "error");
+      .insert({
+        user_id: viewedUserId,
+        program_id: template.id,
+        program_name: template.name,
+        is_active: true,
+        assigned_at: now,
+        assigned_by: state.user ? state.user.id : null
+      })
+      .then(function (insertResult) {
+        if (insertResult.error) {
+          setCoachProgramStatus(insertResult.error.message, "error");
           return;
         }
 
-        state.client
-          .from("user_training_programs")
-          .insert({
-            user_id: viewedUserId,
-            program_id: template.id,
-            program_name: template.name,
-            is_active: true,
-            assigned_at: now,
-            assigned_by: state.user ? state.user.id : null
-          })
-          .then(function (insertResult) {
-            if (insertResult.error) {
-              setCoachProgramStatus(insertResult.error.message, "error");
-              return;
-            }
-
-            setCoachProgramStatus("Template assigned to this athlete.", "success");
-            setTrainingProgramStatus("Program updated for this athlete only.", "success");
-            setTimeout(function () {
-              closeCoachProgramModal();
-              loadCurrentTrainingProgram();
-            }, 500);
-          })
-          .catch(function (error) {
-            setCoachProgramStatus(error && error.message ? error.message : "Failed to assign template.", "error");
-          });
+        setCoachProgramStatus("Template assigned to this athlete.", "success");
+        setTrainingProgramStatus("Program added to this athlete.", "success");
+        setTimeout(function () {
+          closeCoachProgramModal();
+          loadCurrentTrainingProgram();
+        }, 500);
       })
       .catch(function (error) {
         setCoachProgramStatus(error && error.message ? error.message : "Failed to assign template.", "error");
@@ -3119,42 +3142,110 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
   }
 
-  function onRemoveActiveProgram() {
+  function onCompleteProgram(programId) {
     var viewedUserId = getViewedUserId();
-    if (!state.isCoachView) {
+    if (!viewedUserId || !state.client || !programId) {
+      setTrainingProgramStatus("Unable to update this program right now.", "error");
       return;
     }
 
-    if (!viewedUserId || !state.client) {
-      setTrainingProgramStatus("Unable to remove program right now.", "error");
+    if (!confirm("Move this training program into the past training programs section?")) {
       return;
     }
 
-    if (!confirm("Remove the active training program from this athlete?")) {
-      return;
-    }
-
-    setTrainingProgramStatus("Removing active program...", "info");
+    setTrainingProgramStatus("Marking program complete...", "info");
 
     state.client
       .from("user_training_programs")
       .update({ is_active: false })
+      .eq("id", programId)
       .eq("user_id", viewedUserId)
-      .eq("is_active", true)
       .then(function (result) {
         if (result.error) {
           setTrainingProgramStatus(result.error.message, "error");
           return;
         }
 
-        setTrainingProgramStatus("Program removed from athlete.", "success");
+        setTrainingProgramStatus("Training program moved to past programs.", "success");
         setTimeout(function () {
           loadCurrentTrainingProgram();
         }, 350);
       })
       .catch(function (error) {
         setTrainingProgramStatus(
-          error && error.message ? error.message : "Failed to remove active program.",
+          error && error.message ? error.message : "Failed to complete program.",
+          "error"
+        );
+      });
+  }
+
+  function onMakeProgramCurrent(programId) {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId || !state.client || !programId) {
+      setTrainingProgramStatus("Unable to update this program right now.", "error");
+      return;
+    }
+
+    setTrainingProgramStatus("Moving program to current...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .update({ is_active: true })
+      .eq("id", programId)
+      .eq("user_id", viewedUserId)
+      .eq("is_active", false)
+      .then(function (result) {
+        if (result.error) {
+          setTrainingProgramStatus(result.error.message, "error");
+          return;
+        }
+
+        setTrainingProgramStatus("Program moved to current training programs.", "success");
+        setTimeout(function () {
+          loadCurrentTrainingProgram();
+        }, 350);
+      })
+      .catch(function (error) {
+        setTrainingProgramStatus(
+          error && error.message ? error.message : "Failed to make program current.",
+          "error"
+        );
+      });
+  }
+
+  function onDeletePastProgram(programId) {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId || !state.client || !programId) {
+      setTrainingProgramStatus("Unable to delete this program right now.", "error");
+      return;
+    }
+
+    if (!confirm("Delete this past training program? This cannot be undone.")) {
+      return;
+    }
+
+    setTrainingProgramStatus("Deleting past program...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .delete()
+      .eq("id", programId)
+      .eq("user_id", viewedUserId)
+      .eq("is_active", false)
+      .then(function (result) {
+        if (result.error) {
+          setTrainingProgramStatus(result.error.message, "error");
+          return;
+        }
+
+        setTrainingProgramStatus("Past training program deleted.", "success");
+        setTimeout(function () {
+          loadCurrentTrainingProgram();
+        }, 350);
+      })
+      .catch(function (error) {
+        setTrainingProgramStatus(
+          error && error.message ? error.message : "Failed to delete past program.",
           "error"
         );
       });
