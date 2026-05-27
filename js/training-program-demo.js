@@ -13,6 +13,7 @@
     assignedProgramInstanceId: null,
     assignedTemplateDays: null,
     legacyStoragePrefix: null,
+    athleteName: "",
     isAthleteLockedView: false,
     isProgramReadOnly: false,
     structure: {
@@ -450,10 +451,15 @@
     try {
       var params = new URLSearchParams(window.location.search);
       var programName = params.get("program");
+      var athleteName = String(params.get("athleteName") || "").trim();
       if (programName) {
         heading.textContent = programName;
       } else if (state.isTemplateBuilder) {
         heading.textContent = state.templateName || "New Training Program Template";
+      }
+
+      if (athleteName) {
+        state.athleteName = athleteName;
       }
     } catch (e) {
       // Ignore malformed query parameters.
@@ -1597,6 +1603,7 @@
     var programTitle = String(state.templateName || "Workout Program").trim();
     var dayTitle = String(labelForSlot(state.day) || "Workout Day").trim();
     var generatedAt = new Date().toLocaleDateString();
+    var athleteLabel = resolvePrintAthleteLabel();
 
     var sectionOrder = [];
     defaultSections.forEach(function (section) {
@@ -1823,6 +1830,7 @@
       '<div>',
       '<h1 class="sheet-title">' + escapeHtml(programTitle) + '</h1>',
       '<div class="sheet-subtitle">' + escapeHtml(dayTitle) + ' - exercises only</div>',
+      '<div class="sheet-subtitle">Athlete: ' + escapeHtml(athleteLabel) + '</div>',
       '</div>',
       '<div class="sheet-meta">Printed ' + escapeHtml(generatedAt) + '<br />Target values shown for paper tracking</div>',
       '</div>',
@@ -1849,6 +1857,7 @@
     var slotKeys = getAllSlotKeys();
     var programTitle = String(state.templateName || "Training Plan").trim();
     var generatedAt = new Date().toLocaleDateString();
+    var athleteLabel = resolvePrintAthleteLabel();
     var dayEntries = slotKeys
       .map(function (slotKey) {
         var exercises = getExercisesForPrintForDay(slotKey);
@@ -2025,13 +2034,13 @@
       '<body>',
       '<div class="plan-sheet">',
       '<section class="' + frontPageClass + '">',
-      '<div class="plan-header"><div class="plan-title-wrap"><div class="plan-kicker">Nomadic Performance</div><h1 class="plan-title">' + escapeHtml(programTitle) + '</h1><div class="plan-subtitle">Front: weekly plan overview</div></div><div class="plan-meta">Printed ' + escapeHtml(generatedAt) + '<br />Optimized for front/back printing</div></div>',
+      '<div class="plan-header"><div class="plan-title-wrap"><div class="plan-kicker">Nomadic Performance</div><h1 class="plan-title">' + escapeHtml(programTitle) + '</h1><div class="plan-subtitle">Athlete: ' + escapeHtml(athleteLabel) + '</div><div class="plan-subtitle">Front: weekly plan overview</div></div><div class="plan-meta">Printed ' + escapeHtml(generatedAt) + '<br />Optimized for front/back printing</div></div>',
       '<div class="plan-side-label">Front</div>',
       '<div class="plan-grid">' + frontHtmlParts.join('') + '</div>',
       '<div class="plan-footer"><span>Use this side as the quick-reference overview for every training day.</span><span>Front</span></div>',
       '</section>',
       '<section class="' + backPageClass + '">',
-      '<div class="plan-header"><div class="plan-title-wrap"><div class="plan-kicker">Nomadic Performance</div><h1 class="plan-title">' + escapeHtml(programTitle) + '</h1><div class="plan-subtitle">Back: athlete tracking sheet</div></div><div class="plan-meta">Load, reps, and note boxes for every training day</div></div>',
+      '<div class="plan-header"><div class="plan-title-wrap"><div class="plan-kicker">Nomadic Performance</div><h1 class="plan-title">' + escapeHtml(programTitle) + '</h1><div class="plan-subtitle">Athlete: ' + escapeHtml(athleteLabel) + '</div><div class="plan-subtitle">Back: athlete tracking sheet</div></div><div class="plan-meta">Load, reps, and note boxes for every training day</div></div>',
       '<div class="plan-side-label">Back</div>',
       '<div class="plan-grid">' + backHtmlParts.join('') + '</div>',
       '<div class="plan-footer"><span>Record actual loads, completed work, and progress notes by hand.</span><span>Back</span></div>',
@@ -2040,6 +2049,15 @@
       '</body>',
       '</html>'
     ].join('');
+  }
+
+  function resolvePrintAthleteLabel() {
+    var label = String(state.athleteName || "").trim();
+    if (label) {
+      return label;
+    }
+
+    return "Athlete";
   }
 
   function buildFullPlanOverviewCard(slotKey, exercises) {

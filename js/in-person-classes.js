@@ -7,20 +7,253 @@
   var state = {
     client: null,
     user: null,
+    pageMode: "list",
     classes: [],
     templates: [],
     athletes: [],
     createSelectedAthletes: [],
-    hasClassesTableWarning: false
-  };
+    hasClassesTableWarning: false,
+    supportsClassScheduleColumns: null,
+    supportsClassEndDateColumn: null,
     selectedClassId: null,
     attendance: {}, // { [classId]: { [athleteId]: { [week]: attended } } }
+  };
 
   document.addEventListener("DOMContentLoaded", function () {
     init();
   });
 
+  function getPageMode() {
+    return String(document.body && document.body.dataset && document.body.dataset.classesPage || "list").toLowerCase();
+  }
+
+  function getClassIdFromUrl() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return String(params.get("id") || params.get("classId") || "").trim();
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function getWeekdayLabels() {
+    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  }
+
+  function getDayLabel(dayNumber) {
+    var labels = getWeekdayLabels();
+    return labels[Number(dayNumber) >= 0 && Number(dayNumber) <= 6 ? Number(dayNumber) : 0] || "Sun";
+  }
+
+  function getLongDayLabel(dayNumber) {
+    var labels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return labels[Number(dayNumber) >= 0 && Number(dayNumber) <= 6 ? Number(dayNumber) : 0] || "Sunday";
+  }
+
+  function parseIsoDate(dateValue) {
+    if (!dateValue) {
+      return null;
+    }
+
+    var date = new Date(String(dateValue) + "T00:00:00");
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  function formatDateLabel(dateValue) {
+    var date = parseIsoDate(dateValue);
+    if (!date) {
+      return String(dateValue || "");
+    }
+
+    return date.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
+  }
+
+  function formatShortDateLabel(dateValue) {
+    var date = parseIsoDate(dateValue);
+    if (!date) {
+      return String(dateValue || "");
+    }
+
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric"
+    });
+  }
+
+  function formatIsoDateLocal(date) {
+    return [
+      date.getFullYear(),
+      pad(date.getMonth() + 1),
+      pad(date.getDate())
+    ].join("-");
+  }
+
+  function getMeetingDaysFromClass(classItem) {
+    var source = classItem && classItem.meeting_days;
+    if (!Array.isArray(source) || !source.length) {
+      var fallbackDate = getClassStartDate(classItem);
+      var fallback = parseIsoDate(fallbackDate);
+      return fallback ? [fallback.getDay()] : [];
+    }
+
+    return source
+      .map(function (day) {
+        return Number(day);
+      })
+      .filter(function (day) {
+        return day >= 0 && day <= 6;
+      });
+  }
+
+  function getClassSessionDates(classItem) {
+    var startDate = parseIsoDate(getClassStartDate(classItem));
+    var endDate = parseIsoDate(getClassEndDate(classItem));
+    if (!startDate) {
+      return [];
+    }
+
+    if (!endDate || endDate < startDate) {
+      endDate = new Date(startDate.getTime());
+    }
+
+    var meetingDays = getMeetingDaysFromClass(classItem);
+    if (!meetingDays.length) {
+      meetingDays = [startDate.getDay()];
+    }
+
+    var meetingLookup = {};
+    meetingDays.forEach(function (day) {
+      meetingLookup[day] = true;
+    });
+
+    var dates = [];
+    var cursor = new Date(startDate.getTime());
+    while (cursor <= endDate) {
+      if (meetingLookup[cursor.getDay()]) {
+        dates.push(formatIsoDateLocal(cursor));
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    if (!dates.length) {
+      dates.push(formatIsoDateLocal(startDate));
+    }
+
+    return dates;
+  }
+
+  function getClassDescription(classItem) {
+    return String(classItem && classItem.description || "").trim();
+  }
+
+  function getMeetingDaysText(classItem) {
+    var meetingDays = getMeetingDaysFromClass(classItem);
+    if (!meetingDays.length) {
+      return "No repeat days set";
+    }
+
+    return meetingDays.map(function (day) {
+      return getLongDayLabel(day);
+    }).join(", ");
+  }
+
+  function getAttendanceByDate(classItem) {
+    return classItem && classItem.attendance_by_date && typeof classItem.attendance_by_date === "object"
+      ? classItem.attendance_by_date
+      : {};
+  }
+
+  function getAttendanceForDate(classItem, attendeeId, dateValue) {
+    var dateMap = getAttendanceByDate(classItem)[dateValue];
+    if (!dateMap || typeof dateMap !== "object") {
+      return true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(dateMap, attendeeId)) {
+      return !!dateMap[attendeeId];
+    }
+
+    return true;
+  }
+
+  function setAttendanceForDate(classItem, dateValue, attendeeId, present) {
+    if (!classItem || !dateValue || !attendeeId) {
+      return;
+    }
+
+    if (!classItem.attendance_by_date || typeof classItem.attendance_by_date !== "object") {
+      classItem.attendance_by_date = {};
+    }
+
+    if (!classItem.attendance_by_date[dateValue] || typeof classItem.attendance_by_date[dateValue] !== "object") {
+      classItem.attendance_by_date[dateValue] = {};
+    }
+
+    classItem.attendance_by_date[dateValue][attendeeId] = !!present;
+    classItem.updated_at = new Date().toISOString();
+  }
+
+  function getSessionAttendanceCount(classItem, dateValue) {
+    var attendees = Array.isArray(classItem && classItem.attendees) ? classItem.attendees : [];
+    return attendees.filter(function (attendee) {
+      return getAttendanceForDate(classItem, attendee.id, dateValue);
+    }).length;
+  }
+
+  function getClassCapacityText(classItem, dateValue) {
+    var attendees = Array.isArray(classItem && classItem.attendees) ? classItem.attendees : [];
+    return getSessionAttendanceCount(classItem, dateValue) + " / " + attendees.length + " attending";
+  }
+
+  function getSelectedMeetingDays(dayPicker, fallbackDate) {
+    var selected = [];
+    if (dayPicker) {
+      dayPicker.querySelectorAll('input[type="checkbox"]:checked').forEach(function (input) {
+        selected.push(Number(input.value));
+      });
+    }
+
+    if (!selected.length) {
+      var fallback = parseIsoDate(fallbackDate);
+      if (fallback) {
+        selected.push(fallback.getDay());
+      }
+    }
+
+    return selected
+      .filter(function (day, index, array) {
+        return day >= 0 && day <= 6 && array.indexOf(day) === index;
+      })
+      .sort(function (a, b) {
+        return a - b;
+      });
+  }
+
+  function getClassListUrl() {
+    return "in-person-classes.html";
+  }
+
+  function getClassCreateUrl() {
+    return "in-person-class-create.html";
+  }
+
+  function getClassDetailUrl(classId) {
+    var url = "in-person-class-detail.html";
+    if (classId) {
+      url += "?id=" + encodeURIComponent(classId);
+    }
+    return url;
+  }
+
   function init() {
+    state.pageMode = getPageMode();
+    state.selectedClassId = getClassIdFromUrl();
+
     if (!window.supabase || !window.supabase.createClient) {
       showGuardError("Supabase client library failed to load.");
       return;
@@ -52,12 +285,10 @@
       showContent();
       bindEvents();
       loadClasses();
-      renderClasses();
-        renderSidebarClassList();
-      renderStats();
       loadTemplates();
       loadAthletes();
       loadClassesFromCloud();
+      renderActivePage();
     });
 
     state.client.auth.onAuthStateChange(function (_event, session) {
@@ -68,6 +299,13 @@
   }
 
   function bindEvents() {
+    var createPageButton = document.querySelector("[data-classes-open-create]");
+    if (createPageButton) {
+      createPageButton.addEventListener("click", function () {
+        window.location.href = getClassCreateUrl();
+      });
+    }
+
     var createBtn = document.querySelector("[data-classes-create]");
     if (createBtn) {
       createBtn.addEventListener("click", onCreateClass);
@@ -99,6 +337,24 @@
       clearBtn.addEventListener("click", clearCreateForm);
     }
 
+    var startDateInput = document.querySelector("[data-classes-date]");
+    var dayPicker = document.querySelector("[data-classes-day-picker]");
+    if (startDateInput && dayPicker) {
+      startDateInput.addEventListener("change", function () {
+        var parsed = parseIsoDate(startDateInput.value);
+        if (!parsed) {
+          return;
+        }
+
+        var hasSelectedDays = dayPicker.querySelectorAll('input[type="checkbox"]:checked').length > 0;
+        if (!hasSelectedDays) {
+          dayPicker.querySelectorAll('input[type="checkbox"]').forEach(function (checkbox) {
+            checkbox.checked = Number(checkbox.value) === parsed.getDay();
+          });
+        }
+      });
+    }
+
     var createAthleteAddBtn = document.querySelector("[data-classes-athlete-add]");
     if (createAthleteAddBtn) {
       createAthleteAddBtn.addEventListener("click", onAddCreateAthlete);
@@ -128,6 +384,15 @@
     if (list) {
       list.addEventListener("click", function (event) {
         var target = event.target;
+        var viewBtn = target.closest("[data-class-view]");
+        if (viewBtn) {
+          var viewClassId = viewBtn.getAttribute("data-class-view");
+          if (viewClassId) {
+            window.location.href = getClassDetailUrl(viewClassId);
+            return;
+          }
+        }
+
         var actionBtn = target.closest("[data-class-action]");
 
         if (actionBtn) {
@@ -186,22 +451,37 @@
 
   function onCreateClass() {
     var nameInput = document.querySelector("[data-classes-name]");
-    var dateInput = document.querySelector("[data-classes-date]");
+    var startDateInput = document.querySelector("[data-classes-date]");
+    var endDateInput = document.querySelector("[data-classes-end-date]");
     var timeInput = document.querySelector("[data-classes-time]");
     var locationInput = document.querySelector("[data-classes-location]");
+    var descriptionInput = document.querySelector("[data-classes-description]");
+    var dayPicker = document.querySelector("[data-classes-day-picker]");
     var programSelect = document.querySelector("[data-classes-program]");
     var rosterInput = document.querySelector("[data-classes-roster]");
 
     var className = String(nameInput && nameInput.value || "").trim();
-    var classDate = String(dateInput && dateInput.value || "").trim();
+    var classStartDate = String(startDateInput && startDateInput.value || "").trim();
+    var classEndDate = String(endDateInput && endDateInput.value || "").trim();
     var startTime = String(timeInput && timeInput.value || "").trim();
     var location = String(locationInput && locationInput.value || "").trim();
+    var description = String(descriptionInput && descriptionInput.value || "").trim();
     var programId = String(programSelect && programSelect.value || "").trim();
     var rosterRaw = String(rosterInput && rosterInput.value || "");
+    var meetingDays = getSelectedMeetingDays(dayPicker, classStartDate);
 
-    if (!className || !classDate) {
-      setStatus("Class name and date are required.", "error");
+    if (!className || !classStartDate) {
+      setStatus("Class name and start date are required.", "error");
       return;
+    }
+
+    if (classEndDate && classEndDate < classStartDate) {
+      setStatus("End date cannot be before start date.", "error");
+      return;
+    }
+
+    if (!classEndDate) {
+      classEndDate = classStartDate;
     }
 
     var selectedTemplate = getTemplateById(programId);
@@ -235,13 +515,17 @@
     var newClass = {
       id: uniqueId("class"),
       name: className,
-      class_date: classDate,
+      class_date: classStartDate,
+      class_end_date: classEndDate,
+      description: description,
+      meeting_days: meetingDays,
       start_time: startTime,
       location: location,
       program_id: programId,
       program_name: selectedTemplate ? selectedTemplate.name : "",
       notes: "",
       attendees: attendees,
+      attendance_by_date: {},
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -250,9 +534,7 @@
     persistClasses();
     saveClassToCloud(newClass, false);
     clearCreateForm();
-    renderClasses();
-    renderStats();
-    setStatus("Class saved.", "success");
+    window.location.href = getClassDetailUrl(newClass.id);
   }
 
   function onAddAttendee(classId) {
@@ -397,14 +679,33 @@
     }
 
     var nameInput = card.querySelector("[data-class-name]");
-    var dateInput = card.querySelector("[data-class-date]");
+    var startDateInput = card.querySelector("[data-class-date]");
+    var endDateInput = card.querySelector("[data-class-end-date]");
     var timeInput = card.querySelector("[data-class-time]");
     var locationInput = card.querySelector("[data-class-location]");
     var programInput = card.querySelector("[data-class-program]");
     var notesInput = card.querySelector("[data-class-notes]");
 
+    var startDate = String(startDateInput && startDateInput.value || "").trim();
+    var endDate = String(endDateInput && endDateInput.value || "").trim();
+
+    if (!startDate) {
+      setStatus("Start date is required.", "error");
+      return;
+    }
+
+    if (endDate && endDate < startDate) {
+      setStatus("End date cannot be before start date.", "error");
+      return;
+    }
+
+    if (!endDate) {
+      endDate = startDate;
+    }
+
     classItem.name = String(nameInput && nameInput.value || "").trim();
-    classItem.class_date = String(dateInput && dateInput.value || "").trim();
+    classItem.class_date = startDate;
+    classItem.class_end_date = endDate;
     classItem.start_time = String(timeInput && timeInput.value || "").trim();
     classItem.location = String(locationInput && locationInput.value || "").trim();
     classItem.program_id = String(programInput && programInput.value || "").trim();
@@ -446,13 +747,13 @@
       return;
     }
     var sorted = state.classes.slice().sort(function (a, b) {
-      return String(b.class_date || '').localeCompare(String(a.class_date || ''));
+      return getClassSortDate(b).localeCompare(getClassSortDate(a));
     });
     sidebar.innerHTML = sorted.map(function (classItem) {
       var selected = classItem.id === state.selectedClassId ? ' class="selected"' : '';
       return '<li' + selected + ' data-class-sidebar-id="' + escapeAttribute(classItem.id) + '">' +
         '<strong>' + escapeHtml(classItem.name || 'Untitled') + '</strong><br>' +
-        '<small>' + escapeHtml(classItem.class_date || '') + '</small>' +
+        '<small>' + escapeHtml(getClassDateRangeText(classItem)) + '</small>' +
       '</li>';
     }).join('');
     // Auto-select first if none selected
@@ -470,59 +771,234 @@
     var header = document.querySelector('[data-classes-detail-header]');
     var grid = document.querySelector('[data-classes-attendance-grid]');
     var actions = document.querySelector('[data-classes-detail-actions]');
+    var titleEl = document.querySelector('[data-classes-detail-page-title]');
+    var templateSelect = document.querySelector('[data-class-template-select]');
+    var templateSaveBtn = document.querySelector('[data-class-template-save]');
+    var templatePanel = document.querySelector('[data-class-template-panel]');
+    var sessionDates = getClassSessionDates(classItem);
+
+    if (titleEl) {
+      titleEl.textContent = classItem ? (classItem.name || 'Class Detail') : 'Class Detail';
+    }
+
     if (!classItem) {
+      if (templatePanel) {
+        templatePanel.hidden = true;
+      }
       if (header) header.innerHTML = '<p>Select a class to view details.</p>';
       if (grid) grid.innerHTML = '';
       if (actions) actions.innerHTML = '';
       return;
     }
+
+    if (templatePanel) {
+      templatePanel.hidden = false;
+    }
+
+    if (templateSelect) {
+      renderProgramsIntoSelect(templateSelect, classItem.program_id);
+    }
+
+    if (templateSaveBtn) {
+      templateSaveBtn.onclick = function () {
+        var selectedTemplateId = String(templateSelect && templateSelect.value || '').trim();
+        var selectedTemplate = getTemplateById(selectedTemplateId);
+
+        classItem.program_id = selectedTemplateId;
+        classItem.program_name = selectedTemplate ? selectedTemplate.name : '';
+        classItem.updated_at = new Date().toISOString();
+
+        persistClasses();
+        saveClassToCloud(classItem, false);
+        renderClassDetailPanel();
+        renderClasses();
+        setStatus(selectedTemplate ? 'Training program template saved to class.' : 'Training program template cleared from class.', 'success');
+      };
+    }
+
     // Header: class info
     if (header) {
       header.innerHTML =
-        '<h2>' + escapeHtml(classItem.name || 'Untitled') + '</h2>' +
-        '<p><strong>Date:</strong> ' + escapeHtml(classItem.class_date || '') +
-        ' <strong>Time:</strong> ' + escapeHtml(classItem.start_time || '') +
-        ' <strong>Location:</strong> ' + escapeHtml(classItem.location || '') + '</p>' +
-        '<p><strong>Program:</strong> ' + escapeHtml(classItem.program_name || '') + '</p>' +
-        '<p><strong>Notes:</strong> ' + escapeHtml(classItem.notes || '') + '</p>';
+        '<div class="classes-detail-hero">' +
+          '<div>' +
+            '<h2>' + escapeHtml(classItem.name || 'Untitled') + '</h2>' +
+            '<p class="classes-detail-description">' + escapeHtml(getClassDescription(classItem) || 'No class description added yet.') + '</p>' +
+          '</div>' +
+          '<div class="classes-detail-pill-row">' +
+            '<span class="class-attendance-pill">' + escapeHtml(getClassDateRangeText(classItem)) + '</span>' +
+            '<span class="class-attendance-pill">' + escapeHtml(getMeetingDaysText(classItem)) + '</span>' +
+            '<span class="class-attendance-pill">' + escapeHtml(String(sessionDates.length) + ' sessions') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="classes-detail-meta-grid">' +
+          '<div><strong>Start Date</strong><span>' + escapeHtml(getClassStartDate(classItem)) + '</span></div>' +
+          '<div><strong>End Date</strong><span>' + escapeHtml(getClassEndDate(classItem)) + '</span></div>' +
+          '<div><strong>Days</strong><span>' + escapeHtml(getMeetingDaysText(classItem)) + '</span></div>' +
+          '<div><strong>Time</strong><span>' + escapeHtml(classItem.start_time || '') + '</span></div>' +
+          '<div><strong>Location</strong><span>' + escapeHtml(classItem.location || '') + '</span></div>' +
+          '<div><strong>Program</strong><span>' + escapeHtml(classItem.program_name || '') + '</span></div>' +
+        '</div>';
     }
     // Attendance grid
     if (grid) {
-      grid.innerHTML = renderAttendanceGrid(classItem);
-      // Bind checkboxes
-      grid.querySelectorAll('input[data-attendance-week]').forEach(function (cb) {
+      grid.innerHTML = renderAttendanceMatrix(classItem, sessionDates);
+      grid.querySelectorAll('input[data-session-date]').forEach(function (cb) {
         cb.addEventListener('change', function (e) {
-          var athleteId = cb.getAttribute('data-athlete-id');
-          var week = cb.getAttribute('data-attendance-week');
+          var attendeeId = cb.getAttribute('data-attendee-id');
+          var sessionDate = cb.getAttribute('data-session-date');
           var checked = !!cb.checked;
-          setAttendance(classId, athleteId, week, checked);
+          setAttendanceForDate(classItem, sessionDate, attendeeId, checked);
+          persistClasses();
+          saveClassToCloud(classItem, true);
+          renderClassDetailPanel();
+          renderStats();
+        });
+      });
+
+      var addMemberBtn = grid.querySelector('[data-class-detail-add-member]');
+      if (addMemberBtn) {
+        addMemberBtn.addEventListener('click', function () {
+          var select = grid.querySelector('[data-class-detail-member-select]');
+          if (!select) {
+            return;
+          }
+
+          var athleteId = String(select.value || '').trim();
+          if (!athleteId) {
+            setStatus('Select an athlete before adding them to the class.', 'error');
+            return;
+          }
+
+          var athlete = getAthleteById(athleteId);
+          if (!athlete) {
+            setStatus('Selected athlete not found.', 'error');
+            return;
+          }
+
+          var alreadyExists = (classItem.attendees || []).some(function (attendee) {
+            return String(attendee.athlete_id || '') === athleteId || String(attendee.name || '').toLowerCase() === String(athlete.name || athlete.email || '').toLowerCase();
+          });
+
+          if (alreadyExists) {
+            setStatus('Athlete is already in this class.', 'info');
+            return;
+          }
+
+          classItem.attendees = Array.isArray(classItem.attendees) ? classItem.attendees : [];
+          classItem.attendees.push({
+            id: uniqueId('attendee'),
+            athlete_id: athleteId,
+            name: String(athlete.name || athlete.email || 'Athlete'),
+            present: false
+          });
+          classItem.updated_at = new Date().toISOString();
+          persistClasses();
+          saveClassToCloud(classItem, true);
+          renderClassDetailPanel();
+          renderStats();
+          setStatus('Athlete added to class.', 'success');
+        });
+      }
+
+      grid.querySelectorAll('[data-class-detail-remove-member]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var attendeeId = button.getAttribute('data-class-detail-remove-member');
+          if (!attendeeId) {
+            return;
+          }
+
+          classItem.attendees = (classItem.attendees || []).filter(function (attendee) {
+            return attendee.id !== attendeeId;
+          });
+
+          if (classItem.attendance_by_date && typeof classItem.attendance_by_date === 'object') {
+            Object.keys(classItem.attendance_by_date).forEach(function (dateKey) {
+              if (classItem.attendance_by_date[dateKey] && typeof classItem.attendance_by_date[dateKey] === 'object') {
+                delete classItem.attendance_by_date[dateKey][attendeeId];
+              }
+            });
+          }
+
+          classItem.updated_at = new Date().toISOString();
+          persistClasses();
+          saveClassToCloud(classItem, true);
+          renderClassDetailPanel();
+          renderStats();
+          setStatus('Member removed from class.', 'info');
         });
       });
     }
-    // Actions (optional: add edit/save buttons here)
     if (actions) {
-      actions.innerHTML = '';
+      actions.innerHTML =
+        '<a class="btn admin-btn-reset-password" href="' + escapeAttribute(getClassListUrl()) + '">Back to Classes</a>' +
+        '<a class="btn admin-btn-refresh" href="' + escapeAttribute(getClassCreateUrl()) + '">Create Another Class</a>' +
+        (classItem.program_id ? '<a class="btn admin-btn-primary" href="training-program-example.html?templateId=' + encodeURIComponent(classItem.program_id) + '">Open Assigned Template</a>' : '');
     }
   }
 
-  // Render week-by-week attendance grid (athletes × weeks)
-  function renderAttendanceGrid(classItem) {
-    // For demo: assume 8 weeks, can be dynamic
-    var NUM_WEEKS = 8;
+  function renderClassDetailPage() {
+    if (!state.selectedClassId) {
+      state.selectedClassId = getClassIdFromUrl();
+    }
+
+    renderClassDetailPanel();
+  }
+
+  function renderCreatePage() {
+    hydrateProgramSelect();
+    hydrateCreateAthleteSelect();
+    renderCreatePickedAthletes();
+    hydrateMeetingDayPicker();
+  }
+
+  function hydrateMeetingDayPicker() {
+    var picker = document.querySelector('[data-classes-day-picker]');
+    if (!picker) {
+      return;
+    }
+
+    var selectedDays = getSelectedMeetingDays(picker, document.querySelector('[data-classes-date]') ? document.querySelector('[data-classes-date]').value : '');
+    picker.querySelectorAll('input[type="checkbox"]').forEach(function (checkbox) {
+      checkbox.checked = selectedDays.indexOf(Number(checkbox.value)) !== -1;
+    });
+  }
+
+  // Render per-session attendance grid (members × session dates)
+  function renderAttendanceMatrix(classItem, sessionDates) {
     var attendees = Array.isArray(classItem.attendees) ? classItem.attendees : [];
-    if (!attendees.length) return '<p>No attendees for this class.</p>';
-    var weeks = Array.from({length: NUM_WEEKS}, (_, i) => i + 1);
-    var html = '<table class="attendance-grid"><thead><tr><th>Athlete</th>';
-    weeks.forEach(function (w) { html += '<th>Week ' + w + '</th>'; });
-    html += '</tr></thead><tbody>';
-    attendees.forEach(function (att) {
-      html += '<tr><td>' + escapeHtml(att.name || 'Athlete') + '</td>';
-      weeks.forEach(function (w) {
-        var checked = getAttendance(classItem.id, att.athlete_id || att.id, w) ? 'checked' : '';
-        html += '<td><input type="checkbox" data-attendance-week="' + w + '" data-athlete-id="' + escapeAttribute(att.athlete_id || att.id) + '" ' + checked + '></td>';
+    var dates = Array.isArray(sessionDates) ? sessionDates : [];
+    var html = '<div class="classes-attendance-tools">' +
+      '<div class="classes-attendance-add">' +
+        '<select data-class-detail-member-select>' + renderAthleteOptions("", attendees) + '</select>' +
+        '<button type="button" class="btn admin-btn-small" data-class-detail-add-member>+ Add Member</button>' +
+      '</div>' +
+      '<p class="classes-attendance-caption">Toggle a member off for a specific date if they miss a session, or back on if they can attend.</p>' +
+    '</div>';
+
+    if (!attendees.length) {
+      return html + '<p class="class-attendance-empty">No members in this class yet.</p>';
+    }
+
+    if (!dates.length) {
+      return html + '<p class="class-attendance-empty">No session dates could be generated from this range and day pattern.</p>';
+    }
+
+    html += '<table class="attendance-grid"><thead><tr><th>Member</th>';
+    dates.forEach(function (dateValue) {
+      html += '<th><span class="attendance-grid-date">' + escapeHtml(formatShortDateLabel(dateValue)) + '</span><span class="attendance-grid-day">' + escapeHtml(formatDateLabel(dateValue).split(',')[0] || '') + '</span><span class="attendance-grid-count">' + escapeHtml(getClassCapacityText(classItem, dateValue)) + '</span></th>';
+    });
+    html += '<th>Remove</th></tr></thead><tbody>';
+
+    attendees.forEach(function (attendee) {
+      html += '<tr><td class="attendance-grid-member">' + escapeHtml(attendee.name || 'Athlete') + (attendee && attendee.athlete_id ? ' <small class="class-athlete-tag">Member</small>' : '') + '</td>';
+      dates.forEach(function (dateValue) {
+        var checked = getAttendanceForDate(classItem, attendee.id, dateValue) ? 'checked' : '';
+        html += '<td><input type="checkbox" data-session-date="' + escapeAttribute(dateValue) + '" data-attendee-id="' + escapeAttribute(attendee.id) + '" ' + checked + '></td>';
       });
+      html += '<td><button type="button" class="btn admin-btn-delete-mini" data-class-detail-remove-member="' + escapeAttribute(attendee.id) + '">Remove</button></td>';
       html += '</tr>';
     });
+
     html += '</tbody></table>';
     return html;
   }
@@ -539,6 +1015,8 @@
     state.attendance[classId][athleteId][week] = !!present;
     // TODO: persist to Supabase/localStorage as needed
   }
+
+  function renderClasses() {
     var list = document.querySelector("[data-classes-list]");
     if (!list) {
       return;
@@ -550,8 +1028,8 @@
     }
 
     var sorted = state.classes.slice().sort(function (a, b) {
-      var aDate = String(a.class_date || "");
-      var bDate = String(b.class_date || "");
+      var aDate = getClassSortDate(a);
+      var bDate = getClassSortDate(b);
       if (aDate === bDate) {
         var aTime = String(a.start_time || "");
         var bTime = String(b.start_time || "");
@@ -562,50 +1040,21 @@
 
     list.innerHTML = sorted.map(function (classItem) {
       var attendees = Array.isArray(classItem.attendees) ? classItem.attendees : [];
-      var presentCount = attendees.filter(function (attendee) {
-        return !!attendee.present;
-      }).length;
-      var attendanceSummary = attendees.length ? presentCount + " / " + attendees.length + " present" : "No attendees yet";
+      var attendanceSummary = attendees.length ? attendees.length + " members · " + getClassSessionDates(classItem).length + " sessions" : "No members yet";
 
       return (
-        '<article class="class-card" data-class-card="' + escapeAttribute(classItem.id) + '">' +
+        '<article class="class-card class-card-summary" data-class-card="' + escapeAttribute(classItem.id) + '">' +
           '<div class="class-card-header">' +
             '<h3>' + escapeHtml(classItem.name || "Untitled Class") + '</h3>' +
             '<span class="class-attendance-pill">' + escapeHtml(attendanceSummary) + '</span>' +
           '</div>' +
-          '<div class="class-card-grid">' +
-            '<label class="admin-modal-info-row"><span>Class Name</span><input type="text" data-class-name value="' + escapeAttribute(classItem.name || "") + '" /></label>' +
-            '<label class="admin-modal-info-row"><span>Date</span><input type="date" data-class-date value="' + escapeAttribute(classItem.class_date || "") + '" /></label>' +
-            '<label class="admin-modal-info-row"><span>Start Time</span><input type="time" data-class-time value="' + escapeAttribute(classItem.start_time || "") + '" /></label>' +
-            '<label class="admin-modal-info-row"><span>Location</span><input type="text" data-class-location value="' + escapeAttribute(classItem.location || "") + '" /></label>' +
-            '<label class="admin-modal-info-row class-card-program"><span>Program Used</span>' + renderProgramSelect(classItem.program_id) + '</label>' +
-            '<label class="admin-modal-info-row class-card-notes"><span>Class Notes</span><textarea data-class-notes placeholder="Session notes, highlights, regressions/progressions...">' + escapeHtml(classItem.notes || "") + '</textarea></label>' +
-          '</div>' +
-          '<div class="class-attendance">' +
-            '<h4>Attendance</h4>' +
-            '<div class="class-attendance-list">' +
-              (attendees.length
-                ? attendees.map(function (attendee) {
-                    return (
-                      '<label class="class-attendance-item">' +
-                        '<input type="checkbox" data-attendee-present="' + escapeAttribute(attendee.id) + '" ' + (attendee.present ? "checked" : "") + ' />' +
-                        '<span>' + escapeHtml(attendee.name || "Attendee") + (attendee && attendee.athlete_id ? ' <small class="class-athlete-tag">Athlete</small>' : '') + '</span>' +
-                        '<button type="button" class="btn admin-btn-delete-mini" data-class-action="remove-attendee" data-class-id="' + escapeAttribute(classItem.id) + '" data-attendee-id="' + escapeAttribute(attendee.id) + '">Remove</button>' +
-                      '</label>'
-                    );
-                  }).join("")
-                : '<p class="class-attendance-empty">No attendees yet.</p>') +
-            '</div>' +
-            '<div class="class-attendance-add">' +
-              '<select data-class-athlete-select>' + renderAthleteOptions("", attendees) + '</select>' +
-              '<button type="button" class="btn admin-btn-small" data-class-action="add-athlete" data-class-id="' + escapeAttribute(classItem.id) + '">+ Add Athlete</button>' +
-              '<input type="text" placeholder="Add attendee name..." data-new-attendee />' +
-              '<button type="button" class="btn admin-btn-small" data-class-action="add-attendee" data-class-id="' + escapeAttribute(classItem.id) + '">+ Add</button>' +
-            '</div>' +
-          '</div>' +
+          '<p class="class-card-meta"><strong>Dates:</strong> ' + escapeHtml(getClassDateRangeText(classItem)) + ' <strong>Days:</strong> ' + escapeHtml(getMeetingDaysText(classItem)) + '</p>' +
+          '<p class="class-card-meta"><strong>Description:</strong> ' + escapeHtml(getClassDescription(classItem) || "No description added yet.") + '</p>' +
+          '<p class="class-card-meta"><strong>Time:</strong> ' + escapeHtml(classItem.start_time || "") + ' <strong>Location:</strong> ' + escapeHtml(classItem.location || "") + '</p>' +
+          '<p class="class-card-meta"><strong>Program:</strong> ' + escapeHtml(classItem.program_name || "") + '</p>' +
+          '<p class="class-card-meta"><strong>Notes:</strong> ' + escapeHtml(classItem.notes || "") + '</p>' +
           '<div class="class-card-actions">' +
-            '<button type="button" class="btn admin-btn-primary" data-class-action="save-class" data-class-id="' + escapeAttribute(classItem.id) + '">Save Updates</button>' +
-            '<button type="button" class="btn admin-btn-delete" data-class-action="delete-class" data-class-id="' + escapeAttribute(classItem.id) + '">Delete Class</button>' +
+            '<a class="btn admin-btn-primary" href="' + escapeAttribute(getClassDetailUrl(classItem.id)) + '" data-class-view="' + escapeAttribute(classItem.id) + '">View Class</a>' +
           '</div>' +
         '</article>'
       );
@@ -626,7 +1075,7 @@
     ].join("-");
 
     var upcoming = state.classes.filter(function (classItem) {
-      return String(classItem.class_date || "") >= isoToday;
+      return getClassEndDate(classItem) >= isoToday;
     }).length;
 
     var attendanceTotals = state.classes.reduce(function (acc, classItem) {
@@ -652,6 +1101,22 @@
     if (attendanceEl) {
       attendanceEl.textContent = String(attendanceRate) + "%";
     }
+  }
+
+  function renderActivePage() {
+    if (state.pageMode === "detail") {
+      renderClassDetailPage();
+      renderStats();
+      return;
+    }
+
+    if (state.pageMode === "create") {
+      renderCreatePage();
+      return;
+    }
+
+    renderClasses();
+    renderStats();
   }
 
   function renderProgramsIntoSelect(select, selectedId) {
@@ -715,8 +1180,7 @@
   function loadTemplates() {
     if (!state.client) {
       state.templates = readTemplateLibrary();
-      hydrateProgramSelect();
-      renderClasses();
+      renderActivePage();
       return;
     }
 
@@ -727,8 +1191,7 @@
       .then(function (result) {
         if (result.error) {
           state.templates = readTemplateLibrary();
-          hydrateProgramSelect();
-          renderClasses();
+          renderActivePage();
           setStatus("Using local program library for class program options.", "info");
           return;
         }
@@ -740,20 +1203,18 @@
           };
         });
 
-        hydrateProgramSelect();
-        renderClasses();
+        renderActivePage();
       })
       .catch(function () {
         state.templates = readTemplateLibrary();
-        hydrateProgramSelect();
-        renderClasses();
+        renderActivePage();
       });
   }
 
   function loadAthletes() {
     if (!state.client) {
       state.athletes = [];
-      hydrateCreateAthleteSelect();
+      renderActivePage();
       return;
     }
 
@@ -765,8 +1226,7 @@
         if (result.error) {
           setStatus("Could not load athlete list for class picker.", "info");
           state.athletes = [];
-          hydrateCreateAthleteSelect();
-          renderClasses();
+          renderActivePage();
           return;
         }
 
@@ -778,13 +1238,11 @@
           };
         });
 
-        hydrateCreateAthleteSelect();
-        renderCreatePickedAthletes();
-        renderClasses();
+        renderActivePage();
       })
       .catch(function () {
         state.athletes = [];
-        hydrateCreateAthleteSelect();
+        renderActivePage();
       });
   }
 
@@ -876,16 +1334,26 @@
     }
 
     var localSnapshot = state.classes.slice();
+    var selectFields = getClassesSelectFields();
 
     state.client
       .from(CLASSES_TABLE)
-      .select("id,name,class_date,start_time,location,program_id,program_name,notes,attendees,created_at,updated_at")
+      .select(selectFields)
       .order("class_date", { ascending: false })
       .order("start_time", { ascending: false })
       .then(function (result) {
         if (result.error) {
+          if (isMissingClassScheduleColumnError(result.error) && state.supportsClassScheduleColumns !== false) {
+            state.supportsClassScheduleColumns = false;
+            loadClassesFromCloud();
+            return;
+          }
           handleClassesCloudError(result.error, false);
           return;
+        }
+
+        if (state.supportsClassScheduleColumns === null) {
+          state.supportsClassScheduleColumns = selectFields.indexOf("meeting_days") !== -1;
         }
 
         var cloudClasses = (result.data || []).map(normalizeClassRecordFromCloud);
@@ -893,8 +1361,7 @@
         if (cloudClasses.length) {
           state.classes = cloudClasses;
           persistClasses();
-          renderClasses();
-          renderStats();
+          renderActivePage();
           return;
         }
 
@@ -947,6 +1414,12 @@
           id: String(item.id || uniqueId("class")),
           name: String(item.name || "Untitled Class"),
           class_date: String(item.class_date || ""),
+          class_end_date: String(item.class_end_date || item.class_date || ""),
+          description: String(item.description || ""),
+          meeting_days: Array.isArray(item.meeting_days)
+            ? item.meeting_days.map(function (day) { return Number(day); }).filter(function (day) { return day >= 0 && day <= 6; })
+            : [],
+          attendance_by_date: item.attendance_by_date && typeof item.attendance_by_date === "object" ? item.attendance_by_date : {},
           start_time: String(item.start_time || ""),
           location: String(item.location || ""),
           program_id: String(item.program_id || ""),
@@ -981,6 +1454,23 @@
       .upsert(toCloudClassPayload(classItem), { onConflict: "id" })
       .then(function (result) {
         if (result.error) {
+          if (isMissingClassScheduleColumnError(result.error) && state.supportsClassScheduleColumns !== false) {
+            state.supportsClassScheduleColumns = false;
+            state.client
+              .from(CLASSES_TABLE)
+              .upsert(toCloudClassPayload(classItem), { onConflict: "id" })
+              .then(function (retryResult) {
+                if (retryResult.error) {
+                  handleClassesCloudError(retryResult.error, silent);
+                }
+              })
+              .catch(function () {
+                if (!silent) {
+                  setStatus("Class saved locally. Could not sync to Supabase.", "info");
+                }
+              });
+            return;
+          }
           handleClassesCloudError(result.error, silent);
         }
       })
@@ -1036,11 +1526,76 @@
     return code === "42P01" || (message.indexOf("in_person_classes") !== -1 && message.indexOf("does not exist") !== -1);
   }
 
+  function isMissingClassEndDateColumnError(error) {
+    var code = String(error && error.code || "");
+    var message = String(error && error.message || "").toLowerCase();
+    return code === "42703" && message.indexOf("class_end_date") !== -1;
+  }
+
+  function getClassesSelectFields() {
+    var baseFields = "id,name,class_date,start_time,location,program_id,program_name,notes,attendees,created_at,updated_at";
+    if (state.supportsClassScheduleColumns === false) {
+      return baseFields;
+    }
+    return "id,name,class_date,class_end_date,description,meeting_days,attendance_by_date,start_time,location,program_id,program_name,notes,attendees,created_at,updated_at";
+  }
+
+  function getClassStartDate(classItem) {
+    return String(classItem && classItem.class_date || "");
+  }
+
+  function getClassEndDate(classItem) {
+    return String(classItem && (classItem.class_end_date || classItem.class_date) || "");
+  }
+
+  function getClassDateRangeText(classItem) {
+    var startDate = getClassStartDate(classItem);
+    var endDate = getClassEndDate(classItem);
+    if (!startDate && !endDate) {
+      return "";
+    }
+    if (!endDate || startDate === endDate) {
+      return startDate;
+    }
+    if (!startDate) {
+      return endDate;
+    }
+    return startDate + " to " + endDate;
+  }
+
+  function getClassSortDate(classItem) {
+    return getClassStartDate(classItem);
+  }
+
+  function isMissingClassScheduleColumnError(error) {
+    var code = String(error && error.code || "");
+    var message = String(error && error.message || "").toLowerCase();
+    if (code !== "42703") {
+      return false;
+    }
+
+    return ["class_end_date", "description", "meeting_days", "attendance_by_date"].some(function (fieldName) {
+      return message.indexOf(fieldName) !== -1;
+    });
+  }
+
   function normalizeClassRecordFromCloud(item) {
     return {
       id: String(item && item.id || uniqueId("class")),
       name: String(item && item.name || "Untitled Class"),
       class_date: String(item && item.class_date || ""),
+      class_end_date: String(item && item.class_end_date || item && item.class_date || ""),
+      description: String(item && item.description || ""),
+      meeting_days: Array.isArray(item && item.meeting_days)
+        ? item.meeting_days.map(function (day) {
+            return Number(day);
+          }).filter(function (day) {
+            return day >= 0 && day <= 6;
+          })
+        : [],
+      attendance_by_date: item && item.attendance_by_date && typeof item.attendance_by_date === "object"
+        ? item.attendance_by_date
+        : {},
       start_time: String(item && item.start_time || ""),
       location: String(item && item.location || ""),
       program_id: String(item && item.program_id || ""),
@@ -1062,10 +1617,14 @@
   }
 
   function toCloudClassPayload(classItem) {
-    return {
+    var payload = {
       id: String(classItem.id || uniqueId("class")),
       name: String(classItem.name || "Untitled Class"),
       class_date: String(classItem.class_date || ""),
+      class_end_date: String(classItem.class_end_date || classItem.class_date || ""),
+      description: String(classItem.description || ""),
+      meeting_days: Array.isArray(classItem.meeting_days) ? classItem.meeting_days : [],
+      attendance_by_date: classItem.attendance_by_date && typeof classItem.attendance_by_date === "object" ? classItem.attendance_by_date : {},
       start_time: String(classItem.start_time || ""),
       location: String(classItem.location || ""),
       program_id: String(classItem.program_id || ""),
@@ -1082,20 +1641,39 @@
           })
         : []
     };
+
+    if (state.supportsClassScheduleColumns === false) {
+      delete payload.class_end_date;
+      delete payload.description;
+      delete payload.meeting_days;
+      delete payload.attendance_by_date;
+    }
+
+    return payload;
   }
 
   function clearCreateForm() {
     var nameInput = document.querySelector("[data-classes-name]");
     var dateInput = document.querySelector("[data-classes-date]");
+    var endDateInput = document.querySelector("[data-classes-end-date]");
     var timeInput = document.querySelector("[data-classes-time]");
     var locationInput = document.querySelector("[data-classes-location]");
+    var descriptionInput = document.querySelector("[data-classes-description]");
+    var dayPicker = document.querySelector("[data-classes-day-picker]");
     var programSelect = document.querySelector("[data-classes-program]");
     var rosterInput = document.querySelector("[data-classes-roster]");
 
     if (nameInput) nameInput.value = "";
     if (dateInput) dateInput.value = "";
+    if (endDateInput) endDateInput.value = "";
     if (timeInput) timeInput.value = "";
     if (locationInput) locationInput.value = "";
+    if (descriptionInput) descriptionInput.value = "";
+    if (dayPicker) {
+      dayPicker.querySelectorAll('input[type="checkbox"]').forEach(function (checkbox) {
+        checkbox.checked = false;
+      });
+    }
     if (programSelect) programSelect.value = "";
     if (rosterInput) rosterInput.value = "";
     state.createSelectedAthletes = [];

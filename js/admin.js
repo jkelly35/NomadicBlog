@@ -2,6 +2,9 @@
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
   var TEMPLATE_LIBRARY_KEY = "nomadic_training_program_templates_v1";
   var HIDDEN_ATHLETES_KEY = "nomadic_hidden_athletes_v1";
+  var COACH_TODO_KEY = "nomadic_coach_todo_v1";
+  var COACH_FLAGS_KEY = "nomadic_coach_flags_v1";
+  var CLASSES_STORAGE_KEY = "nomadic_in_person_classes_v1";
   var EXERCISE_LIBRARY_KEY = "nomadic_exercise_library_v1";
   var EXERCISE_LIBRARY_TABLE = "exercise_library";
   var TEMPLATE_MARKER = "__NOMADIC_TEMPLATE__";
@@ -146,7 +149,13 @@
     templateFilter: "active",
     currentPage: 1,
     pageSize: 10,
-    searchTerm: ""
+    searchTerm: "",
+    selectedCalendarDate: null,
+    classEvents: [],
+    activePrograms: [],
+    athleteGoalEvents: [],
+    coachTodos: [],
+    coachFlags: []
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -200,8 +209,12 @@
 
     hideGuard();
     showContent();
+    state.selectedCalendarDate = formatDateKey(new Date());
+    state.coachTodos = readCoachTodos();
+    state.coachFlags = readCoachFlags();
     setupEventHandlers();
     loadAthletes();
+    loadCoachOverviewData();
   }
 
   function setupEventHandlers() {
@@ -219,6 +232,45 @@
       refreshBtn.addEventListener("click", function () {
         loadAthletes();
       });
+    }
+
+    var calendarStrip = document.querySelector("[data-admin-calendar-strip]");
+    if (calendarStrip) {
+      calendarStrip.addEventListener("click", function (event) {
+        var dayBtn = event.target && event.target.closest("[data-calendar-date]");
+        if (!dayBtn) {
+          return;
+        }
+
+        var dateValue = String(dayBtn.getAttribute("data-calendar-date") || "").trim();
+        if (!dateValue) {
+          return;
+        }
+
+        state.selectedCalendarDate = dateValue;
+        renderCoachOverview();
+      });
+    }
+
+    var todoForm = document.querySelector("[data-admin-todo-form]");
+    if (todoForm) {
+      todoForm.addEventListener("submit", onAddCoachTodo);
+    }
+
+    var todoList = document.querySelector("[data-admin-todo-list]");
+    if (todoList) {
+      todoList.addEventListener("click", onCoachTodoListClick);
+      todoList.addEventListener("change", onCoachTodoListChange);
+    }
+
+    var flagForm = document.querySelector("[data-admin-flag-form]");
+    if (flagForm) {
+      flagForm.addEventListener("submit", onAddCoachFlag);
+    }
+
+    var flagsList = document.querySelector("[data-admin-flags-list]");
+    if (flagsList) {
+      flagsList.addEventListener("click", onCoachFlagsListClick);
     }
 
     var addAthleteBtn = document.querySelector("[data-admin-add-athlete]");
@@ -1178,6 +1230,7 @@
         });
         state.currentPage = 1;
         renderAthletesTable();
+        loadCoachOverviewData();
         updateStats();
         setStatus("Users loaded successfully.", "success");
         setTimeout(function () {
@@ -2539,9 +2592,680 @@
     }
   }
 
+  function loadCoachOverviewData() {
+    state.classEvents = buildClassEvents(readInPersonClasses());
+    renderCoachOverview();
+    updateStats();
+
+    if (!state.client) {
+      state.activePrograms = [];
+      state.athleteGoalEvents = [];
+      renderCoachOverview();
+      updateStats();
+      return;
+    }
+
+    var activeProgramsRequest = state.client
+      .from("user_training_programs")
+      .select("user_id,program_id,program_name,is_active,assigned_at")
+      .eq("is_active", true)
+      .order("assigned_at", { ascending: false })
+      .limit(200);
+
+    var goalEventsRequest = state.client
+      .from("athlete_goals_events")
+      .select("id,user_id,title,goal_type,target_date,details,status,created_at")
+      .order("target_date", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    Promise.all([activeProgramsRequest, goalEventsRequest])
+      .then(function (results) {
+        var programsResult = results[0];
+        var goalsResult = results[1];
+
+        if (programsResult && !programsResult.error) {
+          state.activePrograms = programsResult.data || [];
+        } else {
+          state.activePrograms = [];
+        }
+
+        if (goalsResult && !goalsResult.error) {
+          state.athleteGoalEvents = (goalsResult.data || []).map(function (item) {
+            return {
+              id: String(item && item.id || ""),
+              user_id: String(item && item.user_id || ""),
+              title: String(item && item.title || "Goal"),
+              goal_type: String(item && item.goal_type || "goal"),
+              target_date: item && item.target_date ? String(item.target_date) : "",
+              details: String(item && item.details || ""),
+              status: String(item && item.status || "active"),
+              created_at: item && item.created_at ? String(item.created_at) : ""
+            };
+          });
+        } else {
+          state.athleteGoalEvents = [];
+        }
+
+        renderCoachOverview();
+        updateStats();
+      })
+      .catch(function () {
+        state.activePrograms = [];
+        state.athleteGoalEvents = [];
+        renderCoachOverview();
+        updateStats();
+      });
+  }
+
+  function renderCoachOverview() {
+    renderCalendarStrip();
+    renderCalendarDayList();
+    renderUpcomingTimeline();
+    renderCoachTodoList();
+    renderCoachFlagsList();
+  }
+
+  function readInPersonClasses() {
+    try {
+      var raw = window.localStorage.getItem(CLASSES_STORAGE_KEY);
+      if (!raw) {
+        return [];
+      }
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function buildClassEvents(classes) {
+    var source = Array.isArray(classes) ? classes : [];
+    var events = [];
+
+    source.forEach(function (classItem) {
+      var dates = getClassSessionDateKeys(classItem);
+      dates.forEach(function (dateKey) {
+        events.push({
+          id: String(classItem.id || "") + "_" + dateKey,
+          class_id: String(classItem.id || ""),
+          type: "class",
+          date: dateKey,
+          title: String(classItem.name || "Class Session"),
+          time: String(classItem.start_time || ""),
+          location: String(classItem.location || ""),
+          expected_count: getExpectedAttendanceCount(classItem, dateKey),
+          total_count: Array.isArray(classItem.attendees) ? classItem.attendees.length : 0
+        });
+      });
+    });
+
+    return events.sort(function (a, b) {
+      if (a.date === b.date) {
+        return String(a.time || "").localeCompare(String(b.time || ""));
+      }
+      return String(a.date || "").localeCompare(String(b.date || ""));
+    });
+  }
+
+  function getClassSessionDateKeys(classItem) {
+    var startDate = parseDateOnly(String(classItem && classItem.class_date || ""));
+    if (!startDate) {
+      return [];
+    }
+
+    var endDate = parseDateOnly(String(classItem && (classItem.class_end_date || classItem.class_date) || ""));
+    if (!endDate || endDate < startDate) {
+      endDate = new Date(startDate.getTime());
+    }
+
+    var meetingDays = Array.isArray(classItem && classItem.meeting_days)
+      ? classItem.meeting_days.map(function (day) {
+          return Number(day);
+        }).filter(function (day) {
+          return day >= 0 && day <= 6;
+        })
+      : [];
+
+    if (!meetingDays.length) {
+      meetingDays = [startDate.getDay()];
+    }
+
+    var lookup = {};
+    meetingDays.forEach(function (day) {
+      lookup[day] = true;
+    });
+
+    var cursor = new Date(startDate.getTime());
+    var output = [];
+    while (cursor <= endDate) {
+      if (lookup[cursor.getDay()]) {
+        output.push(formatDateKey(cursor));
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    if (!output.length) {
+      output.push(formatDateKey(startDate));
+    }
+
+    return output;
+  }
+
+  function getExpectedAttendanceCount(classItem, dateKey) {
+    var attendees = Array.isArray(classItem && classItem.attendees) ? classItem.attendees : [];
+    var attendanceByDate = classItem && classItem.attendance_by_date && typeof classItem.attendance_by_date === "object"
+      ? classItem.attendance_by_date
+      : {};
+    var dateMap = attendanceByDate[dateKey] && typeof attendanceByDate[dateKey] === "object"
+      ? attendanceByDate[dateKey]
+      : {};
+
+    return attendees.filter(function (attendee) {
+      var attendeeId = String(attendee && attendee.id || "");
+      if (!attendeeId) {
+        return true;
+      }
+      if (Object.prototype.hasOwnProperty.call(dateMap, attendeeId)) {
+        return !!dateMap[attendeeId];
+      }
+      return true;
+    }).length;
+  }
+
+  function renderCalendarStrip() {
+    var container = document.querySelector("[data-admin-calendar-strip]");
+    if (!container) {
+      return;
+    }
+
+    var baseDate = parseDateOnly(state.selectedCalendarDate || formatDateKey(new Date())) || new Date();
+    var today = formatDateKey(new Date());
+    var html = "";
+
+    for (var i = 0; i < 14; i++) {
+      var day = new Date(baseDate.getTime());
+      day.setDate(baseDate.getDate() + i);
+      var dateKey = formatDateKey(day);
+      var dayEvents = state.classEvents.filter(function (event) {
+        return event.date === dateKey;
+      });
+      var isActive = state.selectedCalendarDate === dateKey || (!state.selectedCalendarDate && dateKey === today);
+      var label = day.toLocaleDateString(undefined, { weekday: "short" });
+      var dayOfMonth = day.getDate();
+
+      html +=
+        '<button type="button" class="admin-calendar-day ' + (isActive ? "is-active" : "") + '" data-calendar-date="' + escapeAttribute(dateKey) + '">' +
+          '<span class="admin-calendar-day-name">' + escapeHtml(label) + '</span>' +
+          '<span class="admin-calendar-day-date">' + escapeHtml(dayOfMonth) + '</span>' +
+          '<span class="admin-calendar-day-count">' + escapeHtml(String(dayEvents.length)) + ' sessions</span>' +
+        '</button>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  function renderCalendarDayList() {
+    var container = document.querySelector("[data-admin-calendar-day-list]");
+    if (!container) {
+      return;
+    }
+
+    var selected = state.selectedCalendarDate || formatDateKey(new Date());
+    var selectedDate = parseDateOnly(selected);
+    var selectedLabel = selectedDate
+      ? selectedDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
+      : selected;
+
+    var dayEvents = state.classEvents.filter(function (event) {
+      return event.date === selected;
+    });
+
+    var html = '<div class="admin-overview-item"><p class="admin-overview-item-title">' + escapeHtml(selectedLabel) + '</p><p class="admin-overview-item-meta">Class and training workload for this day.</p></div>';
+
+    if (!dayEvents.length) {
+      html += '<div class="admin-overview-item"><p class="admin-overview-item-title">No classes scheduled</p><p class="admin-overview-item-meta">Use In-Person Classes to plan sessions.</p></div>';
+    } else {
+      dayEvents.forEach(function (eventItem) {
+        html +=
+          '<div class="admin-overview-item">' +
+            '<p class="admin-overview-item-title">' + escapeHtml(eventItem.title) + '</p>' +
+            '<p class="admin-overview-item-meta">' +
+              escapeHtml(eventItem.time || "Time TBD") +
+              (eventItem.location ? ' • ' + escapeHtml(eventItem.location) : '') +
+              ' • ' + escapeHtml(String(eventItem.expected_count || 0)) + '/' + escapeHtml(String(eventItem.total_count || 0)) + ' expected' +
+            '</p>' +
+          '</div>';
+      });
+    }
+
+    if (state.activePrograms.length) {
+      html += '<div class="admin-overview-item"><p class="admin-overview-item-title">Athlete Training Load</p><p class="admin-overview-item-meta">' + escapeHtml(String(state.activePrograms.length)) + ' active athlete programs running.</p></div>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  function renderUpcomingTimeline() {
+    var container = document.querySelector("[data-admin-upcoming-list]");
+    if (!container) {
+      return;
+    }
+
+    var todayKey = formatDateKey(new Date());
+    var upcomingClasses = state.classEvents
+      .filter(function (eventItem) {
+        return eventItem.date >= todayKey;
+      })
+      .slice(0, 8)
+      .map(function (eventItem) {
+        return {
+          kind: "class",
+          sortKey: eventItem.date + " " + String(eventItem.time || ""),
+          title: eventItem.title,
+          subtitle: [eventItem.date, eventItem.time || "Time TBD", (eventItem.expected_count || 0) + "/" + (eventItem.total_count || 0) + " expected"].join(" • ")
+        };
+      });
+
+    var athleteById = {};
+    state.athletes.forEach(function (athlete) {
+      athleteById[String(athlete.user_id || "")] = athlete;
+    });
+
+    var recentAssignments = state.activePrograms.slice(0, 6).map(function (assignment) {
+      var athlete = athleteById[String(assignment.user_id || "")];
+      var athleteName = athlete && (athlete.name || athlete.email) ? (athlete.name || athlete.email) : "Athlete";
+      var assignedAt = assignment.assigned_at ? formatDate(assignment.assigned_at) : "recently";
+      return {
+        kind: "program",
+        sortKey: String(assignment.assigned_at || ""),
+        title: String(assignment.program_name || "Program") + " assigned",
+        subtitle: athleteName + " • " + assignedAt
+      };
+    });
+
+    var upcomingGoals = state.athleteGoalEvents
+      .filter(function (goalItem) {
+        var status = String(goalItem.status || "active").toLowerCase();
+        if (status === "completed" || status === "archived") {
+          return false;
+        }
+        return !!goalItem.target_date && goalItem.target_date >= todayKey;
+      })
+      .slice(0, 8)
+      .map(function (goalItem) {
+        var athlete = athleteById[String(goalItem.user_id || "")];
+        var athleteName = athlete && (athlete.name || athlete.email) ? (athlete.name || athlete.email) : "Athlete";
+        var daysUntil = getDaysUntilDateKey(goalItem.target_date);
+        var countdownLabel = "";
+        if (typeof daysUntil === "number") {
+          if (daysUntil > 0) {
+            countdownLabel = daysUntil + " days";
+          } else if (daysUntil === 0) {
+            countdownLabel = "Today";
+          } else {
+            countdownLabel = Math.abs(daysUntil) + " days ago";
+          }
+        }
+
+        return {
+          kind: "goal",
+          sortKey: String(goalItem.target_date || ""),
+          title: goalItem.title,
+          subtitle: [
+            athleteName,
+            getGoalTypeLabel(goalItem.goal_type),
+            goalItem.target_date,
+            countdownLabel
+          ].filter(Boolean).join(" • ")
+        };
+      });
+
+    var items = upcomingClasses.concat(upcomingGoals, recentAssignments);
+    items.sort(function (a, b) {
+      return String(a.sortKey || "").localeCompare(String(b.sortKey || ""));
+    });
+
+    if (!items.length) {
+      container.innerHTML = '<p class="admin-loading">No upcoming items yet.</p>';
+      return;
+    }
+
+    container.innerHTML = items
+      .slice(0, 12)
+      .map(function (item) {
+        return '<div class="admin-overview-item"><p class="admin-overview-item-title">' + escapeHtml(item.title) + '</p><p class="admin-overview-item-meta">' + escapeHtml(item.subtitle) + '</p></div>';
+      })
+      .join("");
+  }
+
+  function onAddCoachTodo(event) {
+    event.preventDefault();
+    var input = document.querySelector("[data-admin-todo-input]");
+    var text = String(input && input.value || "").trim();
+    if (!text) {
+      return;
+    }
+
+    state.coachTodos.unshift({
+      id: "todo_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+      text: text,
+      done: false,
+      created_at: new Date().toISOString()
+    });
+
+    if (input) {
+      input.value = "";
+    }
+
+    writeCoachTodos(state.coachTodos);
+    renderCoachTodoList();
+  }
+
+  function onCoachTodoListChange(event) {
+    var checkbox = event.target && event.target.closest("[data-todo-toggle]");
+    if (!checkbox) {
+      return;
+    }
+
+    var todoId = String(checkbox.getAttribute("data-todo-toggle") || "").trim();
+    state.coachTodos = state.coachTodos.map(function (todo) {
+      if (todo.id !== todoId) {
+        return todo;
+      }
+      return {
+        id: todo.id,
+        text: todo.text,
+        done: !!checkbox.checked,
+        created_at: todo.created_at
+      };
+    });
+
+    writeCoachTodos(state.coachTodos);
+    renderCoachTodoList();
+  }
+
+  function onCoachTodoListClick(event) {
+    var removeBtn = event.target && event.target.closest("[data-todo-remove]");
+    if (!removeBtn) {
+      return;
+    }
+
+    var todoId = String(removeBtn.getAttribute("data-todo-remove") || "").trim();
+    state.coachTodos = state.coachTodos.filter(function (todo) {
+      return todo.id !== todoId;
+    });
+    writeCoachTodos(state.coachTodos);
+    renderCoachTodoList();
+  }
+
+  function renderCoachTodoList() {
+    var container = document.querySelector("[data-admin-todo-list]");
+    if (!container) {
+      return;
+    }
+
+    if (!state.coachTodos.length) {
+      container.innerHTML = '<p class="admin-loading">No tasks yet.</p>';
+      return;
+    }
+
+    container.innerHTML = state.coachTodos
+      .map(function (todo) {
+        return (
+          '<div class="admin-overview-item admin-todo-item ' + (todo.done ? 'is-done' : '') + '">' +
+            '<input type="checkbox" data-todo-toggle="' + escapeAttribute(todo.id) + '" ' + (todo.done ? 'checked' : '') + ' />' +
+            '<p class="admin-overview-item-title">' + escapeHtml(todo.text) + '</p>' +
+            '<button type="button" class="btn admin-btn-delete-mini" data-todo-remove="' + escapeAttribute(todo.id) + '">Remove</button>' +
+          '</div>'
+        );
+      })
+      .join("");
+  }
+
+  function onAddCoachFlag(event) {
+    event.preventDefault();
+    var input = document.querySelector("[data-admin-flag-input]");
+    var severityInput = document.querySelector("[data-admin-flag-severity]");
+    var text = String(input && input.value || "").trim();
+    if (!text) {
+      return;
+    }
+
+    state.coachFlags.unshift({
+      id: "flag_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+      text: text,
+      severity: String(severityInput && severityInput.value || "medium"),
+      source: "manual",
+      created_at: new Date().toISOString()
+    });
+
+    if (input) {
+      input.value = "";
+    }
+
+    writeCoachFlags(state.coachFlags);
+    renderCoachFlagsList();
+    updateStats();
+  }
+
+  function onCoachFlagsListClick(event) {
+    var removeBtn = event.target && event.target.closest("[data-flag-remove]");
+    if (!removeBtn) {
+      return;
+    }
+
+    var flagId = String(removeBtn.getAttribute("data-flag-remove") || "").trim();
+    state.coachFlags = state.coachFlags.filter(function (flag) {
+      return flag.id !== flagId;
+    });
+    writeCoachFlags(state.coachFlags);
+    renderCoachFlagsList();
+    updateStats();
+  }
+
+  function renderCoachFlagsList() {
+    var container = document.querySelector("[data-admin-flags-list]");
+    if (!container) {
+      return;
+    }
+
+    var flags = getOpenFlags();
+    if (!flags.length) {
+      container.innerHTML = '<p class="admin-loading">No flags yet.</p>';
+      return;
+    }
+
+    container.innerHTML = flags
+      .map(function (flag) {
+        var severity = String(flag.severity || "medium").toLowerCase();
+        return (
+          '<div class="admin-overview-item admin-flag-item">' +
+            '<span class="admin-flag-severity is-' + escapeAttribute(severity) + '">' + escapeHtml(severity) + '</span>' +
+            '<div>' +
+              '<p class="admin-overview-item-title">' + escapeHtml(flag.text || "Flag") + '</p>' +
+              '<p class="admin-overview-item-meta">' + escapeHtml(flag.source === "auto" ? "Auto-detected" : "Manual") + '</p>' +
+            '</div>' +
+            (flag.source === "manual"
+              ? '<button type="button" class="btn admin-btn-delete-mini" data-flag-remove="' + escapeAttribute(flag.id) + '">Clear</button>'
+              : '<span></span>') +
+          '</div>'
+        );
+      })
+      .join("");
+  }
+
+  function getOpenFlags() {
+    return buildAutoFlags().concat(state.coachFlags || []);
+  }
+
+  function buildAutoFlags() {
+    var autoFlags = [];
+    var now = Date.now();
+    var athleteById = {};
+
+    state.athletes.forEach(function (athlete) {
+      athleteById[String(athlete.user_id || "")] = athlete;
+      var athleteName = String(athlete && (athlete.name || athlete.email) || "Athlete");
+
+      if (!athlete.sport || !athlete.level) {
+        autoFlags.push({
+          id: "auto_profile_" + String(athlete.user_id || athleteName),
+          text: athleteName + " is missing sport/level profile details.",
+          severity: "medium",
+          source: "auto"
+        });
+      }
+
+      if (!athlete.last_sign_in_at) {
+        autoFlags.push({
+          id: "auto_signin_" + String(athlete.user_id || athleteName),
+          text: athleteName + " has never signed in.",
+          severity: "high",
+          source: "auto"
+        });
+      } else {
+        var lastSeen = new Date(athlete.last_sign_in_at).getTime();
+        if (lastSeen && now - lastSeen > 1000 * 60 * 60 * 24 * 45) {
+          autoFlags.push({
+            id: "auto_inactive_" + String(athlete.user_id || athleteName),
+            text: athleteName + " has not signed in for 45+ days.",
+            severity: "high",
+            source: "auto"
+          });
+        }
+      }
+    });
+
+    state.athleteGoalEvents.forEach(function (goalItem) {
+      var status = String(goalItem.status || "active").toLowerCase();
+      if (status === "completed" || status === "archived") {
+        return;
+      }
+
+      if (!goalItem.target_date) {
+        return;
+      }
+
+      var daysUntil = getDaysUntilDateKey(goalItem.target_date);
+      if (typeof daysUntil !== "number" || daysUntil < 0 || daysUntil > 14) {
+        return;
+      }
+
+      var athlete = athleteById[String(goalItem.user_id || "")];
+      var athleteName = athlete && (athlete.name || athlete.email) ? (athlete.name || athlete.email) : "Athlete";
+
+      autoFlags.push({
+        id: "auto_goal_due_" + String(goalItem.id || goalItem.user_id || athleteName),
+        text: athleteName + " has a " + getGoalTypeLabel(goalItem.goal_type).toLowerCase() + " in " + (daysUntil === 0 ? "0 days" : daysUntil + " days") + ".",
+        severity: daysUntil <= 3 ? "high" : "medium",
+        source: "auto"
+      });
+    });
+
+    return autoFlags;
+  }
+
+  function readCoachTodos() {
+    try {
+      var raw = window.localStorage.getItem(COACH_TODO_KEY);
+      if (!raw) {
+        return [];
+      }
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function writeCoachTodos(todos) {
+    try {
+      window.localStorage.setItem(COACH_TODO_KEY, JSON.stringify(Array.isArray(todos) ? todos : []));
+    } catch (e) {
+      setStatus("Could not save coach to-do list in this browser.", "error");
+    }
+  }
+
+  function readCoachFlags() {
+    try {
+      var raw = window.localStorage.getItem(COACH_FLAGS_KEY);
+      if (!raw) {
+        return [];
+      }
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function writeCoachFlags(flags) {
+    try {
+      window.localStorage.setItem(COACH_FLAGS_KEY, JSON.stringify(Array.isArray(flags) ? flags : []));
+    } catch (e) {
+      setStatus("Could not save coach flags in this browser.", "error");
+    }
+  }
+
+  function parseDateOnly(value) {
+    if (!value) {
+      return null;
+    }
+    var date = new Date(String(value) + "T00:00:00");
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  function formatDateKey(date) {
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  function getDaysUntilDateKey(dateKey) {
+    if (!dateKey) {
+      return null;
+    }
+
+    var target = parseDateOnly(String(dateKey));
+    if (!target) {
+      return null;
+    }
+
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  function getGoalTypeLabel(goalType) {
+    var value = String(goalType || "goal").toLowerCase();
+    if (value === "specific_goal") {
+      return "Specific Goal";
+    }
+    if (value === "race") {
+      return "Race";
+    }
+    if (value === "event") {
+      return "Event";
+    }
+    if (value === "trip") {
+      return "Trip";
+    }
+    if (value === "milestone") {
+      return "Milestone";
+    }
+    return "Goal";
+  }
+
   function updateStats() {
     var totalEl = document.querySelector("[data-stat-total-athletes]");
     var profilesEl = document.querySelector("[data-stat-profiles]");
+    var todayClassesEl = document.querySelector("[data-stat-today-classes]");
+    var upcomingClassesEl = document.querySelector("[data-stat-upcoming-classes]");
+    var activeProgramsEl = document.querySelector("[data-stat-active-programs]");
+    var openFlagsEl = document.querySelector("[data-stat-open-flags]");
 
     if (totalEl) {
       totalEl.textContent = state.athletes.length;
@@ -2553,6 +3277,36 @@
 
     if (profilesEl) {
       profilesEl.textContent = withProfiles;
+    }
+
+    var today = new Date();
+    var todayKey = formatDateKey(today);
+    var sevenDaysOut = new Date(today.getTime());
+    sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
+    var sevenDaysKey = formatDateKey(sevenDaysOut);
+
+    var todayClasses = state.classEvents.filter(function (eventItem) {
+      return eventItem.date === todayKey;
+    }).length;
+
+    var upcomingClasses = state.classEvents.filter(function (eventItem) {
+      return eventItem.date >= todayKey && eventItem.date <= sevenDaysKey;
+    }).length;
+
+    if (todayClassesEl) {
+      todayClassesEl.textContent = String(todayClasses);
+    }
+
+    if (upcomingClassesEl) {
+      upcomingClassesEl.textContent = String(upcomingClasses);
+    }
+
+    if (activeProgramsEl) {
+      activeProgramsEl.textContent = String((state.activePrograms || []).length);
+    }
+
+    if (openFlagsEl) {
+      openFlagsEl.textContent = String(getOpenFlags().length);
     }
   }
 
@@ -2896,7 +3650,10 @@
   }
 
   function escapeHtml(text) {
-    if (!text) return "";
+    if (text === null || typeof text === "undefined") {
+      return "";
+    }
+    var value = String(text);
     var map = {
       "&": "&amp;",
       "<": "&lt;",
@@ -2904,7 +3661,7 @@
       '"': "&quot;",
       "'": "&#039;"
     };
-    return text.replace(/[&<>"']/g, function (m) {
+    return value.replace(/[&<>"']/g, function (m) {
       return map[m];
     });
   }

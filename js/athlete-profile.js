@@ -568,6 +568,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 (function () {
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
   var METRICS_COLLAPSE_KEY = "nomadic.metricsSectionCollapsed";
+  var GOALS_FALLBACK_KEY = "nomadic_athlete_goals_events_v1";
   var STRAVA_REDIRECT_STATUS_PARAM = "strava_status";
   var STRAVA_REDIRECT_MESSAGE_PARAM = "strava_message";
   var state = {
@@ -600,6 +601,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     stravaConnectionMeta: null,
     stravaMetricsGrid: null,
     stravaStatusElement: null,
+    goalsManageLink: null,
+    goalsList: null,
+    goalsCountdown: null,
+    goalsStatus: null,
+    goalItems: [],
     passwordStatus: null,
     editToggleButton: null,
     editorSection: null,
@@ -668,6 +674,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.stravaConnectionMeta = document.querySelector("[data-strava-connection-meta]");
     state.stravaMetricsGrid = document.querySelector("[data-strava-metrics-grid]");
     state.stravaStatusElement = document.querySelector("[data-strava-status]");
+    state.goalsManageLink = document.querySelector("[data-goals-manage-link]");
+    state.goalsList = document.querySelector("[data-goals-list]");
+    state.goalsCountdown = document.querySelector("[data-goals-countdown]");
+    state.goalsStatus = document.querySelector("[data-goals-status]");
     state.passwordStatus = document.querySelector("[data-password-status]");
     state.editToggleButton = document.querySelector("[data-profile-edit-toggle]");
     state.editorSection = document.querySelector("[data-profile-editor]");
@@ -783,6 +793,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     loadStravaOverview();
     maybeShowStravaRedirectStatus();
     loadCurrentTrainingProgram();
+    loadGoalItems();
   }
 
   function applyCoachViewUi() {
@@ -830,6 +841,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (emailField) {
       emailField.disabled = true;
       emailField.title = "Email changes are disabled in coach view.";
+    }
+
+    if (state.goalsManageLink) {
+      state.goalsManageLink.style.display = "none";
     }
   }
 
@@ -2081,6 +2096,278 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     loadCurrentTrainingProgramWithoutJoin(content);
   }
 
+  function loadGoalItems() {
+    if (!state.client || !getViewedUserId()) {
+      return;
+    }
+
+    setGoalsStatus("Loading goals and milestones...", "info");
+
+    state.client
+      .from("athlete_goals_events")
+      .select("id,user_id,title,goal_type,target_date,details,status,created_at,updated_at")
+      .eq("user_id", getViewedUserId())
+      .order("target_date", { ascending: true })
+      .order("created_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingRelationError(result.error)) {
+            state.goalItems = readGoalFallbackItems(getViewedUserId());
+            renderGoalItems();
+            setGoalsStatus(
+              "Goals table not found yet. Run the goals SQL migration to sync goals with coach dashboard.",
+              "error"
+            );
+            return;
+          }
+
+          setGoalsStatus(result.error.message, "error");
+          return;
+        }
+
+        state.goalItems = (result.data || []).map(normalizeGoalItem);
+        writeGoalFallbackItems(getViewedUserId(), state.goalItems);
+        renderGoalItems();
+        setGoalsStatus("", "info");
+      })
+      .catch(function (error) {
+        setGoalsStatus(error && error.message ? error.message : "Failed to load goals.", "error");
+      });
+  }
+
+  function normalizeGoalItem(item) {
+    return {
+      id: String(item && item.id || ""),
+      user_id: String(item && item.user_id || getViewedUserId() || ""),
+      title: String(item && item.title || "").trim(),
+      goal_type: String(item && item.goal_type || "goal").trim() || "goal",
+      target_date: item && item.target_date ? String(item.target_date) : "",
+      details: String(item && item.details || "").trim(),
+      status: String(item && item.status || "active").trim() || "active",
+      created_at: item && item.created_at ? String(item.created_at) : new Date().toISOString(),
+      updated_at: item && item.updated_at ? String(item.updated_at) : new Date().toISOString()
+    };
+  }
+
+  function renderGoalItems() {
+    if (!state.goalsList || !state.goalsCountdown) {
+      return;
+    }
+
+    var items = (state.goalItems || [])
+      .slice()
+      .sort(function (a, b) {
+        var aCompleted = String(a.status || "active") === "completed" ? 1 : 0;
+        var bCompleted = String(b.status || "active") === "completed" ? 1 : 0;
+        if (aCompleted !== bCompleted) {
+          return aCompleted - bCompleted;
+        }
+
+        var aDate = a.target_date || "9999-12-31";
+        var bDate = b.target_date || "9999-12-31";
+        if (aDate !== bDate) {
+          return aDate.localeCompare(bDate);
+        }
+        return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+      });
+
+    renderGoalCountdown(items);
+
+    if (!items.length) {
+      state.goalsList.innerHTML = '<p class="profile-loading">No goals added yet. Use Manage Goals to add races, trips, and milestones.</p>';
+      return;
+    }
+
+    var visibleItems = items.slice(0, 4);
+
+    state.goalsList.innerHTML = visibleItems
+      .map(function (item) {
+        var isCompleted = String(item.status || "active") === "completed";
+        var daysUntil = getDaysUntilDate(item.target_date);
+        var countdown = "";
+
+        if (typeof daysUntil === "number") {
+          if (daysUntil > 0) {
+            countdown = daysUntil + " days away";
+          } else if (daysUntil === 0) {
+            countdown = "Today";
+          } else {
+            countdown = Math.abs(daysUntil) + " days ago";
+          }
+        }
+
+        return (
+          '<article class="profile-goal-item ' + (isCompleted ? 'is-completed' : '') + '">' +
+            '<div class="profile-goal-main">' +
+              '<div class="profile-goal-top">' +
+                '<span class="profile-goal-type">' + escapeHtml(getGoalTypeLabel(item.goal_type)) + '</span>' +
+                '<span class="profile-goal-status-chip ' + (isCompleted ? 'is-completed' : 'is-active') + '">' + (isCompleted ? 'Completed' : 'Active') + '</span>' +
+                (item.target_date ? '<span class="profile-goal-date">' + escapeHtml(formatGoalDate(item.target_date)) + '</span>' : '<span class="profile-goal-date is-empty">No target date</span>') +
+              '</div>' +
+              '<h3>' + escapeHtml(item.title || 'Untitled goal') + '</h3>' +
+              (item.details ? '<p class="profile-goal-details">' + escapeHtml(item.details) + '</p>' : '') +
+              (countdown ? '<p class="profile-goal-countdown-inline">' + escapeHtml(countdown) + '</p>' : '') +
+            '</div>' +
+          '</article>'
+        );
+      })
+      .join("");
+
+    if (items.length > visibleItems.length) {
+      state.goalsList.innerHTML +=
+        '<p class="profile-goals-more-note">' +
+        escapeHtml(String(items.length - visibleItems.length)) +
+        ' more goals. Use Manage Goals to view all.</p>';
+    }
+  }
+
+  function renderGoalCountdown(items) {
+    var activeUpcoming = (items || []).filter(function (item) {
+      if (String(item.status || "active") === "completed") {
+        return false;
+      }
+      return !!item.target_date;
+    }).sort(function (a, b) {
+      return String(a.target_date || "").localeCompare(String(b.target_date || ""));
+    });
+
+    if (!activeUpcoming.length) {
+      state.goalsCountdown.innerHTML =
+        '<div class="profile-goals-countdown-card is-empty"><p class="profile-goals-countdown-label">Next Countdown</p><strong>Add a dated event to start your countdown</strong></div>';
+      return;
+    }
+
+    var nextItem = activeUpcoming[0];
+    var daysUntil = getDaysUntilDate(nextItem.target_date);
+    var countdownText;
+    if (typeof daysUntil !== "number") {
+      countdownText = "Date unavailable";
+    } else if (daysUntil > 0) {
+      countdownText = daysUntil + " days";
+    } else if (daysUntil === 0) {
+      countdownText = "Today";
+    } else {
+      countdownText = Math.abs(daysUntil) + " days ago";
+    }
+
+    state.goalsCountdown.innerHTML =
+      '<div class="profile-goals-countdown-card">' +
+        '<p class="profile-goals-countdown-label">Next ' + escapeHtml(getGoalTypeLabel(nextItem.goal_type)) + '</p>' +
+        '<strong>' + escapeHtml(nextItem.title || 'Upcoming event') + '</strong>' +
+        '<p class="profile-goals-countdown-meta">' + escapeHtml(formatGoalDate(nextItem.target_date)) + ' • ' + escapeHtml(countdownText) + '</p>' +
+      '</div>';
+  }
+
+  function getGoalTypeLabel(goalType) {
+    var value = String(goalType || "goal").toLowerCase();
+    if (value === "specific_goal") return "Specific Goal";
+    if (value === "race") return "Race";
+    if (value === "event") return "Event";
+    if (value === "trip") return "Trip";
+    if (value === "milestone") return "Milestone";
+    return "General Goal";
+  }
+
+  function getDaysUntilDate(dateKey) {
+    if (!dateKey) {
+      return null;
+    }
+
+    var target = new Date(String(dateKey) + "T00:00:00");
+    if (Number.isNaN(target.getTime())) {
+      return null;
+    }
+
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  function formatGoalDate(dateKey) {
+    if (!dateKey) {
+      return "No target date";
+    }
+
+    try {
+      var date = new Date(String(dateKey) + "T00:00:00");
+      if (Number.isNaN(date.getTime())) {
+        return dateKey;
+      }
+
+      return date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+    } catch (e) {
+      return dateKey;
+    }
+  }
+
+  function setGoalsStatus(message, variant) {
+    if (!state.goalsStatus) {
+      return;
+    }
+
+    state.goalsStatus.textContent = message || "";
+    state.goalsStatus.classList.remove("is-error", "is-success", "is-info");
+
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      state.goalsStatus.classList.add("is-error");
+    } else if (variant === "success") {
+      state.goalsStatus.classList.add("is-success");
+    } else {
+      state.goalsStatus.classList.add("is-info");
+    }
+  }
+
+  function readGoalFallbackItems(userId) {
+    var map = readGoalFallbackMap();
+    var key = String(userId || "");
+    var rows = map[key];
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+
+    return rows.map(normalizeGoalItem);
+  }
+
+  function writeGoalFallbackItems(userId, rows) {
+    var key = String(userId || "");
+    if (!key) {
+      return;
+    }
+
+    var map = readGoalFallbackMap();
+    map[key] = Array.isArray(rows) ? rows.map(normalizeGoalItem) : [];
+
+    try {
+      window.localStorage.setItem(GOALS_FALLBACK_KEY, JSON.stringify(map));
+    } catch (e) {
+      // Local storage can fail in private browsing modes.
+    }
+  }
+
+  function readGoalFallbackMap() {
+    try {
+      var raw = window.localStorage.getItem(GOALS_FALLBACK_KEY);
+      if (!raw) {
+        return {};
+      }
+
+      var parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   function loadStravaOverview() {
     if (!state.client || !getViewedUserId()) {
       return;
@@ -2733,13 +3020,19 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       (program.training_program && program.training_program.name) ||
       program.program_name ||
       (program.program_id ? "Program " + String(program.program_id).slice(0, 8) : "Assigned Program");
+    var athleteName =
+      (state.profile && state.profile.name) ||
+      (state.viewUser && state.viewUser.email) ||
+      "Athlete";
 
     var startDate = program.assigned_at ? formatDate(program.assigned_at) : "—";
     var assignmentQuery = program.id ? "&assignmentId=" + encodeURIComponent(program.id) : "";
+    var athleteQuery = "&athleteName=" + encodeURIComponent(athleteName);
     var programUrl =
       "training-program-example.html?program=" + encodeURIComponent(programName) +
       (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "") +
-      assignmentQuery;
+      assignmentQuery +
+      athleteQuery;
     var viewUrl = programUrl + "&view=1";
 
     return [

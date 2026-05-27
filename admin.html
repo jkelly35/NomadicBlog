@@ -53,7 +53,81 @@
             <div class="admin-stat-value" data-stat-profiles>0</div>
             <div class="admin-stat-label">Profiles Created</div>
           </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-today-classes>0</div>
+            <div class="admin-stat-label">Classes Today</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-upcoming-classes>0</div>
+            <div class="admin-stat-label">Classes Next 7 Days</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-active-programs>0</div>
+            <div class="admin-stat-label">Active Programs</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-open-flags>0</div>
+            <div class="admin-stat-label">Open Flags</div>
+          </div>
         </div>
+
+        <section class="admin-overview-grid" aria-label="Coach Overview">
+          <article class="admin-overview-card admin-overview-calendar-card">
+            <div class="admin-overview-card-head">
+              <h2>Schedule Calendar</h2>
+              <p>Today and upcoming sessions at a glance.</p>
+            </div>
+            <div class="admin-calendar-strip" data-admin-calendar-strip>
+              <p class="admin-loading">Loading calendar...</p>
+            </div>
+            <div class="admin-calendar-day-list" data-admin-calendar-day-list>
+              <p class="admin-loading">Loading day schedule...</p>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Upcoming Timeline</h2>
+              <p>Classes, athlete events, and program activity.</p>
+            </div>
+            <div class="admin-overview-list" data-admin-upcoming-list>
+              <p class="admin-loading">Loading upcoming items...</p>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Coach To-Do</h2>
+              <p>Track priorities that need attention.</p>
+            </div>
+            <form class="admin-inline-form" data-admin-todo-form>
+              <input type="text" class="admin-search" placeholder="Add a task..." data-admin-todo-input />
+              <button class="btn admin-btn-refresh" type="submit">Add</button>
+            </form>
+            <div class="admin-overview-list" data-admin-todo-list>
+              <p class="admin-loading">No tasks yet.</p>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Athlete Flags</h2>
+              <p>Surface issues and coaching risks fast.</p>
+            </div>
+            <form class="admin-inline-form" data-admin-flag-form>
+              <select data-admin-flag-severity>
+                <option value="high">High</option>
+                <option value="medium" selected>Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <input type="text" class="admin-search" placeholder="Add a flag..." data-admin-flag-input />
+              <button class="btn admin-btn-refresh" type="submit">Add</button>
+            </form>
+            <div class="admin-overview-list" data-admin-flags-list>
+              <p class="admin-loading">No flags yet.</p>
+            </div>
+          </article>
+        </section>
 
         <section class="admin-athletes-panel" aria-label="Athletes">
           <!-- Controls -->

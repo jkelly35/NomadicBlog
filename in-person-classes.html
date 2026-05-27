@@ -9,9 +9,9 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js"></script>
   <script defer src="js/auth-ui.js"></script>
-  <script defer src="js/in-person-classes.js"></script>
+  <script defer src="js/in-person-classes.js?v=20260526d"></script>
 </head>
-<body>
+<body data-classes-page="list">
   <header>
     <div class="brand">
       <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
@@ -28,7 +28,7 @@
   </header>
 
   <main class="admin-main">
-    <div class="admin-container classes-flex-layout">
+    <div class="admin-container">
       <div data-classes-guard>
         <p class="admin-loading">Verifying admin access...</p>
       </div>
@@ -36,87 +36,35 @@
       <div class="admin-content" hidden data-classes-content>
         <div class="admin-header">
           <h1>In-Person Classes</h1>
-          <p class="admin-subtitle">Plan class sessions, assign a program, and track attendance.</p>
+          <p class="admin-subtitle">Browse all classes, open one for attendance, or create a new session.</p>
         </div>
 
-        <div class="classes-main-layout">
-          <!-- Sidebar: Class List -->
-          <aside class="classes-sidebar">
-            <h2>Your Classes</h2>
-            <ul class="classes-sidebar-list" data-classes-sidebar-list>
-              <li class="admin-loading">Loading classes...</li>
-            </ul>
+        <div class="admin-stats classes-stats">
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-classes-total>0</div>
+            <div class="admin-stat-label">Total Classes</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-classes-upcoming>0</div>
+            <div class="admin-stat-label">Upcoming</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-classes-attendance>0%</div>
+            <div class="admin-stat-label">Attendance Recorded</div>
+          </div>
+        </div>
+
+        <section class="admin-athletes-panel" aria-label="Classes">
+          <div class="admin-controls">
+            <a class="btn admin-btn-refresh" href="in-person-class-create.html" data-classes-open-create>+ Create New Class</a>
             <button class="btn admin-btn-refresh" type="button" data-classes-refresh>Refresh</button>
-          </aside>
+            <a class="btn admin-btn-reset-password" href="admin.html">Back to Dashboard</a>
+          </div>
 
-          <!-- Main: Class Details and Attendance -->
-          <section class="classes-detail-panel">
-            <div class="classes-detail-header" data-classes-detail-header>
-              <!-- Populated by JS: class name, date, time, location, program, notes -->
-            </div>
-            <div class="classes-attendance-grid-container" data-classes-attendance-grid>
-              <!-- Populated by JS: week-by-week attendance grid -->
-            </div>
-            <div class="classes-detail-actions" data-classes-detail-actions>
-              <!-- Populated by JS: action buttons (edit, save, etc.) -->
-            </div>
-          </section>
-
-          <!-- Panel: Create New Class -->
-          <section class="admin-athletes-panel classes-create-panel" aria-label="Create Class">
-            <div class="admin-programs-header">
-              <div>
-                <h2>Create New Class</h2>
-                <p>Add a session and optionally pre-load attendee names.</p>
-              </div>
-              <a class="btn admin-btn-reset-password" href="admin.html">Back to Dashboard</a>
-            </div>
-
-            <div class="classes-create-grid">
-              <label class="admin-modal-info-row">
-                <span>Class Name</span>
-                <input type="text" placeholder="e.g., Wednesday Strength Group" data-classes-name />
-              </label>
-              <label class="admin-modal-info-row">
-                <span>Date</span>
-                <input type="date" data-classes-date />
-              </label>
-              <label class="admin-modal-info-row">
-                <span>Start Time</span>
-                <input type="time" data-classes-time />
-              </label>
-              <label class="admin-modal-info-row">
-                <span>Location</span>
-                <input type="text" placeholder="e.g., Summit Gym" data-classes-location />
-              </label>
-              <label class="admin-modal-info-row classes-program-field">
-                <span>Program Used</span>
-                <select data-classes-program>
-                  <option value="">Loading programs...</option>
-                </select>
-              </label>
-              <div class="admin-modal-info-row classes-roster-field">
-                <span>Add Athletes from Your Roster</span>
-                <div class="class-athlete-picker">
-                  <select data-classes-athlete-select>
-                    <option value="">Loading athletes...</option>
-                  </select>
-                  <button class="btn admin-btn-small" type="button" data-classes-athlete-add>+ Add Athlete</button>
-                </div>
-                <div class="class-picked-athletes" data-classes-athlete-picked></div>
-              </div>
-              <label class="admin-modal-info-row classes-roster-field">
-                <span>Additional Attendees (comma separated)</span>
-                <input type="text" placeholder="e.g., Alex, Sam, Taylor" data-classes-roster />
-              </label>
-            </div>
-
-            <div class="admin-controls classes-controls-row">
-              <button class="btn admin-btn-refresh" type="button" data-classes-create>+ Save Class</button>
-              <button class="btn admin-btn-reset-password" type="button" data-classes-clear>Clear Form</button>
-            </div>
-          </section>
-        </div>
+          <div class="classes-list" data-classes-list>
+            <p class="admin-loading">Loading classes...</p>
+          </div>
+        </section>
 
         <p class="admin-status" role="status" aria-live="polite" data-classes-status></p>
       </div>
