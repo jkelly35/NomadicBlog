@@ -7470,6 +7470,273 @@ footer a:hover {
   color: #5d6666;
 }
 
+/* ---------- Athlete Nutrition Tracking ---------- */
+.profile-nutrition-subheading {
+  margin: 0 0 0.7rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #355d3f;
+}
+
+.profile-nutrition-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.profile-nutrition-today-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+}
+
+.profile-nutrition-progress-card {
+  background: #fff;
+  border: 1px solid #dfe8d9;
+  border-radius: 11px;
+  padding: 0.75rem 0.8rem;
+}
+
+.profile-nutrition-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.profile-nutrition-progress-label {
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #556a5a;
+  font-weight: 700;
+}
+
+.profile-nutrition-progress-value {
+  color: #1a3f2a;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.profile-nutrition-progress-bar {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background: #edf3e8;
+  overflow: hidden;
+  margin-top: 0.45rem;
+}
+
+.profile-nutrition-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #5ea06d 0%, #3f8254 100%);
+}
+
+.profile-nutrition-progress-meta {
+  margin: 0.42rem 0 0;
+  font-size: 0.8rem;
+  color: #4e6355;
+}
+
+.profile-nutrition-summary-card {
+  background: linear-gradient(150deg, #fbfff8 0%, #f2f7ee 100%);
+  border: 1px solid #d8e4d2;
+  border-radius: 11px;
+  padding: 0.7rem 0.8rem;
+}
+
+.profile-nutrition-summary-card-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #556a5a;
+  font-weight: 700;
+}
+
+.profile-nutrition-summary-card-value {
+  display: block;
+  color: #1a3f2a;
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+.profile-nutrition-targets-form,
+.profile-nutrition-form {
+  margin-bottom: 1rem;
+}
+
+.profile-nutrition-log-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.profile-nutrition-log-item {
+  background: #fff;
+  border: 1px solid #dfe8d9;
+  border-radius: 11px;
+  padding: 0.8rem 0.9rem;
+}
+
+.profile-nutrition-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.profile-nutrition-log-date {
+  margin: 0;
+  color: #173636;
+  font-size: 0.98rem;
+}
+
+.profile-nutrition-log-delete {
+  border: 1px solid #e7d7cb;
+  background: #fff8f4;
+  color: #8a3f1d;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+
+.profile-nutrition-log-delete:hover {
+  background: #f6e9e1;
+}
+
+.profile-nutrition-log-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.45rem;
+}
+
+.profile-nutrition-chip {
+  background: #f6faf3;
+  border: 1px solid #e1ecdc;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.76rem;
+  color: #3a5a3f;
+  width: fit-content;
+}
+
+.profile-nutrition-notes {
+  margin: 0.55rem 0 0;
+  color: #53655b;
+  font-size: 0.88rem;
+}
+
+.profile-nutrition-food-builder {
+  border: 1px solid #d9e8d9;
+  background: #f9fcf8;
+  border-radius: 12px;
+  padding: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.profile-nutrition-food-results {
+  border: 1px solid #e1ebe1;
+  background: #fff;
+  border-radius: 10px;
+  margin-bottom: 0.75rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.profile-nutrition-food-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #eff4ef;
+  background: #fff;
+  text-align: left;
+  padding: 0.7rem 0.8rem;
+  cursor: pointer;
+}
+
+.profile-nutrition-food-row:last-child {
+  border-bottom: 0;
+}
+
+.profile-nutrition-food-row:hover {
+  background: #f3f9f1;
+}
+
+.profile-nutrition-food-row strong {
+  color: #1f3f2b;
+  display: block;
+  font-size: 0.9rem;
+}
+
+.profile-nutrition-food-row span {
+  color: #58705f;
+  font-size: 0.8rem;
+}
+
+.profile-nutrition-food-selected {
+  border: 1px dashed #c8dac8;
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: #fff;
+}
+
+.profile-nutrition-food-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+
+.profile-nutrition-food-preview-item {
+  background: #f6faf3;
+  border: 1px solid #e2eee0;
+  border-radius: 999px;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.78rem;
+  color: #375744;
+}
+
+.profile-nutrition-food-entries {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.profile-nutrition-food-entry {
+  border: 1px solid #dce7d9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.72rem 0.85rem;
+}
+
+.profile-nutrition-food-entry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.profile-nutrition-food-entry-head h4 {
+  margin: 0;
+  color: #193a2b;
+  font-size: 0.9rem;
+}
+
+.profile-nutrition-food-entry-meta {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: #587061;
+}
+
 @media (max-width: 760px) {
   .profile-goals-form-row {
     grid-template-columns: 1fr;
