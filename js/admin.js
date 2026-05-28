@@ -1266,9 +1266,6 @@
 
     tbody.innerHTML = paginated
       .map(function (athlete) {
-        var viewUrl =
-          "profile.html?coachView=1&athleteId=" +
-          encodeURIComponent(athlete.user_id || "");
         return (
           "<tr>" +
           "<td>" + escapeHtml(athlete.email || "N/A") + "</td>" +
@@ -1278,9 +1275,7 @@
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
           "<td><div class='admin-program-item-actions'><a class='btn admin-btn-small' href='athlete-insight.html?athleteId=" +
           encodeURIComponent(athlete.user_id || "") +
-          "' target='_blank'>Insights</a><a class='btn admin-btn-small' href='" +
-          viewUrl +
-          "'>View</a><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
+          "' target='_blank'>Insights</a><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
           escapeAttribute(athlete.user_id || "") +
           "'>Delete</button></div></td>" +
           "</tr>"
