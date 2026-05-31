@@ -33,13 +33,16 @@
         <p class="profile-loading">Loading nutrition tracker...</p>
       </div>
 
-      <div class="profile-content" hidden data-nutrition-content>
+      <div class="profile-content" hidden data-nutrition-content data-nutrition-page-mode="log">
         <div class="profile-dashboard-heading-row">
           <div>
             <h1 class="section-heading">Nutrition Tracker</h1>
-            <p class="profile-dashboard-subtitle">Log food, hydration, and daily nutrition feedback in one place.</p>
+            <p class="profile-dashboard-subtitle">Fast logging for food, hydration, and daily nutrition feedback.</p>
           </div>
-          <a href="profile.html" class="btn profile-btn-cancel" data-nutrition-back-link>Back to Dashboard</a>
+          <div class="profile-section-actions">
+            <a href="athlete-nutrition-goals.html" class="btn profile-btn-cancel" data-nutrition-goals-link>Nutrition Goals</a>
+            <a href="profile.html" class="btn profile-btn-cancel" data-nutrition-back-link>Back to Dashboard</a>
+          </div>
         </div>
 
         <div class="profile-section" id="nutrition-daily-overview-section">
@@ -59,60 +62,98 @@
           </div>
         </div>
 
-        <div class="profile-section" id="nutrition-targets-section">
-          <h2>Daily Targets</h2>
-          <form class="profile-form profile-nutrition-targets-form" data-nutrition-targets-form>
+        <div class="profile-section" id="nutrition-db-manager-section" data-food-admin-section hidden>
+          <div class="profile-section-header">
+            <div>
+              <h2>Food Database Manager</h2>
+              <p class="profile-section-copy">Coach-only controls to add, update, and remove foods used in athlete tracking.</p>
+            </div>
+          </div>
+
+          <form class="profile-form profile-nutrition-food-admin-form" data-food-admin-form>
+            <input type="hidden" data-food-admin-id />
+
             <div class="form-row profile-goals-form-row">
               <div class="form-group">
-                <label for="nutrition-target-calories">Calories (kcal)</label>
-                <input id="nutrition-target-calories" name="target_calories" type="number" min="0" max="20000" step="1" placeholder="e.g. 2600" />
+                <label for="food-admin-name">Food Name</label>
+                <input id="food-admin-name" type="text" data-food-admin-name placeholder="e.g. Cottage Cheese" required />
               </div>
               <div class="form-group">
-                <label for="nutrition-target-protein">Protein (g)</label>
-                <input id="nutrition-target-protein" name="target_protein_g" type="number" min="0" max="2000" step="1" placeholder="e.g. 160" />
+                <label for="food-admin-brand">Brand (optional)</label>
+                <input id="food-admin-brand" type="text" data-food-admin-brand placeholder="e.g. Good Culture" />
               </div>
             </div>
 
             <div class="form-row profile-goals-form-row">
               <div class="form-group">
-                <label for="nutrition-target-carbs">Carbs (g)</label>
-                <input id="nutrition-target-carbs" name="target_carbs_g" type="number" min="0" max="2500" step="1" placeholder="e.g. 320" />
+                <label for="food-admin-calories">Calories / 100g</label>
+                <input id="food-admin-calories" type="number" min="0" step="0.1" data-food-admin-calories required />
               </div>
               <div class="form-group">
-                <label for="nutrition-target-fat">Fat (g)</label>
-                <input id="nutrition-target-fat" name="target_fats_g" type="number" min="0" max="1000" step="1" placeholder="e.g. 80" />
+                <label for="food-admin-protein">Protein / 100g</label>
+                <input id="food-admin-protein" type="number" min="0" step="0.1" data-food-admin-protein required />
               </div>
             </div>
 
             <div class="form-row profile-goals-form-row">
               <div class="form-group">
-                <label for="nutrition-target-hydration">Hydration (L)</label>
-                <input id="nutrition-target-hydration" name="target_hydration_l" type="number" min="0" max="20" step="0.1" placeholder="e.g. 3.0" />
+                <label for="food-admin-carbs">Carbs / 100g</label>
+                <input id="food-admin-carbs" type="number" min="0" step="0.1" data-food-admin-carbs required />
               </div>
               <div class="form-group">
-                <label for="nutrition-target-fiber">Fiber (g)</label>
-                <input id="nutrition-target-fiber" name="target_fiber_g" type="number" min="0" max="200" step="1" placeholder="e.g. 30" />
+                <label for="food-admin-fats">Fat / 100g</label>
+                <input id="food-admin-fats" type="number" min="0" step="0.1" data-food-admin-fats required />
+              </div>
+            </div>
+
+            <div class="form-row profile-goals-form-row">
+              <div class="form-group">
+                <label for="food-admin-fiber">Fiber / 100g</label>
+                <input id="food-admin-fiber" type="number" min="0" step="0.1" data-food-admin-fiber />
+              </div>
+              <div class="form-group">
+                <label for="food-admin-serving-label">Default Serving Label</label>
+                <input id="food-admin-serving-label" type="text" data-food-admin-serving-label placeholder="e.g. 1 cup" />
+              </div>
+            </div>
+
+            <div class="form-row profile-goals-form-row">
+              <div class="form-group">
+                <label for="food-admin-serving-grams">Default Serving Grams</label>
+                <input id="food-admin-serving-grams" type="number" min="1" step="0.1" data-food-admin-serving-grams value="100" required />
+              </div>
+              <div class="form-group">
+                <label for="food-admin-search">Filter Food List</label>
+                <input id="food-admin-search" type="search" data-food-admin-search placeholder="Search by food or brand" />
               </div>
             </div>
 
             <div class="profile-form-actions">
-              <button type="submit" class="btn profile-btn-save">Save Targets</button>
+              <button type="submit" class="btn profile-btn-save" data-food-admin-save>Save Food</button>
+              <button type="button" class="btn profile-btn-cancel" data-food-admin-reset>Reset</button>
             </div>
           </form>
+
+          <div class="profile-nutrition-admin-food-list" data-food-admin-list>
+            <p class="profile-loading">Loading food database...</p>
+          </div>
+
+          <p class="profile-status" role="status" aria-live="polite" data-food-admin-status></p>
         </div>
 
         <div class="profile-section" id="nutrition-log-section">
-          <h2>Log Food and Recovery</h2>
+          <h2>Quick Log</h2>
 
           <div class="profile-nutrition-food-builder" data-food-builder>
-            <div class="profile-nutrition-subheading">Food Database</div>
+            <div class="profile-nutrition-subheading">Search and log in seconds</div>
+            <p class="profile-section-copy">Search a food, choose a serving, and add it with one tap.</p>
             <div class="form-row profile-goals-form-row">
               <div class="form-group">
-                <label for="nutrition-food-search">Search Food</label>
-                <input id="nutrition-food-search" type="text" placeholder="e.g. Banana, Oats, Chicken Breast" data-food-search />
+                <label for="nutrition-food-search">Search food</label>
+                <input id="nutrition-food-search" type="text" placeholder="Banana, oats, chicken breast" data-food-search />
               </div>
               <div class="form-group">
-                <label for="nutrition-food-date">Log Date</label>
+                <label for="nutrition-food-date">Date</label>
                 <input id="nutrition-food-date" type="date" data-food-date />
               </div>
             </div>
@@ -145,6 +186,9 @@
             <p class="profile-loading">No food entries logged yet.</p>
           </div>
 
+          <details class="profile-nutrition-advanced">
+            <summary class="profile-nutrition-advanced-summary">Advanced manual log</summary>
+            <div class="profile-nutrition-advanced-body">
           <form class="profile-form profile-nutrition-form" data-nutrition-form>
             <div class="form-row profile-goals-form-row">
               <div class="form-group">
@@ -185,40 +229,20 @@
                 <input id="nutrition-hydration" name="hydration_l" type="number" min="0" max="20" step="0.1" placeholder="e.g. 2.7" />
               </div>
               <div class="form-group">
-                <label for="nutrition-meal-quality">Meal Quality (1-5)</label>
-                <select id="nutrition-meal-quality" name="meal_quality">
-                  <option value="">Select</option>
-                  <option value="1">1 - Very Poor</option>
-                  <option value="2">2 - Poor</option>
-                  <option value="3">3 - Average</option>
-                  <option value="4">4 - Good</option>
-                  <option value="5">5 - Excellent</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row profile-goals-form-row">
-              <div class="form-group">
-                <label for="nutrition-energy">Energy (1-5)</label>
-                <select id="nutrition-energy" name="energy_level">
-                  <option value="">Select</option>
-                  <option value="1">1 - Very Low</option>
-                  <option value="2">2 - Low</option>
-                  <option value="3">3 - Stable</option>
-                  <option value="4">4 - High</option>
-                  <option value="5">5 - Very High</option>
+                <label for="nutrition-meal-type">Meal Type</label>
+                <select id="nutrition-meal-type" name="meal_type">
+                  <option value="">Select meal type</option>
+                  <option value="Breakfast">Breakfast</option>
+                  <option value="Lunch">Lunch</option>
+                  <option value="Dinner">Dinner</option>
+                  <option value="Snack">Snack</option>
+                  <option value="Pre-Workout">Pre-Workout</option>
+                  <option value="Post-Workout">Post-Workout</option>
                 </select>
               </div>
               <div class="form-group">
-                <label for="nutrition-hunger">Hunger Control (1-5)</label>
-                <select id="nutrition-hunger" name="hunger_level">
-                  <option value="">Select</option>
-                  <option value="1">1 - Poor</option>
-                  <option value="2">2 - Low</option>
-                  <option value="3">3 - Moderate</option>
-                  <option value="4">4 - Good</option>
-                  <option value="5">5 - Excellent</option>
-                </select>
+                <label for="nutrition-meal-name">Meal / Food Name</label>
+                <input id="nutrition-meal-name" name="meal_name" type="text" placeholder="e.g. Post-run breakfast" />
               </div>
             </div>
 
@@ -232,6 +256,8 @@
               <button type="button" class="btn profile-btn-cancel" data-nutrition-reset>Reset</button>
             </div>
           </form>
+            </div>
+          </details>
 
           <div class="profile-nutrition-log-list" data-nutrition-list>
             <p class="profile-loading">Loading nutrition log history...</p>

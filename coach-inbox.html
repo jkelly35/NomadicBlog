@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unified Inbox - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/coach-messages.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="admin.html">Dashboard</a>
+      <a href="coach-training-programs.html">Programs</a>
+      <a href="in-person-classes.html">Classes</a>
+      <a href="coach-blog-manager.html">Blog</a>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+      <div class="coach-inbox-page-head">
+        <div>
+          <h1>Unified Inbox</h1>
+          <p>Manage one-on-one, group, and all-athlete communication from one place.</p>
+        </div>
+        <a class="btn admin-btn-refresh" href="admin.html#coach-messages">Back to Dashboard Alerts</a>
+      </div>
+
+      <section class="admin-athletes-panel" aria-label="Coach Messages">
+        <div class="coach-inbox-toolbar" aria-label="Inbox Controls">
+          <input
+            type="search"
+            class="admin-search coach-inbox-search"
+            placeholder="Search athletes or message text..."
+            data-coach-msg-search
+          />
+          <select class="coach-inbox-sort" data-coach-msg-sort>
+            <option value="needs-response" selected>Sort: Needs Response</option>
+            <option value="newest">Sort: Newest Activity</option>
+            <option value="name">Sort: Athlete Name</option>
+          </select>
+          <label class="coach-inbox-toggle">
+            <input type="checkbox" data-coach-msg-unread-only />
+            <span>Unread only</span>
+          </label>
+          <button type="button" class="btn admin-btn-refresh" data-coach-msg-refresh>Refresh</button>
+        </div>
+
+        <div class="coach-mail-layout" aria-label="Unified inbox layout">
+          <article class="admin-overview-card coach-inbox-card">
+            <div class="admin-overview-card-head">
+              <h3>Conversations</h3>
+              <p data-coach-msg-inbox-subtitle>Latest athlete replies and unread counts.</p>
+            </div>
+            <div class="coach-inbox-list" data-coach-msg-inbox>
+              <p class="admin-loading">Loading conversations...</p>
+            </div>
+          </article>
+
+          <section class="coach-mail-thread-pane" aria-label="Selected conversation">
+            <article class="admin-overview-card coach-thread-card">
+              <div class="admin-overview-card-head">
+                <h3 data-coach-msg-thread-title>Select a conversation</h3>
+                <p data-coach-msg-thread-subtitle>Open a thread to reply one-on-one.</p>
+              </div>
+              <div class="coach-thread-meta" data-coach-msg-thread-meta>
+                <span class="coach-thread-chip">No thread selected</span>
+              </div>
+              <div class="coach-thread-list" data-coach-msg-thread>
+                <p class="admin-loading">No conversation selected.</p>
+              </div>
+              <form class="coach-thread-reply-form" data-coach-msg-thread-form>
+                <textarea rows="2" placeholder="Reply in this conversation..." data-coach-msg-thread-body></textarea>
+                <div class="coach-thread-reply-actions">
+                  <p class="coach-compose-hint">Cmd/Ctrl + Enter to send</p>
+                  <button type="submit" class="btn admin-btn-refresh">Send Reply</button>
+                </div>
+              </form>
+            </article>
+
+            <article class="admin-overview-card coach-compose-card">
+              <div class="admin-overview-card-head">
+                <h3>Compose Message</h3>
+                <p>Use this for direct, group, or all-athlete announcements.</p>
+              </div>
+              <form class="coach-compose-form" data-coach-msg-form>
+                <div class="admin-inline-form coach-compose-mode-row">
+                  <select data-coach-msg-mode>
+                    <option value="direct">Direct Message</option>
+                    <option value="group">Selected Group</option>
+                    <option value="all">All Athletes</option>
+                  </select>
+                  <select data-coach-msg-athlete></select>
+                </div>
+
+                <div class="coach-group-picker" data-coach-msg-group hidden>
+                  <p class="coach-group-picker-label">Select athletes for this group message:</p>
+                  <div class="coach-group-picker-list" data-coach-msg-group-list>
+                    <p class="admin-loading">Loading athletes...</p>
+                  </div>
+                </div>
+
+                <textarea rows="4" placeholder="Type your message..." data-coach-msg-body required></textarea>
+                <div class="coach-compose-footer">
+                  <p class="coach-compose-hint">Press Cmd/Ctrl + Enter to send quickly.</p>
+                  <div class="admin-controls-actions" style="justify-content:flex-end;">
+                  <button type="submit" class="btn admin-btn-refresh">Send Message</button>
+                  </div>
+                </div>
+              </form>
+              <p class="admin-status" role="status" aria-live="polite" data-coach-msg-status></p>
+            </article>
+          </section>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

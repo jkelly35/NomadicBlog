@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nutrition Foodbank Settings - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/nutrition-foodbank-settings.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="admin.html">Dashboard</a>
+      <a href="coach-inbox.html">Inbox</a>
+      <a href="coach-training-programs.html">Programs</a>
+      <a href="in-person-classes.html">Classes</a>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+      <div data-foodbank-guard>
+        <p class="admin-loading">Verifying coach access...</p>
+      </div>
+
+      <div class="admin-content" hidden data-foodbank-content>
+        <div class="coach-inbox-page-head">
+          <div>
+            <h1>Nutrition Foodbank Settings</h1>
+            <p>Manage food items, nutrition info, and serving options used in athlete nutrition logging.</p>
+          </div>
+          <a class="btn admin-btn-refresh" href="admin.html">Back to Dashboard</a>
+        </div>
+
+        <section class="admin-athletes-panel" aria-label="Foodbank Settings">
+          <div class="admin-controls">
+            <div class="admin-controls-search-wrap">
+              <input
+                type="search"
+                class="admin-search"
+                placeholder="Filter foodbank by name, brand, or source"
+                data-food-admin-search
+              />
+              <p class="admin-results-summary" data-food-admin-results-summary>Loading foods...</p>
+            </div>
+            <div class="admin-controls-actions">
+              <button type="button" class="btn admin-btn-refresh" data-food-csv-export>Export CSV</button>
+              <button type="button" class="btn admin-btn-refresh" data-food-csv-template>Download Template</button>
+              <button type="button" class="btn admin-btn-refresh" data-food-csv-import-trigger>Import CSV</button>
+              <input type="file" accept=".csv,text/csv" data-food-csv-input hidden />
+            </div>
+          </div>
+
+          <div class="foodbank-settings-layout">
+            <article class="admin-overview-card">
+              <div class="admin-overview-card-head">
+                <h3>Add or Edit Food</h3>
+                <p>Maintain food nutrition data used by athlete tracking.</p>
+              </div>
+
+              <form class="profile-form profile-nutrition-food-admin-form" data-food-admin-form>
+                <input type="hidden" data-food-admin-id />
+
+                <div class="form-row profile-goals-form-row">
+                  <div class="form-group">
+                    <label for="food-admin-name">Food Name</label>
+                    <input id="food-admin-name" type="text" data-food-admin-name placeholder="e.g. Cottage Cheese" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="food-admin-brand">Brand (optional)</label>
+                    <input id="food-admin-brand" type="text" data-food-admin-brand placeholder="e.g. Good Culture" />
+                  </div>
+                </div>
+
+                <div class="form-row profile-goals-form-row">
+                  <div class="form-group">
+                    <label for="food-admin-calories">Calories / 100g</label>
+                    <input id="food-admin-calories" type="number" min="0" step="0.1" data-food-admin-calories required />
+                  </div>
+                  <div class="form-group">
+                    <label for="food-admin-protein">Protein / 100g</label>
+                    <input id="food-admin-protein" type="number" min="0" step="0.1" data-food-admin-protein required />
+                  </div>
+                </div>
+
+                <div class="form-row profile-goals-form-row">
+                  <div class="form-group">
+                    <label for="food-admin-carbs">Carbs / 100g</label>
+                    <input id="food-admin-carbs" type="number" min="0" step="0.1" data-food-admin-carbs required />
+                  </div>
+                  <div class="form-group">
+                    <label for="food-admin-fats">Fat / 100g</label>
+                    <input id="food-admin-fats" type="number" min="0" step="0.1" data-food-admin-fats required />
+                  </div>
+                </div>
+
+                <div class="form-row profile-goals-form-row">
+                  <div class="form-group">
+                    <label for="food-admin-fiber">Fiber / 100g</label>
+                    <input id="food-admin-fiber" type="number" min="0" step="0.1" data-food-admin-fiber />
+                  </div>
+                  <div class="form-group">
+                    <label for="food-admin-serving-label">Default Serving Label</label>
+                    <input id="food-admin-serving-label" type="text" data-food-admin-serving-label placeholder="e.g. 1 cup" />
+                  </div>
+                </div>
+
+                <div class="form-row profile-goals-form-row">
+                  <div class="form-group">
+                    <label for="food-admin-serving-grams">Default Serving Grams</label>
+                    <input id="food-admin-serving-grams" type="number" min="1" step="0.1" data-food-admin-serving-grams value="100" required />
+                  </div>
+                </div>
+
+                <div class="profile-form-actions">
+                  <button type="submit" class="btn profile-btn-save" data-food-admin-save>Save Food</button>
+                  <button type="button" class="btn profile-btn-cancel" data-food-admin-reset>Reset</button>
+                </div>
+              </form>
+            </article>
+
+            <article class="admin-overview-card">
+              <div class="admin-overview-card-head">
+                <h3>Serving Options</h3>
+                <p>Add and maintain serving sizes for the selected food.</p>
+              </div>
+
+              <div class="foodbank-serving-empty" data-food-serving-empty>
+                <p>Select a food from the list to manage servings.</p>
+              </div>
+
+              <div data-food-serving-manager hidden>
+                <p class="foodbank-serving-title" data-food-serving-title></p>
+
+                <form class="profile-form foodbank-serving-form" data-food-serving-form>
+                  <div class="form-row profile-goals-form-row">
+                    <div class="form-group">
+                      <label for="food-serving-name">Serving Name</label>
+                      <input id="food-serving-name" type="text" data-food-serving-name placeholder="e.g. 1 tbsp" required />
+                    </div>
+                    <div class="form-group">
+                      <label for="food-serving-grams">Grams</label>
+                      <input id="food-serving-grams" type="number" min="0.1" step="0.1" data-food-serving-grams required />
+                    </div>
+                  </div>
+
+                  <label class="coach-inbox-toggle" style="margin-bottom:0.6rem;">
+                    <input type="checkbox" data-food-serving-default />
+                    <span>Set as default serving</span>
+                  </label>
+
+                  <div class="profile-form-actions">
+                    <button type="submit" class="btn profile-btn-save">Add/Update Serving</button>
+                  </div>
+                </form>
+
+                <div class="foodbank-serving-list" data-food-serving-list>
+                  <p class="profile-loading">No servings yet.</p>
+                </div>
+              </div>
+            </article>
+
+            <article class="admin-overview-card foodbank-settings-list-card">
+              <div class="admin-overview-card-head">
+                <h3>Foodbank</h3>
+                <p>Click Edit to load a food, update it, or manage servings.</p>
+              </div>
+
+              <div class="profile-nutrition-admin-food-list" data-food-admin-list>
+                <p class="profile-loading">Loading food database...</p>
+              </div>
+            </article>
+          </div>
+
+          <p class="admin-status" role="status" aria-live="polite" data-food-admin-status></p>
+        </section>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

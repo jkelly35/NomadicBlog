@@ -97,6 +97,10 @@ create table if not exists public.nutrition_foods (
 create unique index if not exists nutrition_foods_name_brand_unique_idx
   on public.nutrition_foods (lower(name), lower(coalesce(brand, '')));
 
+create unique index if not exists nutrition_foods_source_food_id_unique_idx
+  on public.nutrition_foods (source, source_food_id)
+  where source is not null and source_food_id is not null;
+
 create table if not exists public.nutrition_food_servings (
   id uuid primary key default gen_random_uuid(),
   food_id uuid not null references public.nutrition_foods(id) on delete cascade,
@@ -110,6 +114,9 @@ create table if not exists public.nutrition_food_servings (
 
 create unique index if not exists nutrition_food_servings_food_label_unique_idx
   on public.nutrition_food_servings (food_id, lower(serving_name));
+
+create unique index if not exists nutrition_food_servings_food_name_unique_idx
+  on public.nutrition_food_servings (food_id, serving_name);
 
 create index if not exists nutrition_food_servings_food_idx
   on public.nutrition_food_servings (food_id, is_default desc, grams);

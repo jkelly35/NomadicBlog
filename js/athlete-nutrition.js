@@ -8,10 +8,13 @@
     user: null,
     viewUser: null,
     isCoachView: false,
+    pageMode: "log",
     viewedAthleteId: null,
     guardElement: null,
     contentElement: null,
     backLink: null,
+    goalsLink: null,
+    logLink: null,
     nutritionForm: null,
     nutritionResetButton: null,
     nutritionTargetsForm: null,
@@ -28,6 +31,24 @@
     foodPreview: null,
     foodAddButton: null,
     foodEntries: null,
+    foodAdminSection: null,
+    foodAdminForm: null,
+    foodAdminId: null,
+    foodAdminName: null,
+    foodAdminBrand: null,
+    foodAdminCalories: null,
+    foodAdminProtein: null,
+    foodAdminCarbs: null,
+    foodAdminFats: null,
+    foodAdminFiber: null,
+    foodAdminServingLabel: null,
+    foodAdminServingGrams: null,
+    foodAdminSearch: null,
+    foodAdminReset: null,
+    foodAdminList: null,
+    foodAdminStatus: null,
+    foodAdminRows: [],
+    foodAdminFilterTerm: "",
     foodCatalogRows: [],
     foodEntryRows: [],
     foodServings: [],
@@ -48,7 +69,12 @@
   function initializePage() {
     state.guardElement = document.querySelector("[data-nutrition-guard]");
     state.contentElement = document.querySelector("[data-nutrition-content]");
+    state.pageMode = String(
+      (state.contentElement && state.contentElement.getAttribute("data-nutrition-page-mode")) || "log"
+    ).toLowerCase() === "goals" ? "goals" : "log";
     state.backLink = document.querySelector("[data-nutrition-back-link]");
+    state.goalsLink = document.querySelector("[data-nutrition-goals-link]");
+    state.logLink = document.querySelector("[data-nutrition-log-link]");
     state.nutritionForm = document.querySelector("[data-nutrition-form]");
     state.nutritionResetButton = document.querySelector("[data-nutrition-reset]");
     state.nutritionTargetsForm = document.querySelector("[data-nutrition-targets-form]");
@@ -65,6 +91,22 @@
     state.foodPreview = document.querySelector("[data-food-preview]");
     state.foodAddButton = document.querySelector("[data-food-add-entry]");
     state.foodEntries = document.querySelector("[data-food-entries]");
+    state.foodAdminSection = document.querySelector("[data-food-admin-section]");
+    state.foodAdminForm = document.querySelector("[data-food-admin-form]");
+    state.foodAdminId = document.querySelector("[data-food-admin-id]");
+    state.foodAdminName = document.querySelector("[data-food-admin-name]");
+    state.foodAdminBrand = document.querySelector("[data-food-admin-brand]");
+    state.foodAdminCalories = document.querySelector("[data-food-admin-calories]");
+    state.foodAdminProtein = document.querySelector("[data-food-admin-protein]");
+    state.foodAdminCarbs = document.querySelector("[data-food-admin-carbs]");
+    state.foodAdminFats = document.querySelector("[data-food-admin-fats]");
+    state.foodAdminFiber = document.querySelector("[data-food-admin-fiber]");
+    state.foodAdminServingLabel = document.querySelector("[data-food-admin-serving-label]");
+    state.foodAdminServingGrams = document.querySelector("[data-food-admin-serving-grams]");
+    state.foodAdminSearch = document.querySelector("[data-food-admin-search]");
+    state.foodAdminReset = document.querySelector("[data-food-admin-reset]");
+    state.foodAdminList = document.querySelector("[data-food-admin-list]");
+    state.foodAdminStatus = document.querySelector("[data-food-admin-status]");
     state.nutritionLogSection = document.getElementById("nutrition-log-section");
     state.nutritionTargetsSection = document.getElementById("nutrition-targets-section");
 
@@ -161,6 +203,9 @@
   }
 
   function applyPageContext() {
+    var logHref = getPageHref("athlete-nutrition.html");
+    var goalsHref = getPageHref("athlete-nutrition-goals.html");
+
     if (state.backLink) {
       if (state.isCoachView && state.viewedAthleteId) {
         state.backLink.href = "profile.html?coachView=1&athleteId=" + encodeURIComponent(state.viewedAthleteId);
@@ -171,25 +216,70 @@
       }
     }
 
+    if (state.goalsLink) {
+      state.goalsLink.href = goalsHref;
+    }
+
+    if (state.logLink) {
+      state.logLink.href = logHref;
+    }
+
     var heading = document.querySelector(".section-heading");
     var subtitle = document.querySelector(".profile-dashboard-subtitle");
-    if (heading) {
-      heading.textContent = state.isCoachView ? "Coach Nutrition Goals" : "Nutrition Tracker";
+    if (state.pageMode === "goals") {
+      if (heading) {
+        heading.textContent = state.isCoachView ? "Coach Nutrition Goals" : "Nutrition Goals";
+      }
+
+      if (subtitle) {
+        subtitle.textContent = state.isCoachView
+          ? "Set nutritional targets for this athlete and review their current progress."
+          : "Set your nutrition targets for calories, macros, hydration, and fiber.";
+      }
+
+      if (state.nutritionLogSection) {
+        state.nutritionLogSection.hidden = true;
+      }
+
+      if (state.foodAdminSection) {
+        state.foodAdminSection.hidden = true;
+      }
+
+      if (state.nutritionTargetsSection) {
+        state.nutritionTargetsSection.hidden = false;
+        state.nutritionTargetsSection.classList.toggle("profile-section-wide", !!state.isCoachView);
+      }
+    } else {
+      if (heading) {
+        heading.textContent = state.isCoachView ? "Athlete Nutrition Log" : "Nutrition Tracker";
+      }
+
+      if (subtitle) {
+        subtitle.textContent = state.isCoachView
+          ? "Review nutrition logs and trends for this athlete."
+          : "Fast logging for food, hydration, and daily nutrition feedback.";
+      }
+
+      if (state.nutritionLogSection) {
+        state.nutritionLogSection.hidden = false;
+      }
+
+      if (state.foodAdminSection) {
+        state.foodAdminSection.hidden = !state.isCoachView;
+      }
+
+      if (state.nutritionTargetsSection) {
+        state.nutritionTargetsSection.hidden = true;
+      }
+    }
+  }
+
+  function getPageHref(basePath) {
+    if (state.isCoachView && state.viewedAthleteId) {
+      return basePath + "?athleteId=" + encodeURIComponent(state.viewedAthleteId) + "&coachView=1";
     }
 
-    if (subtitle) {
-      subtitle.textContent = state.isCoachView
-        ? "Set nutritional targets for this athlete and review their current progress."
-        : "Log food, hydration, and daily nutrition feedback in one place.";
-    }
-
-    if (state.nutritionLogSection) {
-      state.nutritionLogSection.hidden = !!state.isCoachView;
-    }
-
-    if (state.nutritionTargetsSection) {
-      state.nutritionTargetsSection.classList.toggle("profile-section-wide", !!state.isCoachView);
-    }
+    return basePath;
   }
 
   function bindEvents() {
@@ -283,6 +373,38 @@
         deleteFoodEntry(entryId, loggedOn);
       });
     }
+
+    if (state.foodAdminForm) {
+      state.foodAdminForm.addEventListener("submit", onFoodAdminSubmit);
+    }
+
+    if (state.foodAdminReset) {
+      state.foodAdminReset.addEventListener("click", function () {
+        resetFoodAdminForm(true);
+      });
+    }
+
+    if (state.foodAdminSearch) {
+      state.foodAdminSearch.addEventListener("input", function () {
+        state.foodAdminFilterTerm = String(state.foodAdminSearch.value || "").trim().toLowerCase();
+        renderFoodAdminList();
+      });
+    }
+
+    if (state.foodAdminList) {
+      state.foodAdminList.addEventListener("click", function (event) {
+        var editBtn = event.target && event.target.closest("[data-food-admin-edit]");
+        if (editBtn) {
+          onFoodAdminEdit(String(editBtn.getAttribute("data-food-admin-edit") || ""));
+          return;
+        }
+
+        var deleteBtn = event.target && event.target.closest("[data-food-admin-delete]");
+        if (deleteBtn) {
+          onFoodAdminDelete(String(deleteBtn.getAttribute("data-food-admin-delete") || ""));
+        }
+      });
+    }
   }
 
   function loadNutritionData() {
@@ -296,7 +418,12 @@
       state.foodDateInput.value = getTodayDateInputValue();
     }
 
-    Promise.all([loadNutritionTargets(), loadNutritionLogs(), loadFoodEntries()])
+    Promise.all([
+      loadNutritionTargets(),
+      loadNutritionLogs(),
+      loadFoodEntries(),
+      state.isCoachView ? loadFoodAdminCatalog() : Promise.resolve([])
+    ])
       .then(function () {
         renderNutritionDashboard();
         renderFoodSearchResults("");
@@ -380,6 +507,273 @@
     renderNutritionSummary();
     renderNutritionList();
     renderFoodEntries();
+    renderFoodAdminList();
+  }
+
+  function loadFoodAdminCatalog() {
+    if (!state.client || !state.isCoachView) {
+      state.foodAdminRows = [];
+      return Promise.resolve([]);
+    }
+
+    setFoodAdminStatus("Loading food database...", "info");
+
+    return state.client
+      .from("nutrition_foods")
+      .select("id,name,brand,source,source_food_id,default_serving_g,kcal_100g,protein_g_100g,carbs_g_100g,fats_g_100g,fiber_g_100g,is_verified,updated_at")
+      .order("is_verified", { ascending: false })
+      .order("name", { ascending: true })
+      .limit(500)
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingNutritionTableError(result.error)) {
+            state.foodAdminRows = [];
+            setFoodAdminStatus("Food database tables are not set up yet.", "error");
+            return [];
+          }
+          throw result.error;
+        }
+
+        state.foodAdminRows = (result.data || []).map(normalizeFood);
+        resetFoodAdminForm(false);
+        setFoodAdminStatus("", "info");
+        return state.foodAdminRows;
+      })
+      .catch(function (error) {
+        setFoodAdminStatus(error && error.message ? error.message : "Failed to load food database.", "error");
+        return [];
+      });
+  }
+
+  function renderFoodAdminList() {
+    if (!state.foodAdminList || !state.isCoachView) {
+      return;
+    }
+
+    var rows = Array.isArray(state.foodAdminRows) ? state.foodAdminRows : [];
+    var term = String(state.foodAdminFilterTerm || "").trim().toLowerCase();
+    if (term) {
+      rows = rows.filter(function (row) {
+        var haystack = (String(row.name || "") + " " + String(row.brand || "") + " " + String(row.source || "")).toLowerCase();
+        return haystack.indexOf(term) > -1;
+      });
+    }
+
+    if (!rows.length) {
+      state.foodAdminList.innerHTML = '<p class="profile-loading">No foods match this filter.</p>';
+      return;
+    }
+
+    state.foodAdminList.innerHTML = rows.slice(0, 150)
+      .map(function (food) {
+        var sourceLabel = food.source ? String(food.source) : "manual";
+        var brandLabel = food.brand ? " • " + food.brand : "";
+        return (
+          '<article class="profile-nutrition-admin-food-row">' +
+            '<div class="profile-nutrition-admin-food-head">' +
+              '<h4>' + escapeHtml(food.name + brandLabel) + '</h4>' +
+              '<div class="profile-nutrition-admin-food-actions">' +
+                '<button type="button" class="btn profile-btn-cancel" data-food-admin-edit="' + escapeAttribute(food.id) + '">Edit</button>' +
+                '<button type="button" class="btn profile-btn-delete" data-food-admin-delete="' + escapeAttribute(food.id) + '">Delete</button>' +
+              '</div>' +
+            '</div>' +
+            '<p class="profile-nutrition-admin-food-meta">' +
+              escapeHtml('Source: ' + sourceLabel + ' • ' + formatInteger(food.kcal_100g) + ' kcal • P ' + formatDecimal(food.protein_g_100g, 1) + 'g • C ' + formatDecimal(food.carbs_g_100g, 1) + 'g • F ' + formatDecimal(food.fats_g_100g, 1) + 'g • Fiber ' + formatDecimal(food.fiber_g_100g, 1) + 'g') +
+            '</p>' +
+          '</article>'
+        );
+      })
+      .join("");
+  }
+
+  function onFoodAdminSubmit(event) {
+    event.preventDefault();
+
+    if (!state.client || !state.isCoachView) {
+      return;
+    }
+
+    var name = String(state.foodAdminName && state.foodAdminName.value || "").trim();
+    if (!name) {
+      setFoodAdminStatus("Food name is required.", "error");
+      return;
+    }
+
+    var servingGrams = parseOptionalNumber(state.foodAdminServingGrams && state.foodAdminServingGrams.value, 0.1);
+    if (servingGrams == null) {
+      setFoodAdminStatus("Default serving grams must be greater than 0.", "error");
+      return;
+    }
+
+    var payload = {
+      name: name,
+      brand: String(state.foodAdminBrand && state.foodAdminBrand.value || "").trim() || null,
+      source: "coach",
+      source_food_id: null,
+      default_serving_g: servingGrams,
+      kcal_100g: parseOptionalNumber(state.foodAdminCalories && state.foodAdminCalories.value, 0) || 0,
+      protein_g_100g: parseOptionalNumber(state.foodAdminProtein && state.foodAdminProtein.value, 0) || 0,
+      carbs_g_100g: parseOptionalNumber(state.foodAdminCarbs && state.foodAdminCarbs.value, 0) || 0,
+      fats_g_100g: parseOptionalNumber(state.foodAdminFats && state.foodAdminFats.value, 0) || 0,
+      fiber_g_100g: parseOptionalNumber(state.foodAdminFiber && state.foodAdminFiber.value, 0) || 0,
+      is_verified: true
+    };
+
+    var foodId = String(state.foodAdminId && state.foodAdminId.value || "").trim();
+    setFoodAdminStatus(foodId ? "Updating food..." : "Adding food...", "info");
+
+    var operation = foodId
+      ? state.client.from("nutrition_foods").update(payload).eq("id", foodId).select("id").single()
+      : state.client.from("nutrition_foods").insert([payload]).select("id").single();
+
+    operation
+      .then(function (result) {
+        if (result.error || !result.data || !result.data.id) {
+          throw (result && result.error) || new Error("Could not save food.");
+        }
+
+        var servingName = String(state.foodAdminServingLabel && state.foodAdminServingLabel.value || "").trim() || "1 serving";
+        return ensureDefaultServingForFood(result.data.id, servingName, servingGrams);
+      })
+      .then(function () {
+        return loadFoodAdminCatalog();
+      })
+      .then(function () {
+        renderFoodSearchResults(state.foodSearchInput ? String(state.foodSearchInput.value || "") : "");
+        setFoodAdminStatus("Food database updated.", "success");
+      })
+      .catch(function (error) {
+        setFoodAdminStatus(error && error.message ? error.message : "Failed to save food.", "error");
+      });
+  }
+
+  function onFoodAdminEdit(foodId) {
+    var id = String(foodId || "").trim();
+    if (!id) {
+      return;
+    }
+
+    var food = (state.foodAdminRows || []).find(function (row) {
+      return String(row.id || "") === id;
+    });
+    if (!food) {
+      return;
+    }
+
+    if (state.foodAdminId) state.foodAdminId.value = food.id || "";
+    if (state.foodAdminName) state.foodAdminName.value = food.name || "";
+    if (state.foodAdminBrand) state.foodAdminBrand.value = food.brand || "";
+    if (state.foodAdminCalories) state.foodAdminCalories.value = String(food.kcal_100g || 0);
+    if (state.foodAdminProtein) state.foodAdminProtein.value = String(food.protein_g_100g || 0);
+    if (state.foodAdminCarbs) state.foodAdminCarbs.value = String(food.carbs_g_100g || 0);
+    if (state.foodAdminFats) state.foodAdminFats.value = String(food.fats_g_100g || 0);
+    if (state.foodAdminFiber) state.foodAdminFiber.value = String(food.fiber_g_100g || 0);
+    if (state.foodAdminServingGrams) state.foodAdminServingGrams.value = String(food.default_serving_g || 100);
+
+    if (!state.client) {
+      return;
+    }
+
+    state.client
+      .from("nutrition_food_servings")
+      .select("serving_name,grams,is_default")
+      .eq("food_id", id)
+      .order("is_default", { ascending: false })
+      .order("grams", { ascending: true })
+      .limit(1)
+      .then(function (result) {
+        if (result.error) {
+          return;
+        }
+        var serving = Array.isArray(result.data) && result.data.length ? result.data[0] : null;
+        if (serving) {
+          if (state.foodAdminServingLabel) state.foodAdminServingLabel.value = String(serving.serving_name || "");
+          if (state.foodAdminServingGrams) state.foodAdminServingGrams.value = String(parseOptionalNumber(serving.grams, 0.1) || food.default_serving_g || 100);
+        }
+      });
+
+    setFoodAdminStatus("Editing food: " + (food.name || ""), "info");
+  }
+
+  function onFoodAdminDelete(foodId) {
+    var id = String(foodId || "").trim();
+    if (!id || !state.client || !state.isCoachView) {
+      return;
+    }
+
+    if (!window.confirm("Delete this food from the database? Existing athlete entries using this food may block deletion.")) {
+      return;
+    }
+
+    setFoodAdminStatus("Deleting food...", "info");
+
+    state.client
+      .from("nutrition_foods")
+      .delete()
+      .eq("id", id)
+      .then(function (result) {
+        if (result.error) {
+          setFoodAdminStatus(result.error.message, "error");
+          return;
+        }
+
+        if (state.foodAdminId && String(state.foodAdminId.value || "") === id) {
+          resetFoodAdminForm(true);
+        }
+
+        return loadFoodAdminCatalog().then(function () {
+          renderFoodSearchResults(state.foodSearchInput ? String(state.foodSearchInput.value || "") : "");
+          setFoodAdminStatus("Food deleted.", "success");
+        });
+      })
+      .catch(function (error) {
+        setFoodAdminStatus(error && error.message ? error.message : "Failed to delete food.", "error");
+      });
+  }
+
+  function ensureDefaultServingForFood(foodId, servingName, grams) {
+    if (!state.client || !foodId) {
+      return Promise.resolve();
+    }
+
+    return state.client
+      .from("nutrition_food_servings")
+      .update({ is_default: false })
+      .eq("food_id", foodId)
+      .then(function () {
+        return state.client
+          .from("nutrition_food_servings")
+          .upsert([
+            {
+              food_id: foodId,
+              serving_name: servingName,
+              grams: grams,
+              is_default: true
+            }
+          ], { onConflict: "food_id,serving_name" });
+      })
+      .then(function (result) {
+        if (result && result.error) {
+          throw result.error;
+        }
+      });
+  }
+
+  function resetFoodAdminForm(clearStatus) {
+    if (state.foodAdminId) state.foodAdminId.value = "";
+    if (state.foodAdminName) state.foodAdminName.value = "";
+    if (state.foodAdminBrand) state.foodAdminBrand.value = "";
+    if (state.foodAdminCalories) state.foodAdminCalories.value = "";
+    if (state.foodAdminProtein) state.foodAdminProtein.value = "";
+    if (state.foodAdminCarbs) state.foodAdminCarbs.value = "";
+    if (state.foodAdminFats) state.foodAdminFats.value = "";
+    if (state.foodAdminFiber) state.foodAdminFiber.value = "";
+    if (state.foodAdminServingLabel) state.foodAdminServingLabel.value = "";
+    if (state.foodAdminServingGrams) state.foodAdminServingGrams.value = "100";
+
+    if (clearStatus) {
+      setFoodAdminStatus("", "info");
+    }
   }
 
   function renderNutritionTargetsForm() {
@@ -507,15 +901,15 @@
     state.nutritionList.innerHTML = visible
       .map(function (log) {
         var chips = [];
+        var mealName = extractMealNameFromNotes(log.notes);
+        var visibleNotes = extractVisibleNutritionNotes(log.notes);
         if (log.calories != null) chips.push("Calories " + formatInteger(log.calories));
         if (log.protein_g != null) chips.push("Protein " + formatInteger(log.protein_g) + "g");
         if (log.carbs_g != null) chips.push("Carbs " + formatInteger(log.carbs_g) + "g");
         if (log.fats_g != null) chips.push("Fat " + formatInteger(log.fats_g) + "g");
         if (log.fiber_g != null) chips.push("Fiber " + formatInteger(log.fiber_g) + "g");
         if (log.hydration_l != null) chips.push("Hydration " + formatDecimal(log.hydration_l, 1) + "L");
-        if (log.meal_quality != null) chips.push("Meal Quality " + formatInteger(log.meal_quality) + "/5");
-        if (log.energy_level != null) chips.push("Energy " + formatInteger(log.energy_level) + "/5");
-        if (log.hunger_level != null) chips.push("Hunger Control " + formatInteger(log.hunger_level) + "/5");
+        if (mealName) chips.unshift("Meal " + mealName);
 
         return (
           '<article class="profile-nutrition-log-item">' +
@@ -532,7 +926,7 @@
                 return '<span class="profile-nutrition-chip">' + escapeHtml(chip) + '</span>';
               }).join("") +
             '</div>' +
-            (log.notes ? '<p class="profile-nutrition-notes">' + escapeHtml(log.notes) + '</p>' : '') +
+            (visibleNotes ? '<p class="profile-nutrition-notes">' + escapeHtml(visibleNotes) + '</p>' : '') +
           '</article>'
         );
       })
@@ -656,6 +1050,43 @@
   }
 
   function searchFoods(searchTerm) {
+    if (!state.client) {
+      return Promise.resolve([]);
+    }
+
+    var term = String(searchTerm || "").trim();
+
+    // For typed searches, prefer edge function so we can merge USDA/Open Food Facts into local catalog.
+    if (term && state.client.functions && typeof state.client.functions.invoke === "function") {
+      return state.client.functions
+        .invoke("nutrition-food-search", {
+          body: {
+            query: term,
+            limit: 25
+          }
+        })
+        .then(function (result) {
+          if (!result || result.error) {
+            throw (result && result.error) || new Error("Food search function unavailable.");
+          }
+
+          var foods = result.data && Array.isArray(result.data.foods) ? result.data.foods : [];
+          if (foods.length) {
+            return foods.map(normalizeFood);
+          }
+
+          // Fall back to direct table query when the function returns no matches.
+          return searchFoodsLocally(term);
+        })
+        .catch(function () {
+          return searchFoodsLocally(term);
+        });
+    }
+
+    return searchFoodsLocally(term);
+  }
+
+  function searchFoodsLocally(searchTerm) {
     if (!state.client) {
       return Promise.resolve([]);
     }
@@ -997,6 +1428,8 @@
       id: String(row && row.id || ""),
       name: String(row && row.name || ""),
       brand: String(row && row.brand || "").trim(),
+      source: String(row && row.source || "").trim(),
+      source_food_id: String(row && row.source_food_id || "").trim(),
       default_serving_g: parseOptionalNumber(row && row.default_serving_g, 0) || 100,
       kcal_100g: parseOptionalNumber(row && row.kcal_100g, 0) || 0,
       protein_g_100g: parseOptionalNumber(row && row.protein_g_100g, 0) || 0,
@@ -1104,10 +1537,7 @@
       fats_g: formData.get("fats_g"),
       fiber_g: formData.get("fiber_g"),
       hydration_l: formData.get("hydration_l"),
-      meal_quality: formData.get("meal_quality"),
-      energy_level: formData.get("energy_level"),
-      hunger_level: formData.get("hunger_level"),
-      notes: formData.get("notes"),
+      notes: composeNutritionNotes(formData.get("meal_type"), formData.get("meal_name"), formData.get("notes")),
       updated_at: new Date().toISOString()
     });
 
@@ -1274,13 +1704,55 @@
       log.carbs_g,
       log.fats_g,
       log.fiber_g,
-      log.hydration_l,
-      log.meal_quality,
-      log.energy_level,
-      log.hunger_level
+      log.hydration_l
     ].some(function (value) {
       return value != null;
     }) || !!String(log.notes || "").trim();
+  }
+
+  function composeNutritionNotes(mealType, mealName, notes) {
+    var typeText = String(mealType || "").trim();
+    var meal = String(mealName || "").trim();
+    var body = String(notes || "").trim();
+    var label = "";
+
+    if (typeText && meal) {
+      label = typeText + " - " + meal;
+    } else {
+      label = typeText || meal;
+    }
+
+    if (!label) {
+      return body;
+    }
+
+    return body ? "[Meal] " + label + "\n" + body : "[Meal] " + label;
+  }
+
+  function extractMealNameFromNotes(notes) {
+    var text = String(notes || "").trim();
+    if (!text) {
+      return "";
+    }
+
+    var firstLine = text.split(/\r?\n/)[0] || "";
+    var match = firstLine.match(/^\[Meal\]\s*(.+)$/i);
+    return match ? String(match[1] || "").trim() : "";
+  }
+
+  function extractVisibleNutritionNotes(notes) {
+    var text = String(notes || "").trim();
+    if (!text) {
+      return "";
+    }
+
+    if (!/^\[Meal\]\s*/i.test(text)) {
+      return text;
+    }
+
+    var lines = text.split(/\r?\n/);
+    lines.shift();
+    return lines.join("\n").trim();
   }
 
   function averageNumeric(rows, key) {
@@ -1395,9 +1867,8 @@
       "fats_g",
       "fiber_g",
       "hydration_l",
-      "meal_quality",
-      "energy_level",
-      "hunger_level",
+      "meal_type",
+      "meal_name",
       "notes"
     ].forEach(function (name) {
       setInputValue(state.nutritionForm, name, "");
@@ -1483,6 +1954,27 @@
       state.nutritionStatus.classList.add("is-success");
     } else {
       state.nutritionStatus.classList.add("is-info");
+    }
+  }
+
+  function setFoodAdminStatus(message, variant) {
+    if (!state.foodAdminStatus) {
+      return;
+    }
+
+    state.foodAdminStatus.textContent = message || "";
+    state.foodAdminStatus.classList.remove("is-error", "is-success", "is-info");
+
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      state.foodAdminStatus.classList.add("is-error");
+    } else if (variant === "success") {
+      state.foodAdminStatus.classList.add("is-success");
+    } else {
+      state.foodAdminStatus.classList.add("is-info");
     }
   }
 

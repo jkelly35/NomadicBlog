@@ -2,6 +2,8 @@
 
 This folder contains Strava integration functions used by `profile.html` / `js/athlete-profile.js`.
 
+It also contains nutrition catalog enrichment used by `athlete-nutrition.html` / `js/athlete-nutrition.js`.
+
 ## Functions
 
 - `strava-connect-start`
@@ -18,6 +20,12 @@ This folder contains Strava integration functions used by `profile.html` / `js/a
 - `strava-disconnect`
   - Auth required
   - Deauthorizes token at Strava and deletes local Strava rows
+- `nutrition-food-search`
+  - Auth required
+  - Searches local `nutrition_foods`
+  - Pulls additional matches from USDA FoodData Central and Open Food Facts
+  - Normalizes and upserts rows into `nutrition_foods` + default serving in `nutrition_food_servings`
+  - Returns merged foods for typeahead search
 
 ## Required Secrets
 
@@ -33,6 +41,8 @@ Set these in Supabase project secrets:
 - `STRAVA_POST_CONNECT_REDIRECT` (optional, e.g. `https://nomadicperformance.com/profile.html`)
 - `STRAVA_OAUTH_SCOPES` (optional, default: `read,activity:read_all,profile:read_all`)
 - `STRAVA_OAUTH_PROMPT` (optional, default: `auto`)
+- `USDA_FOODDATA_API_KEY` (required for USDA import; function still works without it)
+- `OPENFOODFACTS_USER_AGENT` (optional but recommended, e.g. `NomadicPerformance/1.0 (support@nomadicperformance.com)`)
 
 ## Local Setup
 
@@ -51,6 +61,7 @@ supabase functions deploy strava-connect-start
 supabase functions deploy strava-connect-callback
 supabase functions deploy strava-sync-latest
 supabase functions deploy strava-disconnect
+supabase functions deploy nutrition-food-search
 ```
 
 ## SQL Setup
@@ -58,5 +69,6 @@ supabase functions deploy strava-disconnect
 Run:
 
 - `sql/create-strava-integration.sql`
+- `sql/create-athlete-nutrition-tracking-tables.sql`
 
 before using these functions.

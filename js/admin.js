@@ -150,12 +150,16 @@
     currentPage: 1,
     pageSize: 10,
     searchTerm: "",
+    riskFilter: "all",
     selectedCalendarDate: null,
     classEvents: [],
     activePrograms: [],
     athleteGoalEvents: [],
+    coachReadinessByAthlete: {},
     coachTodos: [],
-    coachFlags: []
+    coachFlags: [],
+    climbingComparisonRows: [],
+    athleteProfilesById: {}
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -271,6 +275,11 @@
     var flagsList = document.querySelector("[data-admin-flags-list]");
     if (flagsList) {
       flagsList.addEventListener("click", onCoachFlagsListClick);
+    }
+
+    var riskFilter = document.querySelector("[data-admin-risk-filter]");
+    if (riskFilter) {
+      riskFilter.addEventListener("click", onCoachRiskFilterClick);
     }
 
     var addAthleteBtn = document.querySelector("[data-admin-add-athlete]");
@@ -1247,6 +1256,7 @@
 
   function renderAthletesTable() {
     var tbody = document.querySelector("[data-admin-table-body]");
+    var resultsSummary = document.querySelector("[data-admin-results-summary]");
     if (!tbody) {
       return;
     }
@@ -1264,6 +1274,30 @@
     var end = start + state.pageSize;
     var paginated = filtered.slice(start, end);
 
+    if (resultsSummary) {
+      if (!filtered.length) {
+        resultsSummary.textContent = "No athletes match your search.";
+      } else {
+        var pageStart = start + 1;
+        var pageEnd = Math.min(end, filtered.length);
+        resultsSummary.textContent =
+          "Showing " +
+          String(pageStart) +
+          "-" +
+          String(pageEnd) +
+          " of " +
+          String(filtered.length) +
+          " athletes";
+      }
+    }
+
+    if (!paginated.length) {
+      tbody.innerHTML =
+        '<tr class="admin-table-loading"><td colspan="6" style="text-align: center; padding: 2rem;">No athletes found for this view.</td></tr>';
+      renderPagination(filtered.length);
+      return;
+    }
+
     tbody.innerHTML = paginated
       .map(function (athlete) {
         return (
@@ -1273,7 +1307,7 @@
           "<td>" + (athlete.sport ? escapeHtml(athlete.sport) : "—") + "</td>" +
           "<td>" + (athlete.level ? escapeHtml(athlete.level) : "—") + "</td>" +
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
-          "<td><div class='admin-program-item-actions'><a class='btn admin-btn-small' href='athlete-insight.html?athleteId=" +
+          "<td><div class='admin-table-actions'><a class='btn admin-btn-small' href='athlete-insight.html?athleteId=" +
           encodeURIComponent(athlete.user_id || "") +
           "' target='_blank'>Insights</a><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
           escapeAttribute(athlete.user_id || "") +
@@ -2595,6 +2629,9 @@
     if (!state.client) {
       state.activePrograms = [];
       state.athleteGoalEvents = [];
+      state.coachReadinessByAthlete = {};
+      state.climbingComparisonRows = [];
+      state.athleteProfilesById = {};
       renderCoachOverview();
       updateStats();
       return;
@@ -2614,10 +2651,49 @@
       .order("created_at", { ascending: false })
       .limit(500);
 
-    Promise.all([activeProgramsRequest, goalEventsRequest])
+    var nutritionTargetsRequest = state.client
+      .from("athlete_nutrition_targets")
+      .select("user_id,target_calories");
+
+    var nutritionLogsRequest = state.client
+      .from("athlete_nutrition_logs")
+      .select("user_id,logged_on,calories")
+      .order("logged_on", { ascending: false })
+      .limit(5000);
+
+    var stravaMetricsRequest = state.client
+      .from("athlete_strava_daily_metrics")
+      .select("user_id,metric_date,recovery_score")
+      .order("metric_date", { ascending: false })
+      .limit(5000);
+
+    var athleteMetricsRequest = state.client
+      .from("athlete_metrics")
+      .select("user_id,metric_name,metric_value,updated_at,created_at")
+      .order("updated_at", { ascending: false })
+      .limit(12000);
+
+    var athleteProfilesRequest = state.client
+      .from("athlete_profiles")
+      .select("user_id,name,sport,level,sports,sport_overview,height_cm,arm_span_cm");
+
+    Promise.all([
+      activeProgramsRequest,
+      goalEventsRequest,
+      nutritionTargetsRequest,
+      nutritionLogsRequest,
+      stravaMetricsRequest,
+      athleteMetricsRequest,
+      athleteProfilesRequest
+    ])
       .then(function (results) {
         var programsResult = results[0];
         var goalsResult = results[1];
+        var targetsResult = results[2];
+        var logsResult = results[3];
+        var stravaResult = results[4];
+        var metricsResult = results[5];
+        var profilesResult = results[6];
 
         if (programsResult && !programsResult.error) {
           state.activePrograms = programsResult.data || [];
@@ -2642,12 +2718,76 @@
           state.athleteGoalEvents = [];
         }
 
+        var nutritionTargets = [];
+        if (targetsResult && !targetsResult.error) {
+          nutritionTargets = Array.isArray(targetsResult.data) ? targetsResult.data : [];
+        }
+
+        var nutritionLogs = [];
+        if (logsResult && !logsResult.error) {
+          nutritionLogs = Array.isArray(logsResult.data) ? logsResult.data : [];
+        } else if (logsResult && logsResult.error && !isMissingTableError(logsResult.error)) {
+          console.warn("Nutrition logs load failed:", logsResult.error);
+        }
+
+        var stravaRows = [];
+        if (stravaResult && !stravaResult.error) {
+          stravaRows = Array.isArray(stravaResult.data) ? stravaResult.data : [];
+        } else if (stravaResult && stravaResult.error && !isMissingTableError(stravaResult.error)) {
+          console.warn("Strava metrics load failed:", stravaResult.error);
+        }
+
+        var athleteMetrics = [];
+        if (metricsResult && !metricsResult.error) {
+          athleteMetrics = Array.isArray(metricsResult.data) ? metricsResult.data : [];
+        } else if (metricsResult && metricsResult.error && !isMissingTableError(metricsResult.error)) {
+          console.warn("Athlete metrics load failed:", metricsResult.error);
+        }
+
+        var athleteProfilesById = {};
+        if (profilesResult && !profilesResult.error) {
+          (profilesResult.data || []).forEach(function (profile) {
+            var userId = String(profile && profile.user_id || "").trim();
+            if (!userId) {
+              return;
+            }
+
+            athleteProfilesById[userId] = {
+              user_id: userId,
+              name: profile && profile.name ? String(profile.name) : "",
+              sport: profile && profile.sport ? String(profile.sport) : "",
+              level: profile && profile.level ? String(profile.level) : "",
+              sports: Array.isArray(profile && profile.sports) ? profile.sports.slice() : [],
+              sport_overview: profile && profile.sport_overview ? profile.sport_overview : null,
+              height_cm: profile && profile.height_cm != null ? profile.height_cm : null,
+              arm_span_cm: profile && profile.arm_span_cm != null ? profile.arm_span_cm : null
+            };
+          });
+        } else if (profilesResult && profilesResult.error && !isMissingTableError(profilesResult.error)) {
+          console.warn("Athlete profiles load failed:", profilesResult.error);
+        }
+
+        state.athleteProfilesById = athleteProfilesById;
+
+        state.coachReadinessByAthlete = buildCoachReadinessByAthlete(
+          state.athletes,
+          state.activePrograms,
+          state.athleteGoalEvents,
+          nutritionTargets,
+          nutritionLogs,
+          stravaRows
+        );
+        state.climbingComparisonRows = buildClimbingComparisonRows(state.athletes, athleteMetrics, athleteProfilesById);
+
         renderCoachOverview();
         updateStats();
       })
       .catch(function () {
         state.activePrograms = [];
         state.athleteGoalEvents = [];
+        state.coachReadinessByAthlete = {};
+        state.climbingComparisonRows = [];
+        state.athleteProfilesById = {};
         renderCoachOverview();
         updateStats();
       });
@@ -2659,6 +2799,8 @@
     renderUpcomingTimeline();
     renderCoachTodoList();
     renderCoachFlagsList();
+    renderCoachRiskBoard();
+    renderClimbingComparison();
   }
 
   function readInPersonClasses() {
@@ -2819,7 +2961,12 @@
     var html = '<div class="admin-overview-item"><p class="admin-overview-item-title">' + escapeHtml(selectedLabel) + '</p><p class="admin-overview-item-meta">Class and training workload for this day.</p></div>';
 
     if (!dayEvents.length) {
-      html += '<div class="admin-overview-item"><p class="admin-overview-item-title">No classes scheduled</p><p class="admin-overview-item-meta">Use In-Person Classes to plan sessions.</p></div>';
+      html +=
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No classes scheduled</p>' +
+          '<p class="admin-empty-state-copy">Use In-Person Classes to plan sessions for this day.</p>' +
+          '<a class="btn admin-btn-refresh" href="in-person-classes.html">Plan Classes</a>' +
+        '</div>';
     } else {
       dayEvents.forEach(function (eventItem) {
         html +=
@@ -2867,25 +3014,17 @@
       athleteById[String(athlete.user_id || "")] = athlete;
     });
 
-    var recentAssignments = state.activePrograms.slice(0, 6).map(function (assignment) {
-      var athlete = athleteById[String(assignment.user_id || "")];
-      var athleteName = athlete && (athlete.name || athlete.email) ? (athlete.name || athlete.email) : "Athlete";
-      var assignedAt = assignment.assigned_at ? formatDate(assignment.assigned_at) : "recently";
-      return {
-        kind: "program",
-        sortKey: String(assignment.assigned_at || ""),
-        title: String(assignment.program_name || "Program") + " assigned",
-        subtitle: athleteName + " • " + assignedAt
-      };
-    });
-
     var upcomingGoals = state.athleteGoalEvents
       .filter(function (goalItem) {
         var status = String(goalItem.status || "active").toLowerCase();
         if (status === "completed" || status === "archived") {
           return false;
         }
-        return !!goalItem.target_date && goalItem.target_date >= todayKey;
+        if (!goalItem.target_date || goalItem.target_date < todayKey) {
+          return false;
+        }
+
+        return isTimelineGoalEvent(goalItem);
       })
       .slice(0, 8)
       .map(function (goalItem) {
@@ -2906,7 +3045,7 @@
         return {
           kind: "goal",
           sortKey: String(goalItem.target_date || ""),
-          title: goalItem.title,
+          title: String(goalItem.title || "Upcoming Event"),
           subtitle: [
             athleteName,
             getGoalTypeLabel(goalItem.goal_type),
@@ -2916,13 +3055,23 @@
         };
       });
 
-    var items = upcomingClasses.concat(upcomingGoals, recentAssignments);
+    var upcomingBirthdays = buildUpcomingBirthdayTimelineItems(state.athletes, todayKey, 45, 8);
+
+    var items = upcomingClasses.concat(upcomingGoals, upcomingBirthdays);
     items.sort(function (a, b) {
       return String(a.sortKey || "").localeCompare(String(b.sortKey || ""));
     });
 
     if (!items.length) {
-      container.innerHTML = '<p class="admin-loading">No upcoming items yet.</p>';
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No upcoming timeline items</p>' +
+          '<p class="admin-empty-state-copy">Add athlete events or schedule classes to populate this timeline.</p>' +
+          '<div class="admin-empty-state-actions">' +
+            '<a class="btn admin-btn-refresh" href="in-person-classes.html">Schedule Classes</a>' +
+            '<a class="btn admin-btn-refresh" href="athlete-goals.html">Manage Events</a>' +
+          '</div>' +
+        '</div>';
       return;
     }
 
@@ -2932,6 +3081,158 @@
         return '<div class="admin-overview-item"><p class="admin-overview-item-title">' + escapeHtml(item.title) + '</p><p class="admin-overview-item-meta">' + escapeHtml(item.subtitle) + '</p></div>';
       })
       .join("");
+  }
+
+  function isTimelineGoalEvent(goalItem) {
+    var goalType = String(goalItem && goalItem.goal_type || "").toLowerCase();
+    if (goalType === "race" || goalType === "event" || goalType === "trip") {
+      return true;
+    }
+
+    var title = String(goalItem && goalItem.title || "").toLowerCase();
+    return /race|event|competition|meet|marathon|ultra|triathlon/.test(title);
+  }
+
+  function buildUpcomingBirthdayTimelineItems(athletes, todayKey, daysAhead, maxItems) {
+    var source = Array.isArray(athletes) ? athletes : [];
+    var horizon = Number(daysAhead) > 0 ? Number(daysAhead) : 45;
+    var limit = Number(maxItems) > 0 ? Number(maxItems) : 8;
+    var items = [];
+
+    source.forEach(function (athlete) {
+      var dobText = getAthleteDobValue(athlete);
+      if (!dobText) {
+        return;
+      }
+
+      var nextBirthday = getNextBirthdayDateKey(dobText, todayKey);
+      if (!nextBirthday) {
+        return;
+      }
+
+      var daysUntil = getDaysUntilDateKey(nextBirthday);
+      if (typeof daysUntil !== "number" || daysUntil < 0 || daysUntil > horizon) {
+        return;
+      }
+
+      var athleteName = String(athlete && (athlete.name || athlete.email) || "Athlete");
+      var birthdayLabel = daysUntil === 0 ? "Today" : daysUntil === 1 ? "Tomorrow" : daysUntil + " days";
+
+      items.push({
+        kind: "birthday",
+        sortKey: nextBirthday + " 00:00",
+        title: athleteName + " birthday",
+        subtitle: [nextBirthday, birthdayLabel].join(" • ")
+      });
+    });
+
+    items.sort(function (a, b) {
+      return String(a.sortKey || "").localeCompare(String(b.sortKey || ""));
+    });
+
+    return items.slice(0, limit);
+  }
+
+  function getAthleteDobValue(athlete) {
+    if (!athlete || typeof athlete !== "object") {
+      return "";
+    }
+
+    var directValue =
+      athlete.dob ||
+      athlete.date_of_birth ||
+      athlete.birth_date ||
+      athlete.birthday;
+
+    var normalizedDirect = normalizeDobValue(directValue);
+    if (normalizedDirect) {
+      return normalizedDirect;
+    }
+
+    var possibleProfileObjects = [
+      athlete.profile,
+      athlete.profile_data,
+      athlete.profile_json,
+      athlete.general_profile,
+      athlete.general
+    ];
+
+    for (var i = 0; i < possibleProfileObjects.length; i++) {
+      var parsed = parseAthleteProfileObject(possibleProfileObjects[i]);
+      if (!parsed) {
+        continue;
+      }
+
+      var nestedValue =
+        parsed.dob ||
+        parsed.date_of_birth ||
+        parsed.birth_date ||
+        parsed.birthday;
+
+      var normalizedNested = normalizeDobValue(nestedValue);
+      if (normalizedNested) {
+        return normalizedNested;
+      }
+    }
+
+    return "";
+  }
+
+  function parseAthleteProfileObject(value) {
+    if (!value) {
+      return null;
+    }
+
+    if (typeof value === "object") {
+      return value;
+    }
+
+    if (typeof value !== "string") {
+      return null;
+    }
+
+    try {
+      var parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function normalizeDobValue(value) {
+    var text = String(value || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      return "";
+    }
+
+    var parsed = parseDateOnly(text);
+    return parsed ? text : "";
+  }
+
+  function getNextBirthdayDateKey(dobText, todayKey) {
+    var dob = normalizeDobValue(dobText);
+    if (!dob) {
+      return "";
+    }
+
+    var birthDate = parseDateOnly(dob);
+    if (!birthDate) {
+      return "";
+    }
+
+    var todayDate = parseDateOnly(todayKey);
+    if (!todayDate) {
+      return "";
+    }
+
+    var nextBirthday = new Date(todayDate.getTime());
+    nextBirthday.setMonth(birthDate.getMonth(), birthDate.getDate());
+
+    if (formatDateKey(nextBirthday) < todayKey) {
+      nextBirthday.setFullYear(nextBirthday.getFullYear() + 1);
+    }
+
+    return formatDateKey(nextBirthday);
   }
 
   function onAddCoachTodo(event) {
@@ -3001,7 +3302,11 @@
     }
 
     if (!state.coachTodos.length) {
-      container.innerHTML = '<p class="admin-loading">No tasks yet.</p>';
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No coach tasks yet</p>' +
+          '<p class="admin-empty-state-copy">Capture top priorities so nothing slips through during the week.</p>' +
+        '</div>';
       return;
     }
 
@@ -3067,7 +3372,11 @@
 
     var flags = getOpenFlags();
     if (!flags.length) {
-      container.innerHTML = '<p class="admin-loading">No flags yet.</p>';
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No active flags</p>' +
+          '<p class="admin-empty-state-copy">You are clear right now. Add manual flags for athletes who need attention.</p>' +
+        '</div>';
       return;
     }
 
@@ -3090,6 +3399,842 @@
       .join("");
   }
 
+  function renderCoachRiskBoard() {
+    var container = document.querySelector("[data-admin-risk-board]");
+    var filterWrap = document.querySelector("[data-admin-risk-filter]");
+    if (!container) {
+      return;
+    }
+
+    var rows = buildAthleteRiskRows();
+    if (!rows.length) {
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No athletes to score yet</p>' +
+          '<p class="admin-empty-state-copy">Add athlete accounts to start prioritizing coaching interventions.</p>' +
+        '</div>';
+      return;
+    }
+
+    if (filterWrap) {
+      var activeFilter = String(state.riskFilter || "all");
+      Array.prototype.slice.call(filterWrap.querySelectorAll("[data-risk-filter]"))
+        .forEach(function (button) {
+          var value = String(button.getAttribute("data-risk-filter") || "all");
+          button.classList.toggle("is-active", value === activeFilter);
+        });
+    }
+
+    var filteredRows = rows;
+    if (state.riskFilter === "urgent" || state.riskFilter === "watch" || state.riskFilter === "stable") {
+      filteredRows = rows.filter(function (row) {
+        return row.band === state.riskFilter;
+      });
+    }
+
+    var highRisk = rows.filter(function (row) {
+      return row.band === "urgent";
+    }).length;
+    var watchRisk = rows.filter(function (row) {
+      return row.band === "watch";
+    }).length;
+
+    var summary =
+      '<div class="admin-overview-item admin-risk-summary">' +
+        '<p class="admin-overview-item-title">Risk Snapshot</p>' +
+        '<p class="admin-overview-item-meta">Urgent: ' + escapeHtml(String(highRisk)) + ' • Watch: ' + escapeHtml(String(watchRisk)) + ' • Stable: ' + escapeHtml(String(Math.max(0, rows.length - highRisk - watchRisk))) + '</p>' +
+      '</div>';
+
+    if (!filteredRows.length) {
+      container.innerHTML = summary +
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No athletes in this filter</p>' +
+          '<p class="admin-empty-state-copy">Try another risk band or clear filters to view all athletes.</p>' +
+        '</div>';
+      return;
+    }
+
+    var listHtml = filteredRows.slice(0, 10).map(function (row) {
+      var insightsHref = "athlete-insight.html?athleteId=" + encodeURIComponent(row.user_id || "");
+      var primaryHref = row.primary_action_href || insightsHref;
+      var primaryLabel = row.primary_action_label || "View Insights";
+
+      return (
+        '<div class="admin-overview-item admin-risk-row">' +
+          '<div class="admin-risk-row-head">' +
+            '<p class="admin-overview-item-title">' + escapeHtml(row.name || "Athlete") + '</p>' +
+            '<div class="admin-risk-pill-group">' +
+              '<span class="admin-risk-readiness is-' + escapeAttribute(row.readiness_tone || "unknown") + '">Readiness ' + escapeHtml(String(row.readiness_score_label || "--")) + '</span>' +
+              '<span class="admin-risk-band is-' + escapeAttribute(row.band) + '">' + escapeHtml(row.band_label) + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<p class="admin-overview-item-meta">' + escapeHtml(row.reasons.join(" | ")) + '</p>' +
+          '<div class="admin-risk-actions">' +
+            '<a class="btn admin-btn-small" href="' + escapeAttribute(primaryHref) + '">' + escapeHtml(primaryLabel) + '</a>' +
+            '<a class="btn admin-btn-small" href="' + escapeAttribute(insightsHref) + '">Insights</a>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join("");
+
+    container.innerHTML = summary + listHtml;
+  }
+
+  function renderClimbingComparison() {
+    var container = document.querySelector("[data-admin-climbing-comparison]");
+    if (!container) {
+      return;
+    }
+
+    var rows = Array.isArray(state.climbingComparisonRows) ? state.climbingComparisonRows.slice() : [];
+    if (!rows.length) {
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No climbing athlete data yet</p>' +
+          '<p class="admin-empty-state-copy">Add climbers and record assessment metrics to unlock level comparison.</p>' +
+        '</div>';
+      return;
+    }
+
+    var strongMismatch = rows.filter(function (row) { return row.status === "assessment-below"; }).length;
+    var underreported = rows.filter(function (row) { return row.status === "assessment-above"; }).length;
+    var aligned = rows.filter(function (row) { return row.status === "aligned"; }).length;
+
+    var summary =
+      '<div class="admin-overview-item admin-climb-summary">' +
+        '<p class="admin-overview-item-title">Comparison Snapshot</p>' +
+        '<p class="admin-overview-item-meta">Aligned: ' + escapeHtml(String(aligned)) + ' • Assessment below profile: ' + escapeHtml(String(strongMismatch)) + ' • Assessment above profile: ' + escapeHtml(String(underreported)) + '</p>' +
+      '</div>';
+
+    var listHtml = rows.slice(0, 10).map(function (row) {
+      var toneClass = row.status === "assessment-below"
+        ? "is-warning"
+        : (row.status === "assessment-above" ? "is-info" : "is-ok");
+      var insightHref = "athlete-insight.html?athleteId=" + encodeURIComponent(row.user_id || "");
+
+      return (
+        '<div class="admin-overview-item admin-climb-row">' +
+          '<div class="admin-climb-row-head">' +
+            '<p class="admin-overview-item-title">' + escapeHtml(row.name || "Athlete") + '</p>' +
+            '<span class="admin-climb-status ' + toneClass + '">' + escapeHtml(row.status_label) + '</span>' +
+          '</div>' +
+          '<p class="admin-overview-item-meta">Self-report: ' + escapeHtml(row.self_grade_label) + ' • Assessment: ' + escapeHtml(row.assessment_label) + ' • Signal: ' + escapeHtml(row.signal_label) + '</p>' +
+          '<div class="admin-risk-actions">' +
+            '<a class="btn admin-btn-small" href="' + escapeAttribute(insightHref) + '">Insights</a>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join("");
+
+    container.innerHTML = summary + listHtml;
+  }
+
+  function buildClimbingComparisonRows(athletes, metricRows, athleteProfilesById) {
+    var athleteList = Array.isArray(athletes) ? athletes : [];
+    var profilesById = athleteProfilesById && typeof athleteProfilesById === "object"
+      ? athleteProfilesById
+      : {};
+    var metricsByAthlete = buildLatestMetricsByAthlete(metricRows);
+
+    return athleteList
+      .map(function (athlete) {
+        var athleteId = String(athlete && athlete.user_id || "").trim();
+        var profile = profilesById[athleteId] || {};
+        var mergedAthlete = mergeAthleteAccountData(athlete, profile);
+
+        if (!isClimbingAthlete(mergedAthlete)) {
+          return null;
+        }
+
+        var athleteName = String(mergedAthlete && (mergedAthlete.name || mergedAthlete.email) || "Athlete");
+        var selfGradeText = resolveSelfReportedClimbingGrade(mergedAthlete);
+        var selfBand = classifyClimbingGradeBand(selfGradeText);
+        var assessment = estimateClimbingAssessmentBand(mergedAthlete, metricsByAthlete[athleteId] || {});
+
+        if (!selfBand && !assessment.band) {
+          return null;
+        }
+
+        var status = "aligned";
+        var statusLabel = "Aligned";
+
+        if (selfBand && assessment.band) {
+          if (assessment.band > selfBand) {
+            status = "assessment-above";
+            statusLabel = "Assessment above profile";
+          } else if (assessment.band < selfBand) {
+            status = "assessment-below";
+            statusLabel = "Assessment below profile";
+          }
+        } else {
+          status = "aligned";
+          statusLabel = "Partial data";
+        }
+
+        return {
+          user_id: athleteId,
+          name: athleteName,
+          self_grade_label: selfGradeText || "Not set",
+          assessment_label: assessment.band_label || "Insufficient test data",
+          signal_label: assessment.signal_label || "No usable climbing test metrics",
+          status: status,
+          status_label: statusLabel,
+          sort_score: selfBand && assessment.band ? Math.abs(assessment.band - selfBand) : 0
+        };
+      })
+      .filter(function (row) {
+        return !!row;
+      })
+      .sort(function (a, b) {
+        if (b.sort_score !== a.sort_score) {
+          return b.sort_score - a.sort_score;
+        }
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      });
+  }
+
+  function mergeAthleteAccountData(baseAthlete, profileAthlete) {
+    var base = baseAthlete && typeof baseAthlete === "object" ? baseAthlete : {};
+    var profile = profileAthlete && typeof profileAthlete === "object" ? profileAthlete : {};
+
+    return {
+      user_id: String(base.user_id || profile.user_id || "").trim(),
+      email: String(base.email || profile.email || "").trim(),
+      name: String(profile.name || base.name || "").trim(),
+      sport: String(profile.sport || base.sport || "").trim(),
+      level: String(profile.level || base.level || "").trim(),
+      sports: Array.isArray(profile.sports)
+        ? profile.sports.slice()
+        : (Array.isArray(base.sports) ? base.sports.slice() : base.sports),
+      sport_overview: profile.sport_overview != null ? profile.sport_overview : base.sport_overview,
+      height_cm: profile.height_cm != null ? profile.height_cm : base.height_cm,
+      arm_span_cm: profile.arm_span_cm != null ? profile.arm_span_cm : base.arm_span_cm
+    };
+  }
+
+  function buildLatestMetricsByAthlete(metricRows) {
+    var source = Array.isArray(metricRows) ? metricRows : [];
+    var output = {};
+
+    source.forEach(function (row) {
+      var userId = String(row && row.user_id || "").trim();
+      var metricName = normalizeMetricName(row && row.metric_name);
+      var metricValue = parseMetricNumericValue(row && row.metric_value);
+      var updatedAt = String((row && (row.updated_at || row.created_at)) || "");
+
+      if (!userId || !metricName || metricValue == null || !updatedAt) {
+        return;
+      }
+
+      if (!output[userId]) {
+        output[userId] = {};
+      }
+
+      var existing = output[userId][metricName];
+      if (!existing || updatedAt > existing.updated_at) {
+        output[userId][metricName] = {
+          value: metricValue,
+          updated_at: updatedAt
+        };
+      }
+    });
+
+    return output;
+  }
+
+  function normalizeMetricName(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\u2013\u2014]/g, "-")
+      .replace(/\s+/g, " ");
+  }
+
+  function parseMetricNumericValue(value) {
+    if (value == null) {
+      return null;
+    }
+
+    var text = String(value).trim();
+    if (!text) {
+      return null;
+    }
+
+    var parsed = parseFloat(text.replace(/,/g, ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function isClimbingAthlete(athlete) {
+    if (!athlete || typeof athlete !== "object") {
+      return false;
+    }
+
+    var sportText = String(athlete.sport || "").toLowerCase();
+    if (sportText.indexOf("climb") > -1 || sportText.indexOf("boulder") > -1) {
+      return true;
+    }
+
+    var sports = athlete.sports;
+    if (Array.isArray(sports)) {
+      if (sports.some(function (sport) {
+        var text = String(sport || "").toLowerCase();
+        return text.indexOf("climb") > -1 || text.indexOf("boulder") > -1;
+      })) {
+        return true;
+      }
+    } else if (typeof sports === "string") {
+      var sportsText = sports.toLowerCase();
+      if (sportsText.indexOf("climb") > -1 || sportsText.indexOf("boulder") > -1) {
+        return true;
+      }
+    }
+
+    var climbingOverview = getClimbingOverviewObject(athlete);
+    return !!climbingOverview;
+  }
+
+  function getClimbingOverviewObject(athlete) {
+    var raw = athlete && (athlete.sport_overview || athlete.profile_overview || athlete.overview);
+    var parsed = parseAthleteProfileObject(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    if (parsed.climbing && typeof parsed.climbing === "object") {
+      return parsed.climbing;
+    }
+
+    if (
+      parsed.climbing_grade ||
+      parsed.goal_grade ||
+      parsed.climbing_type ||
+      parsed.climbing_focus ||
+      parsed.arm_span
+    ) {
+      return parsed;
+    }
+
+    return null;
+  }
+
+  function resolveSelfReportedClimbingGrade(athlete) {
+    var climbingOverview = getClimbingOverviewObject(athlete);
+    var gradeCandidates = [
+      climbingOverview && climbingOverview.climbing_grade,
+      climbingOverview && climbingOverview.goal_grade,
+      climbingOverview && climbingOverview.climbing_goal_grade,
+      athlete && athlete.level
+    ];
+
+    for (var i = 0; i < gradeCandidates.length; i++) {
+      var text = String(gradeCandidates[i] || "").trim();
+      if (text) {
+        return text;
+      }
+    }
+
+    return "";
+  }
+
+  function classifyClimbingGradeBand(gradeText) {
+    var text = String(gradeText || "").trim();
+    if (!text) {
+      return null;
+    }
+
+    var upper = text.toUpperCase();
+    var boulderMatch = upper.match(/V\s*(\d{1,2})/);
+    if (boulderMatch) {
+      var vGrade = parseInt(boulderMatch[1], 10);
+      if (vGrade <= 3) {
+        return 1;
+      }
+      if (vGrade <= 6) {
+        return 2;
+      }
+      return 3;
+    }
+
+    var sportMatch = text.match(/5\.(\d{2})/);
+    if (sportMatch) {
+      var yds = parseInt(sportMatch[1], 10);
+      if (yds <= 10) {
+        return 1;
+      }
+      if (yds <= 12) {
+        return 2;
+      }
+      return 3;
+    }
+
+    var lower = text.toLowerCase();
+    if (lower.indexOf("beginner") > -1 || lower.indexOf("novice") > -1) {
+      return 1;
+    }
+    if (lower.indexOf("intermediate") > -1) {
+      return 2;
+    }
+    if (lower.indexOf("advanced") > -1 || lower.indexOf("expert") > -1) {
+      return 3;
+    }
+
+    return null;
+  }
+
+  function estimateClimbingAssessmentBand(athlete, metricsByName) {
+    var metrics = metricsByName || {};
+    var score = 0;
+    var signalParts = [];
+
+    var apeIndex = resolveApeIndexSignal(athlete, metrics);
+    if (apeIndex != null) {
+      signalParts.push("Ape Index " + formatMetricSigned(apeIndex));
+      if (apeIndex >= 8) {
+        score += 2;
+      } else if (apeIndex >= 3) {
+        score += 1;
+      }
+    }
+
+    var pullUps = readMetricValue(metrics, ["pull-up max", "pull up max", "pullups", "pull ups"]);
+    if (pullUps != null) {
+      signalParts.push("Pull-up max " + formatMetricSigned(pullUps, false));
+      if (pullUps >= 12) {
+        score += 2;
+      } else if (pullUps >= 8) {
+        score += 1;
+      }
+    }
+
+    var gripStrength = readMetricValue(metrics, ["grip strength"]);
+    if (gripStrength != null) {
+      signalParts.push("Grip " + formatMetricSigned(gripStrength, false));
+      if (gripStrength >= 45) {
+        score += 2;
+      } else if (gripStrength >= 35) {
+        score += 1;
+      }
+    }
+
+    var hangTime = readMetricValue(metrics, ["edge hang", "dead hang", "hangboard hang"]);
+    if (hangTime != null) {
+      signalParts.push("Hang " + formatMetricSigned(hangTime, false));
+      if (hangTime >= 20) {
+        score += 2;
+      } else if (hangTime >= 10) {
+        score += 1;
+      }
+    }
+
+    if (!signalParts.length) {
+      return {
+        band: null,
+        band_label: "",
+        signal_label: ""
+      };
+    }
+
+    var band = 1;
+    var bandLabel = "Beginner range";
+    if (score >= 5) {
+      band = 3;
+      bandLabel = "Advanced signal";
+    } else if (score >= 2) {
+      band = 2;
+      bandLabel = "Intermediate signal";
+    }
+
+    return {
+      band: band,
+      band_label: bandLabel,
+      signal_label: signalParts.slice(0, 2).join(" • ")
+    };
+  }
+
+  function resolveApeIndexSignal(athlete, metrics) {
+    var metricApe = readMetricValue(metrics, ["ape index"]);
+    if (metricApe != null) {
+      return metricApe;
+    }
+
+    var climbingOverview = getClimbingOverviewObject(athlete);
+    var armSpan = parseFloat((climbingOverview && climbingOverview.arm_span) || athlete.arm_span_cm || "");
+    var height = parseFloat(athlete.height_cm || "");
+
+    if (Number.isFinite(armSpan) && Number.isFinite(height) && height > 0) {
+      return Math.round((armSpan - height) * 10) / 10;
+    }
+
+    return null;
+  }
+
+  function readMetricValue(metrics, metricNames) {
+    var names = Array.isArray(metricNames) ? metricNames : [];
+    for (var i = 0; i < names.length; i++) {
+      var key = normalizeMetricName(names[i]);
+      if (metrics[key] && Number.isFinite(metrics[key].value)) {
+        return metrics[key].value;
+      }
+    }
+    return null;
+  }
+
+  function formatMetricSigned(value, withPlus) {
+    var numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return "--";
+    }
+
+    var text = formatMetricNumber(numeric);
+    if (withPlus !== false && numeric > 0) {
+      return "+" + text;
+    }
+
+    return text;
+  }
+
+  function formatMetricNumber(value) {
+    var numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return "--";
+    }
+
+    if (Math.abs(numeric % 1) < 0.0001) {
+      return String(Math.round(numeric));
+    }
+
+    return String(Math.round(numeric * 10) / 10);
+  }
+
+  function onCoachRiskFilterClick(event) {
+    var button = event.target && event.target.closest("[data-risk-filter]");
+    if (!button) {
+      return;
+    }
+
+    var filterValue = String(button.getAttribute("data-risk-filter") || "all").toLowerCase();
+    if (filterValue !== "all" && filterValue !== "urgent" && filterValue !== "watch" && filterValue !== "stable") {
+      return;
+    }
+
+    state.riskFilter = filterValue;
+    renderCoachRiskBoard();
+  }
+
+  function buildAthleteRiskRows() {
+    var athletes = Array.isArray(state.athletes) ? state.athletes : [];
+    var activePrograms = Array.isArray(state.activePrograms) ? state.activePrograms : [];
+    var goals = Array.isArray(state.athleteGoalEvents) ? state.athleteGoalEvents : [];
+    var todayKey = formatDateKey(new Date());
+    var nowMs = Date.now();
+    var msPerDay = 1000 * 60 * 60 * 24;
+
+    var activeCountByAthlete = {};
+    activePrograms.forEach(function (program) {
+      var userId = String(program && program.user_id || "").trim();
+      if (!userId) {
+        return;
+      }
+      activeCountByAthlete[userId] = (activeCountByAthlete[userId] || 0) + 1;
+    });
+
+    var nextEventDaysByAthlete = {};
+    goals.forEach(function (goalItem) {
+      var status = String(goalItem && goalItem.status || "active").toLowerCase();
+      if (status === "completed" || status === "archived") {
+        return;
+      }
+      if (!isTimelineGoalEvent(goalItem) || !goalItem.target_date || goalItem.target_date < todayKey) {
+        return;
+      }
+
+      var athleteId = String(goalItem.user_id || "").trim();
+      if (!athleteId) {
+        return;
+      }
+
+      var days = getDaysUntilDateKey(goalItem.target_date);
+      if (typeof days !== "number") {
+        return;
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(nextEventDaysByAthlete, athleteId) || days < nextEventDaysByAthlete[athleteId]) {
+        nextEventDaysByAthlete[athleteId] = days;
+      }
+    });
+
+    return athletes
+      .map(function (athlete) {
+        var athleteId = String(athlete && athlete.user_id || "").trim();
+        var athleteName = String(athlete && (athlete.name || athlete.email) || "Athlete");
+        var score = 0;
+        var reasons = [];
+        var activeProgramCount = Number(activeCountByAthlete[athleteId] || 0);
+        var readiness = state.coachReadinessByAthlete && state.coachReadinessByAthlete[athleteId]
+          ? state.coachReadinessByAthlete[athleteId]
+          : null;
+        var nextEventDays = Object.prototype.hasOwnProperty.call(nextEventDaysByAthlete, athleteId)
+          ? Number(nextEventDaysByAthlete[athleteId])
+          : null;
+        var lastSignInMs = athlete && athlete.last_sign_in_at ? new Date(athlete.last_sign_in_at).getTime() : NaN;
+        var inactiveDays = Number.isFinite(lastSignInMs) ? Math.floor((nowMs - lastSignInMs) / msPerDay) : null;
+
+        if (!Number.isFinite(lastSignInMs)) {
+          score += 45;
+          reasons.push("never signed in");
+        } else if (inactiveDays >= 45) {
+          score += 35;
+          reasons.push("inactive 45+ days");
+        } else if (inactiveDays >= 21) {
+          score += 20;
+          reasons.push("inactive 3+ weeks");
+        } else if (inactiveDays >= 10) {
+          score += 10;
+          reasons.push("inactive 10+ days");
+        }
+
+        if (activeProgramCount <= 0) {
+          score += 22;
+          reasons.push("no active program");
+        } else if (activeProgramCount > 0 && Number.isFinite(inactiveDays) && inactiveDays <= 7) {
+          score -= 6;
+          reasons.push("recently active");
+        }
+
+        if (Number.isFinite(nextEventDays)) {
+          if (nextEventDays <= 3) {
+            score += 20;
+            reasons.push("event in 3 days or less");
+          } else if (nextEventDays <= 7) {
+            score += 12;
+            reasons.push("event this week");
+          } else if (nextEventDays <= 14) {
+            score += 6;
+            reasons.push("event within 2 weeks");
+          }
+
+          if (activeProgramCount <= 0 && nextEventDays <= 14) {
+            score += 18;
+            reasons.push("event approaching without active plan");
+          }
+        }
+
+        if (readiness && Number.isFinite(readiness.score)) {
+          if (readiness.score < 60) {
+            score += 15;
+            reasons.push("low readiness " + readiness.score);
+          } else if (readiness.score < 75) {
+            score += 6;
+            reasons.push("moderate readiness " + readiness.score);
+          } else if (readiness.score >= 85) {
+            score -= 8;
+            reasons.push("strong readiness " + readiness.score);
+          }
+        } else {
+          score += 4;
+          reasons.push("limited readiness data");
+        }
+
+        score = Math.max(0, Math.min(100, Math.round(score)));
+        var band = "stable";
+        var bandLabel = "Stable";
+        if (score >= 45) {
+          band = "urgent";
+          bandLabel = "Urgent";
+        } else if (score >= 22) {
+          band = "watch";
+          bandLabel = "Watch";
+        }
+
+        var primaryActionHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
+        var primaryActionLabel = "View Insights";
+        if (activeProgramCount <= 0) {
+          primaryActionHref = "coach-training-programs.html";
+          primaryActionLabel = "Assign Program";
+        } else if (readiness && Number.isFinite(readiness.score) && readiness.score < 60) {
+          primaryActionHref = "athlete-nutrition.html?athleteId=" + encodeURIComponent(athleteId) + "&coachView=1";
+          primaryActionLabel = "Recovery Check";
+        } else if (Number.isFinite(nextEventDays) && nextEventDays <= 14) {
+          primaryActionHref = "athlete-goals.html?athleteId=" + encodeURIComponent(athleteId) + "&coachView=1";
+          primaryActionLabel = "Review Event";
+        } else if (Number.isFinite(inactiveDays) && inactiveDays >= 21) {
+          primaryActionHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
+          primaryActionLabel = "Check In";
+        }
+
+        return {
+          user_id: athleteId,
+          name: athleteName,
+          score: score,
+          band: band,
+          band_label: bandLabel,
+          readiness_score_label: readiness && Number.isFinite(readiness.score) ? formatInteger(readiness.score) : "--",
+          readiness_tone: readiness && Number.isFinite(readiness.score)
+            ? (readiness.score >= 75 ? "good" : (readiness.score < 60 ? "low" : "mid"))
+            : "unknown",
+          reasons: reasons.length ? reasons.slice(0, 2) : ["no immediate risk signals"],
+          primary_action_href: primaryActionHref,
+          primary_action_label: primaryActionLabel
+        };
+      })
+      .sort(function (a, b) {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      });
+  }
+
+  function buildCoachReadinessByAthlete(athletes, activePrograms, goals, nutritionTargets, nutritionLogs, stravaRows) {
+    var athleteList = Array.isArray(athletes) ? athletes : [];
+    var activeList = Array.isArray(activePrograms) ? activePrograms : [];
+    var goalList = Array.isArray(goals) ? goals : [];
+    var targetList = Array.isArray(nutritionTargets) ? nutritionTargets : [];
+    var logList = Array.isArray(nutritionLogs) ? nutritionLogs : [];
+    var stravaList = Array.isArray(stravaRows) ? stravaRows : [];
+    var todayKey = formatDateKey(new Date());
+
+    var activeCountByAthlete = {};
+    activeList.forEach(function (program) {
+      var userId = String(program && program.user_id || "").trim();
+      if (!userId) {
+        return;
+      }
+      activeCountByAthlete[userId] = (activeCountByAthlete[userId] || 0) + 1;
+    });
+
+    var nextEventDaysByAthlete = {};
+    goalList.forEach(function (goalItem) {
+      var status = String(goalItem && goalItem.status || "active").toLowerCase();
+      if (status === "completed" || status === "archived") {
+        return;
+      }
+      if (!isTimelineGoalEvent(goalItem) || !goalItem.target_date || goalItem.target_date < todayKey) {
+        return;
+      }
+      var athleteId = String(goalItem.user_id || "").trim();
+      if (!athleteId) {
+        return;
+      }
+
+      var days = getDaysUntilDateKey(goalItem.target_date);
+      if (typeof days !== "number") {
+        return;
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(nextEventDaysByAthlete, athleteId) || days < nextEventDaysByAthlete[athleteId]) {
+        nextEventDaysByAthlete[athleteId] = days;
+      }
+    });
+
+    var targetsByAthlete = {};
+    targetList.forEach(function (item) {
+      var userId = String(item && item.user_id || "").trim();
+      if (!userId || Object.prototype.hasOwnProperty.call(targetsByAthlete, userId)) {
+        return;
+      }
+      targetsByAthlete[userId] = Number(item && item.target_calories);
+    });
+
+    var latestLogByAthlete = pickLatestByUser(logList, "logged_on");
+    var latestStravaByAthlete = pickLatestByUser(stravaList, "metric_date");
+
+    var output = {};
+    athleteList.forEach(function (athlete) {
+      var athleteId = String(athlete && athlete.user_id || "").trim();
+      if (!athleteId) {
+        return;
+      }
+
+      var readiness = 55;
+      var reasons = [];
+      var hasActiveProgram = Number(activeCountByAthlete[athleteId] || 0) > 0;
+      var nextEventDays = Object.prototype.hasOwnProperty.call(nextEventDaysByAthlete, athleteId)
+        ? Number(nextEventDaysByAthlete[athleteId])
+        : null;
+      var latestLog = latestLogByAthlete[athleteId] || null;
+      var latestStrava = latestStravaByAthlete[athleteId] || null;
+
+      if (hasActiveProgram) {
+        readiness += 10;
+      } else {
+        readiness -= 10;
+      }
+
+      var targetCalories = Number(targetsByAthlete[athleteId]);
+      if (latestLog && latestLog.logged_on) {
+        var logAge = getDaysUntilDateKey(latestLog.logged_on);
+        var calories = Number(latestLog.calories);
+        if (typeof logAge === "number" && logAge <= 0 && logAge >= -3 && Number.isFinite(calories) && Number.isFinite(targetCalories) && targetCalories > 0) {
+          var pct = (calories / targetCalories) * 100;
+          if (pct >= 80 && pct <= 115) {
+            readiness += 12;
+            reasons.push("nutrition aligned");
+          } else if (pct >= 60 && pct <= 130) {
+            readiness += 6;
+            reasons.push("nutrition partially aligned");
+          } else {
+            readiness -= 6;
+            reasons.push("nutrition off target");
+          }
+        } else {
+          readiness -= 2;
+          reasons.push("nutrition baseline incomplete");
+        }
+      } else {
+        readiness -= 6;
+        reasons.push("no recent nutrition logs");
+      }
+
+      var recoveryScore = Number(latestStrava && latestStrava.recovery_score);
+      if (Number.isFinite(recoveryScore)) {
+        readiness += Math.max(-20, Math.min(20, (recoveryScore - 50) * 0.4));
+        reasons.push("recovery " + formatInteger(recoveryScore));
+      } else {
+        readiness -= 5;
+        reasons.push("limited recovery data");
+      }
+
+      if (Number.isFinite(nextEventDays)) {
+        if (nextEventDays <= 2) {
+          readiness -= 12;
+        } else if (nextEventDays <= 7) {
+          readiness -= 7;
+        } else if (nextEventDays <= 14) {
+          readiness -= 3;
+        }
+      }
+
+      readiness = Math.max(1, Math.min(99, Math.round(readiness)));
+      output[athleteId] = {
+        score: readiness,
+        reasons: reasons.slice(0, 2)
+      };
+    });
+
+    return output;
+  }
+
+  function pickLatestByUser(rows, dateField) {
+    var source = Array.isArray(rows) ? rows : [];
+    var field = String(dateField || "");
+    var map = {};
+
+    source.forEach(function (row) {
+      var userId = String(row && row.user_id || "").trim();
+      var dateKey = String(row && row[field] || "").trim();
+      if (!userId || !dateKey) {
+        return;
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(map, userId) || dateKey > String(map[userId] && map[userId][field] || "")) {
+        map[userId] = row;
+      }
+    });
+
+    return map;
+  }
+
   function getOpenFlags() {
     return buildAutoFlags().concat(state.coachFlags || []);
   }
@@ -3102,15 +4247,6 @@
     state.athletes.forEach(function (athlete) {
       athleteById[String(athlete.user_id || "")] = athlete;
       var athleteName = String(athlete && (athlete.name || athlete.email) || "Athlete");
-
-      if (!athlete.sport || !athlete.level) {
-        autoFlags.push({
-          id: "auto_profile_" + String(athlete.user_id || athleteName),
-          text: athleteName + " is missing sport/level profile details.",
-          severity: "medium",
-          source: "auto"
-        });
-      }
 
       if (!athlete.last_sign_in_at) {
         autoFlags.push({

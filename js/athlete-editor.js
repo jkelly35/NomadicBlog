@@ -13,32 +13,95 @@
     isPersonal: false,
     sportOverviewTemplates: {
       climbing: [
-        { key: "climbing_type", label: "Climbing Type", placeholder: "Bouldering, Sport, Trad, Ice" },
+        {
+          key: "climbing_discipline",
+          label: "Primary Discipline",
+          type: "multi-select",
+          placeholder: "Select discipline",
+          options: ["Bouldering", "Sport", "Trad", "Ice", "Alpine", "Gym / Indoor"]
+        },
         { key: "climbing_grade", label: "Current Climbing Level", placeholder: "V5 / 5.12a" },
-        { key: "climbing_focus", label: "Current Focus", placeholder: "Power endurance, projecting" }
+        { key: "climbing_years", label: "Years Climbing", type: "number", placeholder: "e.g., 4", min: "0", max: "80", step: "0.5" },
+        { key: "climbing_focus", label: "Current Focus", placeholder: "Power endurance, projecting" },
+        { key: "climbing_notes", label: "Important Notes", type: "textarea", placeholder: "Injury history, limitations, preferred climbing days", rows: "3" }
       ],
       skiing: [
-        { key: "ski_discipline", label: "Ski Discipline", placeholder: "Alpine, Touring, Freeride" },
+        {
+          key: "ski_discipline",
+          label: "Ski Disciplines",
+          type: "multi-select",
+          placeholder: "Select one or more disciplines",
+          options: ["Alpine", "Touring", "Freeride", "Nordic", "Park"]
+        },
         { key: "ski_home_mountain", label: "Primary Mountain / Region", placeholder: "e.g., Jackson Hole" },
-        { key: "ski_terrain", label: "Preferred Terrain", placeholder: "Steeps, moguls, groomers" }
+        {
+          key: "ski_terrain",
+          label: "Preferred Terrain",
+          type: "multi-select",
+          placeholder: "Select one or more terrain types",
+          options: ["Groomers", "Steeps", "Moguls", "Backcountry", "Park"]
+        }
       ],
       snowboarding: [
-        { key: "snowboard_discipline", label: "Snowboard Discipline", placeholder: "Freeride, Park, Splitboard" },
+        {
+          key: "snowboard_discipline",
+          label: "Snowboard Disciplines",
+          type: "multi-select",
+          placeholder: "Select one or more disciplines",
+          options: ["Freeride", "Park", "Splitboard", "Alpine", "All-Mountain"]
+        },
         { key: "snowboard_home_mountain", label: "Primary Mountain / Region", placeholder: "e.g., Whistler" },
-        { key: "snowboard_stance", label: "Stance", placeholder: "Regular or Goofy" }
+        {
+          key: "snowboard_stance",
+          label: "Stance",
+          type: "select",
+          placeholder: "Select stance",
+          options: ["Regular", "Goofy", "Switch"]
+        }
       ],
       mountainbiking: [
-        { key: "mtb_discipline", label: "MTB Discipline", placeholder: "XC, Enduro, DH, Trail" },
+        {
+          key: "mtb_discipline",
+          label: "MTB Disciplines",
+          type: "multi-select",
+          placeholder: "Select one or more disciplines",
+          options: ["XC", "Trail", "Enduro", "DH", "Bike Park"]
+        },
         { key: "mtb_home_trails", label: "Primary Trails / Region", placeholder: "e.g., Sedona" },
         { key: "mtb_weekly_volume", label: "Weekly Ride Volume", placeholder: "e.g., 6 hrs" }
       ],
       "trail-running": [
-        { key: "run_primary_distance", label: "Primary Distance", placeholder: "10k, Half, Ultra" },
+        {
+          key: "run_primary_distance",
+          label: "Primary Distances",
+          type: "multi-select",
+          placeholder: "Select one or more distance focuses",
+          options: ["5k", "10k", "Half Marathon", "Marathon", "Ultra"]
+        },
         { key: "run_elevation_goal", label: "Elevation Focus", placeholder: "e.g., 3000 ft/week" },
-        { key: "run_surface", label: "Preferred Terrain", placeholder: "Technical trail, mixed" }
+        {
+          key: "run_surface",
+          label: "Preferred Surface",
+          type: "multi-select",
+          placeholder: "Select one or more surfaces",
+          options: ["Singletrack", "Technical Trail", "Fire Road", "Mixed Trail", "Road"]
+        }
       ],
-      mixed: [
-        { key: "mixed_split", label: "Training Split", placeholder: "Climb 2x, Run 2x, Strength 2x" }
+      cycling: [
+        {
+          key: "cycling_discipline",
+          label: "Cycling Disciplines",
+          type: "multi-select",
+          placeholder: "Select one or more disciplines",
+          options: ["Road", "Gravel", "Mountain Bike", "Cyclocross", "Track"]
+        },
+        { key: "cycling_weekly_volume", label: "Weekly Ride Volume", placeholder: "e.g., 8 hrs / 180 mi" },
+        { key: "cycling_focus", label: "Current Focus", placeholder: "Endurance, sprint power, climbing" }
+      ],
+      other: [
+        { key: "other_sport_name", label: "Sport Name", placeholder: "What sport are you training for?" },
+        { key: "other_focus", label: "Current Focus", placeholder: "What are you working on most right now?" },
+        { key: "other_notes", label: "Important Notes", type: "textarea", placeholder: "Constraints, event schedule, or key context", rows: "3" }
       ]
     }
   };
@@ -190,15 +253,9 @@
 
   function populateForm(athlete) {
     var emailText = athlete.email || (state.user && state.user.email) || "N/A";
-    var createdText = athlete.user_created_at || (state.user && state.user.created_at) || "";
-    var lastSignInText = athlete.last_sign_in_at || (state.user && state.user.last_sign_in_at) || "";
 
     var emailEl = document.querySelector("[data-athlete-editor-email]");
-    var createdEl = document.querySelector("[data-athlete-editor-created]");
-    var lastSignInEl = document.querySelector("[data-athlete-editor-last-signin]");
     if (emailEl) emailEl.textContent = emailText;
-    if (createdEl) createdEl.textContent = createdText ? formatDate(createdText) : "N/A";
-    if (lastSignInEl) lastSignInEl.textContent = lastSignInText ? formatDate(lastSignInText) : "N/A";
 
     setInputValue("name", athlete.name);
     setInputValue("dob", getDobFromProfile(athlete));
@@ -603,17 +660,114 @@
         : {};
 
       var fieldMarkup = fields.map(function (field) {
-        var fieldValue = sportValues[field.key] == null ? "" : String(sportValues[field.key]);
+        var rawFieldValue = sportValues[field.key];
+        var fieldValue = rawFieldValue == null ? "" : String(rawFieldValue);
+        var fieldType = String(field.type || "text").toLowerCase();
+        if (fieldType === "multi-select") {
+          var multiOptions = Array.isArray(field.options) ? field.options : [];
+          var selectedValues = normalizeMultiValue(rawFieldValue);
+          var selectedLookup = {};
+          selectedValues.forEach(function (value) {
+            selectedLookup[String(value || "").toLowerCase()] = true;
+          });
+
+          var multiOptionMarkup = multiOptions.map(function (option) {
+            var optionValue = typeof option === "object" && option
+              ? String(option.value || option.label || "")
+              : String(option || "");
+            if (!optionValue) {
+              return "";
+            }
+            var optionLabel = typeof option === "object" && option
+              ? String(option.label || option.value || optionValue)
+              : optionValue;
+            var checkedAttr = selectedLookup[optionValue.toLowerCase()] ? ' checked' : '';
+            var optionId = 'overview-' + sport + '-' + field.key + '-' + optionValue
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-+|-+$/g, "");
+            return (
+              '<label class="sport-overview-chip" for="' + escapeAttribute(optionId) + '">' +
+              '<input id="' + escapeAttribute(optionId) + '" type="checkbox" data-sport-overview-field data-field-type="multi-check" data-overview-key="' +
+              escapeAttribute(field.key) +
+              '" value="' +
+              escapeAttribute(optionValue) +
+              '"' + checkedAttr + ' />' +
+              '<span>' + escapeHtml(optionLabel) + '</span>' +
+              '</label>'
+            );
+          }).join("");
+
+          return (
+            '<div class="sport-overview-field">' +
+            '<label>' + escapeHtml(field.label) + '</label>' +
+            '<div class="sport-overview-chip-group">' + multiOptionMarkup + '</div>' +
+            '</div>'
+          );
+        }
+
+        if (fieldType === "select") {
+          var options = Array.isArray(field.options) ? field.options : [];
+          var placeholder = String(field.placeholder || "Select an option");
+          var optionMarkup = ['<option value="">' + escapeHtml(placeholder) + '</option>'];
+          options.forEach(function (option) {
+            var optionValue = typeof option === "object" && option
+              ? String(option.value || option.label || "")
+              : String(option || "");
+            if (!optionValue) {
+              return;
+            }
+            var optionLabel = typeof option === "object" && option
+              ? String(option.label || option.value || optionValue)
+              : optionValue;
+            var selectedAttr = fieldValue.toLowerCase() === optionValue.toLowerCase() ? ' selected' : '';
+            optionMarkup.push(
+              '<option value="' + escapeAttribute(optionValue) + '"' + selectedAttr + '>' +
+              escapeHtml(optionLabel) +
+              '</option>'
+            );
+          });
+
+          return (
+            '<div class="sport-overview-field">' +
+            '<label>' + escapeHtml(field.label) + '</label>' +
+            '<select data-sport-overview-field data-overview-key="' +
+            escapeAttribute(field.key) +
+            '">' + optionMarkup.join("") + '</select>' +
+            '</div>'
+          );
+        }
+
+        if (fieldType === "textarea") {
+          return (
+            '<div class="sport-overview-field">' +
+            '<label>' + escapeHtml(field.label) + '</label>' +
+            '<textarea data-sport-overview-field data-overview-key="' +
+            escapeAttribute(field.key) +
+            '" rows="' +
+            escapeAttribute(String(field.rows || "3")) +
+            '" placeholder="' +
+            escapeAttribute(field.placeholder || "") +
+            '">' +
+            escapeHtml(fieldValue) +
+            '</textarea>' +
+            '</div>'
+          );
+        }
+
+        var minAttr = field.min != null ? ' min="' + escapeAttribute(String(field.min)) + '"' : "";
+        var maxAttr = field.max != null ? ' max="' + escapeAttribute(String(field.max)) + '"' : "";
+        var stepAttr = field.step != null ? ' step="' + escapeAttribute(String(field.step)) + '"' : "";
         return (
           '<div class="sport-overview-field">' +
           '<label>' + escapeHtml(field.label) + '</label>' +
-          '<input type="text" data-sport-overview-field data-overview-key="' +
+          '<input type="' + escapeAttribute(fieldType || "text") + '" data-sport-overview-field data-overview-key="' +
           escapeAttribute(field.key) +
           '" value="' +
           escapeAttribute(fieldValue) +
           '" placeholder="' +
           escapeAttribute(field.placeholder || "") +
-          '" />' +
+          '"' + minAttr + maxAttr + stepAttr + ' />' +
           '</div>'
         );
       }).join("");
@@ -647,6 +801,17 @@
       card.querySelectorAll("[data-sport-overview-field]").forEach(function (input) {
         var key = String(input.getAttribute("data-overview-key") || "").trim();
         if (!key) {
+          return;
+        }
+
+        var fieldType = String(input.getAttribute("data-field-type") || "").toLowerCase();
+        if (fieldType === "multi-check") {
+          if (input.checked) {
+            if (!Array.isArray(sportValues[key])) {
+              sportValues[key] = [];
+            }
+            sportValues[key].push(String(input.value || "").trim());
+          }
           return;
         }
 
@@ -688,6 +853,31 @@
       }
       input.value = general && general[key] != null ? String(general[key]) : "";
     });
+  }
+
+  function normalizeMultiValue(value) {
+    if (value == null) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .map(function (item) {
+          return String(item || "").trim();
+        })
+        .filter(function (item) {
+          return !!item;
+        });
+    }
+
+    return String(value)
+      .split(",")
+      .map(function (item) {
+        return String(item || "").trim();
+      })
+      .filter(function (item) {
+        return !!item;
+      });
   }
 
   function getSportLabel(sport) {
@@ -784,16 +974,6 @@
     if (statusEl) {
       statusEl.textContent = "";
       statusEl.className = "admin-modal-status";
-    }
-  }
-
-  function formatDate(dateStr) {
-    if (!dateStr) return "N/A";
-    try {
-      var d = new Date(dateStr);
-      return d.toLocaleDateString() + " " + d.toLocaleTimeString();
-    } catch (e) {
-      return dateStr;
     }
   }
 

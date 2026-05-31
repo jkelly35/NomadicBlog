@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Messages - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/profile-messages.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="profile.html">Dashboard</a>
+      <a href="athlete-nutrition.html">Nutrition</a>
+      <a href="athlete-goals.html">Goals</a>
+    </nav>
+  </header>
+
+  <main class="profile-main">
+    <div class="profile-container">
+      <div class="profile-content" data-profile-content>
+        <div class="coach-inbox-page-head">
+          <div>
+            <h1 class="section-heading">Messages</h1>
+            <p class="profile-dashboard-subtitle" data-profile-messages-copy>Secure conversation between coach and athlete.</p>
+          </div>
+          <a href="profile.html#profile-messages-section" class="btn profile-btn-cancel" data-profile-messages-back>Back to Dashboard</a>
+        </div>
+
+        <section class="profile-section" aria-label="Coach Thread">
+          <div class="profile-message-stats" data-profile-message-stats>
+            <p class="profile-loading">Loading conversation details...</p>
+          </div>
+          <div class="profile-message-thread" data-profile-messages-thread>
+            <p class="profile-loading">Loading messages...</p>
+          </div>
+          <div class="profile-message-quick-actions" data-profile-message-quick-actions>
+            <button type="button" class="btn profile-btn-cancel" data-profile-quick-reply="Got it. I will do this today.">Got it</button>
+            <button type="button" class="btn profile-btn-cancel" data-profile-quick-reply="Can we review this in our next session?">Ask for Review</button>
+            <button type="button" class="btn profile-btn-cancel" data-profile-quick-reply="I have a pain/update I need help with.">Report Issue</button>
+          </div>
+          <form class="profile-form" data-profile-messages-form>
+            <div class="form-group">
+              <label for="profile-message-body">New Message</label>
+              <textarea id="profile-message-body" rows="3" placeholder="Type your message" data-profile-message-body required></textarea>
+              <p class="profile-message-composer-meta" data-profile-message-composer-meta>0 characters</p>
+            </div>
+            <div class="profile-form-actions">
+              <button type="submit" class="btn profile-btn-save">Send Message</button>
+            </div>
+          </form>
+          <p class="profile-status" role="status" aria-live="polite" data-profile-messages-status></p>
+        </section>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

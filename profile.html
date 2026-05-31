@@ -12,6 +12,7 @@
   <script defer src="js/ape-index.js"></script>
   <script defer src="js/auth-ui.js"></script>
   <script defer src="js/athlete-profile.js"></script>
+  <script defer src="js/profile-messages.js"></script>
 </head>
 <body>
 
@@ -41,9 +42,51 @@
 
       <!-- Profile Content (shown when logged in) -->
       <div class="profile-content" hidden data-profile-content>
-        <h1 class="section-heading">Athlete Dashboard</h1>
         <div class="profile-dashboard-heading-row">
-          <p class="profile-dashboard-subtitle">Your training, testing, and progress hub.</p>
+          <div>
+            <h1 class="section-heading">Athlete Dashboard</h1>
+            <p class="profile-dashboard-subtitle">Today at a glance: what to do next and what needs attention.</p>
+          </div>
+          <aside class="profile-header-messages-widget" aria-label="Message Notifications">
+            <p class="profile-header-messages-label">Messages</p>
+            <strong class="profile-header-messages-value" data-profile-msg-summary-unread>0 unread</strong>
+            <a href="athlete-messages.html" class="btn profile-btn-edit-profile" data-profile-messages-open>Open Messages</a>
+          </aside>
+        </div>
+        <nav class="profile-dashboard-nav" aria-label="Dashboard quick navigation">
+          <a href="#profile-training-program-section" class="profile-dashboard-nav-link">Training</a>
+          <a href="#profile-goals-section" class="profile-dashboard-nav-link">Goals</a>
+          <a href="athlete-messages.html" class="profile-dashboard-nav-link" data-profile-messages-open>Messages</a>
+          <a href="#profile-overview-section" class="profile-dashboard-nav-link">Profile</a>
+          <a href="#profile-metrics-section" class="profile-dashboard-nav-link">Metrics</a>
+          <a href="#profile-nutrition-section" class="profile-dashboard-nav-link">Nutrition</a>
+        </nav>
+
+        <div class="profile-dashboard-glance profile-today-strip" data-dashboard-glance>
+          <article class="profile-glance-card profile-today-card" data-glance-card="training">
+            <p class="profile-glance-label">Today's Training</p>
+            <strong class="profile-glance-value" data-glance-training>Loading...</strong>
+            <p class="profile-glance-meta" data-glance-training-meta>Checking your current session focus</p>
+            <a class="profile-glance-action" href="#profile-training-program-section">Open Training</a>
+          </article>
+          <article class="profile-glance-card profile-today-card" data-glance-card="goals">
+            <p class="profile-glance-label">Next Event</p>
+            <strong class="profile-glance-value" data-glance-goals>Loading...</strong>
+            <p class="profile-glance-meta" data-glance-goals-meta>Finding your next race or event</p>
+            <a class="profile-glance-action" href="athlete-goals.html" data-glance-goals-link>View Goals</a>
+          </article>
+          <article class="profile-glance-card profile-today-card" data-glance-card="nutrition">
+            <p class="profile-glance-label">Nutrition Progress</p>
+            <strong class="profile-glance-value" data-glance-nutrition>Loading...</strong>
+            <p class="profile-glance-meta" data-glance-nutrition-meta>Checking today's intake</p>
+            <a class="profile-glance-action" href="athlete-nutrition.html" data-glance-nutrition-link>Log Food</a>
+          </article>
+          <article class="profile-glance-card profile-today-card" data-glance-card="strava">
+            <p class="profile-glance-label">Daily Readiness</p>
+            <strong class="profile-glance-value" data-glance-strava>Loading...</strong>
+            <p class="profile-glance-meta" data-glance-strava-meta>Combining training, nutrition, events, and recovery</p>
+            <a class="profile-glance-action" href="#profile-metrics-section">View Signals</a>
+          </article>
         </div>
 
         <!-- Current Training Program at Top -->
@@ -54,13 +97,39 @@
           </div>
         </div>
 
+        <div class="profile-section" id="profile-nutrition-section">
+          <div class="profile-section-header">
+            <div>
+              <h2>Nutrition Tracking</h2>
+              <p class="profile-section-copy">Quick glance at today's intake versus targets. Log full details from the nutrition page.</p>
+            </div>
+            <div class="profile-section-actions">
+              <a href="athlete-nutrition-goals.html" class="btn profile-btn-cancel" data-nutrition-goals-link>Nutrition Goals</a>
+              <a href="athlete-nutrition.html" class="btn profile-btn-edit-profile" data-nutrition-manage-link>Log Food</a>
+            </div>
+          </div>
+
+          <div class="profile-nutrition-today-grid" data-nutrition-today>
+            <p class="profile-loading">Loading daily nutrition progress...</p>
+          </div>
+
+          <div class="profile-nutrition-summary-grid" data-nutrition-summary>
+            <p class="profile-loading">Loading nutrition summary...</p>
+          </div>
+
+          <p class="profile-status" role="status" aria-live="polite" data-nutrition-status></p>
+        </div>
+
         <div class="profile-section" id="profile-goals-section" data-goals-section>
           <div class="profile-section-header">
             <div>
               <h2>Goals and Milestones</h2>
               <p class="profile-section-copy">Your established races, events, trips, and milestone goals at a glance.</p>
             </div>
-            <a href="athlete-goals.html" class="btn profile-btn-edit-profile" data-goals-manage-link>Manage Goals</a>
+            <div class="profile-section-actions">
+              <button type="button" class="btn profile-btn-cancel profile-btn-section-toggle" data-goals-toggle-list hidden>Show All</button>
+              <a href="athlete-goals.html" class="btn profile-btn-edit-profile" data-goals-manage-link>Manage Goals</a>
+            </div>
           </div>
 
           <div class="profile-goals-countdown" data-goals-countdown>
@@ -74,40 +143,7 @@
           <p class="profile-status" role="status" aria-live="polite" data-goals-status></p>
         </div>
 
-        <div class="profile-section">
-          <div class="profile-section-header">
-            <h2>Athlete Overview</h2>
-            <button type="button" class="btn profile-btn-edit-profile" data-profile-edit-toggle aria-expanded="false" aria-controls="profile-editor-section">Edit Athlete Profile</button>
-          </div>
-          <div class="profile-hero-stats">
-            <div class="profile-hero-chip">
-              <span class="profile-hero-label">Sports</span>
-              <strong data-hero-sport>—</strong>
-            </div>
-            <div class="profile-hero-chip">
-              <span class="profile-hero-label">Training Base</span>
-              <strong data-hero-location>—</strong>
-            </div>
-          </div>
-          <div class="profile-info-grid">
-            <div class="profile-info-item">
-              <label>Email</label>
-              <p class="profile-info-value" data-profile-email>—</p>
-            </div>
-            <div class="profile-info-item">
-              <label>DOB / Age</label>
-              <p class="profile-info-value" data-profile-dob-age>—</p>
-            </div>
-          </div>
-          <div class="profile-sport-overview" data-sport-overview-summary hidden></div>
-          <div class="profile-account-actions">
-            <div class="profile-account-actions-row">
-              <button type="button" class="btn profile-btn-reset-password" data-profile-reset-password>Reset My Password</button>
-              <button type="button" class="btn profile-btn-logout" data-profile-logout>Log Out</button>
-            </div>
-            <p class="profile-status" role="status" aria-live="polite" data-password-status></p>
-          </div>
-        </div>
+        <p class="profile-status" role="status" aria-live="polite" data-profile-messages-status hidden></p>
 
         <div class="profile-section" id="profile-editor-section" hidden data-profile-editor>
           <h2>Edit Athlete Information</h2>
@@ -130,7 +166,8 @@
                 <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="climbing" /> Climbing</label>
                 <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="mountainbiking" /> Mountain Biking</label>
                 <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="trail-running" /> Trail Running</label>
-                <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="mixed" /> Mixed / Multi-Sport</label>
+                <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="cycling" /> Cycling</label>
+                <label class="sport-checkbox-item"><input type="checkbox" name="sports[]" value="other" /> Other</label>
               </div>
             </div>
 
@@ -195,7 +232,8 @@
           </form>
         </div>
 
-        <div class="profile-section">
+        <div class="profile-sections-grid" data-dashboard-sections-grid>
+        <div class="profile-section" id="profile-metrics-section">
           <div class="profile-section-header">
             <div>
               <h2>Athlete Metrics</h2>
@@ -204,7 +242,15 @@
             <div class="metrics-actions">
               <button
                 type="button"
-                class="btn profile-btn-cancel profile-btn-metrics-collapse"
+                class="btn profile-btn-cancel profile-btn-section-toggle"
+                data-metrics-compact-toggle
+                aria-pressed="false"
+              >
+                Show Details
+              </button>
+              <button
+                type="button"
+                class="btn profile-btn-cancel profile-btn-section-toggle profile-btn-metrics-collapse"
                 data-metrics-collapse-toggle
                 aria-expanded="true"
                 aria-controls="athlete-metrics-content"
@@ -235,62 +281,63 @@
           </div>
         </div>
 
-        <div class="profile-section" id="profile-nutrition-section">
+        <div class="profile-section" id="profile-overview-section">
+          <div class="profile-section-header">
+            <h2>Athlete Overview</h2>
+            <button type="button" class="btn profile-btn-edit-profile" data-profile-edit-toggle aria-expanded="false" aria-controls="profile-editor-section">Edit Athlete Profile</button>
+          </div>
+          <div class="profile-hero-stats">
+            <div class="profile-hero-chip">
+              <span class="profile-hero-label">Sports</span>
+              <strong data-hero-sport>—</strong>
+            </div>
+            <div class="profile-hero-chip">
+              <span class="profile-hero-label">Training Base</span>
+              <strong data-hero-location>—</strong>
+            </div>
+          </div>
+          <div class="profile-info-grid">
+            <div class="profile-info-item">
+              <label>Email</label>
+              <p class="profile-info-value" data-profile-email>—</p>
+            </div>
+            <div class="profile-info-item">
+              <label>DOB / Age</label>
+              <p class="profile-info-value" data-profile-dob-age>—</p>
+            </div>
+          </div>
+          <div class="profile-sport-overview" data-sport-overview-summary hidden></div>
+          <div class="profile-account-actions">
+            <div class="profile-account-actions-row">
+              <button type="button" class="btn profile-btn-reset-password" data-profile-reset-password>Reset My Password</button>
+              <button type="button" class="btn profile-btn-logout" data-profile-logout>Log Out</button>
+            </div>
+            <p class="profile-status" role="status" aria-live="polite" data-password-status></p>
+          </div>
+        </div>
+
+        <div class="profile-section profile-section-danger" id="profile-danger-section">
           <div class="profile-section-header">
             <div>
-              <h2>Nutrition Tracking</h2>
-              <p class="profile-section-copy">Quick glance at today's intake versus targets. Log full details from the nutrition page.</p>
+              <h2>Danger Zone</h2>
+              <p class="profile-section-copy">Permanently delete your account and all associated data.</p>
             </div>
-            <a href="athlete-nutrition.html" class="btn profile-btn-edit-profile" data-nutrition-manage-link>Log Food</a>
-          </div>
-
-          <div class="profile-nutrition-today-grid" data-nutrition-today>
-            <p class="profile-loading">Loading daily nutrition progress...</p>
-          </div>
-
-          <div class="profile-nutrition-summary-grid" data-nutrition-summary>
-            <p class="profile-loading">Loading nutrition summary...</p>
-          </div>
-
-          <p class="profile-status" role="status" aria-live="polite" data-nutrition-status></p>
-        </div>
-
-        <div class="profile-section" id="profile-strava-section">
-          <div class="profile-section-header">
-            <div>
-              <h2>Strava Overview</h2>
-              <p class="profile-section-copy">Connect Strava to pull activity and recovery trends into your dashboard.</p>
-            </div>
-            <div class="metrics-actions strava-actions">
-              <button type="button" class="btn profile-btn-edit-profile" data-strava-connect>Connect Strava</button>
-              <button type="button" class="btn profile-btn-cancel" data-strava-sync>Sync Now</button>
-              <button type="button" class="btn profile-btn-delete" data-strava-disconnect>Disconnect</button>
+            <div class="profile-section-actions">
+              <button
+                type="button"
+                class="btn profile-btn-cancel profile-btn-section-toggle"
+                data-section-collapse-toggle="danger"
+                aria-expanded="false"
+                aria-controls="profile-danger-content"
+              >
+                Show Danger Zone
+              </button>
             </div>
           </div>
-
-          <div class="strava-connection-meta" data-strava-connection-meta>
-            <p class="profile-loading">Checking Strava connection...</p>
-          </div>
-
-          <div class="strava-metrics-grid" data-strava-metrics-grid>
-            <p class="profile-loading">Sync your account to view Strava metrics.</p>
-          </div>
-
-          <p class="profile-status" role="status" aria-live="polite" data-strava-status></p>
-        </div>
-
-        <!-- Current Training Program Section -->
-        <div class="profile-section" id="profile-training-program-section">
-          <h2>Current Active Training Program</h2>
-          <div id="profile-training-program-content">
-            <p class="profile-training-loading">Loading your training program...</p>
+          <div id="profile-danger-content" data-section-collapse-content="danger" hidden>
+            <button type="button" class="btn profile-btn-delete" data-profile-delete>Delete Account</button>
           </div>
         </div>
-
-        <div class="profile-section profile-section-danger">
-          <h2>Danger Zone</h2>
-          <p style="margin-bottom: 1rem; color: #555;">Permanently delete your account and all associated data.</p>
-          <button type="button" class="btn profile-btn-delete" data-profile-delete>Delete Account</button>
         </div>
       </div>
     </div>

@@ -21,7 +21,6 @@ const climbingMetrics = [
       "V5": [1.37, 1.64],
       "V6": [1.35, 1.64],
       "V7": [1.37, 1.63],
-      "V8": [1.42, 1.69],
       "V9": [1.39, 1.73],
       "V10": [1.51, 1.80]
     }
@@ -568,6 +567,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 (function () {
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
   var METRICS_COLLAPSE_KEY = "nomadic.metricsSectionCollapsed";
+  var METRICS_COMPACT_KEY = "nomadic.metricsCompactMode";
+  var STRAVA_COLLAPSE_KEY = "nomadic.stravaSectionCollapsed";
+  var DANGER_COLLAPSE_KEY = "nomadic.dangerSectionCollapsed";
+  var GOALS_VIEW_ALL_KEY = "nomadic.goalsViewAll";
   var GOALS_FALLBACK_KEY = "nomadic_athlete_goals_events_v1";
   var NUTRITION_LOGS_FALLBACK_KEY = "nomadic_athlete_nutrition_logs_v1";
   var NUTRITION_TARGETS_FALLBACK_KEY = "nomadic_athlete_nutrition_targets_v1";
@@ -596,6 +599,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     metricsEditorToggle: null,
     metricsContent: null,
     metricsCollapseToggle: null,
+    metricsCompactToggle: null,
     metricsSummaryBtn: null,
     stravaConnectBtn: null,
     stravaSyncBtn: null,
@@ -604,12 +608,30 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     stravaMetricsGrid: null,
     stravaStatusElement: null,
     goalsManageLink: null,
+    goalsToggleButton: null,
+    goalsGlanceLink: null,
     goalsList: null,
     goalsCountdown: null,
     goalsStatus: null,
+    goalsShowAll: false,
+    glanceTrainingValue: null,
+    glanceTrainingMeta: null,
+    glanceGoalsValue: null,
+    glanceGoalsMeta: null,
+    glanceNutritionValue: null,
+    glanceNutritionMeta: null,
+    glanceStravaValue: null,
+    glanceStravaMeta: null,
+    readinessTrainingActiveCount: 0,
+    readinessNextEventDays: null,
+    readinessNutritionPct: null,
+    readinessRecoveryScore: null,
+    readinessStravaConnected: false,
     goalItems: [],
     nutritionToday: null,
     nutritionManageLink: null,
+    nutritionGoalsLink: null,
+    nutritionGlanceLink: null,
     nutritionForm: null,
     nutritionResetButton: null,
     nutritionTargetsForm: null,
@@ -631,33 +653,98 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       skiing: ["Resting HR", "Max HR", "Countermovement Jump", "Single-Leg Balance"],
       snowboarding: ["Resting HR", "Max HR", "Countermovement Jump", "Lateral Bound"],
       mountainbiking: ["Resting HR", "Max HR", "FTP", "Grip Endurance"],
-      mixed: ["Resting HR", "Max HR", "Vertical Jump", "Anaerobic Capacity"]
+      cycling: ["Resting HR", "Max HR", "FTP", "Power Duration"],
+      other: ["Resting HR", "Max HR", "Vertical Jump", "Anaerobic Capacity"]
     },
     sportOverviewTemplates: {
       climbing: [
-        { key: "climbing_type", label: "Climbing Type", placeholder: "Bouldering, Sport, Trad, Ice", type: "text" },
+        {
+          key: "climbing_discipline",
+          label: "Primary Discipline",
+          type: "multi-select",
+          placeholder: "Select discipline",
+          options: ["Bouldering", "Sport", "Trad", "Ice", "Alpine", "Gym / Indoor"]
+        },
         { key: "climbing_grade", label: "Current Climbing Level", placeholder: "5.11a, V4", type: "text" },
+        { key: "climbing_years", label: "Years Climbing", placeholder: "e.g. 4", type: "number", min: "0", max: "80", step: "0.5" },
         { key: "climbing_focus", label: "Current Focus", placeholder: "Power endurance, technique, projecting", type: "text" },
-        { key: "arm_span", label: "Arm Span (cm)", placeholder: "For ape index calculation", type: "text" }
+        { key: "arm_span", label: "Arm Span (cm)", placeholder: "For ape index calculation", type: "text" },
+        { key: "climbing_notes", label: "Important Notes", placeholder: "Injury history, limitations, preferred climbing days", type: "textarea", rows: "3" }
       ],
       skiing: [
-        { key: "ski_discipline", label: "Ski Discipline", placeholder: "Alpine, Touring, Freeride, Nordic", type: "text" },
-        { key: "ski_terrain", label: "Preferred Terrain", placeholder: "Groomers, steeps, park, backcountry", type: "text" }
+        {
+          key: "ski_discipline",
+          label: "Ski Disciplines",
+          type: "multi-select",
+          placeholder: "Select one or more disciplines",
+          options: ["Alpine", "Touring", "Freeride", "Nordic", "Park"]
+        },
+        {
+          key: "ski_terrain",
+          label: "Preferred Terrain",
+          type: "multi-select",
+          placeholder: "Select one or more terrain types",
+          options: ["Groomers", "Steeps", "Moguls", "Backcountry", "Park"]
+        }
       ],
       snowboarding: [
-        { key: "snowboard_discipline", label: "Snowboard Discipline", placeholder: "Freeride, park, splitboarding", type: "text" },
-        { key: "snowboard_stance", label: "Stance", placeholder: "Regular or Goofy", type: "text" }
+        {
+          key: "snowboard_discipline",
+          label: "Snowboard Disciplines",
+          type: "multi-select",
+          placeholder: "Select one or more disciplines",
+          options: ["Freeride", "Park", "Splitboard", "Alpine", "All-Mountain"]
+        },
+        {
+          key: "snowboard_stance",
+          label: "Stance",
+          type: "select",
+          placeholder: "Select stance",
+          options: ["Regular", "Goofy", "Switch"]
+        }
       ],
       mountainbiking: [
-        { key: "mtb_discipline", label: "MTB Discipline", placeholder: "XC, Enduro, DH, Trail", type: "text" },
+        {
+          key: "mtb_discipline",
+          label: "MTB Disciplines",
+          type: "multi-select",
+          placeholder: "Select one or more disciplines",
+          options: ["XC", "Trail", "Enduro", "DH", "Bike Park"]
+        },
         { key: "mtb_weekly_volume", label: "Weekly Ride Volume", placeholder: "e.g. 6 hrs", type: "text" }
       ],
       "trail-running": [
-        { key: "run_primary_distance", label: "Primary Distance", placeholder: "10k, half marathon, ultra", type: "text" },
-        { key: "run_elevation_goal", label: "Elevation Focus", placeholder: "e.g. 3000 ft/week", type: "text" }
+        {
+          key: "run_primary_distance",
+          label: "Primary Distances",
+          type: "multi-select",
+          placeholder: "Select one or more distance focuses",
+          options: ["5k", "10k", "Half Marathon", "Marathon", "Ultra"]
+        },
+        { key: "run_elevation_goal", label: "Elevation Focus", placeholder: "e.g. 3000 ft/week", type: "text" },
+        {
+          key: "run_surface",
+          label: "Preferred Surface",
+          type: "multi-select",
+          placeholder: "Select one or more surfaces",
+          options: ["Singletrack", "Technical Trail", "Fire Road", "Mixed Trail", "Road"]
+        }
       ],
-      mixed: [
-        { key: "mixed_split", label: "Training Split", placeholder: "e.g. Climb 2x, Run 2x, Strength 2x", type: "text" }
+      cycling: [
+        {
+          key: "cycling_discipline",
+          label: "Cycling Disciplines",
+          type: "multi-select",
+          placeholder: "Select one or more disciplines",
+          options: ["Road", "Gravel", "Mountain Bike", "Cyclocross", "Track"]
+        },
+        { key: "cycling_weekly_volume", label: "Weekly Ride Volume", placeholder: "e.g. 8 hrs / 180 mi", type: "text" },
+        { key: "cycling_focus", label: "Current Focus", placeholder: "Endurance, sprint power, climbing", type: "text" }
+      ],
+      other: [
+        { key: "other_sport_name", label: "Sport Name", placeholder: "What sport are you training for?", type: "text" },
+        { key: "other_focus", label: "Current Focus", placeholder: "What are you working on most right now?", type: "text" },
+        { key: "other_notes", label: "Important Notes", placeholder: "Constraints, event schedule, or key context", type: "textarea", rows: "3" }
       ]
     },
     trainingTemplates: [],
@@ -681,6 +768,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.metricsEditorToggle = null;
     state.metricsContent = document.querySelector("[data-metrics-content]");
     state.metricsCollapseToggle = document.querySelector("[data-metrics-collapse-toggle]");
+    state.metricsCompactToggle = document.querySelector("[data-metrics-compact-toggle]");
     state.metricsSummaryBtn = document.querySelector("[data-metrics-summary-pdf]");
     state.stravaConnectBtn = document.querySelector("[data-strava-connect]");
     state.stravaSyncBtn = document.querySelector("[data-strava-sync]");
@@ -689,11 +777,23 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.stravaMetricsGrid = document.querySelector("[data-strava-metrics-grid]");
     state.stravaStatusElement = document.querySelector("[data-strava-status]");
     state.goalsManageLink = document.querySelector("[data-goals-manage-link]");
+    state.goalsToggleButton = document.querySelector("[data-goals-toggle-list]");
+    state.goalsGlanceLink = document.querySelector("[data-glance-goals-link]");
     state.goalsList = document.querySelector("[data-goals-list]");
     state.goalsCountdown = document.querySelector("[data-goals-countdown]");
     state.goalsStatus = document.querySelector("[data-goals-status]");
+    state.glanceTrainingValue = document.querySelector("[data-glance-training]");
+    state.glanceTrainingMeta = document.querySelector("[data-glance-training-meta]");
+    state.glanceGoalsValue = document.querySelector("[data-glance-goals]");
+    state.glanceGoalsMeta = document.querySelector("[data-glance-goals-meta]");
+    state.glanceNutritionValue = document.querySelector("[data-glance-nutrition]");
+    state.glanceNutritionMeta = document.querySelector("[data-glance-nutrition-meta]");
+    state.glanceStravaValue = document.querySelector("[data-glance-strava]");
+    state.glanceStravaMeta = document.querySelector("[data-glance-strava-meta]");
     state.nutritionToday = document.querySelector("[data-nutrition-today]");
     state.nutritionManageLink = document.querySelector("[data-nutrition-manage-link]");
+    state.nutritionGoalsLink = document.querySelector("[data-nutrition-goals-link]");
+    state.nutritionGlanceLink = document.querySelector("[data-glance-nutrition-link]");
     state.nutritionForm = document.querySelector("[data-nutrition-form]");
     state.nutritionResetButton = document.querySelector("[data-nutrition-reset]");
     state.nutritionTargetsForm = document.querySelector("[data-nutrition-targets-form]");
@@ -808,13 +908,13 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     hideGuard();
     showContent();
+    renderDashboardQuickGlanceDefaults();
     applyCoachViewUi();
+    configureGoalsLink();
     configureNutritionLink();
     populateUserInfo();
     loadProfileData();
     loadMetricsData();
-    loadStravaOverview();
-    maybeShowStravaRedirectStatus();
     loadCurrentTrainingProgram();
     loadGoalItems();
     loadNutritionData();
@@ -873,12 +973,17 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (state.nutritionManageLink) {
       state.nutritionManageLink.style.display = "";
-      state.nutritionManageLink.textContent = "Set Nutrition Goals";
+      state.nutritionManageLink.textContent = "View Nutrition Log";
+    }
+
+    if (state.nutritionGoalsLink) {
+      state.nutritionGoalsLink.style.display = "";
+      state.nutritionGoalsLink.textContent = "Set Nutrition Goals";
     }
   }
 
   function configureNutritionLink() {
-    if (!state.nutritionManageLink) {
+    if (!state.nutritionManageLink && !state.nutritionGoalsLink && !state.nutritionGlanceLink) {
       return;
     }
 
@@ -887,16 +992,67 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
-    var href = "athlete-nutrition.html?athleteId=" + encodeURIComponent(viewedUserId);
+    var logHref = "athlete-nutrition.html?athleteId=" + encodeURIComponent(viewedUserId);
+    var goalsHref = "athlete-nutrition-goals.html?athleteId=" + encodeURIComponent(viewedUserId);
     if (state.isCoachView) {
-      href += "&coachView=1";
-      state.nutritionManageLink.textContent = "Set Nutrition Goals";
+      logHref += "&coachView=1";
+      goalsHref += "&coachView=1";
+      if (state.nutritionManageLink) {
+        state.nutritionManageLink.textContent = "View Nutrition Log";
+      }
+      if (state.nutritionGoalsLink) {
+        state.nutritionGoalsLink.textContent = "Set Nutrition Goals";
+      }
     } else {
-      state.nutritionManageLink.textContent = "Log Food";
+      if (state.nutritionManageLink) {
+        state.nutritionManageLink.textContent = "Log Food";
+      }
+      if (state.nutritionGoalsLink) {
+        state.nutritionGoalsLink.textContent = "Nutrition Goals";
+      }
     }
 
-    state.nutritionManageLink.href = href;
-    state.nutritionManageLink.style.display = "";
+    if (state.nutritionManageLink) {
+      state.nutritionManageLink.href = logHref;
+      state.nutritionManageLink.style.display = "";
+    }
+
+    if (state.nutritionGoalsLink) {
+      state.nutritionGoalsLink.href = goalsHref;
+      state.nutritionGoalsLink.style.display = "";
+    }
+
+    if (state.nutritionGlanceLink) {
+      state.nutritionGlanceLink.href = logHref;
+      state.nutritionGlanceLink.textContent = state.isCoachView ? "View Log" : "Log Food";
+    }
+  }
+
+  function configureGoalsLink() {
+    var href = getGoalsPageHref();
+
+    if (state.goalsManageLink) {
+      state.goalsManageLink.href = href;
+    }
+
+    if (state.goalsGlanceLink) {
+      state.goalsGlanceLink.href = href;
+      state.goalsGlanceLink.textContent = state.isCoachView ? "View Goals" : "Manage Goals";
+    }
+  }
+
+  function getGoalsPageHref() {
+    var viewedUserId = getViewedUserId();
+    if (!viewedUserId) {
+      return "athlete-goals.html";
+    }
+
+    var href = "athlete-goals.html?athleteId=" + encodeURIComponent(viewedUserId);
+    if (state.isCoachView) {
+      href += "&coachView=1";
+    }
+
+    return href;
   }
 
   function populateUserInfo() {
@@ -905,19 +1061,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     var emailEl = document.querySelector("[data-profile-email]");
-    var createdEl = document.querySelector("[data-profile-created]");
-    var lastSigninEl = document.querySelector("[data-profile-last-signin]");
 
     if (emailEl) {
       emailEl.textContent = state.viewUser.email || "—";
-    }
-
-    if (createdEl && state.viewUser.created_at) {
-      createdEl.textContent = formatDate(state.viewUser.created_at);
-    }
-
-    if (lastSigninEl && state.viewUser.last_sign_in_at) {
-      lastSigninEl.textContent = formatDate(state.viewUser.last_sign_in_at);
     }
   }
 
@@ -1138,9 +1284,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (!state.metricsLatest.length) {
       state.metricsList.innerHTML =
-        '<div class="metrics-empty">' +
-        '<p>No metrics recorded yet.</p>' +
-        '<p class="metrics-empty-sub">Add your first baseline metric below, or let your coach assign sport-specific tests.</p>' +
+        '<div class="profile-empty-state metrics-empty">' +
+        '<p class="profile-empty-state-title">No metrics recorded yet</p>' +
+        '<p class="profile-empty-state-copy">Add your first baseline metric, or ask your coach to assign sport-specific tests.</p>' +
+        (!state.isCoachView
+          ? '<a class="btn profile-btn-edit-profile" href="metrics-editor.html?athleteId=' + encodeURIComponent(getViewedUserId() || "") + '&athleteName=' + encodeURIComponent((state.profile && state.profile.name) || (state.viewUser && state.viewUser.email) || "Athlete") + '&personal=true">Add Baseline Metrics</a>'
+          : '') +
         "</div>";
       return;
     }
@@ -1334,6 +1483,28 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
     }
 
+    if (state.metricsCompactToggle) {
+      state.metricsCompactToggle.addEventListener("click", function () {
+        toggleMetricsCompactMode();
+      });
+    }
+
+    if (state.goalsToggleButton) {
+      state.goalsToggleButton.addEventListener("click", function () {
+        toggleGoalsListView();
+      });
+    }
+
+    document.querySelectorAll("[data-section-collapse-toggle]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var section = String(btn.getAttribute("data-section-collapse-toggle") || "").trim();
+        if (!section) {
+          return;
+        }
+        toggleSectionCollapsed(section);
+      });
+    });
+
     if (state.metricsSummaryBtn) {
       state.metricsSummaryBtn.addEventListener("click", onGenerateMetricSummaryPdf);
     }
@@ -1348,6 +1519,21 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (state.stravaDisconnectBtn) {
       state.stravaDisconnectBtn.addEventListener("click", onStravaDisconnect);
+    }
+
+    if (state.stravaMetricsGrid) {
+      state.stravaMetricsGrid.addEventListener("click", function (event) {
+        var connectBtn = event.target && event.target.closest("[data-inline-strava-connect]");
+        if (connectBtn) {
+          onStravaConnect();
+          return;
+        }
+
+        var syncBtn = event.target && event.target.closest("[data-inline-strava-sync]");
+        if (syncBtn) {
+          onStravaSync();
+        }
+      });
     }
 
     if (state.nutritionTargetsForm) {
@@ -1541,6 +1727,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     applyMetricsSectionPreference();
+    applyMetricsCompactPreference();
+    applySectionCollapsePreferences();
+    applyGoalsListPreference();
 
     var resetPasswordBtn = document.querySelector("[data-profile-reset-password]");
     if (resetPasswordBtn) {
@@ -1941,6 +2130,143 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
   }
 
+  function applyMetricsCompactPreference() {
+    var compact = true;
+    try {
+      var value = window.localStorage.getItem(METRICS_COMPACT_KEY);
+      if (value === "0") {
+        compact = false;
+      } else if (value === "1") {
+        compact = true;
+      }
+    } catch (_error) {
+      compact = true;
+    }
+
+    setMetricsCompactMode(compact, false);
+  }
+
+  function toggleMetricsCompactMode() {
+    if (!state.metricsList) {
+      return;
+    }
+
+    var compact = !state.metricsList.classList.contains("is-compact");
+    setMetricsCompactMode(compact, true);
+  }
+
+  function setMetricsCompactMode(compact, persist) {
+    if (!state.metricsList) {
+      return;
+    }
+
+    state.metricsList.classList.toggle("is-compact", !!compact);
+
+    if (compact) {
+      closeAllMetricCardEditors();
+    }
+
+    if (state.metricsCompactToggle) {
+      state.metricsCompactToggle.textContent = compact ? "Show Details" : "Hide Details";
+      state.metricsCompactToggle.setAttribute("aria-pressed", compact ? "false" : "true");
+    }
+
+    if (persist) {
+      try {
+        window.localStorage.setItem(METRICS_COMPACT_KEY, compact ? "1" : "0");
+      } catch (_error) {
+        /* localStorage may be unavailable */
+      }
+    }
+  }
+
+  function getCollapseStorageKey(sectionName) {
+    var section = String(sectionName || "").trim().toLowerCase();
+    if (section === "strava") {
+      return STRAVA_COLLAPSE_KEY;
+    }
+    if (section === "danger") {
+      return DANGER_COLLAPSE_KEY;
+    }
+    return "";
+  }
+
+  function getSectionToggleElements(sectionName) {
+    var section = String(sectionName || "").trim().toLowerCase();
+    if (!section) {
+      return { content: null, toggle: null };
+    }
+
+    var content = document.querySelector('[data-section-collapse-content="' + section + '"]');
+    var toggle = document.querySelector('[data-section-collapse-toggle="' + section + '"]');
+    return { content: content, toggle: toggle };
+  }
+
+  function getSectionToggleText(sectionName, collapsed) {
+    var section = String(sectionName || "").trim().toLowerCase();
+    if (section === "strava") {
+      return collapsed ? "Show Strava" : "Hide Strava";
+    }
+    if (section === "danger") {
+      return collapsed ? "Show Danger Zone" : "Hide Danger Zone";
+    }
+    return collapsed ? "Show Section" : "Hide Section";
+  }
+
+  function setSectionCollapsed(sectionName, collapsed, persist) {
+    var elements = getSectionToggleElements(sectionName);
+    if (!elements.content || !elements.toggle) {
+      return;
+    }
+
+    var isCollapsed = !!collapsed;
+    elements.content.hidden = isCollapsed;
+    elements.toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+    elements.toggle.textContent = getSectionToggleText(sectionName, isCollapsed);
+
+    if (persist) {
+      var storageKey = getCollapseStorageKey(sectionName);
+      if (storageKey) {
+        try {
+          window.localStorage.setItem(storageKey, isCollapsed ? "1" : "0");
+        } catch (_error) {
+          /* localStorage may be unavailable */
+        }
+      }
+    }
+  }
+
+  function toggleSectionCollapsed(sectionName) {
+    var elements = getSectionToggleElements(sectionName);
+    if (!elements.content) {
+      return;
+    }
+
+    setSectionCollapsed(sectionName, !elements.content.hidden, true);
+  }
+
+  function applySectionCollapsePreferences() {
+    ["strava", "danger"].forEach(function (sectionName) {
+      var storageKey = getCollapseStorageKey(sectionName);
+      var collapsed = true;
+
+      if (storageKey) {
+        try {
+          var value = window.localStorage.getItem(storageKey);
+          if (value === "0") {
+            collapsed = false;
+          } else if (value === "1") {
+            collapsed = true;
+          }
+        } catch (_error) {
+          collapsed = true;
+        }
+      }
+
+      setSectionCollapsed(sectionName, collapsed, false);
+    });
+  }
+
   function getMetricKey(metric) {
     var name = normalizeMetricValue(metric && metric.metric_name);
     var unit = normalizeMetricValue(metric && metric.metric_unit);
@@ -2250,14 +2576,27 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         return String(b.created_at || "").localeCompare(String(a.created_at || ""));
       });
 
+    updateQuickGlanceGoals(items);
+
     renderGoalCountdown(items);
 
     if (!items.length) {
-      state.goalsList.innerHTML = '<p class="profile-loading">No goals added yet. Use Manage Goals to add races, trips, and milestones.</p>';
+      updateGoalsToggleButton(0, 0);
+      state.goalsList.innerHTML =
+        '<div class="profile-empty-state">' +
+          '<p class="profile-empty-state-title">No goals or events yet</p>' +
+          '<p class="profile-empty-state-copy">Add your next race, event, or milestone to keep training focused.</p>' +
+          (!state.isCoachView
+            ? '<a href="' + escapeAttribute(getGoalsPageHref()) + '" class="btn profile-btn-edit-profile">Add Goal</a>'
+            : '') +
+        '</div>';
       return;
     }
 
-    var visibleItems = items.slice(0, 4);
+    var defaultGoalCount = 2;
+    var visibleCount = state.goalsShowAll ? items.length : Math.min(defaultGoalCount, items.length);
+    var visibleItems = items.slice(0, visibleCount);
+    updateGoalsToggleButton(items.length, visibleCount);
 
     state.goalsList.innerHTML = visibleItems
       .map(function (item) {
@@ -2292,12 +2631,47 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       })
       .join("");
 
-    if (items.length > visibleItems.length) {
-      state.goalsList.innerHTML +=
-        '<p class="profile-goals-more-note">' +
-        escapeHtml(String(items.length - visibleItems.length)) +
-        ' more goals. Use Manage Goals to view all.</p>';
+  }
+
+  function applyGoalsListPreference() {
+    var showAll = false;
+    try {
+      showAll = window.localStorage.getItem(GOALS_VIEW_ALL_KEY) === "1";
+    } catch (_error) {
+      showAll = false;
     }
+    state.goalsShowAll = !!showAll;
+  }
+
+  function toggleGoalsListView() {
+    state.goalsShowAll = !state.goalsShowAll;
+
+    try {
+      window.localStorage.setItem(GOALS_VIEW_ALL_KEY, state.goalsShowAll ? "1" : "0");
+    } catch (_error) {
+      /* localStorage may be unavailable */
+    }
+
+    renderGoalItems();
+  }
+
+  function updateGoalsToggleButton(totalCount, visibleCount) {
+    if (!state.goalsToggleButton) {
+      return;
+    }
+
+    var shouldShow = totalCount > 2;
+    state.goalsToggleButton.hidden = !shouldShow;
+    if (!shouldShow) {
+      return;
+    }
+
+    if (state.goalsShowAll) {
+      state.goalsToggleButton.textContent = "Show Fewer Goals";
+      return;
+    }
+
+    state.goalsToggleButton.textContent = "Show All Goals (" + String(totalCount - visibleCount) + " more)";
   }
 
   function renderGoalCountdown(items) {
@@ -2312,7 +2686,13 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (!activeUpcoming.length) {
       state.goalsCountdown.innerHTML =
-        '<div class="profile-goals-countdown-card is-empty"><p class="profile-goals-countdown-label">Next Countdown</p><strong>Add a dated event to start your countdown</strong></div>';
+        '<div class="profile-goals-countdown-card is-empty">' +
+          '<p class="profile-goals-countdown-label">Next Event</p>' +
+          '<strong>Add a dated event to start your countdown</strong>' +
+          (!state.isCoachView
+            ? '<a href="' + escapeAttribute(getGoalsPageHref()) + '" class="btn profile-btn-cancel profile-goals-empty-action">Set First Event</a>'
+            : '') +
+        '</div>';
       return;
     }
 
@@ -2578,6 +2958,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   function renderNutritionDashboard() {
     renderNutritionTodayProgress();
     renderNutritionSummary();
+    updateQuickGlanceNutrition();
   }
 
   function renderNutritionTodayProgress() {
@@ -2650,8 +3031,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var logs = sortNutritionLogs(state.nutritionLogs || []);
     if (!logs.length) {
       state.nutritionSummary.innerHTML =
-        '<article class="profile-nutrition-summary-card"><span class="profile-nutrition-summary-card-label">Summary</span><strong class="profile-nutrition-summary-card-value">No nutrition logs yet</strong></article>' +
-        '<article class="profile-nutrition-summary-card"><span class="profile-nutrition-summary-card-label">Next Step</span><strong class="profile-nutrition-summary-card-value">Use Log Food to add your first entry</strong></article>';
+        '<div class="profile-empty-state">' +
+          '<p class="profile-empty-state-title">No nutrition logs yet</p>' +
+          '<p class="profile-empty-state-copy">Track today\'s meals to unlock progress and target adherence insights.</p>' +
+        '</div>';
       return;
     }
 
@@ -2707,7 +3090,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     var logs = sortNutritionLogs(state.nutritionLogs || []);
     if (!logs.length) {
-      state.nutritionList.innerHTML = '<p class="profile-loading">No nutrition logs yet. Add your first entry above.</p>';
+      state.nutritionList.innerHTML =
+        '<div class="profile-empty-state">' +
+          '<p class="profile-empty-state-title">No nutrition history yet</p>' +
+          '<p class="profile-empty-state-copy">Log meals to build your daily and weekly trend history.</p>' +
+          '<a href="' + escapeAttribute(state.nutritionManageLink && state.nutritionManageLink.href ? state.nutritionManageLink.href : "athlete-nutrition.html") + '" class="btn profile-btn-cancel">Open Nutrition Log</a>' +
+        '</div>';
       return;
     }
 
@@ -2715,15 +3103,15 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.nutritionList.innerHTML = visible
       .map(function (log) {
         var chips = [];
+        var mealName = extractMealNameFromNotes(log.notes);
+        var visibleNotes = extractVisibleNutritionNotes(log.notes);
         if (log.calories != null) chips.push("Calories " + formatInteger(log.calories));
         if (log.protein_g != null) chips.push("Protein " + formatInteger(log.protein_g) + "g");
         if (log.carbs_g != null) chips.push("Carbs " + formatInteger(log.carbs_g) + "g");
         if (log.fats_g != null) chips.push("Fat " + formatInteger(log.fats_g) + "g");
         if (log.fiber_g != null) chips.push("Fiber " + formatInteger(log.fiber_g) + "g");
         if (log.hydration_l != null) chips.push("Hydration " + formatDecimal(log.hydration_l, 1) + "L");
-        if (log.meal_quality != null) chips.push("Meal Quality " + formatInteger(log.meal_quality) + "/5");
-        if (log.energy_level != null) chips.push("Energy " + formatInteger(log.energy_level) + "/5");
-        if (log.hunger_level != null) chips.push("Hunger Control " + formatInteger(log.hunger_level) + "/5");
+        if (mealName) chips.unshift("Meal " + mealName);
 
         return (
           '<article class="profile-nutrition-log-item">' +
@@ -2740,11 +3128,37 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
                 return '<span class="profile-nutrition-chip">' + escapeHtml(chip) + "</span>";
               }).join("") +
             "</div>" +
-            (log.notes ? '<p class="profile-nutrition-notes">' + escapeHtml(log.notes) + "</p>" : "") +
+            (visibleNotes ? '<p class="profile-nutrition-notes">' + escapeHtml(visibleNotes) + "</p>" : "") +
           "</article>"
         );
       })
       .join("");
+  }
+
+  function extractMealNameFromNotes(notes) {
+    var text = String(notes || "").trim();
+    if (!text) {
+      return "";
+    }
+
+    var firstLine = text.split(/\r?\n/)[0] || "";
+    var match = firstLine.match(/^\[Meal\]\s*(.+)$/i);
+    return match ? String(match[1] || "").trim() : "";
+  }
+
+  function extractVisibleNutritionNotes(notes) {
+    var text = String(notes || "").trim();
+    if (!text) {
+      return "";
+    }
+
+    if (!/^\[Meal\]\s*/i.test(text)) {
+      return text;
+    }
+
+    var lines = text.split(/\r?\n/);
+    lines.shift();
+    return lines.join("\n").trim();
   }
 
   function onNutritionTargetsSubmit(event) {
@@ -3311,6 +3725,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (isLoading) {
       state.stravaConnectionMeta.innerHTML = '<p class="profile-loading">Checking Strava connection...</p>';
+      state.readinessStravaConnected = false;
+      state.readinessRecoveryScore = null;
+      updateDailyReadinessCard();
       return;
     }
 
@@ -3336,6 +3753,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         : "Connect your Strava account to pull activity and recovery metrics into this dashboard.";
       state.stravaConnectionMeta.innerHTML =
         '<p class="strava-connection-empty">' + escapeHtml(coachHint) + "</p>";
+      state.readinessStravaConnected = false;
+      state.readinessRecoveryScore = null;
+      updateDailyReadinessCard();
       return;
     }
 
@@ -3349,6 +3769,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       '<div class="strava-connection-item"><span>Connection Status</span><strong>' + escapeHtml(statusText) + "</strong></div>" +
       '<div class="strava-connection-item"><span>Last Sync</span><strong>' + escapeHtml(syncLabel) + "</strong></div>" +
       "</div>";
+    state.readinessStravaConnected = true;
+    updateDailyReadinessCard();
   }
 
   function renderStravaMetrics(rows) {
@@ -3358,8 +3780,18 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     var data = Array.isArray(rows) ? rows : [];
     if (!data.length) {
+      state.readinessRecoveryScore = null;
       state.stravaMetricsGrid.innerHTML =
-        '<p class="strava-empty">No Strava metrics synced yet. Sync after connecting to populate this section.</p>';
+        '<div class="profile-empty-state">' +
+          '<p class="profile-empty-state-title">No recovery metrics yet</p>' +
+          '<p class="profile-empty-state-copy">Connect and sync Strava to unlock readiness and recovery trends.</p>' +
+          (state.stravaConnection
+            ? '<button type="button" class="btn profile-btn-cancel" data-inline-strava-sync>Sync Strava</button>'
+            : (canManageStravaConnection()
+              ? '<button type="button" class="btn profile-btn-edit-profile" data-inline-strava-connect>Connect Strava</button>'
+              : '')) +
+        '</div>';
+      updateDailyReadinessCard();
       return;
     }
 
@@ -3385,6 +3817,13 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       { label: "HRV", value: formatNullableNumber(latestWithRecovery && latestWithRecovery.hrv_ms, " ms") }
     ];
 
+    var recoveryScore = Number(latestWithRecovery && latestWithRecovery.recovery_score);
+    var restingHr = Number(latestWithRecovery && latestWithRecovery.resting_hr);
+    var hrvMs = Number(latestWithRecovery && latestWithRecovery.hrv_ms);
+
+    state.readinessRecoveryScore = Number.isFinite(recoveryScore) ? recoveryScore : null;
+    updateDailyReadinessCard();
+
     state.stravaMetricsGrid.innerHTML = cards
       .map(function (item) {
         return (
@@ -3395,6 +3834,80 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         );
       })
       .join("");
+  }
+
+  function updateDailyReadinessCard() {
+    var score = 55;
+    var notes = [];
+
+    if ((state.readinessTrainingActiveCount || 0) > 0) {
+      score += 10;
+      notes.push("training plan active");
+    } else {
+      score -= 10;
+      notes.push("no active training plan");
+    }
+
+    if (Number.isFinite(state.readinessNutritionPct)) {
+      var nutritionPct = Number(state.readinessNutritionPct);
+      if (nutritionPct >= 80 && nutritionPct <= 115) {
+        score += 12;
+        notes.push("nutrition aligned");
+      } else if (nutritionPct >= 60 && nutritionPct <= 130) {
+        score += 6;
+        notes.push("nutrition partially aligned");
+      } else {
+        score -= 6;
+        notes.push("nutrition off target");
+      }
+    } else {
+      notes.push("nutrition baseline incomplete");
+    }
+
+    if (Number.isFinite(state.readinessRecoveryScore)) {
+      var recoveryImpact = Math.max(-20, Math.min(20, (Number(state.readinessRecoveryScore) - 50) * 0.4));
+      score += recoveryImpact;
+      notes.push("recovery score " + formatInteger(state.readinessRecoveryScore));
+    } else if (state.readinessStravaConnected) {
+      score += 2;
+      notes.push("sync Strava for full recovery context");
+    } else {
+      score -= 8;
+      notes.push("connect Strava for recovery insights");
+    }
+
+    if (Number.isFinite(state.readinessNextEventDays)) {
+      var days = Number(state.readinessNextEventDays);
+      if (days <= 2) {
+        score -= 12;
+        notes.push("event very close");
+      } else if (days <= 7) {
+        score -= 7;
+        notes.push("event within 7 days");
+      } else if (days <= 14) {
+        score -= 3;
+        notes.push("event within 14 days");
+      }
+    }
+
+    score = Math.max(1, Math.min(99, Math.round(score)));
+
+    var readinessLabel = "Moderate";
+    var variant = "";
+    if (score >= 75) {
+      readinessLabel = "Ready";
+      variant = "good";
+    } else if (score < 60) {
+      readinessLabel = "Caution";
+      variant = "alert";
+    }
+
+    updateQuickGlanceCard(
+      "strava",
+      readinessLabel + " " + String(score),
+      notes.slice(0, 2).join(" | "),
+      variant
+    );
   }
 
   function onStravaConnect() {
@@ -3730,6 +4243,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       .then(function (result) {
         if (result.error) {
           contentElement.innerHTML = '<p class="profile-training-error">' + escapeHtml(result.error.message) + "</p>";
+          updateQuickGlanceCard("training", "Unavailable", "Could not load training programs", "alert");
           return;
         }
 
@@ -3787,6 +4301,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           '<p class="profile-training-error">' +
           escapeHtml(error && error.message ? error.message : "Failed to load training program.") +
           "</p>";
+        updateQuickGlanceCard("training", "Unavailable", "Could not load training programs", "alert");
       });
   }
 
@@ -3797,6 +4312,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var pastPrograms = (programs || []).filter(function (program) {
       return !program.is_active;
     });
+
+    updateQuickGlanceTraining(activePrograms.length, pastPrograms.length);
 
     var html = '';
 
@@ -3814,7 +4331,14 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     html += '<div class="training-program-tab-panel" data-training-program-panel="current">';
     if (!activePrograms.length) {
-      html += '<p class="profile-training-none">You have no active training programs assigned right now.</p>';
+      html +=
+        '<div class="profile-empty-state">' +
+          '<p class="profile-empty-state-title">No training session assigned</p>' +
+          '<p class="profile-empty-state-copy">Activate a plan so your current workout appears here.</p>' +
+          (state.isCoachView
+            ? '<p class="profile-empty-state-copy">Use coach actions above to assign a program.</p>'
+            : '<a class="btn profile-btn-cancel" href="training-programs.html">Browse Program Library</a>') +
+        '</div>';
     } else {
       html += '<div class="training-program-grid training-program-grid-active">';
       activePrograms.forEach(function (program) {
@@ -3826,7 +4350,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     html += '<div class="training-program-tab-panel" data-training-program-panel="past" hidden>';
     if (!pastPrograms.length) {
-      html += '<p class="profile-training-none training-history-empty">No past programs yet.</p>';
+      html +=
+        '<div class="profile-empty-state training-history-empty">' +
+          '<p class="profile-empty-state-title">No past programs yet</p>' +
+          '<p class="profile-empty-state-copy">Completed programs will appear here for review.</p>' +
+        '</div>';
     } else {
       html += '<div class="training-program-grid training-program-grid-past">';
       pastPrograms.forEach(function (program) {
@@ -3839,6 +4367,172 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     html += '<p class="profile-status training-program-status" role="status" aria-live="polite" data-training-program-status></p>';
 
     contentElement.innerHTML = html;
+  }
+
+  function renderDashboardQuickGlanceDefaults() {
+    state.readinessTrainingActiveCount = 0;
+    state.readinessNextEventDays = null;
+    state.readinessNutritionPct = null;
+    state.readinessRecoveryScore = null;
+    state.readinessStravaConnected = false;
+    updateQuickGlanceCard("training", "Loading...", "Checking today's session", "");
+    updateQuickGlanceCard("goals", "Loading...", "Finding your next event", "");
+    updateQuickGlanceCard("nutrition", "Loading...", "Checking today's intake", "");
+    updateQuickGlanceCard("strava", "Loading...", "Checking recovery signals", "");
+  }
+
+  function updateQuickGlanceTraining(activeCount, pastCount) {
+    var active = Number(activeCount) || 0;
+    var past = Number(pastCount) || 0;
+    state.readinessTrainingActiveCount = active;
+    if (active > 0) {
+      updateQuickGlanceCard(
+        "training",
+        "Session Ready",
+        String(active) + " active program" + (active === 1 ? "" : "s") + " | " + String(past) + " past",
+        "good"
+      );
+      updateDailyReadinessCard();
+      return;
+    }
+
+    updateQuickGlanceCard(
+      "training",
+      "No Session Assigned",
+      state.isCoachView ? "Assign a program from coach actions" : "Activate a plan to get today's workout",
+      "alert"
+    );
+    updateDailyReadinessCard();
+  }
+
+  function updateQuickGlanceGoals(items) {
+    var list = Array.isArray(items) ? items : [];
+    var active = list.filter(function (item) {
+      return String(item && item.status || "active") !== "completed";
+    });
+
+    var activeEvents = active.filter(function (item) {
+      var type = String(item && item.goal_type || "").toLowerCase();
+      if (type === "race" || type === "event" || type === "trip") {
+        return true;
+      }
+
+      var title = String(item && item.title || "").toLowerCase();
+      return /race|event|competition|meet|marathon|ultra|triathlon/.test(title);
+    });
+
+    if (!activeEvents.length) {
+      state.readinessNextEventDays = null;
+      updateQuickGlanceCard("goals", "No Event Set", "Add a race, event, or trip to anchor your training", "alert");
+      updateDailyReadinessCard();
+      return;
+    }
+
+    var withDate = activeEvents.filter(function (item) {
+      return !!(item && item.target_date);
+    }).sort(function (a, b) {
+      return String(a.target_date || "").localeCompare(String(b.target_date || ""));
+    });
+
+    if (!withDate.length) {
+      state.readinessNextEventDays = null;
+      updateQuickGlanceCard("goals", String(activeEvents.length) + " Event" + (activeEvents.length === 1 ? "" : "s"), "Add target dates to start countdowns", "");
+      updateDailyReadinessCard();
+      return;
+    }
+
+    var nextItem = withDate[0];
+    var daysUntil = getDaysUntilDate(nextItem.target_date);
+    state.readinessNextEventDays = typeof daysUntil === "number" ? daysUntil : null;
+    var meta = "Next: " + (nextItem.title || "Upcoming milestone");
+    var value = "Upcoming";
+    if (typeof daysUntil === "number") {
+      if (daysUntil > 0) {
+        value = daysUntil + " days";
+      } else if (daysUntil === 0) {
+        value = "Today";
+      } else {
+        value = Math.abs(daysUntil) + " days ago";
+      }
+    }
+
+    updateQuickGlanceCard("goals", value, meta, daysUntil === 0 ? "good" : "");
+    updateDailyReadinessCard();
+  }
+
+  function updateQuickGlanceNutrition() {
+    var logs = sortNutritionLogs(state.nutritionLogs || []);
+    var todayKey = getTodayDateInputValue();
+    var today = logs.find(function (log) {
+      return String(log && log.logged_on || "") === todayKey;
+    }) || null;
+
+    if (!today) {
+      state.readinessNutritionPct = null;
+      updateQuickGlanceCard("nutrition", "No Entry Today", "Add food to track daily intake", "alert");
+      updateDailyReadinessCard();
+      return;
+    }
+
+    var calories = Number(today.calories);
+    var target = Number(state.nutritionTargets && state.nutritionTargets.target_calories);
+    if (Number.isFinite(calories) && Number.isFinite(target) && target > 0) {
+      var pct = Math.max(0, Math.min((calories / target) * 100, 999));
+      state.readinessNutritionPct = pct;
+      var value = formatInteger(calories) + " kcal";
+      var meta = formatInteger(pct) + "% of target";
+      updateQuickGlanceCard("nutrition", value, meta, pct >= 70 && pct <= 120 ? "good" : "");
+      updateDailyReadinessCard();
+      return;
+    }
+
+    if (Number.isFinite(calories)) {
+      state.readinessNutritionPct = null;
+      updateQuickGlanceCard("nutrition", formatInteger(calories) + " kcal", "Set calorie target for comparison", "");
+      updateDailyReadinessCard();
+      return;
+    }
+
+    state.readinessNutritionPct = null;
+    updateQuickGlanceCard("nutrition", "Logged Today", "Nutrition entry saved", "good");
+    updateDailyReadinessCard();
+  }
+
+  function updateQuickGlanceCard(type, value, meta, variant) {
+    var valueElement = null;
+    var metaElement = null;
+    var card = document.querySelector('[data-glance-card="' + String(type || "") + '"]');
+
+    if (type === "training") {
+      valueElement = state.glanceTrainingValue;
+      metaElement = state.glanceTrainingMeta;
+    } else if (type === "goals") {
+      valueElement = state.glanceGoalsValue;
+      metaElement = state.glanceGoalsMeta;
+    } else if (type === "nutrition") {
+      valueElement = state.glanceNutritionValue;
+      metaElement = state.glanceNutritionMeta;
+    } else if (type === "strava") {
+      valueElement = state.glanceStravaValue;
+      metaElement = state.glanceStravaMeta;
+    }
+
+    if (valueElement) {
+      valueElement.textContent = String(value || "--");
+    }
+
+    if (metaElement) {
+      metaElement.textContent = String(meta || "");
+    }
+
+    if (card) {
+      card.classList.remove("is-good", "is-alert");
+      if (variant === "good") {
+        card.classList.add("is-good");
+      } else if (variant === "alert") {
+        card.classList.add("is-alert");
+      }
+    }
   }
 
   function setTrainingProgramsTab(contentElement, tab) {
@@ -9533,17 +10227,114 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         : {};
 
       var fieldMarkup = fields.map(function (field) {
-        var fieldValue = sportValues[field.key] == null ? "" : String(sportValues[field.key]);
+        var rawFieldValue = sportValues[field.key];
+        var fieldValue = rawFieldValue == null ? "" : String(rawFieldValue);
+        var fieldType = String(field.type || "text").toLowerCase();
+        if (fieldType === "multi-select") {
+          var multiOptions = Array.isArray(field.options) ? field.options : [];
+          var selectedValues = normalizeMultiValue(rawFieldValue);
+          var selectedLookup = {};
+          selectedValues.forEach(function (value) {
+            selectedLookup[String(value || "").toLowerCase()] = true;
+          });
+
+          var multiOptionMarkup = multiOptions.map(function (option) {
+            var optionValue = typeof option === "object" && option
+              ? String(option.value || option.label || "")
+              : String(option || "");
+            if (!optionValue) {
+              return "";
+            }
+            var optionLabel = typeof option === "object" && option
+              ? String(option.label || option.value || optionValue)
+              : optionValue;
+            var checkedAttr = selectedLookup[optionValue.toLowerCase()] ? ' checked' : '';
+            var optionId = 'overview-' + sport + '-' + field.key + '-' + optionValue
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-+|-+$/g, "");
+            return (
+              '<label class="sport-overview-chip" for="' + escapeAttribute(optionId) + '">' +
+              '<input id="' + escapeAttribute(optionId) + '" type="checkbox" data-sport-overview-field data-field-type="multi-check" data-overview-key="' +
+              escapeAttribute(field.key) +
+              '" value="' +
+              escapeAttribute(optionValue) +
+              '"' + checkedAttr + ' />' +
+              '<span>' + escapeHtml(optionLabel) + '</span>' +
+              '</label>'
+            );
+          }).join("");
+
+          return (
+            '<div class="sport-overview-field">' +
+            '<label>' + escapeHtml(field.label) + "</label>" +
+            '<div class="sport-overview-chip-group">' + multiOptionMarkup + '</div>' +
+            "</div>"
+          );
+        }
+
+        if (fieldType === "select") {
+          var options = Array.isArray(field.options) ? field.options : [];
+          var placeholder = String(field.placeholder || "Select an option");
+          var optionMarkup = ['<option value="">' + escapeHtml(placeholder) + '</option>'];
+          options.forEach(function (option) {
+            var optionValue = typeof option === "object" && option
+              ? String(option.value || option.label || "")
+              : String(option || "");
+            if (!optionValue) {
+              return;
+            }
+            var optionLabel = typeof option === "object" && option
+              ? String(option.label || option.value || optionValue)
+              : optionValue;
+            var selectedAttr = fieldValue.toLowerCase() === optionValue.toLowerCase() ? ' selected' : '';
+            optionMarkup.push(
+              '<option value="' + escapeAttribute(optionValue) + '"' + selectedAttr + '>' +
+              escapeHtml(optionLabel) +
+              '</option>'
+            );
+          });
+
+          return (
+            '<div class="sport-overview-field">' +
+            '<label>' + escapeHtml(field.label) + "</label>" +
+            '<select data-sport-overview-field data-overview-key="' +
+            escapeAttribute(field.key) +
+            '\">' + optionMarkup.join("") + '</select>' +
+            "</div>"
+          );
+        }
+
+        if (fieldType === "textarea") {
+          return (
+            '<div class="sport-overview-field">' +
+            '<label>' + escapeHtml(field.label) + "</label>" +
+            '<textarea data-sport-overview-field data-overview-key="' +
+            escapeAttribute(field.key) +
+            '" rows="' +
+            escapeAttribute(String(field.rows || "3")) +
+            '" placeholder="' +
+            escapeAttribute(field.placeholder || "") +
+            '">' +
+            escapeHtml(fieldValue) +
+            '</textarea>' +
+            "</div>"
+          );
+        }
+
+        var minAttr = field.min != null ? ' min="' + escapeAttribute(String(field.min)) + '"' : "";
+        var maxAttr = field.max != null ? ' max="' + escapeAttribute(String(field.max)) + '"' : "";
+        var stepAttr = field.step != null ? ' step="' + escapeAttribute(String(field.step)) + '"' : "";
         return (
           '<div class="sport-overview-field">' +
           '<label>' + escapeHtml(field.label) + "</label>" +
-          '<input type="text" data-sport-overview-field data-overview-key="' +
+          '<input type="' + escapeAttribute(fieldType || "text") + '" data-sport-overview-field data-overview-key="' +
           escapeAttribute(field.key) +
           '" value="' +
           escapeAttribute(fieldValue) +
           '" placeholder="' +
           escapeAttribute(field.placeholder || "") +
-          '" />' +
+          '"' + minAttr + maxAttr + stepAttr + ' />' +
           "</div>"
         );
       }).join("");
@@ -9579,6 +10370,17 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       card.querySelectorAll("[data-sport-overview-field]").forEach(function (input) {
         var key = String(input.getAttribute("data-overview-key") || "").trim();
         if (!key) {
+          return;
+        }
+
+        var fieldType = String(input.getAttribute("data-field-type") || "").toLowerCase();
+        if (fieldType === "multi-check") {
+          if (input.checked) {
+            if (!Array.isArray(sportValues[key])) {
+              sportValues[key] = [];
+            }
+            sportValues[key].push(String(input.value || "").trim());
+          }
           return;
         }
 
@@ -9631,7 +10433,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         detailEntries = buildClimbingDetailEntries(details, profile);
       } else {
         detailEntries = Object.keys(details || {}).map(function (key) {
-          return '<li><strong>' + escapeHtml(prettifyOverviewKey(key)) + ':</strong> ' + escapeHtml(details[key]) + "</li>";
+          return '<li><strong>' + escapeHtml(prettifyOverviewKey(key)) + ':</strong> ' + escapeHtml(formatOverviewValue(details[key])) + "</li>";
         }).join("");
       }
 
@@ -9658,7 +10460,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       if (details[key]) {
         entries.push(
           '<li><strong>' + escapeHtml(prettifyOverviewKey(key)) + ':</strong> ' + 
-          escapeHtml(details[key]) + "</li>"
+          escapeHtml(formatOverviewValue(details[key])) + "</li>"
         );
       }
     });
@@ -9687,6 +10489,45 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       .replace(/\b\w/g, function (char) {
         return char.toUpperCase();
       });
+  }
+
+  function normalizeMultiValue(value) {
+    if (value == null) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .map(function (item) {
+          return String(item || "").trim();
+        })
+        .filter(function (item) {
+          return !!item;
+        });
+    }
+
+    return String(value)
+      .split(",")
+      .map(function (item) {
+        return String(item || "").trim();
+      })
+      .filter(function (item) {
+        return !!item;
+      });
+  }
+
+  function formatOverviewValue(value) {
+    if (Array.isArray(value)) {
+      return value
+        .map(function (item) {
+          return String(item || "").trim();
+        })
+        .filter(function (item) {
+          return !!item;
+        })
+        .join(", ");
+    }
+    return String(value == null ? "" : value);
   }
 
   function getSportLabel(sport) {
