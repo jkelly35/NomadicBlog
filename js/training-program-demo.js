@@ -16,14 +16,19 @@
     athleteName: "",
     isAthleteLockedView: false,
     isProgramReadOnly: false,
+    coachUserId: null,
     structure: {
       weeks: 1,
       workoutsPerWeek: 3
     },
     templateFocus: "strength",
+    savedWorkoutBlocks: [],
     daySessionTypes: {},
     customDayNames: {},
     customDayNameMode: "legacy-suffix",
+    workoutBlockFilterTag: "all",
+    editingWorkoutBlockId: null,
+    draggingWorkoutBlockId: null,
     editingExerciseIdx: null,
     athleteMobileOpenByDay: {},
     lastViewportWidth: null,
@@ -32,6 +37,7 @@
 
   var TEMPLATE_DRAFT_PREFIX = "nomadic_training_program_template_builder_draft_";
   var TEMPLATE_MARKER = "__NOMADIC_TEMPLATE__";
+  var WORKOUT_BLOCK_LIBRARY_KEY = "nomadic_template_workout_blocks_v1";
 
   var dayLabels = {
     "w1d1": "Lower Body Power",
@@ -47,11 +53,56 @@
     "Cool Down"
   ];
 
+  var QUICK_EXERCISE_LIBRARY = {
+    "warmup-flow": {
+      name: "Warm-Up Flow",
+      section: "Warm Up",
+      mode: "time",
+      sets: [{ reps: "8 min", weight: "BW", rpe: "", rest: "", notes: "Mobility + activation", done: false }]
+    },
+    "main-strength": {
+      name: "Main Strength Lift",
+      section: "A Block",
+      mode: "reps",
+      sets: [
+        { reps: "5", weight: "", rpe: "7", rest: "120s", notes: "", done: false },
+        { reps: "5", weight: "", rpe: "8", rest: "120s", notes: "", done: false },
+        { reps: "5", weight: "", rpe: "8", rest: "120s", notes: "", done: false }
+      ]
+    },
+    "power-plyo": {
+      name: "Power / Plyometric Series",
+      section: "B Block",
+      mode: "reps",
+      sets: [{ reps: "4 x 3", weight: "BW", rpe: "Fast", rest: "90s", notes: "Quality contacts", done: false }]
+    },
+    "endurance-intervals": {
+      name: "Endurance Intervals",
+      section: "A Block",
+      mode: "endurance",
+      sets: [{ reps: "5 x 3:00", weight: "", rpe: "Z4", rest: "90s", notes: "Steady pacing", done: false }]
+    },
+    "grip-climb": {
+      name: "Grip / Climbing Strength",
+      section: "B Block",
+      mode: "time",
+      sets: [{ reps: "6 x 10s", weight: "20mm edge", rpe: "", rest: "120s", notes: "Submax effort", done: false }]
+    },
+    "cooldown-reset": {
+      name: "Cool Down Reset",
+      section: "Cool Down",
+      mode: "time",
+      sets: [{ reps: "8 min", weight: "", rpe: "", rest: "", notes: "Breathing + mobility", done: false }]
+    }
+  };
+
   document.addEventListener("DOMContentLoaded", function () {
     initialize();
   });
 
   function initialize() {
+    setTemplateBuilderChromeVisible(false);
+    loadSavedWorkoutBlocks();
     configureBuilderMode();
     configureAssignedTemplateMode();
     setProgramTitleFromQuery();
@@ -112,6 +163,8 @@
     }
 
     setupExerciseEditorModal();
+    bindTemplateWorkspaceEvents();
+    bindTemplateKeyboardShortcuts();
 
     if (addExerciseBtn) {
       addExerciseBtn.addEventListener("click", function () {
@@ -193,6 +246,7 @@
       }
 
       if (!state.client) {
+        lockBuilderToReadOnly();
         setStatus("Template editing is coach-only and requires an authenticated session.", "info");
         return;
       }
@@ -205,12 +259,14 @@
 
         if (!isCoach) {
           state.isTemplateBuilder = false;
+          lockBuilderToReadOnly();
           refreshTemplateDayTools();
           setStatus("Template editing tools are available to coach accounts only.", "info");
           return;
         }
 
         state.isTemplateBuilder = true;
+        state.coachUserId = user && user.id ? String(user.id) : null;
         state.storagePrefix = TEMPLATE_DRAFT_PREFIX;
         clearBuilderDrafts();
 
@@ -219,11 +275,14 @@
         }
 
         applyBuilderModeUi();
+        loadSavedWorkoutBlocksFromCloud();
         ensureDaySessionTypesForStructure();
         refreshTemplateDayTools();
         updateDayInfo();
       }).catch(function () {
         state.isTemplateBuilder = false;
+        state.coachUserId = null;
+        lockBuilderToReadOnly();
         refreshTemplateDayTools();
         setStatus("Could not verify coach access. Template editing was disabled.", "info");
       });
@@ -276,6 +335,7 @@
     var subtitle = document.querySelector(".program-demo-subtitle");
     var dayTools = document.querySelector("[data-template-day-tools]");
     var dayTypeControls = document.querySelector("[data-template-day-type-controls]");
+    var templateWorkspace = document.querySelector("[data-template-workspace]");
 
     if (document.body) {
       document.body.classList.add("athlete-locked-view");
@@ -321,6 +381,12 @@
       dayTypeControls.hidden = true;
       dayTypeControls.style.display = "none";
     }
+
+    if (templateWorkspace) {
+      templateWorkspace.hidden = true;
+    }
+
+    setTemplateBuilderChromeVisible(false);
   }
 
   function applyBuilderModeUi() {
@@ -341,6 +407,7 @@
     var backLink = document.querySelector("[data-program-back-link]");
     var subtitle = document.querySelector(".program-demo-subtitle");
     var kicker = document.querySelector(".program-demo-kicker");
+    var templateWorkspace = document.querySelector("[data-template-workspace]");
 
     state.isAthleteLockedView = false;
     if (document.body) {
@@ -350,6 +417,12 @@
     if (panel) {
       panel.hidden = false;
     }
+
+    if (templateWorkspace) {
+      templateWorkspace.hidden = false;
+    }
+
+    setTemplateBuilderChromeVisible(true);
 
     if (dayTypeControls) {
       dayTypeControls.hidden = false;
@@ -393,6 +466,8 @@
     if (kicker) {
       kicker.textContent = "Coaching Template";
     }
+
+    renderSavedWorkoutBlocks();
 
     if (nameInput) {
       nameInput.value = state.templateName || "";
@@ -589,6 +664,1225 @@
     setStatus("Copied this day forward to " + copied + " future slot(s).", "success");
   }
 
+  function bindTemplateWorkspaceEvents() {
+    var workspace = document.querySelector("[data-template-workspace]");
+    if (!workspace) {
+      return;
+    }
+
+    var blockTitleInput = document.querySelector("[data-template-block-title]");
+    var blockFilterInput = document.querySelector("[data-template-block-filter]");
+    if (blockTitleInput) {
+      blockTitleInput.addEventListener("keydown", function (event) {
+        if (!event || event.key !== "Enter") {
+          return;
+        }
+        event.preventDefault();
+        saveWorkoutBlockFromCurrentDay();
+      });
+    }
+
+    if (blockFilterInput) {
+      blockFilterInput.addEventListener("change", function () {
+        state.workoutBlockFilterTag = String(blockFilterInput.value || "all").trim() || "all";
+        renderSavedWorkoutBlocks();
+      });
+    }
+
+    workspace.addEventListener("click", function (event) {
+      var quickBtn = event.target && event.target.closest("[data-template-quick-add]");
+      if (quickBtn) {
+        addQuickExerciseByKey(String(quickBtn.getAttribute("data-template-quick-add") || ""));
+        return;
+      }
+
+      var quickSavedBtn = event.target && event.target.closest("[data-template-block-quick-add-selected]");
+      if (quickSavedBtn) {
+        addSelectedSavedWorkoutBlockFromPicker();
+        return;
+      }
+
+      var blockSaveBtn = event.target && event.target.closest("[data-template-block-save]");
+      if (blockSaveBtn) {
+        saveWorkoutBlockFromCurrentDay();
+        return;
+      }
+
+      var blockAddBtn = event.target && event.target.closest("[data-template-block-add]");
+      if (blockAddBtn) {
+        addSavedWorkoutBlockById(String(blockAddBtn.getAttribute("data-template-block-add") || ""));
+        return;
+      }
+
+      var blockEditBtn = event.target && event.target.closest("[data-template-block-edit]");
+      if (blockEditBtn) {
+        startEditingSavedWorkoutBlockById(String(blockEditBtn.getAttribute("data-template-block-edit") || ""));
+        return;
+      }
+
+      var blockDeleteBtn = event.target && event.target.closest("[data-template-block-delete]");
+      if (blockDeleteBtn) {
+        removeSavedWorkoutBlockById(String(blockDeleteBtn.getAttribute("data-template-block-delete") || ""));
+        return;
+      }
+
+      var bulkBtn = event.target && event.target.closest("[data-template-bulk-action]");
+      if (!bulkBtn) {
+        return;
+      }
+
+      runTemplateBulkAction(String(bulkBtn.getAttribute("data-template-bulk-action") || ""));
+    });
+
+    workspace.addEventListener("dragstart", function (event) {
+      var item = event.target && event.target.closest("[data-template-block-item]");
+      if (!item || !event.dataTransfer) {
+        return;
+      }
+
+      if (String(state.workoutBlockFilterTag || "all") !== "all") {
+        event.preventDefault();
+        setStatus("Clear tag filter before reordering saved blocks.", "info");
+        return;
+      }
+
+      var blockId = String(item.getAttribute("data-template-block-item") || "").trim();
+      if (!blockId) {
+        return;
+      }
+
+      state.draggingWorkoutBlockId = blockId;
+      item.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", blockId);
+    });
+
+    workspace.addEventListener("dragover", function (event) {
+      var item = event.target && event.target.closest("[data-template-block-item]");
+      if (!item) {
+        return;
+      }
+
+      event.preventDefault();
+      if (state.draggingWorkoutBlockId) {
+        item.classList.add("is-drag-over");
+      }
+    });
+
+    workspace.addEventListener("dragleave", function (event) {
+      var item = event.target && event.target.closest("[data-template-block-item]");
+      if (!item) {
+        return;
+      }
+      item.classList.remove("is-drag-over");
+    });
+
+    workspace.addEventListener("drop", function (event) {
+      var item = event.target && event.target.closest("[data-template-block-item]");
+      if (!item) {
+        return;
+      }
+
+      event.preventDefault();
+      var targetId = String(item.getAttribute("data-template-block-item") || "").trim();
+      var draggedId = String((event.dataTransfer && event.dataTransfer.getData("text/plain")) || state.draggingWorkoutBlockId || "").trim();
+
+      clearSavedWorkoutBlockDragState();
+
+      if (!draggedId || !targetId || draggedId === targetId) {
+        return;
+      }
+
+      reorderSavedWorkoutBlocks(draggedId, targetId);
+    });
+
+    workspace.addEventListener("dragend", function () {
+      clearSavedWorkoutBlockDragState();
+    });
+  }
+
+  function bindTemplateKeyboardShortcuts() {
+    document.addEventListener("keydown", function (event) {
+      if (!state.isTemplateBuilder || !event) {
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      var key = String(event.key || "").toLowerCase();
+      if (!key) {
+        return;
+      }
+
+      if (key === "a") {
+        event.preventDefault();
+        openExerciseEditor(null);
+        return;
+      }
+
+      if (key === "s") {
+        event.preventDefault();
+        saveTemplateProgram();
+        return;
+      }
+
+      if (key === "d") {
+        event.preventDefault();
+        copyCurrentDayToNextSlot();
+        return;
+      }
+
+      if (key === "n") {
+        event.preventDefault();
+        moveToAdjacentTemplateDay(1);
+        return;
+      }
+
+      if (key === "p") {
+        event.preventDefault();
+        moveToAdjacentTemplateDay(-1);
+        return;
+      }
+
+      if (key === "1") {
+        event.preventDefault();
+        applyDayTypeToCurrentDay("strength");
+        return;
+      }
+
+      if (key === "2") {
+        event.preventDefault();
+        applyDayTypeToCurrentDay("running");
+        return;
+      }
+
+      if (key === "3") {
+        event.preventDefault();
+        applyDayTypeToCurrentDay("biking");
+      }
+    });
+  }
+
+  function isEditableTarget(target) {
+    if (!target) {
+      return false;
+    }
+
+    var tagName = String(target.tagName || "").toLowerCase();
+    if (tagName === "input" || tagName === "textarea" || tagName === "select") {
+      return true;
+    }
+
+    if (target.isContentEditable) {
+      return true;
+    }
+
+    return !!(target.closest && target.closest("input, textarea, select, [contenteditable='true']"));
+  }
+
+  function addQuickExerciseByKey(key) {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var template = QUICK_EXERCISE_LIBRARY[String(key || "")];
+    if (!template) {
+      setStatus("Unknown quick exercise block.", "error");
+      return;
+    }
+
+    var exercise = cloneExercises([template])[0] || null;
+    if (!exercise) {
+      setStatus("Could not add quick exercise.", "error");
+      return;
+    }
+
+    exercise.superset_group = null;
+    exercise.field_toggles = normalizeExerciseFieldToggles(exercise.field_toggles, exercise.mode);
+
+    state.exercises.push(exercise);
+    saveExercisesForDay(true);
+    renderRows();
+    setStatus("Added quick block: " + exercise.name + ".", "success");
+  }
+
+  function runTemplateBulkAction(action) {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var normalizedAction = String(action || "").trim().toLowerCase();
+    if (normalizedAction === "duplicate-day-next") {
+      copyCurrentDayToNextSlot();
+      return;
+    }
+
+    if (normalizedAction === "copy-week-forward") {
+      copyCurrentWeekForward();
+      return;
+    }
+
+    if (normalizedAction === "clear-current-week") {
+      clearCurrentWeek();
+      return;
+    }
+
+    if (normalizedAction === "apply-day-type-week") {
+      applyCurrentDayTypeToWeek();
+      return;
+    }
+
+    setStatus("Unknown bulk action.", "error");
+  }
+
+  function loadSavedWorkoutBlocks() {
+    state.savedWorkoutBlocks = readSavedWorkoutBlocksFromStorage();
+  }
+
+  function loadSavedWorkoutBlocksFromCloud() {
+    if (!state.client || !state.coachUserId) {
+      return;
+    }
+
+    state.client
+      .from("coach_workout_blocks")
+      .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at")
+      .eq("coach_user_id", state.coachUserId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) {
+          return;
+        }
+
+        var cloudBlocks = normalizeCloudWorkoutBlocks(result.data || []);
+        mergeAndBackfillWorkoutBlocks(cloudBlocks).then(function (mergedBlocks) {
+          state.savedWorkoutBlocks = mergedBlocks;
+          writeSavedWorkoutBlocksToStorage(mergedBlocks);
+          renderSavedWorkoutBlocks();
+        });
+      })
+      .catch(function () {
+        // Keep local fallback when cloud read fails.
+      });
+  }
+
+  function mergeAndBackfillWorkoutBlocks(cloudBlocks) {
+    var cloudList = Array.isArray(cloudBlocks) ? cloudBlocks : [];
+    var localList = readSavedWorkoutBlocksFromStorage();
+    if (!state.client || !state.coachUserId) {
+      return Promise.resolve(cloudList.length ? cloudList : localList);
+    }
+
+    var cloudSignatures = {};
+    cloudList.forEach(function (block) {
+      cloudSignatures[workoutBlockSignature(block)] = true;
+    });
+
+    var unsyncedLocal = localList.filter(function (block) {
+      return !cloudSignatures[workoutBlockSignature(block)];
+    });
+
+    if (!unsyncedLocal.length) {
+      return Promise.resolve(cloudList);
+    }
+
+    var insertRows = unsyncedLocal.map(function (block) {
+      return {
+        coach_user_id: state.coachUserId,
+        title: String(block.title || "Workout Block").trim() || "Workout Block",
+        source_section: String(block.section || "Workout Block").trim() || "Workout Block",
+        tags: normalizeWorkoutBlockTags(block.tags || []),
+        sort_order: parseWorkoutBlockSortOrder(block.sort_order),
+        exercises: normalizeExercisesArray(block.exercises || [])
+      };
+    });
+
+    return state.client
+      .from("coach_workout_blocks")
+      .insert(insertRows)
+      .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at")
+      .then(function (insertResult) {
+        if (insertResult.error) {
+          return cloudList;
+        }
+
+        var inserted = normalizeCloudWorkoutBlocks(insertResult.data || []);
+        return sortWorkoutBlocksByCreatedAtDesc(cloudList.concat(inserted));
+      })
+      .catch(function () {
+        return cloudList;
+      });
+  }
+
+  function renderSavedWorkoutBlocks() {
+    var container = document.querySelector("[data-template-block-list]");
+    var filterInput = document.querySelector("[data-template-block-filter]");
+    var saveButton = document.querySelector("[data-template-block-save]");
+    var allBlocks = Array.isArray(state.savedWorkoutBlocks) ? state.savedWorkoutBlocks : [];
+
+    renderSavedWorkoutBlockQuickPicker(allBlocks);
+
+    if (!container) {
+      return;
+    }
+
+    var blocks = allBlocks;
+    var availableTags = collectSavedWorkoutBlockTags(blocks);
+    if (filterInput) {
+      var currentValue = String(state.workoutBlockFilterTag || "all");
+      var options = ['<option value="all">All tags</option>']
+        .concat(availableTags.map(function (tag) {
+          return '<option value="' + escapeAttribute(tag) + '">' + escapeHtml(tag) + '</option>';
+        }))
+        .join("");
+      filterInput.innerHTML = options;
+
+      if (currentValue !== "all" && availableTags.indexOf(currentValue) === -1) {
+        currentValue = "all";
+        state.workoutBlockFilterTag = "all";
+      }
+
+      filterInput.value = currentValue;
+    }
+
+    blocks = filterSavedWorkoutBlocksByTag(blocks, state.workoutBlockFilterTag);
+
+    if (saveButton) {
+      saveButton.textContent = state.editingWorkoutBlockId ? "Update Block" : "Save Block";
+    }
+
+    if (!blocks.length) {
+      container.innerHTML = '<p class="admin-loading">No saved blocks yet.</p>';
+      return;
+    }
+
+    container.innerHTML = blocks.map(function (block) {
+      var exerciseCount = Array.isArray(block.exercises) ? block.exercises.length : 0;
+      var scopeLabel = String(block.section || "Workout Block");
+      var tags = normalizeWorkoutBlockTags(block.tags || []);
+      var isEditing = String(state.editingWorkoutBlockId || "") === String(block.id || "");
+      var tagsHtml = tags.length
+        ? '<ul class="program-builder-block-tags-list">' + tags.map(function (tag) {
+            return '<li>' + escapeHtml(tag) + '</li>';
+          }).join("") + '</ul>'
+        : '';
+
+      return (
+        '<article class="program-builder-block-item" draggable="true" data-template-block-item="' + escapeAttribute(block.id || "") + '">' +
+          '<div class="program-builder-block-main">' +
+            (isEditing ? '<p class="program-builder-block-item-editing">Editing</p>' : '') +
+            '<p class="program-builder-block-name">' + escapeHtml(block.title || "Workout Block") + '</p>' +
+            '<p class="program-builder-block-meta">' + escapeHtml(scopeLabel) + ' • ' + escapeHtml(String(exerciseCount)) + ' exercise' + (exerciseCount === 1 ? '' : 's') + '</p>' +
+            tagsHtml +
+          '</div>' +
+          '<div class="program-builder-block-actions">' +
+            '<button type="button" class="btn admin-btn-small" data-template-block-add="' + escapeAttribute(block.id || "") + '">Add</button>' +
+            '<button type="button" class="btn admin-btn-small" data-template-block-edit="' + escapeAttribute(block.id || "") + '">Edit</button>' +
+            '<button type="button" class="btn admin-btn-delete-mini" data-template-block-delete="' + escapeAttribute(block.id || "") + '">Delete</button>' +
+          '</div>' +
+        '</article>'
+      );
+    }).join("");
+  }
+
+  function renderSavedWorkoutBlockQuickPicker(blocks) {
+    var picker = document.querySelector("[data-template-block-quick-select]");
+    if (!picker) {
+      return;
+    }
+
+    var sortedBlocks = sortWorkoutBlocksByCreatedAtDesc(Array.isArray(blocks) ? blocks : []);
+    var previousValue = String(picker.value || "");
+    var options = ['<option value="">Select a saved block</option>']
+      .concat(sortedBlocks.map(function (block) {
+        var title = String(block && block.title || "Workout Block");
+        var section = String(block && block.section || "Workout Block");
+        var tags = normalizeWorkoutBlockTags(block && block.tags || []);
+        var tagSuffix = tags.length ? " [" + tags.join(", ") + "]" : "";
+        var label = title + " - " + section + tagSuffix;
+        return '<option value="' + escapeAttribute(String(block && block.id || "")) + '">' + escapeHtml(label) + '</option>';
+      }))
+      .join("");
+
+    picker.innerHTML = options;
+
+    var hasPrevious = sortedBlocks.some(function (block) {
+      return String(block && block.id || "") === previousValue;
+    });
+    if (previousValue && hasPrevious) {
+      picker.value = previousValue;
+    }
+
+    var addButton = document.querySelector("[data-template-block-quick-add-selected]");
+    if (addButton) {
+      addButton.disabled = sortedBlocks.length === 0;
+    }
+  }
+
+  function addSelectedSavedWorkoutBlockFromPicker() {
+    var picker = document.querySelector("[data-template-block-quick-select]");
+    if (!picker) {
+      return;
+    }
+
+    var blockId = String(picker.value || "").trim();
+    if (!blockId) {
+      setStatus("Select a saved block first.", "info");
+      return;
+    }
+
+    addSavedWorkoutBlockById(blockId);
+  }
+
+  function saveWorkoutBlockFromCurrentDay() {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var titleInput = document.querySelector("[data-template-block-title]");
+    var sectionInput = document.querySelector("[data-template-block-section]");
+    var tagsInput = document.querySelector("[data-template-block-tags]");
+    var title = String((titleInput && titleInput.value) || "").trim();
+    var section = String((sectionInput && sectionInput.value) || "Warm Up").trim();
+    var tags = parseWorkoutBlockTags((tagsInput && tagsInput.value) || "");
+
+    if (!title) {
+      setStatus("Please add a title before saving this workout block.", "error");
+      if (titleInput) {
+        titleInput.focus();
+      }
+      return;
+    }
+
+    var sourceExercises = Array.isArray(state.exercises) ? state.exercises : [];
+    var selectedExercises = section === "__all__"
+      ? cloneExercises(sourceExercises)
+      : cloneExercises(sourceExercises.filter(function (exercise) {
+          return String(exercise && exercise.section || "").trim() === section;
+        }));
+
+    if (!selectedExercises.length) {
+      setStatus("No exercises found for that section on this day.", "info");
+      return;
+    }
+
+    selectedExercises = normalizeExercisesArray(selectedExercises).map(function (exercise) {
+      var nextExercise = Object.assign({}, exercise, { superset_group: null });
+      nextExercise.sets = (Array.isArray(exercise.sets) ? exercise.sets : []).map(function (set) {
+        return Object.assign({}, set, { done: false });
+      });
+      return nextExercise;
+    });
+
+    var block = {
+      id: "block_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+      title: title,
+      section: section === "__all__" ? "Entire Day" : section,
+      tags: tags,
+      sort_order: 0,
+      exercises: selectedExercises,
+      created_at: new Date().toISOString()
+    };
+
+    if (state.editingWorkoutBlockId) {
+      updateSavedWorkoutBlock(state.editingWorkoutBlockId, block);
+      return;
+    }
+
+    if (state.client && state.coachUserId) {
+      state.client
+        .from("coach_workout_blocks")
+        .insert({
+          coach_user_id: state.coachUserId,
+          title: block.title,
+          source_section: block.section,
+          tags: block.tags,
+          sort_order: 0,
+          exercises: block.exercises
+        })
+        .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at")
+        .single()
+        .then(function (result) {
+          if (result.error) {
+            saveWorkoutBlockLocally(block);
+            return;
+          }
+
+          var savedBlock = mapCloudWorkoutBlock(result.data || {});
+          state.savedWorkoutBlocks.unshift(savedBlock);
+          reindexSavedWorkoutBlocks();
+          writeSavedWorkoutBlocksToStorage(state.savedWorkoutBlocks);
+          renderSavedWorkoutBlocks();
+
+          if (titleInput) {
+            titleInput.value = "";
+          }
+          if (tagsInput) {
+            tagsInput.value = "";
+          }
+
+          setStatus("Saved workout block: " + title + ".", "success");
+          persistSavedWorkoutBlockOrderToCloud();
+        })
+        .catch(function () {
+          saveWorkoutBlockLocally(block);
+        });
+      return;
+    }
+
+    saveWorkoutBlockLocally(block);
+  }
+
+  function addSavedWorkoutBlockById(blockId) {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var id = String(blockId || "").trim();
+    if (!id) {
+      return;
+    }
+
+    var blocks = Array.isArray(state.savedWorkoutBlocks) ? state.savedWorkoutBlocks : [];
+    var block = blocks.find(function (entry) {
+      return String(entry && entry.id || "") === id;
+    });
+
+    if (!block || !Array.isArray(block.exercises) || !block.exercises.length) {
+      setStatus("Saved block not found.", "error");
+      return;
+    }
+
+    var clonedExercises = cloneExercises(block.exercises);
+    clonedExercises = normalizeExercisesArray(clonedExercises).map(function (exercise) {
+      var nextExercise = Object.assign({}, exercise, { superset_group: null });
+      nextExercise.sets = (Array.isArray(exercise.sets) ? exercise.sets : []).map(function (set) {
+        return Object.assign({}, set, { done: false });
+      });
+      return nextExercise;
+    });
+
+    state.exercises = (Array.isArray(state.exercises) ? state.exercises : []).concat(clonedExercises);
+    saveExercisesForDay(true);
+    renderRows();
+    setStatus("Added block: " + String(block.title || "Workout Block") + ".", "success");
+  }
+
+  function removeSavedWorkoutBlockById(blockId) {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var id = String(blockId || "").trim();
+    if (!id) {
+      return;
+    }
+
+    var blocks = Array.isArray(state.savedWorkoutBlocks) ? state.savedWorkoutBlocks : [];
+    var block = blocks.find(function (entry) {
+      return String(entry && entry.id || "") === id;
+    });
+    if (!block) {
+      return;
+    }
+
+    if (!confirm("Delete saved block '" + String(block.title || "Workout Block") + "'?")) {
+      return;
+    }
+
+    if (state.client && state.coachUserId && isUuid(id)) {
+      state.client
+        .from("coach_workout_blocks")
+        .delete()
+        .eq("id", id)
+        .eq("coach_user_id", state.coachUserId)
+        .then(function (result) {
+          if (result.error) {
+            setStatus(result.error.message || "Could not delete saved block.", "error");
+            return;
+          }
+
+          state.savedWorkoutBlocks = blocks.filter(function (entry) {
+            return String(entry && entry.id || "") !== id;
+          });
+
+          if (String(state.editingWorkoutBlockId || "") === id) {
+            clearSavedWorkoutBlockEditState();
+          }
+
+          reindexSavedWorkoutBlocks();
+
+          writeSavedWorkoutBlocksToStorage(state.savedWorkoutBlocks);
+          renderSavedWorkoutBlocks();
+          setStatus("Deleted saved block.", "info");
+          persistSavedWorkoutBlockOrderToCloud();
+        })
+        .catch(function () {
+          setStatus("Could not delete saved block.", "error");
+        });
+      return;
+    }
+
+    state.savedWorkoutBlocks = blocks.filter(function (entry) {
+      return String(entry && entry.id || "") !== id;
+    });
+
+    if (String(state.editingWorkoutBlockId || "") === id) {
+      clearSavedWorkoutBlockEditState();
+    }
+
+    reindexSavedWorkoutBlocks();
+
+    writeSavedWorkoutBlocksToStorage(state.savedWorkoutBlocks);
+    renderSavedWorkoutBlocks();
+    setStatus("Deleted saved block.", "info");
+  }
+
+  function saveWorkoutBlockLocally(block) {
+    state.savedWorkoutBlocks.unshift(block);
+    reindexSavedWorkoutBlocks();
+    writeSavedWorkoutBlocksToStorage(state.savedWorkoutBlocks);
+    renderSavedWorkoutBlocks();
+
+    var titleInput = document.querySelector("[data-template-block-title]");
+    var tagsInput = document.querySelector("[data-template-block-tags]");
+    if (titleInput) {
+      titleInput.value = "";
+    }
+    if (tagsInput) {
+      tagsInput.value = "";
+    }
+
+    setStatus("Saved workout block locally in this browser.", "info");
+  }
+
+  function normalizeCloudWorkoutBlocks(rows) {
+    return (Array.isArray(rows) ? rows : [])
+      .map(function (row) {
+        return mapCloudWorkoutBlock(row);
+      })
+      .filter(function (row) {
+        return !!row;
+      });
+  }
+
+  function mapCloudWorkoutBlock(row) {
+    var source = row && typeof row === "object" ? row : {};
+    var id = String(source.id || "").trim();
+    var title = String(source.title || "").trim();
+    var section = String(source.source_section || source.section || "Workout Block").trim() || "Workout Block";
+    var tags = normalizeWorkoutBlockTags(source.tags || []);
+    var sortOrder = parseWorkoutBlockSortOrder(source.sort_order);
+    var exercises = normalizeExercisesArray(source.exercises || []);
+
+    if (!id || !title || !exercises.length) {
+      return null;
+    }
+
+    return {
+      id: id,
+      title: title,
+      section: section,
+      tags: tags,
+      sort_order: sortOrder,
+      exercises: exercises,
+      created_at: String(source.created_at || ""),
+      updated_at: String(source.updated_at || "")
+    };
+  }
+
+  function workoutBlockSignature(block) {
+    var safeBlock = block && typeof block === "object" ? block : {};
+    var title = String(safeBlock.title || "").trim().toLowerCase();
+    var section = String(safeBlock.section || "").trim().toLowerCase();
+    var tags = normalizeWorkoutBlockTags(safeBlock.tags || []);
+    var exercises = normalizeExercisesArray(safeBlock.exercises || []);
+
+    return title + "|" + section + "|" + JSON.stringify(tags) + "|" + JSON.stringify(exercises);
+  }
+
+  function sortWorkoutBlocksByCreatedAtDesc(blocks) {
+    return (Array.isArray(blocks) ? blocks : []).slice().sort(function (a, b) {
+      var aSort = parseWorkoutBlockSortOrder(a && a.sort_order);
+      var bSort = parseWorkoutBlockSortOrder(b && b.sort_order);
+      if (aSort !== bSort) {
+        return aSort - bSort;
+      }
+
+      var aTime = Date.parse(String(a && a.created_at || ""));
+      var bTime = Date.parse(String(b && b.created_at || ""));
+      var safeATime = Number.isFinite(aTime) ? aTime : 0;
+      var safeBTime = Number.isFinite(bTime) ? bTime : 0;
+      return safeBTime - safeATime;
+    });
+  }
+
+  function readSavedWorkoutBlocksFromStorage() {
+    try {
+      var raw = window.localStorage.getItem(WORKOUT_BLOCK_LIBRARY_KEY);
+      if (!raw) {
+        return [];
+      }
+
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed
+        .map(function (item) {
+          var block = item && typeof item === "object" ? item : {};
+          var id = String(block.id || "").trim();
+          var title = String(block.title || "").trim();
+          var section = String(block.section || "Workout Block").trim() || "Workout Block";
+          var exercises = normalizeExercisesArray(block.exercises || []);
+
+          if (!id || !title || !exercises.length) {
+            return null;
+          }
+
+          return {
+            id: id,
+            title: title,
+            section: section,
+            tags: normalizeWorkoutBlockTags(block.tags || []),
+            sort_order: parseWorkoutBlockSortOrder(block.sort_order),
+            exercises: exercises,
+            created_at: String(block.created_at || "")
+          };
+        })
+        .filter(function (item) {
+          return !!item;
+        });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function writeSavedWorkoutBlocksToStorage(blocks) {
+    try {
+      var payload = Array.isArray(blocks) ? sortWorkoutBlocksByCreatedAtDesc(blocks).slice(0, 100) : [];
+      window.localStorage.setItem(WORKOUT_BLOCK_LIBRARY_KEY, JSON.stringify(payload));
+    } catch (e) {
+      setStatus("Could not save workout blocks in this browser.", "info");
+    }
+  }
+
+  function parseWorkoutBlockSortOrder(value) {
+    var num = parseInt(value, 10);
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  function normalizeWorkoutBlockTags(tags) {
+    var list = Array.isArray(tags) ? tags : [];
+    var seen = {};
+
+    return list
+      .map(function (tag) {
+        return String(tag || "").trim().toLowerCase();
+      })
+      .filter(function (tag) {
+        if (!tag || seen[tag]) {
+          return false;
+        }
+        seen[tag] = true;
+        return true;
+      })
+      .slice(0, 12);
+  }
+
+  function parseWorkoutBlockTags(raw) {
+    return normalizeWorkoutBlockTags(String(raw || "").split(","));
+  }
+
+  function collectSavedWorkoutBlockTags(blocks) {
+    var seen = {};
+    var tags = [];
+
+    (Array.isArray(blocks) ? blocks : []).forEach(function (block) {
+      normalizeWorkoutBlockTags(block && block.tags || []).forEach(function (tag) {
+        if (seen[tag]) {
+          return;
+        }
+        seen[tag] = true;
+        tags.push(tag);
+      });
+    });
+
+    return tags.sort();
+  }
+
+  function filterSavedWorkoutBlocksByTag(blocks, tag) {
+    var targetTag = String(tag || "all").trim().toLowerCase();
+    var list = sortWorkoutBlocksByCreatedAtDesc(blocks || []);
+    if (targetTag === "all") {
+      return list;
+    }
+
+    return list.filter(function (block) {
+      return normalizeWorkoutBlockTags(block && block.tags || []).indexOf(targetTag) >= 0;
+    });
+  }
+
+  function clearSavedWorkoutBlockDragState() {
+    state.draggingWorkoutBlockId = null;
+    var items = document.querySelectorAll("[data-template-block-item]");
+    items.forEach(function (item) {
+      item.classList.remove("is-dragging");
+      item.classList.remove("is-drag-over");
+    });
+  }
+
+  function reorderSavedWorkoutBlocks(draggedId, targetId) {
+    var blocks = sortWorkoutBlocksByCreatedAtDesc(state.savedWorkoutBlocks || []);
+    var draggedIndex = blocks.findIndex(function (entry) {
+      return String(entry && entry.id || "") === String(draggedId || "");
+    });
+    var targetIndex = blocks.findIndex(function (entry) {
+      return String(entry && entry.id || "") === String(targetId || "");
+    });
+
+    if (draggedIndex < 0 || targetIndex < 0 || draggedIndex === targetIndex) {
+      return;
+    }
+
+    var moved = blocks.splice(draggedIndex, 1)[0];
+    blocks.splice(targetIndex, 0, moved);
+
+    state.savedWorkoutBlocks = blocks;
+    reindexSavedWorkoutBlocks();
+    writeSavedWorkoutBlocksToStorage(state.savedWorkoutBlocks);
+    renderSavedWorkoutBlocks();
+    setStatus("Saved block order updated.", "success");
+    persistSavedWorkoutBlockOrderToCloud();
+  }
+
+  function reindexSavedWorkoutBlocks() {
+    var blocks = sortWorkoutBlocksByCreatedAtDesc(state.savedWorkoutBlocks || []);
+    blocks.forEach(function (block, index) {
+      if (!block || typeof block !== "object") {
+        return;
+      }
+      block.sort_order = index;
+      block.tags = normalizeWorkoutBlockTags(block.tags || []);
+    });
+    state.savedWorkoutBlocks = blocks;
+  }
+
+  function persistSavedWorkoutBlockOrderToCloud() {
+    if (!state.client || !state.coachUserId) {
+      return;
+    }
+
+    var cloudBlocks = (Array.isArray(state.savedWorkoutBlocks) ? state.savedWorkoutBlocks : []).filter(function (block) {
+      return block && isUuid(block.id);
+    });
+    if (!cloudBlocks.length) {
+      return;
+    }
+
+    Promise.all(cloudBlocks.map(function (block) {
+      return state.client
+        .from("coach_workout_blocks")
+        .update({ sort_order: parseWorkoutBlockSortOrder(block.sort_order) })
+        .eq("id", block.id)
+        .eq("coach_user_id", state.coachUserId)
+        .then(function () {
+          return true;
+        })
+        .catch(function () {
+          return false;
+        });
+    }));
+  }
+
+  function startEditingSavedWorkoutBlockById(blockId) {
+    var id = String(blockId || "").trim();
+    if (!id) {
+      return;
+    }
+
+    var block = (Array.isArray(state.savedWorkoutBlocks) ? state.savedWorkoutBlocks : []).find(function (entry) {
+      return String(entry && entry.id || "") === id;
+    });
+    if (!block) {
+      return;
+    }
+
+    var titleInput = document.querySelector("[data-template-block-title]");
+    var sectionInput = document.querySelector("[data-template-block-section]");
+    var tagsInput = document.querySelector("[data-template-block-tags]");
+
+    if (titleInput) {
+      titleInput.value = String(block.title || "");
+    }
+    if (sectionInput) {
+      var sectionValue = String(block.section || "Warm Up");
+      sectionInput.value = sectionValue === "Entire Day" ? "__all__" : sectionValue;
+    }
+    if (tagsInput) {
+      tagsInput.value = normalizeWorkoutBlockTags(block.tags || []).join(", ");
+    }
+
+    state.editingWorkoutBlockId = id;
+    renderSavedWorkoutBlocks();
+    setStatus("Editing saved block: " + String(block.title || "Workout Block") + ".", "info");
+  }
+
+  function clearSavedWorkoutBlockEditState() {
+    state.editingWorkoutBlockId = null;
+    var titleInput = document.querySelector("[data-template-block-title]");
+    var sectionInput = document.querySelector("[data-template-block-section]");
+    var tagsInput = document.querySelector("[data-template-block-tags]");
+
+    if (titleInput) {
+      titleInput.value = "";
+    }
+    if (sectionInput) {
+      sectionInput.value = "Warm Up";
+    }
+    if (tagsInput) {
+      tagsInput.value = "";
+    }
+
+    renderSavedWorkoutBlocks();
+  }
+
+  function updateSavedWorkoutBlock(editingId, nextBlock) {
+    var id = String(editingId || "").trim();
+    if (!id) {
+      return;
+    }
+
+    var blocks = Array.isArray(state.savedWorkoutBlocks) ? state.savedWorkoutBlocks.slice() : [];
+    var index = blocks.findIndex(function (entry) {
+      return String(entry && entry.id || "") === id;
+    });
+    if (index < 0) {
+      state.editingWorkoutBlockId = null;
+      renderSavedWorkoutBlocks();
+      return;
+    }
+
+    var existing = blocks[index] || {};
+    var updatedBlock = {
+      id: id,
+      title: String(nextBlock.title || "Workout Block").trim() || "Workout Block",
+      section: String(nextBlock.section || "Workout Block").trim() || "Workout Block",
+      tags: normalizeWorkoutBlockTags(nextBlock.tags || []),
+      sort_order: parseWorkoutBlockSortOrder(existing.sort_order),
+      exercises: normalizeExercisesArray(nextBlock.exercises || []),
+      created_at: String(existing.created_at || new Date().toISOString()),
+      updated_at: new Date().toISOString()
+    };
+
+    var applyLocalUpdate = function () {
+      blocks[index] = updatedBlock;
+      state.savedWorkoutBlocks = blocks;
+      reindexSavedWorkoutBlocks();
+      writeSavedWorkoutBlocksToStorage(state.savedWorkoutBlocks);
+      clearSavedWorkoutBlockEditState();
+      setStatus("Updated saved block: " + updatedBlock.title + ".", "success");
+      persistSavedWorkoutBlockOrderToCloud();
+    };
+
+    if (state.client && state.coachUserId && isUuid(id)) {
+      state.client
+        .from("coach_workout_blocks")
+        .update({
+          title: updatedBlock.title,
+          source_section: updatedBlock.section,
+          tags: updatedBlock.tags,
+          exercises: updatedBlock.exercises
+        })
+        .eq("id", id)
+        .eq("coach_user_id", state.coachUserId)
+        .then(function (result) {
+          if (result.error) {
+            setStatus(result.error.message || "Could not update saved block.", "error");
+            return;
+          }
+          applyLocalUpdate();
+        })
+        .catch(function () {
+          setStatus("Could not update saved block.", "error");
+        });
+      return;
+    }
+
+    applyLocalUpdate();
+  }
+
+  function moveToAdjacentTemplateDay(step) {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var offset = parseInt(step, 10);
+    if (!Number.isFinite(offset) || !offset) {
+      return;
+    }
+
+    var slotKeys = getAllSlotKeys();
+    var currentIndex = slotKeys.indexOf(state.day);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    var nextIndex = currentIndex + offset;
+    if (nextIndex < 0 || nextIndex >= slotKeys.length) {
+      return;
+    }
+
+    saveExercisesForDay(true);
+    state.day = slotKeys[nextIndex];
+
+    var daySelect = document.querySelector("[data-workout-day]");
+    if (daySelect) {
+      daySelect.value = state.day;
+    }
+
+    loadExercisesForDay();
+    renderRows();
+    updateDayInfo();
+    refreshTemplateDayTools();
+    setStatus("Switched to " + labelForSlot(state.day) + ".", "info");
+  }
+
+  function copyCurrentDayToNextSlot() {
+    if (!state.isTemplateBuilder || !state.day) {
+      return;
+    }
+
+    saveExercisesForDay(true);
+
+    var slotKeys = getAllSlotKeys();
+    var currentIndex = slotKeys.indexOf(state.day);
+    if (currentIndex === -1 || currentIndex >= slotKeys.length - 1) {
+      setStatus("No next workout slot available.", "info");
+      return;
+    }
+
+    var nextKey = slotKeys[currentIndex + 1];
+    writeToStorage(state.storagePrefix + nextKey, {
+      exercises: cloneExercises(state.exercises),
+      saved_at: new Date().toISOString()
+    });
+
+    if (state.daySessionTypes && state.daySessionTypes[state.day]) {
+      state.daySessionTypes[nextKey] = state.daySessionTypes[state.day];
+    }
+
+    if (state.customDayNames && state.customDayNames[state.day]) {
+      state.customDayNames[nextKey] = state.customDayNames[state.day];
+    }
+
+    setStatus("Duplicated this day into " + labelForSlot(nextKey) + ".", "success");
+  }
+
+  function copyCurrentWeekForward() {
+    if (!state.isTemplateBuilder || !state.day) {
+      return;
+    }
+
+    var parsed = parseSlotKey(state.day);
+    if (!parsed) {
+      return;
+    }
+
+    var sourceWeek = parsed.week;
+    var targetWeek = sourceWeek + 1;
+    if (targetWeek > state.structure.weeks) {
+      setStatus("No following week available to copy into.", "info");
+      return;
+    }
+
+    saveExercisesForDay(true);
+
+    var copiedCount = 0;
+    for (var workout = 1; workout <= state.structure.workoutsPerWeek; workout++) {
+      var sourceKey = "w" + sourceWeek + "d" + workout;
+      var targetKey = "w" + targetWeek + "d" + workout;
+      var sourcePayload = readFromStorage(state.storagePrefix + sourceKey);
+      var sourceExercises = sourcePayload && Array.isArray(sourcePayload.exercises)
+        ? cloneExercises(sourcePayload.exercises)
+        : [];
+
+      writeToStorage(state.storagePrefix + targetKey, {
+        exercises: sourceExercises,
+        saved_at: new Date().toISOString()
+      });
+
+      if (state.daySessionTypes && state.daySessionTypes[sourceKey]) {
+        state.daySessionTypes[targetKey] = state.daySessionTypes[sourceKey];
+      }
+
+      if (state.customDayNames && state.customDayNames[sourceKey]) {
+        state.customDayNames[targetKey] = state.customDayNames[sourceKey];
+      }
+
+      copiedCount += 1;
+    }
+
+    setStatus("Copied Week " + sourceWeek + " into Week " + targetWeek + " (" + copiedCount + " workout slot(s)).", "success");
+  }
+
+  function clearCurrentWeek() {
+    if (!state.isTemplateBuilder || !state.day) {
+      return;
+    }
+
+    var parsed = parseSlotKey(state.day);
+    if (!parsed) {
+      return;
+    }
+
+    if (!confirm("Clear all workout slots in Week " + parsed.week + "?")) {
+      return;
+    }
+
+    for (var workout = 1; workout <= state.structure.workoutsPerWeek; workout++) {
+      var slotKey = "w" + parsed.week + "d" + workout;
+      try {
+        window.localStorage.removeItem(state.storagePrefix + slotKey);
+      } catch (e) {
+        // Continue clearing remaining keys.
+      }
+    }
+
+    loadExercisesForDay();
+    renderRows();
+    updateDayInfo();
+    setStatus("Cleared all workout slots in Week " + parsed.week + ".", "info");
+  }
+
+  function applyCurrentDayTypeToWeek() {
+    if (!state.isTemplateBuilder || !state.day) {
+      return;
+    }
+
+    var parsed = parseSlotKey(state.day);
+    var currentDayType = getDayTypeForSlot(state.day);
+    if (!parsed || !currentDayType) {
+      setStatus("No day type found to apply.", "info");
+      return;
+    }
+
+    for (var workout = 1; workout <= state.structure.workoutsPerWeek; workout++) {
+      state.daySessionTypes["w" + parsed.week + "d" + workout] = currentDayType;
+    }
+
+    updateDayInfo();
+    setStatus("Applied " + capitalize(currentDayType) + " day type across Week " + parsed.week + ".", "success");
+  }
+
   function setupExerciseEditorModal() {
     var modal = document.querySelector("[data-exercise-editor-modal]");
     var overlay = document.querySelector(".exercise-editor-overlay[data-exercise-editor-close]");
@@ -614,6 +1908,10 @@
   }
 
   function openExerciseEditor(exerciseIdx) {
+    if (state.isProgramReadOnly && !state.isTemplateBuilder) {
+      return;
+    }
+
     var modal = document.querySelector("[data-exercise-editor-modal]");
     var title = document.querySelector("[data-exercise-editor-title]");
     var nameInput = document.querySelector("[data-exercise-name-input]");
@@ -671,6 +1969,32 @@
        modal.setAttribute("hidden", "");
     }
     state.editingExerciseIdx = null;
+  }
+
+  function lockBuilderToReadOnly() {
+    state.isAthleteLockedView = true;
+    state.isProgramReadOnly = true;
+    applyAthleteLockedUi();
+  }
+
+  function setTemplateBuilderChromeVisible(isVisible) {
+    var show = !!isVisible;
+    var panel = document.querySelector("[data-template-builder-panel]");
+    var workspace = document.querySelector("[data-template-workspace]");
+
+    if (panel) {
+      panel.hidden = !show;
+      panel.setAttribute("aria-hidden", show ? "false" : "true");
+    }
+
+    if (workspace) {
+      workspace.hidden = !show;
+      workspace.setAttribute("aria-hidden", show ? "false" : "true");
+    }
+
+    if (document.body) {
+      document.body.classList.toggle("template-builder-mode", show);
+    }
   }
 
   function submitExerciseEditor(event) {

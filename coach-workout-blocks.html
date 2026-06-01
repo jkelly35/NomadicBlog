@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workout Blocks Library - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/coach-workout-blocks.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="field-guides.html">Field Guides</a>
+      <a href="services.html">Services</a>
+      <a href="admin.html">Coaching Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="block-manager-main">
+    <div class="block-manager-panel" data-block-manager-guard>
+      <p class="admin-loading">Verifying coach access...</p>
+    </div>
+
+    <section class="block-manager-content" data-block-manager-content hidden>
+      <div class="block-manager-header">
+        <div>
+          <h1>Workout Blocks Library</h1>
+          <p>Save, edit, tag, and order reusable blocks in one focused place.</p>
+        </div>
+        <a class="btn btn-secondary" href="training-program-example.html?builder=1">Back to Template Builder</a>
+      </div>
+
+      <div class="block-manager-grid">
+        <article class="block-manager-panel">
+          <h2>Save or Update Block</h2>
+          <p>Choose a draft workout day and section to capture block exercises.</p>
+          <div class="block-manager-form">
+            <input type="text" class="program-builder-block-title" placeholder="Block title" data-block-title />
+            <label for="block-source-day">Source Draft Day</label>
+            <select id="block-source-day" class="program-builder-block-section" data-block-source-day>
+              <option value="">Select a source day</option>
+            </select>
+            <select class="program-builder-block-section" data-block-section>
+              <option value="Warm Up">Warm Up</option>
+              <option value="A Block">A Block</option>
+              <option value="B Block">B Block</option>
+              <option value="C Block">C Block</option>
+              <option value="Cool Down">Cool Down</option>
+              <option value="__all__">Entire Day</option>
+            </select>
+            <input type="text" class="program-builder-block-tags" placeholder="Tags (comma separated)" data-block-tags />
+            <div class="block-manager-form-actions">
+              <button type="button" class="btn admin-btn-small" data-block-save>Save Block</button>
+              <button type="button" class="btn btn-secondary" data-block-cancel-edit hidden>Cancel Edit</button>
+            </div>
+          </div>
+          <p class="admin-loading" data-block-status></p>
+        </article>
+
+        <article class="block-manager-panel">
+          <div class="block-manager-list-toolbar">
+            <div>
+              <h2>Saved Blocks</h2>
+              <p>Filter by tag, edit content, or reorder with arrows.</p>
+            </div>
+            <div>
+              <label for="block-tag-filter">Tag filter</label>
+              <select id="block-tag-filter" class="program-builder-block-filter" data-block-filter>
+                <option value="all">All tags</option>
+              </select>
+            </div>
+          </div>
+          <div class="block-manager-list" data-block-list>
+            <p class="admin-loading">No saved blocks yet.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

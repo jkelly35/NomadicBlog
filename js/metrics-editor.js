@@ -12,6 +12,104 @@
     isPersonal: false
   };
 
+  var METRIC_CATEGORIES = [
+    "Readiness",
+    "Recovery",
+    "Load",
+    "Strength",
+    "Power",
+    "Cardio",
+    "Mobility",
+    "Performance",
+    "Sport-Specific",
+    "Health"
+  ];
+
+  var PRESET_METRICS = [
+    { name: "Readiness", unit: "score", category: "Readiness" },
+    { name: "HRV", unit: "ms", category: "Recovery" },
+    { name: "Resting HR", unit: "bpm", category: "Recovery" },
+    { name: "Sleep", unit: "h", category: "Recovery" },
+    { name: "Fatigue", unit: "score", category: "Readiness" },
+    { name: "Training Load", unit: "AU", category: "Load" },
+    { name: "Acute:Chronic Workload Ratio", unit: "ratio", category: "Load" },
+    { name: "Recovery Score", unit: "score", category: "Recovery" },
+    { name: "VO2 Max", unit: "ml/kg/min", category: "Cardio" },
+    { name: "Strength Metrics", unit: "", category: "Strength" },
+    { name: "Grip Strength", unit: "kg", category: "Strength" },
+    { name: "Jump Metrics", unit: "cm", category: "Power" },
+    { name: "Power Output", unit: "W", category: "Power" },
+    { name: "Session Adherence", unit: "%", category: "Readiness" },
+    { name: "Pain/Injury Flags", unit: "", category: "Health" },
+    { name: "Altitude Exposure", unit: "m", category: "Load" },
+    { name: "Ski Vertical Feet", unit: "ft", category: "Sport-Specific" },
+    { name: "Trail Elevation Gain", unit: "ft", category: "Sport-Specific" },
+    { name: "Climbing Grades", unit: "grade", category: "Sport-Specific" },
+    { name: "MTB Ride Metrics", unit: "", category: "Sport-Specific" },
+    { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
+    { name: "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)", unit: "reps", category: "Strength" },
+    { name: "20mm Edge Pull Strength", unit: "kg", category: "Strength" },
+    { name: "Max Pull Ups", unit: "reps", category: "Strength" },
+    { name: "Max Hang Time", unit: "sec", category: "Strength" },
+    { name: "90 Degree Bent Leg Hang", unit: "sec", category: "Strength" },
+    { name: "Adapted Grant Foot Raise", unit: "reps", category: "Mobility" },
+    { name: "Ape Index", unit: "cm", category: "Performance" },
+    { name: "Vertical Jump Height", unit: "cm", category: "Power" },
+    { name: "Single Leg Squat Test", unit: "reps", category: "Strength" },
+    { name: "Single Leg Heel Raise", unit: "reps", category: "Strength" },
+    { name: "Side Plank with Hip Abduction Hold (Max Time)", unit: "sec", category: "Strength" },
+    { name: "Knee to Wall (Ankle DF Test)", unit: "cm", category: "Mobility" },
+    { name: "Y Balance (Anterior Reach)", unit: "cm", category: "Mobility" },
+    { name: "Broad Jump", unit: "cm", category: "Power" },
+    { name: "Tripple Hop", unit: "cm", category: "Power" }
+  ];
+
+  var ASSESSMENT_CLUSTERS = {
+    climbing: [
+      "Countermovement Push-Up (CMPU)",
+      "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)",
+      "20mm Edge Pull Strength",
+      "Max Pull Ups",
+      "Max Hang Time",
+      "90 Degree Bent Leg Hang",
+      "Adapted Grant Foot Raise",
+      "Ape Index",
+      "Climbing Grades",
+      "Grip Strength"
+    ],
+    running: [
+      "Vertical Jump Height",
+      "Single Leg Squat Test",
+      "Single Leg Heel Raise",
+      "Side Plank with Hip Abduction Hold (Max Time)",
+      "Y Balance (Anterior Reach)",
+      "VO2 Max",
+      "Trail Elevation Gain"
+    ],
+    readiness: [
+      "Readiness",
+      "HRV",
+      "Resting HR",
+      "Sleep",
+      "Fatigue",
+      "Training Load",
+      "Acute:Chronic Workload Ratio",
+      "Recovery Score",
+      "Session Adherence",
+      "Pain/Injury Flags"
+    ],
+    mountain: [
+      "Altitude Exposure",
+      "Ski Vertical Feet",
+      "Trail Elevation Gain",
+      "Climbing Grades",
+      "MTB Ride Metrics",
+      "Power Output"
+    ]
+  };
+
+  var PRESET_DEFAULTS = buildPresetDefaults();
+
   document.addEventListener("DOMContentLoaded", function () {
     initializeMetricsEditor();
   });
@@ -78,6 +176,8 @@
   }
 
   function setupEventHandlers() {
+    populatePresetSelectors();
+
     var assessmentSelect = document.querySelector("[data-metrics-editor-assessment]");
     if (assessmentSelect) {
       assessmentSelect.addEventListener("change", onAssessmentSelected);
@@ -197,12 +297,7 @@
           <div class="metrics-editor-row-details">
             <input type="text" class="metrics-editor-metric-value" data-metric-index="${index}" placeholder="Value" value="${escapeAttribute(metric.metric_value || "")}" />
             <input type="text" class="metrics-editor-metric-unit" data-metric-index="${index}" placeholder="Unit" value="${escapeAttribute(metric.metric_unit || "")}" />
-            <select class="metrics-editor-metric-category" data-metric-index="${index}">
-              <option value="Strength" ${metric.metric_category === "Strength" ? "selected" : ""}>Strength</option>
-              <option value="Cardio" ${metric.metric_category === "Cardio" ? "selected" : ""}>Cardio</option>
-              <option value="Mobility" ${metric.metric_category === "Mobility" ? "selected" : ""}>Mobility</option>
-              <option value="Performance" ${metric.metric_category === "Performance" ? "selected" : ""}>Performance</option>
-            </select>
+            <select class="metrics-editor-metric-category" data-metric-index="${index}">${buildCategoryOptions(metric.metric_category)}</select>
           </div>
         </div>
         <button type="button" class="btn metrics-editor-delete-btn" data-metric-delete data-metric-id="${escapeAttribute(metric.id || "")}">Delete</button>
@@ -231,35 +326,16 @@
     var val = event.target.value;
     if (!val) return;
 
-    var assessmentClusters = {
-      climbing: [
-        { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
-        { name: "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)", unit: "reps", category: "Strength" },
-        { name: "20mm Edge Pull Strength", unit: "kg", category: "Strength" },
-        { name: "Max Pull Ups", unit: "reps", category: "Strength" },
-        { name: "Max Hang Time", unit: "sec", category: "Strength" },
-        { name: "90 Degree Bent Leg Hang", unit: "sec", category: "Strength" },
-        { name: "Adapted Grant Foot Raise", unit: "reps", category: "Mobility" },
-        { name: "Ape Index", unit: "cm", category: "Performance" }
-      ],
-      running: [
-        { name: "Vertical Jump Height", unit: "cm", category: "Performance" },
-        { name: "Single Leg Squat Test", unit: "reps", category: "Strength" },
-        { name: "Single Leg Heel Raise", unit: "reps", category: "Strength" },
-        { name: "Side Plank with Hip Abduction Hold (Max Time)", unit: "sec", category: "Strength" },
-        { name: "Y Balance (Anterior Reach)", unit: "cm", category: "Mobility" }
-      ]
-    };
-
-    var cluster = assessmentClusters[val];
+    var cluster = ASSESSMENT_CLUSTERS[val];
     if (!cluster) {
       setStatus("Unknown assessment cluster.", "error");
       return;
     }
 
-    cluster.forEach(function (metric) {
+    cluster.forEach(function (metricName) {
+      var metric = PRESET_DEFAULTS[metricName] || { unit: "", category: "Performance" };
       state.currentMetrics.push({
-        metric_name: metric.name,
+        metric_name: metricName,
         metric_value: "",
         metric_unit: metric.unit,
         metric_category: metric.category
@@ -276,25 +352,7 @@
     var val = event.target.value;
     if (!val) return;
 
-    var presetDefaults = {
-      "Countermovement Push-Up (CMPU)": {unit: "reps", category: "Strength"},
-      "Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)": {unit: "reps", category: "Strength"},
-      "20mm Edge Pull Strength": {unit: "kg", category: "Strength"},
-      "Max Pull Ups": {unit: "reps", category: "Strength"},
-      "Max Hang Time": {unit: "sec", category: "Strength"},
-      "90 Degree Bent Leg Hang": {unit: "sec", category: "Strength"},
-      "Adapted Grant Foot Raise": {unit: "reps", category: "Mobility"},
-      "Ape Index": {unit: "cm", category: "Performance"},
-      "Vertical Jump Height": {unit: "cm", category: "Performance"},
-      "Single Leg Squat Test": {unit: "reps", category: "Strength"},
-      "Single Leg Heel Raise": {unit: "reps", category: "Strength"},
-      "Side Plank with Hip Abduction Hold (Max Time)": {unit: "sec", category: "Strength"},
-      "Knee to Wall (Ankle DF Test)": {unit: "cm", category: "Mobility"},
-      "Y Balance (Anterior Reach)": {unit: "cm", category: "Mobility"},
-      "Broad Jump": {unit: "cm", category: "Performance"},
-      "Tripple Hop": {unit: "cm", category: "Performance"}
-    };
-    var def = presetDefaults[val] || {unit: "", category: "Performance"};
+    var def = PRESET_DEFAULTS[val] || {unit: "", category: "Performance"};
 
     state.currentMetrics.push({
       metric_name: val,
@@ -445,6 +503,63 @@
 
   function isMissingTableError(error) {
     return error && error.message && error.message.toLowerCase().includes("does not exist");
+  }
+
+  function populatePresetSelectors() {
+    var assessmentSelect = document.querySelector("[data-metrics-editor-assessment]");
+    if (assessmentSelect) {
+      assessmentSelect.innerHTML = [
+        '<option value="">+ Add Assessment...</option>',
+        '<option value="climbing">Climbing Performance Assessment</option>',
+        '<option value="running">Running Performance Assessment</option>',
+        '<option value="readiness">Readiness & Recovery Tracking Set</option>',
+        '<option value="mountain">Mountain Sport Tracking Set</option>'
+      ].join("");
+    }
+
+    var presetSelect = document.querySelector("[data-metrics-editor-preset]");
+    if (presetSelect) {
+      var options = ['<option value="">+ Add Preset Metric...</option>'];
+      PRESET_METRICS.forEach(function (metric) {
+        options.push(
+          '<option value="' + escapeAttribute(metric.name) + '">' + escapeHtml(metric.name) + '</option>'
+        );
+      });
+      presetSelect.innerHTML = options.join("");
+    }
+  }
+
+  function buildCategoryOptions(currentCategory) {
+    var selected = String(currentCategory || "Performance").trim();
+    var categories = METRIC_CATEGORIES.slice();
+    if (selected && categories.indexOf(selected) === -1) {
+      categories.unshift(selected);
+    }
+
+    return categories
+      .map(function (category) {
+        return (
+          '<option value="' +
+          escapeAttribute(category) +
+          '" ' +
+          (category === selected ? "selected" : "") +
+          ">" +
+          escapeHtml(category) +
+          "</option>"
+        );
+      })
+      .join("");
+  }
+
+  function buildPresetDefaults() {
+    var defaults = {};
+    PRESET_METRICS.forEach(function (metric) {
+      defaults[metric.name] = {
+        unit: metric.unit,
+        category: metric.category
+      };
+    });
+    return defaults;
   }
 
   function escapeHtml(str) {

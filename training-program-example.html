@@ -75,6 +75,56 @@
         </div>
       </div>
 
+      <aside class="program-builder-sidebar" data-template-workspace hidden>
+        <section class="program-builder-sidebar-card">
+          <h3>Quick Exercise Library</h3>
+          <p>Add common blocks in one click.</p>
+          <div class="program-builder-quick-grid">
+            <button type="button" class="btn admin-btn-small" data-template-quick-add="warmup-flow">Warm-Up Flow</button>
+            <button type="button" class="btn admin-btn-small" data-template-quick-add="main-strength">Main Strength Lift</button>
+            <button type="button" class="btn admin-btn-small" data-template-quick-add="power-plyo">Power / Plyo</button>
+            <button type="button" class="btn admin-btn-small" data-template-quick-add="endurance-intervals">Endurance Intervals</button>
+            <button type="button" class="btn admin-btn-small" data-template-quick-add="grip-climb">Grip / Climbing</button>
+            <button type="button" class="btn admin-btn-small" data-template-quick-add="cooldown-reset">Cool Down Reset</button>
+          </div>
+        </section>
+
+        <section class="program-builder-sidebar-card">
+          <h3>Bulk Edits</h3>
+          <p>Apply changes across day or week fast.</p>
+          <div class="program-builder-bulk-grid">
+            <button type="button" class="btn admin-btn-small" data-template-bulk-action="duplicate-day-next">Duplicate Day to Next</button>
+            <button type="button" class="btn admin-btn-small" data-template-bulk-action="copy-week-forward">Copy Week Forward</button>
+            <button type="button" class="btn admin-btn-small" data-template-bulk-action="clear-current-week">Clear Current Week</button>
+            <button type="button" class="btn admin-btn-small" data-template-bulk-action="apply-day-type-week">Apply Day Type to Week</button>
+          </div>
+        </section>
+
+        <section class="program-builder-sidebar-card">
+          <h3>Workout Block Library</h3>
+          <p>Add from your saved library or open the dedicated block manager.</p>
+          <div class="program-builder-block-compact-actions">
+            <select class="program-builder-block-section" data-template-block-quick-select>
+              <option value="">Select a saved block</option>
+            </select>
+            <button type="button" class="btn admin-btn-small" data-template-block-quick-add-selected>Add Selected Block</button>
+            <a class="btn btn-secondary" href="coach-workout-blocks.html">Manage Workout Blocks</a>
+          </div>
+        </section>
+
+        <section class="program-builder-sidebar-card">
+          <h3>Keyboard Shortcuts</h3>
+          <p>Speed up plan building.</p>
+          <ul class="program-builder-shortcuts-list">
+            <li><span>A</span> Add exercise</li>
+            <li><span>S</span> Save template</li>
+            <li><span>D</span> Duplicate day to next</li>
+            <li><span>N / P</span> Next / previous day</li>
+            <li><span>1 / 2 / 3</span> Set day type: strength / running / biking</li>
+          </ul>
+        </section>
+      </aside>
+
       <!-- Program Overview Stats -->
       <div class="program-stats">
         <div class="program-stat-card">

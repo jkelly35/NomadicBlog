@@ -156,10 +156,12 @@
     activePrograms: [],
     athleteGoalEvents: [],
     coachReadinessByAthlete: {},
+    coachStravaRows: [],
     coachTodos: [],
     coachFlags: [],
     climbingComparisonRows: [],
-    athleteProfilesById: {}
+    athleteProfilesById: {},
+    latestMetricRowsByAthlete: {}
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -2630,8 +2632,10 @@
       state.activePrograms = [];
       state.athleteGoalEvents = [];
       state.coachReadinessByAthlete = {};
+      state.coachStravaRows = [];
       state.climbingComparisonRows = [];
       state.athleteProfilesById = {};
+      state.latestMetricRowsByAthlete = {};
       renderCoachOverview();
       updateStats();
       return;
@@ -2777,7 +2781,9 @@
           nutritionLogs,
           stravaRows
         );
+        state.coachStravaRows = stravaRows;
         state.climbingComparisonRows = buildClimbingComparisonRows(state.athletes, athleteMetrics, athleteProfilesById);
+        state.latestMetricRowsByAthlete = buildLatestMetricRowsByAthlete(athleteMetrics);
 
         renderCoachOverview();
         updateStats();
@@ -2786,8 +2792,10 @@
         state.activePrograms = [];
         state.athleteGoalEvents = [];
         state.coachReadinessByAthlete = {};
+        state.coachStravaRows = [];
         state.climbingComparisonRows = [];
         state.athleteProfilesById = {};
+        state.latestMetricRowsByAthlete = {};
         renderCoachOverview();
         updateStats();
       });
@@ -2800,6 +2808,7 @@
     renderCoachTodoList();
     renderCoachFlagsList();
     renderCoachRiskBoard();
+    renderCoachPerformanceWidgets();
     renderClimbingComparison();
   }
 
@@ -3346,6 +3355,7 @@
 
     writeCoachFlags(state.coachFlags);
     renderCoachFlagsList();
+    renderCoachPerformanceWidgets();
     updateStats();
   }
 
@@ -3361,7 +3371,381 @@
     });
     writeCoachFlags(state.coachFlags);
     renderCoachFlagsList();
+    renderCoachPerformanceWidgets();
     updateStats();
+  }
+
+  function renderCoachPerformanceWidgets() {
+    renderReadinessTrendWidget();
+    renderAcwrRiskWidget();
+    renderInjuryAlertsWidget();
+  }
+
+  function renderReadinessTrendWidget() {
+    var container = document.querySelector("[data-admin-readiness-trend]");
+    if (!container) {
+      return;
+    }
+
+    var readinessMap = state.coachReadinessByAthlete && typeof state.coachReadinessByAthlete === "object"
+      ? state.coachReadinessByAthlete
+      : {};
+    var readinessScores = Object.keys(readinessMap)
+      .map(function (key) {
+        return Number(readinessMap[key] && readinessMap[key].score);
+      })
+      .filter(function (value) {
+        return Number.isFinite(value);
+      });
+
+    var lowCount = readinessScores.filter(function (score) { return score < 60; }).length;
+    var midCount = readinessScores.filter(function (score) { return score >= 60 && score < 75; }).length;
+    var highCount = readinessScores.filter(function (score) { return score >= 75; }).length;
+    var avgReadiness = readinessScores.length ? Math.round(readinessScores.reduce(function (sum, score) { return sum + score; }, 0) / readinessScores.length) : null;
+
+    var trend = computeRecoveryTrendSnapshot(state.coachStravaRows);
+    var trendClass = trend.delta > 1 ? "is-up" : (trend.delta < -1 ? "is-down" : "is-flat");
+    var trendLabel = trend.delta > 1
+      ? "up " + formatInteger(Math.abs(trend.delta))
+      : (trend.delta < -1 ? "down " + formatInteger(Math.abs(trend.delta)) : "stable");
+
+    container.innerHTML =
+      '<div class="admin-overview-item admin-widget-summary">' +
+        '<p class="admin-overview-item-title">Current Team Readiness</p>' +
+        '<p class="admin-overview-item-meta">Avg readiness: ' + escapeHtml(avgReadiness == null ? "--" : formatInteger(avgReadiness)) + ' • Athletes scored: ' + escapeHtml(String(readinessScores.length)) + '</p>' +
+      '</div>' +
+      '<div class="admin-overview-item admin-widget-grid">' +
+        '<span class="admin-widget-pill is-good">Ready ' + escapeHtml(String(highCount)) + '</span>' +
+        '<span class="admin-widget-pill is-mid">Watch ' + escapeHtml(String(midCount)) + '</span>' +
+        '<span class="admin-widget-pill is-low">Low ' + escapeHtml(String(lowCount)) + '</span>' +
+      '</div>' +
+      '<div class="admin-overview-item admin-widget-trend">' +
+        '<p class="admin-overview-item-title">14-day recovery trend</p>' +
+        '<p class="admin-overview-item-meta">Last 7-day avg: ' + escapeHtml(trend.recentLabel) + ' • Prior 7-day avg: ' + escapeHtml(trend.previousLabel) + '</p>' +
+        '<span class="admin-widget-trend-badge ' + trendClass + '">Trend ' + escapeHtml(trendLabel) + '</span>' +
+      '</div>';
+  }
+
+  function renderAcwrRiskWidget() {
+    var container = document.querySelector("[data-admin-acwr-risk]");
+    if (!container) {
+      return;
+    }
+
+    var athleteMap = state.latestMetricRowsByAthlete && typeof state.latestMetricRowsByAthlete === "object"
+      ? state.latestMetricRowsByAthlete
+      : {};
+    var athletes = Array.isArray(state.athletes) ? state.athletes : [];
+    var nameByAthleteId = {};
+
+    athletes.forEach(function (athlete) {
+      var athleteId = String(athlete && athlete.user_id || "").trim();
+      if (!athleteId) {
+        return;
+      }
+      nameByAthleteId[athleteId] = String(athlete && (athlete.name || athlete.email) || "Athlete");
+    });
+
+    var athleteIds = Object.keys(athleteMap);
+    var rows = [];
+    var highRisk = 0;
+    var watchRisk = 0;
+    var optimal = 0;
+
+    athleteIds.forEach(function (athleteId) {
+      var acwrValue = resolveAcwrMetricValue(athleteMap[athleteId]);
+      if (!Number.isFinite(acwrValue)) {
+        return;
+      }
+
+      var band = classifyAcwrBand(acwrValue);
+      if (band === "high") {
+        highRisk += 1;
+      } else if (band === "watch") {
+        watchRisk += 1;
+      } else {
+        optimal += 1;
+      }
+
+      rows.push({
+        athleteId: athleteId,
+        name: nameByAthleteId[athleteId] || "Athlete",
+        value: acwrValue,
+        band: band
+      });
+    });
+
+    rows.sort(function (a, b) {
+      var severityWeight = { high: 3, watch: 2, optimal: 1 };
+      var bySeverity = (severityWeight[b.band] || 0) - (severityWeight[a.band] || 0);
+      if (bySeverity !== 0) {
+        return bySeverity;
+      }
+
+      var deviationA = Math.abs(a.value - 1);
+      var deviationB = Math.abs(b.value - 1);
+      return deviationB - deviationA;
+    });
+
+    if (!rows.length) {
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No ACWR data yet</p>' +
+          '<p class="admin-empty-state-copy">Track Acute:Chronic Workload Ratio in athlete metrics to populate this widget.</p>' +
+        '</div>';
+      return;
+    }
+
+    var summary =
+      '<div class="admin-overview-item admin-widget-summary">' +
+        '<p class="admin-overview-item-title">ACWR Distribution</p>' +
+        '<p class="admin-overview-item-meta">Tracked: ' + escapeHtml(String(rows.length)) + ' • High: ' + escapeHtml(String(highRisk)) + ' • Watch: ' + escapeHtml(String(watchRisk)) + ' • Optimal: ' + escapeHtml(String(optimal)) + '</p>' +
+      '</div>';
+
+    var topRows = rows.slice(0, 6).map(function (row) {
+      var bandLabel = row.band === "high" ? "High" : (row.band === "watch" ? "Watch" : "Optimal");
+      return (
+        '<div class="admin-overview-item admin-widget-row">' +
+          '<div>' +
+            '<p class="admin-overview-item-title">' + escapeHtml(row.name) + '</p>' +
+            '<p class="admin-overview-item-meta">ACWR ' + escapeHtml(formatMetricNumber(row.value)) + '</p>' +
+          '</div>' +
+          '<span class="admin-widget-pill is-' + escapeAttribute(row.band) + '">' + escapeHtml(bandLabel) + '</span>' +
+        '</div>'
+      );
+    }).join("");
+
+    container.innerHTML = summary + topRows;
+  }
+
+  function renderInjuryAlertsWidget() {
+    var container = document.querySelector("[data-admin-injury-alerts]");
+    if (!container) {
+      return;
+    }
+
+    var athleteMap = state.latestMetricRowsByAthlete && typeof state.latestMetricRowsByAthlete === "object"
+      ? state.latestMetricRowsByAthlete
+      : {};
+    var openFlags = getOpenFlags();
+    var highFlags = openFlags.filter(function (flag) {
+      return String(flag && flag.severity || "").toLowerCase() === "high";
+    }).length;
+
+    var painRows = collectPainInjuryRows(athleteMap);
+    if (!openFlags.length && !painRows.length) {
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No active injury alerts</p>' +
+          '<p class="admin-empty-state-copy">Manual flags and pain/injury metrics will surface here automatically.</p>' +
+        '</div>';
+      return;
+    }
+
+    var summary =
+      '<div class="admin-overview-item admin-widget-summary">' +
+        '<p class="admin-overview-item-title">Alert Totals</p>' +
+        '<p class="admin-overview-item-meta">Open flags: ' + escapeHtml(String(openFlags.length)) + ' • High severity: ' + escapeHtml(String(highFlags)) + ' • Pain/injury metric alerts: ' + escapeHtml(String(painRows.length)) + '</p>' +
+      '</div>';
+
+    var athleteNameById = {};
+    (state.athletes || []).forEach(function (athlete) {
+      var athleteId = String(athlete && athlete.user_id || "").trim();
+      if (!athleteId) {
+        return;
+      }
+      athleteNameById[athleteId] = String(athlete && (athlete.name || athlete.email) || "Athlete");
+    });
+
+    var metricAlerts = painRows.slice(0, 6).map(function (item) {
+      var athleteName = athleteNameById[item.athleteId] || "Athlete";
+      return (
+        '<div class="admin-overview-item admin-widget-row">' +
+          '<div>' +
+            '<p class="admin-overview-item-title">' + escapeHtml(athleteName) + '</p>' +
+            '<p class="admin-overview-item-meta">' + escapeHtml(item.metricLabel + ": " + item.valueLabel) + '</p>' +
+          '</div>' +
+          '<span class="admin-widget-pill is-high">Alert</span>' +
+        '</div>'
+      );
+    }).join("");
+
+    container.innerHTML = summary + metricAlerts;
+  }
+
+  function buildLatestMetricRowsByAthlete(metricRows) {
+    var source = Array.isArray(metricRows) ? metricRows : [];
+    var output = {};
+
+    source.forEach(function (row) {
+      var userId = String(row && row.user_id || "").trim();
+      var metricName = normalizeMetricName(row && row.metric_name);
+      var updatedAt = String((row && (row.updated_at || row.created_at)) || "");
+
+      if (!userId || !metricName || !updatedAt) {
+        return;
+      }
+
+      if (!output[userId]) {
+        output[userId] = {};
+      }
+
+      var existing = output[userId][metricName];
+      if (!existing || updatedAt > existing.updated_at) {
+        output[userId][metricName] = {
+          metric_name: String(row && row.metric_name || ""),
+          metric_value: row && row.metric_value != null ? String(row.metric_value) : "",
+          updated_at: updatedAt
+        };
+      }
+    });
+
+    return output;
+  }
+
+  function computeRecoveryTrendSnapshot(stravaRows) {
+    var rows = Array.isArray(stravaRows) ? stravaRows : [];
+    var recoveryByDate = {};
+
+    rows.forEach(function (row) {
+      var dateKey = String(row && row.metric_date || "").trim();
+      var value = Number(row && row.recovery_score);
+      if (!dateKey || !Number.isFinite(value)) {
+        return;
+      }
+
+      if (!recoveryByDate[dateKey]) {
+        recoveryByDate[dateKey] = [];
+      }
+      recoveryByDate[dateKey].push(value);
+    });
+
+    var dates = Object.keys(recoveryByDate).sort();
+    if (!dates.length) {
+      return { recent: null, previous: null, delta: 0, recentLabel: "--", previousLabel: "--" };
+    }
+
+    var recentDates = dates.slice(-7);
+    var previousDates = dates.slice(Math.max(0, dates.length - 14), Math.max(0, dates.length - 7));
+    var recentAvg = averageRecoveryForDates(recoveryByDate, recentDates);
+    var previousAvg = averageRecoveryForDates(recoveryByDate, previousDates);
+    var delta = Number.isFinite(recentAvg) && Number.isFinite(previousAvg) ? (recentAvg - previousAvg) : 0;
+
+    return {
+      recent: recentAvg,
+      previous: previousAvg,
+      delta: delta,
+      recentLabel: Number.isFinite(recentAvg) ? formatInteger(recentAvg) : "--",
+      previousLabel: Number.isFinite(previousAvg) ? formatInteger(previousAvg) : "--"
+    };
+  }
+
+  function averageRecoveryForDates(recoveryByDate, dates) {
+    var dateList = Array.isArray(dates) ? dates : [];
+    var values = [];
+
+    dateList.forEach(function (dateKey) {
+      var dayValues = Array.isArray(recoveryByDate[dateKey]) ? recoveryByDate[dateKey] : [];
+      dayValues.forEach(function (value) {
+        if (Number.isFinite(value)) {
+          values.push(value);
+        }
+      });
+    });
+
+    if (!values.length) {
+      return null;
+    }
+    return values.reduce(function (sum, value) { return sum + value; }, 0) / values.length;
+  }
+
+  function resolveAcwrMetricValue(metricSnapshot) {
+    var aliases = ["acute:chronic workload ratio", "acute chronic workload ratio", "acwr"];
+    var entry = findMetricSnapshotByAliases(metricSnapshot, aliases);
+    if (!entry) {
+      return null;
+    }
+
+    return parseMetricNumericValue(entry.metric_value);
+  }
+
+  function classifyAcwrBand(acwrValue) {
+    var value = Number(acwrValue);
+    if (!Number.isFinite(value)) {
+      return "optimal";
+    }
+
+    if (value > 1.5 || value < 0.7) {
+      return "high";
+    }
+    if ((value >= 1.3 && value <= 1.5) || (value >= 0.7 && value < 0.8)) {
+      return "watch";
+    }
+    return "optimal";
+  }
+
+  function collectPainInjuryRows(metricMapByAthlete) {
+    var map = metricMapByAthlete && typeof metricMapByAthlete === "object" ? metricMapByAthlete : {};
+    var athleteIds = Object.keys(map);
+    var aliases = ["pain/injury flags", "pain injury flags", "injury flags", "pain flags"];
+    var rows = [];
+
+    athleteIds.forEach(function (athleteId) {
+      var entry = findMetricSnapshotByAliases(map[athleteId], aliases);
+      if (!entry) {
+        return;
+      }
+
+      var rawValue = String(entry.metric_value || "").trim();
+      if (!rawValue) {
+        return;
+      }
+
+      var lower = rawValue.toLowerCase();
+      var numeric = parseMetricNumericValue(rawValue);
+      var flagged = false;
+
+      if (Number.isFinite(numeric)) {
+        flagged = numeric > 0;
+      } else {
+        flagged = /yes|pain|injury|flare|acute|moderate|high|true|present/.test(lower) && !/none|no|false|clear/.test(lower);
+      }
+
+      if (!flagged) {
+        return;
+      }
+
+      rows.push({
+        athleteId: athleteId,
+        metricLabel: String(entry.metric_name || "Pain/Injury Flags"),
+        valueLabel: rawValue,
+        updatedAt: String(entry.updated_at || "")
+      });
+    });
+
+    rows.sort(function (a, b) {
+      return String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""));
+    });
+
+    return rows;
+  }
+
+  function findMetricSnapshotByAliases(metricSnapshot, aliases) {
+    var snapshot = metricSnapshot && typeof metricSnapshot === "object" ? metricSnapshot : {};
+    var aliasList = Array.isArray(aliases) ? aliases : [];
+
+    for (var i = 0; i < aliasList.length; i++) {
+      var key = normalizeMetricName(aliasList[i]);
+      if (!key) {
+        continue;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(snapshot, key)) {
+        return snapshot[key];
+      }
+    }
+
+    return null;
   }
 
   function renderCoachFlagsList() {

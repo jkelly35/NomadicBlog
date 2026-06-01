@@ -365,7 +365,19 @@
 
     // Group by category
     var grouped = {};
-    var categoryOrder = ["Strength", "Performance", "Cardio", "Mobility", "Other"];
+    var categoryOrder = [
+      "Readiness",
+      "Recovery",
+      "Load",
+      "Strength",
+      "Power",
+      "Performance",
+      "Cardio",
+      "Mobility",
+      "Sport-Specific",
+      "Health",
+      "Other"
+    ];
 
     metrics.forEach(function (m) {
       var cat = m.metric_category || "Other";
