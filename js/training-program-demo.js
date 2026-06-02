@@ -122,6 +122,10 @@
     }
 
     refreshWorkoutDaySelect(daySelect);
+    var preferredDay = getPreferredDayFromQuery();
+    if (preferredDay && daySelect.querySelector('option[value="' + preferredDay + '"]')) {
+      daySelect.value = preferredDay;
+    }
     state.day = daySelect.value || getAllSlotKeys()[0] || "w1d1";
 
     if (state.isTemplateBuilder) {
@@ -198,6 +202,7 @@
         }
 
         saveExercisesForDay();
+        syncScheduledSessionStatusForCurrentDay();
         updateStats();
       });
     }
@@ -323,6 +328,16 @@
       hydrateAssignedTemplate(templateId);
     } catch (e) {
       // Ignore malformed query parameters.
+    }
+  }
+
+  function getPreferredDayFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      var day = String(params.get("day") || "").trim();
+      return /^w\d+d\d+$/i.test(day) ? day : "";
+    } catch (e) {
+      return "";
     }
   }
 
@@ -2402,6 +2417,56 @@
     if (!silent) {
       setStatus(state.isTemplateBuilder ? "Draft day saved." : "✓ Workout log saved successfully.", "success");
     }
+  }
+
+  function syncScheduledSessionStatusForCurrentDay() {
+    if (
+      !state.client ||
+      state.isTemplateBuilder ||
+      !state.assignedProgramInstanceId ||
+      state.isProgramReadOnly ||
+      !state.day
+    ) {
+      return;
+    }
+
+    var snapshot = getWorkoutCompletionSnapshot(state.exercises || []);
+    var nextStatus = snapshot.totalSets > 0 && snapshot.doneSets === snapshot.totalSets
+      ? "completed"
+      : "scheduled";
+
+    state.client
+      .from("athlete_program_schedule")
+      .update({ status: nextStatus })
+      .eq("user_training_program_id", state.assignedProgramInstanceId)
+      .eq("slot_key", state.day)
+      .then(function () {
+        return true;
+      })
+      .catch(function () {
+        return false;
+      });
+  }
+
+  function getWorkoutCompletionSnapshot(exercises) {
+    var safeExercises = Array.isArray(exercises) ? exercises : [];
+    var totalSets = 0;
+    var doneSets = 0;
+
+    safeExercises.forEach(function (exercise) {
+      var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
+      sets.forEach(function (set) {
+        totalSets++;
+        if (set && set.done) {
+          doneSets++;
+        }
+      });
+    });
+
+    return {
+      totalSets: totalSets,
+      doneSets: doneSets
+    };
   }
 
   function saveTemplateProgram() {

@@ -46,6 +46,7 @@
               <p>Manage existing templates and build new ones.</p>
             </div>
             <div class="admin-programs-header-actions">
+              <a class="btn admin-btn-refresh" href="coach-schedule-calendar.html">Open Calendar Editor</a>
               <button class="btn admin-btn-refresh" type="button" data-programs-create>
                 + Create Training Program
               </button>
@@ -79,6 +80,22 @@
         <div class="admin-modal-section">
           <h3 data-programs-assign-template-name>Template</h3>
           <div class="admin-assign-controls">
+            <div class="admin-assign-schedule-grid">
+              <label class="admin-assign-schedule-field" for="programs-assign-start-date">
+                <span>Schedule Start Date</span>
+                <input id="programs-assign-start-date" type="date" data-programs-assign-start-date />
+              </label>
+            </div>
+            <fieldset class="admin-assign-weekdays" data-programs-assign-weekdays>
+              <legend>Assign workouts on these days</legend>
+              <label><input type="checkbox" value="1" data-programs-assign-weekday checked /> Mon</label>
+              <label><input type="checkbox" value="2" data-programs-assign-weekday checked /> Tue</label>
+              <label><input type="checkbox" value="3" data-programs-assign-weekday checked /> Wed</label>
+              <label><input type="checkbox" value="4" data-programs-assign-weekday /> Thu</label>
+              <label><input type="checkbox" value="5" data-programs-assign-weekday /> Fri</label>
+              <label><input type="checkbox" value="6" data-programs-assign-weekday /> Sat</label>
+              <label><input type="checkbox" value="0" data-programs-assign-weekday /> Sun</label>
+            </fieldset>
             <input
               type="text"
               class="admin-search"

@@ -112,12 +112,14 @@
     var editUrl    = "profile.html?coachView=1&athleteId=" + id;
     var metricsUrl = "metrics-editor.html?athleteId=" + id;
     var programUrl = "profile.html?coachView=1&athleteId=" + id + "#profile-training-program-section";
+    var calendarUrl = "coach-schedule-calendar.html?athleteId=" + id;
 
     setLink("[data-insight-edit-link]",     editUrl);
     setLink("[data-insight-metrics-link]",  metricsUrl);
     setLink("[data-insight-metrics-link2]", metricsUrl);
     setLink("[data-insight-programs-link]", programUrl);
     setLink("[data-insight-programs-link2]",programUrl);
+    setLink("[data-insight-calendar-link]", calendarUrl);
   }
 
   function setLink(selector, href) {

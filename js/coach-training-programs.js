@@ -115,6 +115,11 @@
           return;
         }
 
+        if (action === "calendar") {
+          window.location.href = "coach-schedule-calendar.html?templateId=" + encodeURIComponent(templateId);
+          return;
+        }
+
         if (action === "duplicate") {
           onDuplicateTemplate(templateId);
           return;
@@ -277,6 +282,7 @@
           '<div class="admin-program-item-actions">' +
           '<button type="button" class="btn admin-btn-small" data-program-action="edit" data-program-id="' + escapeAttribute(template.id) + '">Edit</button>' +
           '<button type="button" class="btn admin-btn-small" data-program-action="assign" data-program-id="' + escapeAttribute(template.id) + '">Assign</button>' +
+          '<button type="button" class="btn admin-btn-small" data-program-action="calendar" data-program-id="' + escapeAttribute(template.id) + '">Calendar</button>' +
           '<button type="button" class="btn admin-btn-small" data-program-action="duplicate" data-program-id="' + escapeAttribute(template.id) + '">Duplicate</button>' +
           '<button type="button" class="btn admin-btn-archive-mini" data-program-action="archive" data-program-id="' + escapeAttribute(template.id) + '">' + archiveLabel + '</button>' +
           '<button type="button" class="btn admin-btn-delete-mini" data-program-action="delete" data-program-id="' + escapeAttribute(template.id) + '">Delete</button>' +
@@ -314,6 +320,17 @@
     if (searchInput) {
       searchInput.value = "";
     }
+
+    var startDateInput = document.querySelector("[data-programs-assign-start-date]");
+    if (startDateInput) {
+      startDateInput.value = toDateInputValue(new Date());
+    }
+
+    var weekdayInputs = document.querySelectorAll("[data-programs-assign-weekday]");
+    weekdayInputs.forEach(function (input) {
+      var value = parseInt(String(input.value || ""), 10);
+      input.checked = value === 1 || value === 2 || value === 3;
+    });
 
     setAssignStatus("", "info");
     renderAssignAthleteList("");
@@ -384,6 +401,33 @@
       return;
     }
 
+    var startDateInput = document.querySelector("[data-programs-assign-start-date]");
+    var startDate = String(startDateInput && startDateInput.value || "").trim();
+    if (!isIsoDate(startDate)) {
+      setAssignStatus("Choose a valid schedule start date.", "error");
+      return;
+    }
+
+    var selectedWeekdays = Array.prototype.slice
+      .call(document.querySelectorAll("[data-programs-assign-weekday]:checked"))
+      .map(function (checkbox) {
+        return parseInt(String(checkbox.value || ""), 10);
+      })
+      .filter(function (day) {
+        return Number.isFinite(day) && day >= 0 && day <= 6;
+      });
+
+    if (!selectedWeekdays.length) {
+      setAssignStatus("Select at least one day of week for scheduling.", "error");
+      return;
+    }
+
+    var scheduleBlueprint = buildTemplateScheduleBlueprint(template);
+    if (!scheduleBlueprint.length) {
+      setAssignStatus("This template has no workout days to schedule.", "error");
+      return;
+    }
+
     var now = new Date().toISOString();
     var rows = selectedIds.map(function (userId) {
       return {
@@ -401,21 +445,204 @@
     state.client
       .from("user_training_programs")
       .insert(rows)
+      .select("id,user_id,program_id")
       .then(function (insertResult) {
         if (insertResult.error) {
           setAssignStatus(insertResult.error.message, "error");
           return;
         }
 
-        setAssignStatus("Assigned template to " + selectedIds.length + " athlete(s).", "success");
-        setStatus("Assigned '" + (template.name || "Template") + "' to " + selectedIds.length + " athlete(s).", "success");
-        setTimeout(function () {
-          closeAssignModal();
-        }, 700);
+        var insertedAssignments = insertResult.data || [];
+        if (!insertedAssignments.length) {
+          setAssignStatus("Template assignment completed, but no assignment rows returned.", "info");
+          setStatus("Assigned '" + (template.name || "Template") + "' to " + selectedIds.length + " athlete(s).", "success");
+          setTimeout(function () {
+            closeAssignModal();
+          }, 900);
+          return;
+        }
+
+        var scheduleRows = [];
+        insertedAssignments.forEach(function (assignment) {
+          var userId = String(assignment && assignment.user_id || "").trim();
+          var assignmentId = String(assignment && assignment.id || "").trim();
+          var programId = String(assignment && assignment.program_id || "").trim();
+          if (!userId || !assignmentId) {
+            return;
+          }
+
+          var scheduledDates = generateScheduledDates(startDate, scheduleBlueprint.length, selectedWeekdays);
+          scheduleBlueprint.forEach(function (slotEntry, index) {
+            var scheduledDate = scheduledDates[index];
+            if (!scheduledDate) {
+              return;
+            }
+
+            scheduleRows.push({
+              athlete_user_id: userId,
+              user_training_program_id: assignmentId,
+              program_id: programId || null,
+              slot_key: slotEntry.slot_key,
+              session_label: slotEntry.session_label,
+              scheduled_for: scheduledDate,
+              status: "scheduled",
+              scheduled_by: state.user ? state.user.id : null
+            });
+          });
+        });
+
+        if (!scheduleRows.length) {
+          setAssignStatus("Assigned template, but no schedule rows were generated.", "info");
+          setStatus("Assigned '" + (template.name || "Template") + "' to " + selectedIds.length + " athlete(s).", "success");
+          setTimeout(function () {
+            closeAssignModal();
+          }, 900);
+          return;
+        }
+
+        state.client
+          .from("athlete_program_schedule")
+          .insert(scheduleRows)
+          .then(function (scheduleResult) {
+            if (scheduleResult.error) {
+              setAssignStatus(
+                "Assigned template, but calendar schedule could not be saved: " + scheduleResult.error.message,
+                "error"
+              );
+              setStatus(
+                "Template assigned. Schedule table may be missing; run the athlete calendar SQL migration.",
+                "info"
+              );
+              return;
+            }
+
+            setAssignStatus(
+              "Assigned template and scheduled " + scheduleRows.length + " workout date(s).",
+              "success"
+            );
+            setStatus(
+              "Assigned '" + (template.name || "Template") + "' and created athlete workout calendar entries.",
+              "success"
+            );
+            setTimeout(function () {
+              closeAssignModal();
+            }, 900);
+          })
+          .catch(function (error) {
+            setAssignStatus(
+              error && error.message
+                ? "Assigned template, but schedule save failed: " + error.message
+                : "Assigned template, but schedule save failed.",
+              "error"
+            );
+          });
       })
       .catch(function (error) {
         setAssignStatus(error && error.message ? error.message : "Failed to assign template.", "error");
       });
+  }
+
+  function buildTemplateScheduleBlueprint(template) {
+    var slotKeys = getOrderedTemplateSlotKeys(template);
+    return slotKeys.map(function (slotKey) {
+      return {
+        slot_key: slotKey,
+        session_label: resolveTemplateSlotLabel(template, slotKey)
+      };
+    });
+  }
+
+  function getOrderedTemplateSlotKeys(template) {
+    var days = template && template.days ? template.days : {};
+    var keys = Object.keys(days || {}).filter(function (key) {
+      return /^w\d+d\d+$/i.test(String(key || ""));
+    });
+
+    return keys.sort(function (a, b) {
+      var parsedA = parseTemplateSlotKey(a);
+      var parsedB = parseTemplateSlotKey(b);
+      if (!parsedA || !parsedB) {
+        return String(a || "").localeCompare(String(b || ""));
+      }
+
+      if (parsedA.week !== parsedB.week) {
+        return parsedA.week - parsedB.week;
+      }
+
+      return parsedA.workout - parsedB.workout;
+    });
+  }
+
+  function parseTemplateSlotKey(slotKey) {
+    var match = /^w(\d+)d(\d+)$/i.exec(String(slotKey || ""));
+    if (!match) {
+      return null;
+    }
+
+    return {
+      week: parseInt(match[1], 10),
+      workout: parseInt(match[2], 10)
+    };
+  }
+
+  function resolveTemplateSlotLabel(template, slotKey) {
+    var customNames = template && template.custom_day_names && typeof template.custom_day_names === "object"
+      ? template.custom_day_names
+      : {};
+
+    if (customNames[slotKey]) {
+      return String(customNames[slotKey]);
+    }
+
+    var parsed = parseTemplateSlotKey(slotKey);
+    if (!parsed) {
+      return "Workout";
+    }
+
+    return "Week " + parsed.week + " - Workout " + parsed.workout;
+  }
+
+  function generateScheduledDates(startDate, totalSessions, weekdays) {
+    var results = [];
+    var allowedDays = (Array.isArray(weekdays) ? weekdays : [])
+      .filter(function (day) {
+        return Number.isFinite(day) && day >= 0 && day <= 6;
+      })
+      .sort();
+
+    if (!allowedDays.length || !isIsoDate(startDate)) {
+      return results;
+    }
+
+    var cursor = new Date(startDate + "T00:00:00");
+    var safety = 0;
+
+    while (results.length < totalSessions && safety < 730) {
+      if (allowedDays.indexOf(cursor.getDay()) >= 0) {
+        results.push(toDateInputValue(cursor));
+      }
+
+      cursor.setDate(cursor.getDate() + 1);
+      safety++;
+    }
+
+    return results;
+  }
+
+  function isIsoDate(value) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+  }
+
+  function toDateInputValue(date) {
+    var d = date instanceof Date ? date : new Date(date);
+    if (!d || isNaN(d.getTime())) {
+      return "";
+    }
+
+    var year = d.getFullYear();
+    var month = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
   }
 
   function showAssignModal() {
@@ -588,7 +815,8 @@
       updated_at: row.updated_at,
       archived: !!payload.archived,
       structure: payload.structure || { weeks: 1, workoutsPerWeek: 3 },
-      days: payload.days || { "day-1": [], "day-2": [], "day-3": [] }
+      days: payload.days || { "day-1": [], "day-2": [], "day-3": [] },
+      custom_day_names: payload.custom_day_names || {}
     };
   }
 
@@ -609,7 +837,8 @@
     var safePayload = {
       archived: !!(payload && payload.archived),
       structure: payload && payload.structure ? payload.structure : { weeks: 1, workoutsPerWeek: 3 },
-      days: payload && payload.days ? payload.days : { "day-1": [], "day-2": [], "day-3": [] }
+      days: payload && payload.days ? payload.days : { "day-1": [], "day-2": [], "day-3": [] },
+      custom_day_names: payload && payload.custom_day_names ? payload.custom_day_names : {}
     };
     return TEMPLATE_MARKER + JSON.stringify(safePayload);
   }
@@ -633,7 +862,8 @@
           updated_at: item.updated_at,
           archived: !!item.archived,
           structure: item.structure || { weeks: 1, workoutsPerWeek: 3 },
-          days: item.days || {}
+          days: item.days || {},
+          custom_day_names: item.custom_day_names || {}
         };
       });
     } catch (e) {

@@ -4346,7 +4346,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
         var programs = result.data || [];
         if (!programs.length) {
-          renderTrainingPrograms(contentElement, []);
+          renderTrainingPrograms(contentElement, [], {});
           return;
         }
 
@@ -4360,7 +4360,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         });
 
         if (!missingProgramIds.length) {
-          renderTrainingPrograms(contentElement, programs);
+          hydrateAndRenderTrainingSchedules(contentElement, programs);
           return;
         }
 
@@ -4387,10 +4387,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
               return copy;
             });
 
-            renderTrainingPrograms(contentElement, enrichedPrograms);
+            hydrateAndRenderTrainingSchedules(contentElement, enrichedPrograms);
           })
           .catch(function () {
-            renderTrainingPrograms(contentElement, programs);
+            hydrateAndRenderTrainingSchedules(contentElement, programs);
           });
       })
       .catch(function (error) {
@@ -4402,7 +4402,61 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
   }
 
-  function renderTrainingPrograms(contentElement, programs) {
+  function hydrateAndRenderTrainingSchedules(contentElement, programs) {
+    var activeAssignmentIds = (programs || [])
+      .filter(function (program) {
+        return !!program && !!program.is_active && !!program.id;
+      })
+      .map(function (program) {
+        return String(program.id);
+      });
+
+    if (!activeAssignmentIds.length) {
+      renderTrainingPrograms(contentElement, programs, {});
+      return;
+    }
+
+    state.client
+      .from("athlete_program_schedule")
+      .select("id,user_training_program_id,slot_key,session_label,scheduled_for,status")
+      .eq("athlete_user_id", getViewedUserId())
+      .in("user_training_program_id", activeAssignmentIds)
+      .gte("scheduled_for", getDateOffsetInputValue(-2))
+      .order("scheduled_for", { ascending: true })
+      .then(function (scheduleResult) {
+        if (scheduleResult.error) {
+          renderTrainingPrograms(contentElement, programs, {});
+          return;
+        }
+
+        var scheduleByAssignment = {};
+        (scheduleResult.data || []).forEach(function (row) {
+          var assignmentId = String(row && row.user_training_program_id || "");
+          if (!assignmentId) {
+            return;
+          }
+
+          if (!scheduleByAssignment[assignmentId]) {
+            scheduleByAssignment[assignmentId] = [];
+          }
+
+          scheduleByAssignment[assignmentId].push({
+            id: String(row && row.id || ""),
+            slot_key: String(row && row.slot_key || ""),
+            session_label: String(row && row.session_label || "").trim(),
+            scheduled_for: String(row && row.scheduled_for || ""),
+            status: String(row && row.status || "scheduled")
+          });
+        });
+
+        renderTrainingPrograms(contentElement, programs, scheduleByAssignment);
+      })
+      .catch(function () {
+        renderTrainingPrograms(contentElement, programs, {});
+      });
+  }
+
+  function renderTrainingPrograms(contentElement, programs, scheduleByAssignment) {
     var activePrograms = (programs || []).filter(function (program) {
       return !!program.is_active;
     });
@@ -4410,7 +4464,13 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return !program.is_active;
     });
 
-    updateQuickGlanceTraining(activePrograms.length, pastPrograms.length);
+    var safeScheduleMap = scheduleByAssignment && typeof scheduleByAssignment === "object"
+      ? scheduleByAssignment
+      : {};
+
+    var upcomingScheduledItems = collectUpcomingScheduledItems(activePrograms, safeScheduleMap, 14);
+
+    updateQuickGlanceTraining(activePrograms.length, pastPrograms.length, upcomingScheduledItems);
 
     var html = '';
 
@@ -4427,6 +4487,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     html += '</div>';
 
     html += '<div class="training-program-tab-panel" data-training-program-panel="current">';
+    if (activePrograms.length) {
+      html += buildTrainingCalendarCardHtml(upcomingScheduledItems);
+    }
+
     if (!activePrograms.length) {
       html +=
         '<div class="profile-empty-state">' +
@@ -4439,7 +4503,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     } else {
       html += '<div class="training-program-grid training-program-grid-active">';
       activePrograms.forEach(function (program) {
-        html += buildTrainingProgramCard(program, true);
+        var scheduleRows = safeScheduleMap[String(program.id || "")] || [];
+        html += buildTrainingProgramCard(program, true, scheduleRows);
       });
       html += '</div>';
     }
@@ -4455,7 +4520,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     } else {
       html += '<div class="training-program-grid training-program-grid-past">';
       pastPrograms.forEach(function (program) {
-        html += buildTrainingProgramCard(program, false);
+        html += buildTrainingProgramCard(program, false, []);
       });
       html += '</div>';
     }
@@ -4478,11 +4543,47 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     updateQuickGlanceCard("strava", "Loading...", "Checking recovery signals", "");
   }
 
-  function updateQuickGlanceTraining(activeCount, pastCount) {
+  function updateQuickGlanceTraining(activeCount, pastCount, upcomingScheduledItems) {
     var active = Number(activeCount) || 0;
     var past = Number(pastCount) || 0;
     state.readinessTrainingActiveCount = active;
+
+    var upcoming = Array.isArray(upcomingScheduledItems) ? upcomingScheduledItems : [];
+    var todayKey = getTodayDateInputValue();
+    var todaysSessions = upcoming.filter(function (item) {
+      return String(item && item.scheduled_for || "") === todayKey;
+    });
+    var nextUpcoming = upcoming.find(function (item) {
+      return String(item && item.scheduled_for || "") >= todayKey;
+    });
+
     if (active > 0) {
+      if (todaysSessions.length) {
+        updateQuickGlanceCard(
+          "training",
+          "Today: " + todaysSessions.length + " Session" + (todaysSessions.length === 1 ? "" : "s"),
+          "Open your scheduled workout calendar below",
+          "good"
+        );
+        updateDailyReadinessCard();
+        return;
+      }
+
+      if (nextUpcoming && nextUpcoming.scheduled_for) {
+        var daysUntil = getDaysUntilDate(nextUpcoming.scheduled_for);
+        var nextText = typeof daysUntil === "number"
+          ? (daysUntil === 0 ? "Today" : (daysUntil > 0 ? "In " + daysUntil + " day" + (daysUntil === 1 ? "" : "s") : "Overdue"))
+          : "Upcoming";
+        updateQuickGlanceCard(
+          "training",
+          nextText,
+          "Next: " + String(nextUpcoming.session_label || "Scheduled workout"),
+          daysUntil === 0 ? "good" : ""
+        );
+        updateDailyReadinessCard();
+        return;
+      }
+
       updateQuickGlanceCard(
         "training",
         "Session Ready",
@@ -4670,19 +4771,146 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       athleteQuery;
     var viewUrl = programUrl + "&view=1";
 
+    var scheduleRows = Array.isArray(arguments[2]) ? arguments[2] : [];
+    var nextSession = getNextScheduledSession(scheduleRows);
+    var nextSessionLabel = nextSession
+      ? String(nextSession.session_label || nextSession.slot_key || "Scheduled Workout")
+      : "Not scheduled";
+    var nextSessionDate = nextSession && nextSession.scheduled_for
+      ? formatDate(nextSession.scheduled_for)
+      : "—";
+    var scheduledProgramUrl = nextSession && nextSession.slot_key
+      ? (programUrl + "&day=" + encodeURIComponent(nextSession.slot_key))
+      : programUrl;
+
     return [
       '<div class="profile-training-details training-program-card' + (isActive ? ' is-active' : ' is-past') + '" data-training-program-id="' + escapeAttribute(program.id || "") + '">',
       '<div class="training-row"><span>Program</span><strong><a class="training-program-link" href="' + programUrl + '">' + escapeHtml(programName) + '</a></strong></div>',
       '<div class="training-row"><span>Start Date</span><strong>' + escapeHtml(startDate) + '</strong></div>',
+      (isActive ? '<div class="training-row"><span>Next Workout</span><strong>' + escapeHtml(nextSessionLabel) + ' · ' + escapeHtml(nextSessionDate) + '</strong></div>' : ''),
       isActive
         ? '<p class="training-note">This program is currently active. Use the button below when it is complete.</p>'
         : '<p class="training-note">This program has been moved to your past training history.</p>',
-      '<a class="btn training-open-btn" href="' + (isActive ? programUrl : viewUrl) + '">' + (isActive ? 'Open Program + Log Workout' : 'View Program') + '</a>',
+      '<a class="btn training-open-btn" href="' + (isActive ? scheduledProgramUrl : viewUrl) + '">' + (isActive ? 'Open Program + Log Workout' : 'View Program') + '</a>',
       isActive
         ? '<div class="training-card-actions"><button type="button" class="btn profile-btn-edit-profile training-complete-btn" data-complete-program="' + escapeAttribute(program.id || "") + '">Completed Training Program</button></div>'
         : '<div class="training-card-actions training-card-actions-past"><button type="button" class="btn profile-btn-edit-profile training-make-current-btn" data-make-current-program="' + escapeAttribute(program.id || "") + '">Make Current</button><button type="button" class="btn profile-btn-delete training-delete-past-btn" data-delete-past-program="' + escapeAttribute(program.id || "") + '">Delete</button></div>',
       '</div>'
     ].join("");
+  }
+
+  function collectUpcomingScheduledItems(activePrograms, scheduleByAssignment, maxItems) {
+    var programsById = {};
+    (Array.isArray(activePrograms) ? activePrograms : []).forEach(function (program) {
+      programsById[String(program && program.id || "")] = program;
+    });
+
+    var todayKey = getTodayDateInputValue();
+    var allItems = [];
+
+    Object.keys(scheduleByAssignment || {}).forEach(function (assignmentId) {
+      var rows = Array.isArray(scheduleByAssignment[assignmentId]) ? scheduleByAssignment[assignmentId] : [];
+      var program = programsById[String(assignmentId || "")];
+      if (!program) {
+        return;
+      }
+
+      rows.forEach(function (row) {
+        var dateValue = String(row && row.scheduled_for || "");
+        if (!dateValue || dateValue < todayKey) {
+          return;
+        }
+
+        allItems.push({
+          program: program,
+          assignment_id: assignmentId,
+          scheduled_for: dateValue,
+          slot_key: String(row && row.slot_key || ""),
+          session_label: String(row && row.session_label || row && row.slot_key || "Workout").trim() || "Workout"
+        });
+      });
+    });
+
+    allItems.sort(function (a, b) {
+      if (a.scheduled_for !== b.scheduled_for) {
+        return a.scheduled_for.localeCompare(b.scheduled_for);
+      }
+      return String(a.session_label || "").localeCompare(String(b.session_label || ""));
+    });
+
+    return allItems.slice(0, Math.max(0, parseInt(maxItems, 10) || 0));
+  }
+
+  function getNextScheduledSession(rows) {
+    var todayKey = getTodayDateInputValue();
+    var sorted = (Array.isArray(rows) ? rows : []).slice().sort(function (a, b) {
+      return String(a && a.scheduled_for || "").localeCompare(String(b && b.scheduled_for || ""));
+    });
+
+    for (var i = 0; i < sorted.length; i++) {
+      var row = sorted[i];
+      if (String(row && row.scheduled_for || "") >= todayKey) {
+        return row;
+      }
+    }
+
+    return null;
+  }
+
+  function buildTrainingCalendarCardHtml(items) {
+    var list = Array.isArray(items) ? items : [];
+    if (!list.length) {
+      return (
+        '<article class="training-calendar-card">' +
+          '<h3>Upcoming Workout Calendar</h3>' +
+          '<p>Your coach has not scheduled specific workout dates yet.</p>' +
+        '</article>'
+      );
+    }
+
+    var calendarItems = list.map(function (item) {
+      var program = item && item.program ? item.program : {};
+      var programName =
+        (program.training_program && program.training_program.name) ||
+        program.program_name ||
+        (program.program_id ? "Program " + String(program.program_id).slice(0, 8) : "Assigned Program");
+      var athleteName =
+        (state.profile && state.profile.name) ||
+        (state.viewUser && state.viewUser.email) ||
+        "Athlete";
+      var url =
+        "training-program-example.html?program=" + encodeURIComponent(programName) +
+        (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "") +
+        (program.id ? "&assignmentId=" + encodeURIComponent(program.id) : "") +
+        "&athleteName=" + encodeURIComponent(athleteName) +
+        "&day=" + encodeURIComponent(String(item.slot_key || ""));
+
+      return (
+        '<li class="training-calendar-item">' +
+          '<span class="training-calendar-date">' + escapeHtml(formatDate(item.scheduled_for)) + '</span>' +
+          '<p class="training-calendar-title"><a href="' + url + '">' + escapeHtml(String(item.session_label || "Workout")) + '</a></p>' +
+          '<p class="training-calendar-meta">' + escapeHtml(programName) + '</p>' +
+        '</li>'
+      );
+    }).join("");
+
+    return (
+      '<article class="training-calendar-card">' +
+        '<h3>Upcoming Workout Calendar</h3>' +
+        '<p>These sessions are scheduled by your coach. Open any workout to log it.</p>' +
+        '<ul class="training-calendar-list">' + calendarItems + '</ul>' +
+      '</article>'
+    );
+  }
+
+  function getDateOffsetInputValue(offsetDays) {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + (parseInt(offsetDays, 10) || 0));
+    var year = d.getFullYear();
+    var month = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
   }
 
   function onCustomizeProgramForAthlete() {
