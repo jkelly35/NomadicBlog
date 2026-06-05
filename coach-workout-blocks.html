@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Workout Blocks Library - Nomadic Performance</title>
+  <title>Exercise &amp; Block Library - Nomadic Performance</title>
   <link rel="stylesheet" href="css/style.css" />
   <script defer src="js/analytics.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -35,33 +35,58 @@
     <section class="block-manager-content" data-block-manager-content hidden>
       <div class="block-manager-header">
         <div>
-          <h1>Workout Blocks Library</h1>
-          <p>Save, edit, tag, and order reusable blocks in one focused place.</p>
+          <h1>Exercise &amp; Block Library</h1>
+          <p>Create, save, edit, and organize single exercises or full blocks from one reusable library.</p>
         </div>
         <a class="btn btn-secondary" href="training-program-example.html?builder=1">Back to Template Builder</a>
       </div>
 
       <div class="block-manager-grid">
         <article class="block-manager-panel">
-          <h2>Save or Update Block</h2>
-          <p>Choose a draft workout day and section to capture block exercises.</p>
+          <h2>Create or Update Library Item</h2>
+          <p>Build a single exercise manually, assemble a block, or import exercises from a draft template day.</p>
           <div class="block-manager-form">
-            <input type="text" class="program-builder-block-title" placeholder="Block title" data-block-title />
-            <label for="block-source-day">Source Draft Day</label>
-            <select id="block-source-day" class="program-builder-block-section" data-block-source-day>
-              <option value="">Select a source day</option>
+            <label for="block-entry-type">Library Item Type</label>
+            <select id="block-entry-type" class="program-builder-block-section" data-block-entry-type>
+              <option value="exercise">Single Exercise</option>
+              <option value="block">Exercise Block</option>
             </select>
-            <select class="program-builder-block-section" data-block-section>
-              <option value="Warm Up">Warm Up</option>
-              <option value="A Block">A Block</option>
-              <option value="B Block">B Block</option>
-              <option value="C Block">C Block</option>
-              <option value="Cool Down">Cool Down</option>
-              <option value="__all__">Entire Day</option>
-            </select>
+            <input type="text" class="program-builder-block-title" placeholder="Exercise or block title" data-block-title />
+            <label for="block-tags">Tags</label>
             <input type="text" class="program-builder-block-tags" placeholder="Tags (comma separated)" data-block-tags />
+
+            <div class="block-manager-import-panel">
+              <div>
+                <label for="block-source-day">Import From Draft Day</label>
+                <select id="block-source-day" class="program-builder-block-section" data-block-source-day>
+                  <option value="">Select a source day</option>
+                </select>
+              </div>
+              <div>
+                <label for="block-section">Import Section</label>
+                <select id="block-section" class="program-builder-block-section" data-block-section>
+                  <option value="Warm Up">Warm Up</option>
+                  <option value="A Block">A Block</option>
+                  <option value="B Block">B Block</option>
+                  <option value="C Block">C Block</option>
+                  <option value="Cool Down">Cool Down</option>
+                  <option value="__all__">Entire Day</option>
+                </select>
+              </div>
+              <button type="button" class="btn btn-secondary" data-block-import>Import Exercises</button>
+            </div>
+
+            <div class="block-manager-composer-header">
+              <div>
+                <h3>Exercises In This Item</h3>
+                <p>Add one exercise for a single-exercise item, or stack several for a reusable block.</p>
+              </div>
+              <button type="button" class="btn admin-btn-small" data-block-add-exercise>Add Exercise</button>
+            </div>
+
+            <div class="block-manager-exercise-list" data-block-exercise-list></div>
             <div class="block-manager-form-actions">
-              <button type="button" class="btn admin-btn-small" data-block-save>Save Block</button>
+              <button type="button" class="btn admin-btn-small" data-block-save>Save Item</button>
               <button type="button" class="btn btn-secondary" data-block-cancel-edit hidden>Cancel Edit</button>
             </div>
           </div>
@@ -71,10 +96,18 @@
         <article class="block-manager-panel">
           <div class="block-manager-list-toolbar">
             <div>
-              <h2>Saved Blocks</h2>
-              <p>Filter by tag, edit content, or reorder with arrows.</p>
+              <h2>Saved Library Items</h2>
+              <p>Filter by item type or tag, then edit, reorder, or delete.</p>
             </div>
-            <div>
+            <div class="block-manager-list-filters">
+              <div>
+                <label for="block-type-filter">Type</label>
+                <select id="block-type-filter" class="program-builder-block-filter" data-block-type-filter>
+                  <option value="all">All items</option>
+                  <option value="exercise">Exercises</option>
+                  <option value="block">Blocks</option>
+                </select>
+              </div>
               <label for="block-tag-filter">Tag filter</label>
               <select id="block-tag-filter" class="program-builder-block-filter" data-block-filter>
                 <option value="all">All tags</option>

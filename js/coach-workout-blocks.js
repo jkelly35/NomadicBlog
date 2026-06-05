@@ -2,13 +2,18 @@
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
   var TEMPLATE_DRAFT_PREFIX = "nomadic_training_program_template_builder_draft_";
   var WORKOUT_BLOCK_LIBRARY_KEY = "nomadic_template_workout_blocks_v1";
+  var DEFAULT_SECTION = "A Block";
+  var DEFAULT_MODE = "reps";
+  var SECTION_OPTIONS = ["Warm Up", "A Block", "B Block", "C Block", "Cool Down"];
 
   var state = {
     client: null,
     coachUserId: null,
-    blocks: [],
+    items: [],
+    editingId: null,
     filterTag: "all",
-    editingId: null
+    filterType: "all",
+    draftExercises: []
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -16,43 +21,231 @@
   });
 
   function initialize() {
+    bindEvents();
+    state.draftExercises = [createDefaultExercise()];
+    renderDraftExercises();
+
     state.client = createSupabaseClient();
     if (!state.client) {
-      showGuard("Supabase is unavailable. Check client configuration.");
+      showGuardMessage("Supabase is not configured. Cannot load the exercise library.");
       return;
     }
 
-    state.client.auth.getSession().then(function (result) {
-      var session = result && result.data && result.data.session;
-      var user = session && session.user;
-      var email = String(user && user.email || "").toLowerCase();
-      if (!user || email !== ADMIN_EMAIL) {
-        showGuard("Workout block management is available to coach accounts only.");
-        return;
+    resolveCoachAccess()
+      .then(function (access) {
+        if (!access || !access.allowed || !access.user) {
+          showGuardMessage("Coach access is required to manage the exercise library.");
+          return;
+        }
+
+        state.coachUserId = String(access.user.id || "").trim() || null;
+        if (!state.coachUserId) {
+          showGuardMessage("Could not verify coach account.");
+          return;
+        }
+
+        showManager();
+        loadDraftDayOptions();
+        clearEditState();
+        loadLibraryItems();
+      })
+      .catch(function () {
+        showGuardMessage("Could not verify coach access.");
+      });
+  }
+
+  function resolveCoachAccess() {
+    if (!state.client || !state.client.auth) {
+      return Promise.resolve({ allowed: false, user: null });
+    }
+
+    return resolveCurrentUser().then(function (user) {
+      if (!user) {
+        return { allowed: false, user: null };
       }
 
-      state.coachUserId = String(user.id || "");
-      showContent();
-      bindEvents();
-      loadDraftDayOptions();
-      loadBlocksFromCloud();
-    }).catch(function () {
-      showGuard("Could not verify coach access.");
+      return resolveIsCoach(user).then(function (allowed) {
+        return {
+          allowed: !!allowed,
+          user: user
+        };
+      });
     });
   }
 
-  function showGuard(message) {
+  function resolveCurrentUser() {
+    return state.client.auth.getSession()
+      .then(function (result) {
+        var session = result && result.data && result.data.session;
+        if (session && session.user) {
+          return session.user;
+        }
+        return resolveCurrentUserFallback();
+      })
+      .catch(function () {
+        return resolveCurrentUserFallback();
+      });
+  }
+
+  function resolveCurrentUserFallback() {
+    if (!state.client || !state.client.auth || typeof state.client.auth.getUser !== "function") {
+      return Promise.resolve(null);
+    }
+
+    return state.client.auth.getUser()
+      .then(function (result) {
+        return result && result.data && result.data.user ? result.data.user : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function resolveIsCoach(user) {
+    var email = String(user && user.email || "").toLowerCase();
+    if (email && email === ADMIN_EMAIL) {
+      return Promise.resolve(true);
+    }
+
+    if (!state.client || !state.client.rpc) {
+      return Promise.resolve(false);
+    }
+
+    return state.client.rpc("is_nomadic_admin")
+      .then(function (result) {
+        if (result && result.error) {
+          return false;
+        }
+        return !!(result && result.data === true);
+      })
+      .catch(function () {
+        return false;
+      });
+  }
+
+  function bindEvents() {
+    var saveBtn = document.querySelector("[data-block-save]");
+    var cancelBtn = document.querySelector("[data-block-cancel-edit]");
+    var filterInput = document.querySelector("[data-block-filter]");
+    var typeFilterInput = document.querySelector("[data-block-type-filter]");
+    var addExerciseBtn = document.querySelector("[data-block-add-exercise]");
+    var importBtn = document.querySelector("[data-block-import]");
+    var entryTypeInput = document.querySelector("[data-block-entry-type]");
+    var titleInput = document.querySelector("[data-block-title]");
+
+    if (saveBtn) {
+      saveBtn.addEventListener("click", saveOrUpdateItem);
+    }
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", clearEditState);
+    }
+
+    if (filterInput) {
+      filterInput.addEventListener("change", function () {
+        state.filterTag = String(filterInput.value || "all").trim() || "all";
+        renderItems();
+      });
+    }
+
+    if (typeFilterInput) {
+      typeFilterInput.addEventListener("change", function () {
+        state.filterType = normalizeFilterType(typeFilterInput.value);
+        renderItems();
+      });
+    }
+
+    if (addExerciseBtn) {
+      addExerciseBtn.addEventListener("click", function () {
+        if (getSelectedEntryType() === "exercise" && state.draftExercises.length >= 1) {
+          setStatus("Single exercise items can only contain one exercise.", "info");
+          return;
+        }
+
+        state.draftExercises.push(createDefaultExercise());
+        renderDraftExercises();
+      });
+    }
+
+    if (importBtn) {
+      importBtn.addEventListener("click", importExercisesFromDraft);
+    }
+
+    if (entryTypeInput) {
+      entryTypeInput.addEventListener("change", function () {
+        if (getSelectedEntryType() === "exercise" && state.draftExercises.length > 1) {
+          state.draftExercises = [cloneExercise(state.draftExercises[0])];
+        }
+        renderDraftExercises();
+      });
+    }
+
+    if (titleInput) {
+      titleInput.addEventListener("keydown", function (event) {
+        if (!event || event.key !== "Enter") {
+          return;
+        }
+        event.preventDefault();
+        saveOrUpdateItem();
+      });
+    }
+
+    document.addEventListener("click", function (event) {
+      var editBtn = event.target && event.target.closest("[data-block-edit]");
+      if (editBtn) {
+        startEditingItem(String(editBtn.getAttribute("data-block-edit") || ""));
+        return;
+      }
+
+      var deleteBtn = event.target && event.target.closest("[data-block-delete]");
+      if (deleteBtn) {
+        deleteItem(String(deleteBtn.getAttribute("data-block-delete") || ""));
+        return;
+      }
+
+      var moveBtn = event.target && event.target.closest("[data-block-move]");
+      if (moveBtn) {
+        moveItem(
+          String(moveBtn.getAttribute("data-block-id") || ""),
+          String(moveBtn.getAttribute("data-block-move") || "")
+        );
+        return;
+      }
+
+      var removeExerciseBtn = event.target && event.target.closest("[data-block-exercise-remove]");
+      if (removeExerciseBtn) {
+        removeDraftExercise(removeExerciseBtn.getAttribute("data-block-exercise-remove"));
+      }
+    });
+
+    document.addEventListener("input", function (event) {
+      var exerciseItem = event.target && event.target.closest && event.target.closest("[data-block-exercise-item]");
+      if (!exerciseItem) {
+        return;
+      }
+
+      var index = parseInt(exerciseItem.getAttribute("data-block-exercise-item") || "-1", 10);
+      if (!Number.isFinite(index) || index < 0 || index >= state.draftExercises.length) {
+        return;
+      }
+
+      updateDraftExerciseFromRow(index, exerciseItem);
+    });
+  }
+
+  function showGuardMessage(message) {
     var guard = document.querySelector("[data-block-manager-guard]");
     var content = document.querySelector("[data-block-manager-content]");
     if (guard) {
-      guard.innerHTML = '<p class="admin-loading">' + escapeHtml(message) + "</p>";
+      guard.hidden = false;
+      guard.innerHTML = '<p class="admin-loading">' + escapeHtml(message) + '</p>';
     }
     if (content) {
       content.hidden = true;
     }
   }
 
-  function showContent() {
+  function showManager() {
     var guard = document.querySelector("[data-block-manager-guard]");
     var content = document.querySelector("[data-block-manager-content]");
     if (guard) {
@@ -63,60 +256,6 @@
     }
   }
 
-  function bindEvents() {
-    var saveButton = document.querySelector("[data-block-save]");
-    var cancelButton = document.querySelector("[data-block-cancel-edit]");
-    var filterInput = document.querySelector("[data-block-filter]");
-    var titleInput = document.querySelector("[data-block-title]");
-
-    if (saveButton) {
-      saveButton.addEventListener("click", onSaveBlock);
-    }
-
-    if (cancelButton) {
-      cancelButton.addEventListener("click", clearEditState);
-    }
-
-    if (filterInput) {
-      filterInput.addEventListener("change", function () {
-        state.filterTag = String(filterInput.value || "all").trim() || "all";
-        renderBlocks();
-      });
-    }
-
-    if (titleInput) {
-      titleInput.addEventListener("keydown", function (event) {
-        if (!event || event.key !== "Enter") {
-          return;
-        }
-        event.preventDefault();
-        onSaveBlock();
-      });
-    }
-
-    document.addEventListener("click", function (event) {
-      var editBtn = event.target && event.target.closest("[data-block-edit]");
-      if (editBtn) {
-        startEditingBlock(String(editBtn.getAttribute("data-block-edit") || ""));
-        return;
-      }
-
-      var deleteBtn = event.target && event.target.closest("[data-block-delete]");
-      if (deleteBtn) {
-        deleteBlock(String(deleteBtn.getAttribute("data-block-delete") || ""));
-        return;
-      }
-
-      var moveBtn = event.target && event.target.closest("[data-block-move]");
-      if (moveBtn) {
-        moveBlock(
-          String(moveBtn.getAttribute("data-block-id") || ""),
-          String(moveBtn.getAttribute("data-block-move") || "")
-        );
-      }
-    });
-  }
-
   function loadDraftDayOptions() {
     var daySelect = document.querySelector("[data-block-source-day]");
     if (!daySelect) {
@@ -124,20 +263,18 @@
     }
 
     var draftDays = getTemplateDraftDays();
-    var options = ['<option value="">Select a source day</option>']
+    daySelect.innerHTML = ['<option value="">Select a source day</option>']
       .concat(draftDays.map(function (day) {
         return '<option value="' + escapeAttribute(day) + '">' + escapeHtml(labelForSlot(day)) + '</option>';
       }))
       .join("");
-
-    daySelect.innerHTML = options;
   }
 
   function getTemplateDraftDays() {
     var days = [];
     var seen = {};
     try {
-      for (var i = 0; i < window.localStorage.length; i++) {
+      for (var i = 0; i < window.localStorage.length; i += 1) {
         var key = window.localStorage.key(i);
         if (!key || key.indexOf(TEMPLATE_DRAFT_PREFIX) !== 0) {
           continue;
@@ -151,15 +288,16 @@
         seen[slot] = true;
         days.push(slot);
       }
-    } catch (e) {
+    } catch (error) {
       return [];
     }
 
     return days.sort(compareSlotKeysAsc);
   }
 
-  function loadBlocksFromCloud() {
-    state.blocks = readBlocksFromStorage();
+  function loadLibraryItems() {
+    state.items = readItemsFromStorage();
+    renderItems();
 
     state.client
       .from("coach_workout_blocks")
@@ -169,49 +307,40 @@
       .order("created_at", { ascending: false })
       .then(function (result) {
         if (result.error) {
-          renderBlocks();
           setStatus("Using local cache. Cloud read failed.", "info");
           return;
         }
 
-        var cloudBlocks = normalizeCloudBlocks(result.data || []);
-        mergeAndBackfillCloud(cloudBlocks).then(function (merged) {
-          state.blocks = sortBlocks(merged);
-          writeBlocksToStorage(state.blocks);
-          renderBlocks();
-          setStatus("Workout blocks loaded.", "success");
+        var cloudItems = normalizeCloudItems(result.data || []);
+        mergeAndBackfillCloudItems(cloudItems).then(function (merged) {
+          state.items = sortItems(merged);
+          writeItemsToStorage(state.items);
+          renderItems();
+          setStatus("Library loaded.", "success");
         });
       })
       .catch(function () {
-        renderBlocks();
         setStatus("Using local cache. Cloud read failed.", "info");
       });
   }
 
-  function mergeAndBackfillCloud(cloudBlocks) {
-    var localBlocks = readBlocksFromStorage();
+  function mergeAndBackfillCloudItems(cloudItems) {
+    var localItems = readItemsFromStorage();
     var signatures = {};
-    cloudBlocks.forEach(function (block) {
-      signatures[blockSignature(block)] = true;
+    cloudItems.forEach(function (item) {
+      signatures[itemSignature(item)] = true;
     });
 
-    var unsynced = localBlocks.filter(function (block) {
-      return !signatures[blockSignature(block)];
+    var unsyncedItems = localItems.filter(function (item) {
+      return !signatures[itemSignature(item)];
     });
 
-    if (!unsynced.length) {
-      return Promise.resolve(cloudBlocks);
+    if (!unsyncedItems.length) {
+      return Promise.resolve(cloudItems);
     }
 
-    var rows = unsynced.map(function (block) {
-      return {
-        coach_user_id: state.coachUserId,
-        title: block.title,
-        source_section: block.section,
-        tags: normalizeTags(block.tags || []),
-        sort_order: parseSortOrder(block.sort_order),
-        exercises: normalizeExercises(block.exercises || [])
-      };
+    var rows = unsyncedItems.map(function (item) {
+      return buildCloudPayload(item);
     });
 
     return state.client
@@ -220,26 +349,22 @@
       .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at")
       .then(function (result) {
         if (result.error) {
-          return cloudBlocks;
+          return cloudItems;
         }
-        return sortBlocks(cloudBlocks.concat(normalizeCloudBlocks(result.data || [])));
+        return sortItems(cloudItems.concat(normalizeCloudItems(result.data || [])));
       })
       .catch(function () {
-        return cloudBlocks;
+        return cloudItems;
       });
   }
 
-  function onSaveBlock() {
+  function saveOrUpdateItem() {
     var titleInput = document.querySelector("[data-block-title]");
-    var dayInput = document.querySelector("[data-block-source-day]");
-    var sectionInput = document.querySelector("[data-block-section]");
     var tagsInput = document.querySelector("[data-block-tags]");
-
     var title = String((titleInput && titleInput.value) || "").trim();
-    var sourceDay = String((dayInput && dayInput.value) || "").trim();
-    var sectionRaw = String((sectionInput && sectionInput.value) || "Warm Up").trim();
-    var section = sectionRaw === "__all__" ? "Entire Day" : sectionRaw;
     var tags = parseTags((tagsInput && tagsInput.value) || "");
+    var entryType = getSelectedEntryType();
+    var exercises = normalizeExercises(state.draftExercises);
 
     if (!title) {
       setStatus("Title is required.", "error");
@@ -249,33 +374,33 @@
       return;
     }
 
-    var existing = findBlockById(state.editingId);
-    var exercises = buildExercisesFromSource(sourceDay, sectionRaw, existing);
     if (!exercises.length) {
-      setStatus("Select a source day with exercises for this section.", "info");
+      setStatus("Add at least one exercise before saving.", "info");
       return;
     }
 
-    if (state.editingId) {
-      updateBlock(existing, {
-        title: title,
-        section: section,
-        tags: tags,
-        exercises: exercises
-      });
+    if (entryType === "exercise" && exercises.length !== 1) {
+      setStatus("Single exercise items must contain exactly one exercise.", "info");
       return;
     }
 
-    createBlock({
+    var payload = {
       title: title,
-      section: section,
+      section: deriveItemSection(exercises, entryType),
       tags: tags,
       exercises: exercises
-    });
+    };
+
+    if (state.editingId) {
+      updateItem(findItemById(state.editingId), payload);
+      return;
+    }
+
+    createItem(payload);
   }
 
-  function createBlock(payload) {
-    var localBlock = {
+  function createItem(payload) {
+    var localItem = {
       id: "block_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
       title: payload.title,
       section: payload.section,
@@ -288,39 +413,31 @@
 
     state.client
       .from("coach_workout_blocks")
-      .insert({
-        coach_user_id: state.coachUserId,
-        title: localBlock.title,
-        source_section: localBlock.section,
-        tags: localBlock.tags,
-        sort_order: 0,
-        exercises: localBlock.exercises
-      })
+      .insert(buildCloudPayload(localItem))
       .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at")
       .single()
       .then(function (result) {
         if (result.error) {
-          saveLocalOnly(localBlock, "Saved locally. Cloud sync failed.");
+          saveLocalOnly(localItem, "Saved locally. Cloud sync failed.");
           return;
         }
 
-        var cloudBlock = mapCloudBlock(result.data || {});
-        state.blocks.unshift(cloudBlock);
-        reindexBlocks();
-        writeBlocksToStorage(state.blocks);
-        renderBlocks();
+        state.items.unshift(mapCloudItem(result.data || {}));
+        reindexItems();
+        writeItemsToStorage(state.items);
+        renderItems();
         clearEditState();
-        setStatus("Saved block: " + localBlock.title + ".", "success");
+        setStatus("Saved item: " + localItem.title + ".", "success");
         persistOrderToCloud();
       })
       .catch(function () {
-        saveLocalOnly(localBlock, "Saved locally. Cloud sync failed.");
+        saveLocalOnly(localItem, "Saved locally. Cloud sync failed.");
       });
   }
 
-  function updateBlock(existing, payload) {
+  function updateItem(existing, payload) {
     if (!existing) {
-      setStatus("Block not found.", "error");
+      setStatus("Library item not found.", "error");
       clearEditState();
       return;
     }
@@ -337,14 +454,14 @@
     };
 
     var applyLocal = function () {
-      state.blocks = state.blocks.map(function (block) {
-        return String(block.id) === String(updated.id) ? updated : block;
+      state.items = state.items.map(function (item) {
+        return String(item.id) === String(updated.id) ? updated : item;
       });
-      reindexBlocks();
-      writeBlocksToStorage(state.blocks);
-      renderBlocks();
+      reindexItems();
+      writeItemsToStorage(state.items);
+      renderItems();
       clearEditState();
-      setStatus("Updated block: " + updated.title + ".", "success");
+      setStatus("Updated item: " + updated.title + ".", "success");
       persistOrderToCloud();
     };
 
@@ -365,121 +482,129 @@
       .eq("coach_user_id", state.coachUserId)
       .then(function (result) {
         if (result.error) {
-          setStatus(result.error.message || "Could not update block.", "error");
+          setStatus(result.error.message || "Could not update item.", "error");
           return;
         }
         applyLocal();
       })
       .catch(function () {
-        setStatus("Could not update block.", "error");
+        setStatus("Could not update item.", "error");
       });
   }
 
-  function saveLocalOnly(block, message) {
-    state.blocks.unshift(block);
-    reindexBlocks();
-    writeBlocksToStorage(state.blocks);
-    renderBlocks();
+  function saveLocalOnly(item, message) {
+    state.items.unshift(item);
+    reindexItems();
+    writeItemsToStorage(state.items);
+    renderItems();
     clearEditState();
     setStatus(message, "info");
   }
 
-  function startEditingBlock(blockId) {
-    var block = findBlockById(blockId);
-    if (!block) {
+  function startEditingItem(itemId) {
+    var item = findItemById(itemId);
+    var titleInput = document.querySelector("[data-block-title]");
+    var tagsInput = document.querySelector("[data-block-tags]");
+    var entryTypeInput = document.querySelector("[data-block-entry-type]");
+    var saveButton = document.querySelector("[data-block-save]");
+    var cancelButton = document.querySelector("[data-block-cancel-edit]");
+    var dayInput = document.querySelector("[data-block-source-day]");
+
+    if (!item) {
       return;
     }
 
-    var titleInput = document.querySelector("[data-block-title]");
-    var sectionInput = document.querySelector("[data-block-section]");
-    var tagsInput = document.querySelector("[data-block-tags]");
-    var dayInput = document.querySelector("[data-block-source-day]");
-    var saveButton = document.querySelector("[data-block-save]");
-    var cancelButton = document.querySelector("[data-block-cancel-edit]");
-
-    state.editingId = String(block.id);
+    state.editingId = String(item.id || "");
+    state.draftExercises = normalizeExercises(item.exercises || []);
 
     if (titleInput) {
-      titleInput.value = String(block.title || "");
+      titleInput.value = String(item.title || "");
       titleInput.focus();
     }
-    if (sectionInput) {
-      sectionInput.value = block.section === "Entire Day" ? "__all__" : String(block.section || "Warm Up");
-    }
     if (tagsInput) {
-      tagsInput.value = normalizeTags(block.tags || []).join(", ");
+      tagsInput.value = normalizeTags(item.tags || []).join(", ");
     }
-    if (dayInput) {
-      dayInput.value = "";
+    if (entryTypeInput) {
+      entryTypeInput.value = normalizeExercises(item.exercises || []).length === 1 ? "exercise" : "block";
     }
     if (saveButton) {
-      saveButton.textContent = "Update Block";
+      saveButton.textContent = "Update Item";
     }
     if (cancelButton) {
       cancelButton.hidden = false;
     }
+    if (dayInput) {
+      dayInput.value = "";
+    }
 
-    renderBlocks();
-    setStatus("Editing block: " + String(block.title || "Workout Block") + ".", "info");
+    renderDraftExercises();
+    renderItems();
+    setStatus("Editing item: " + String(item.title || "Library Item") + ".", "info");
   }
 
   function clearEditState() {
-    state.editingId = null;
-
     var titleInput = document.querySelector("[data-block-title]");
-    var sectionInput = document.querySelector("[data-block-section]");
     var tagsInput = document.querySelector("[data-block-tags]");
+    var entryTypeInput = document.querySelector("[data-block-entry-type]");
     var dayInput = document.querySelector("[data-block-source-day]");
+    var sectionInput = document.querySelector("[data-block-section]");
     var saveButton = document.querySelector("[data-block-save]");
     var cancelButton = document.querySelector("[data-block-cancel-edit]");
+
+    state.editingId = null;
+    state.draftExercises = [createDefaultExercise()];
 
     if (titleInput) {
       titleInput.value = "";
     }
-    if (sectionInput) {
-      sectionInput.value = "Warm Up";
-    }
     if (tagsInput) {
       tagsInput.value = "";
+    }
+    if (entryTypeInput) {
+      entryTypeInput.value = "exercise";
     }
     if (dayInput) {
       dayInput.value = "";
     }
+    if (sectionInput) {
+      sectionInput.value = DEFAULT_SECTION;
+    }
     if (saveButton) {
-      saveButton.textContent = "Save Block";
+      saveButton.textContent = "Save Item";
     }
     if (cancelButton) {
       cancelButton.hidden = true;
     }
 
-    renderBlocks();
+    renderDraftExercises();
+    renderItems();
   }
 
-  function deleteBlock(blockId) {
-    var block = findBlockById(blockId);
-    if (!block) {
+  function deleteItem(itemId) {
+    var item = findItemById(itemId);
+    if (!item) {
       return;
     }
 
-    if (!confirm("Delete saved block '" + String(block.title || "Workout Block") + "'?")) {
+    if (!confirm("Delete saved item '" + String(item.title || "Library Item") + "'?")) {
       return;
     }
 
     var removeLocal = function () {
-      state.blocks = state.blocks.filter(function (entry) {
-        return String(entry.id) !== String(blockId);
+      state.items = state.items.filter(function (entry) {
+        return String(entry.id) !== String(itemId);
       });
-      if (String(state.editingId || "") === String(blockId)) {
+      if (String(state.editingId || "") === String(itemId)) {
         clearEditState();
       }
-      reindexBlocks();
-      writeBlocksToStorage(state.blocks);
-      renderBlocks();
-      setStatus("Block deleted.", "info");
+      reindexItems();
+      writeItemsToStorage(state.items);
+      renderItems();
+      setStatus("Library item deleted.", "info");
       persistOrderToCloud();
     };
 
-    if (!isUuid(blockId)) {
+    if (!isUuid(itemId)) {
       removeLocal();
       return;
     }
@@ -487,29 +612,29 @@
     state.client
       .from("coach_workout_blocks")
       .delete()
-      .eq("id", blockId)
+      .eq("id", itemId)
       .eq("coach_user_id", state.coachUserId)
       .then(function (result) {
         if (result.error) {
-          setStatus(result.error.message || "Could not delete block.", "error");
+          setStatus(result.error.message || "Could not delete item.", "error");
           return;
         }
         removeLocal();
       })
       .catch(function () {
-        setStatus("Could not delete block.", "error");
+        setStatus("Could not delete item.", "error");
       });
   }
 
-  function moveBlock(blockId, direction) {
+  function moveItem(itemId, direction) {
     var delta = direction === "up" ? -1 : (direction === "down" ? 1 : 0);
     if (!delta) {
       return;
     }
 
-    var ordered = sortBlocks(state.blocks);
-    var index = ordered.findIndex(function (block) {
-      return String(block.id) === String(blockId);
+    var ordered = sortItems(state.items);
+    var index = ordered.findIndex(function (item) {
+      return String(item.id) === String(itemId);
     });
     if (index < 0) {
       return;
@@ -522,27 +647,27 @@
 
     var moved = ordered.splice(index, 1)[0];
     ordered.splice(target, 0, moved);
-    state.blocks = ordered;
-    reindexBlocks();
-    writeBlocksToStorage(state.blocks);
-    renderBlocks();
-    setStatus("Block order updated.", "success");
+    state.items = ordered;
+    reindexItems();
+    writeItemsToStorage(state.items);
+    renderItems();
+    setStatus("Item order updated.", "success");
     persistOrderToCloud();
   }
 
   function persistOrderToCloud() {
-    var cloudBlocks = (Array.isArray(state.blocks) ? state.blocks : []).filter(function (block) {
-      return block && isUuid(block.id);
+    var cloudItems = (Array.isArray(state.items) ? state.items : []).filter(function (item) {
+      return item && isUuid(item.id);
     });
-    if (!cloudBlocks.length) {
+    if (!cloudItems.length) {
       return;
     }
 
-    Promise.all(cloudBlocks.map(function (block) {
+    Promise.all(cloudItems.map(function (item) {
       return state.client
         .from("coach_workout_blocks")
-        .update({ sort_order: parseSortOrder(block.sort_order) })
-        .eq("id", block.id)
+        .update({ sort_order: parseSortOrder(item.sort_order) })
+        .eq("id", item.id)
         .eq("coach_user_id", state.coachUserId)
         .then(function () {
           return true;
@@ -553,15 +678,120 @@
     }));
   }
 
-  function renderBlocks() {
-    var list = document.querySelector("[data-block-list]");
-    var filterInput = document.querySelector("[data-block-filter]");
+  function importExercisesFromDraft() {
+    var dayInput = document.querySelector("[data-block-source-day]");
+    var sectionInput = document.querySelector("[data-block-section]");
+    var exercises = buildExercisesFromSource(dayInput && dayInput.value, sectionInput && sectionInput.value);
+
+    if (!exercises.length) {
+      setStatus("No exercises found in that draft section.", "info");
+      return;
+    }
+
+    if (getSelectedEntryType() === "exercise") {
+      state.draftExercises = [cloneExercise(exercises[0])];
+    } else {
+      state.draftExercises = exercises.map(cloneExercise);
+    }
+
+    renderDraftExercises();
+    setStatus("Imported " + state.draftExercises.length + " exercise" + (state.draftExercises.length === 1 ? "" : "s") + ".", "success");
+  }
+
+  function removeDraftExercise(indexValue) {
+    var index = parseInt(indexValue, 10);
+    if (!Number.isFinite(index) || index < 0 || index >= state.draftExercises.length) {
+      return;
+    }
+
+    state.draftExercises.splice(index, 1);
+    if (!state.draftExercises.length) {
+      state.draftExercises = [createDefaultExercise()];
+    }
+    renderDraftExercises();
+  }
+
+  function renderDraftExercises() {
+    var list = document.querySelector("[data-block-exercise-list]");
+    var addExerciseBtn = document.querySelector("[data-block-add-exercise]");
     if (!list) {
       return;
     }
 
-    var allBlocks = sortBlocks(state.blocks);
-    var availableTags = collectTags(allBlocks);
+    state.draftExercises = normalizeExercises(state.draftExercises);
+    if (!state.draftExercises.length) {
+      state.draftExercises = [createDefaultExercise()];
+    }
+
+    list.innerHTML = state.draftExercises.map(function (exercise, index) {
+      return buildDraftExerciseMarkup(exercise, index);
+    }).join("");
+
+    if (addExerciseBtn) {
+      addExerciseBtn.hidden = getSelectedEntryType() === "exercise";
+    }
+  }
+
+  function buildDraftExerciseMarkup(exercise, index) {
+    return (
+      '<article class="block-manager-exercise-item" data-block-exercise-item="' + index + '">' +
+        '<div class="block-manager-exercise-row">' +
+          '<input type="text" class="program-builder-block-title" placeholder="Exercise name" data-field="name" value="' + escapeAttribute(exercise.name || "") + '" />' +
+          '<select class="program-builder-block-section" data-field="section">' +
+            renderSectionOptions(exercise.section) +
+          '</select>' +
+          '<select class="program-builder-block-section" data-field="mode">' +
+            renderModeOptions(exercise.mode) +
+          '</select>' +
+        '</div>' +
+        '<div class="block-manager-exercise-row">' +
+          '<input type="text" class="program-builder-block-section" placeholder="Reps / Time" data-field="reps" value="' + escapeAttribute(firstSetValue(exercise, "reps")) + '" />' +
+          '<input type="text" class="program-builder-block-section" placeholder="Weight / Metric" data-field="weight" value="' + escapeAttribute(firstSetValue(exercise, "weight")) + '" />' +
+          '<input type="text" class="program-builder-block-section" placeholder="RPE" data-field="rpe" value="' + escapeAttribute(firstSetValue(exercise, "rpe")) + '" />' +
+          '<input type="text" class="program-builder-block-section" placeholder="Rest" data-field="rest" value="' + escapeAttribute(firstSetValue(exercise, "rest")) + '" />' +
+        '</div>' +
+        '<textarea class="program-builder-block-section block-manager-exercise-notes" placeholder="Notes or coaching cues" data-field="notes">' + escapeHtml(firstSetValue(exercise, "notes")) + '</textarea>' +
+        '<div class="block-manager-exercise-actions">' +
+          '<button type="button" class="btn admin-btn-delete-mini" data-block-exercise-remove="' + index + '">Remove</button>' +
+        '</div>' +
+      '</article>'
+    );
+  }
+
+  function updateDraftExerciseFromRow(index, exerciseItem) {
+    state.draftExercises[index] = {
+      name: readFieldValue(exerciseItem, '[data-field="name"]') || "Exercise",
+      section: readFieldValue(exerciseItem, '[data-field="section"]') || DEFAULT_SECTION,
+      mode: readFieldValue(exerciseItem, '[data-field="mode"]') || DEFAULT_MODE,
+      superset_group: null,
+      field_toggles: null,
+      sets: [{
+        reps: readFieldValue(exerciseItem, '[data-field="reps"]'),
+        weight: readFieldValue(exerciseItem, '[data-field="weight"]'),
+        rpe: readFieldValue(exerciseItem, '[data-field="rpe"]'),
+        rest: readFieldValue(exerciseItem, '[data-field="rest"]'),
+        notes: readFieldValue(exerciseItem, '[data-field="notes"]'),
+        done: false,
+        target_reps: readFieldValue(exerciseItem, '[data-field="reps"]'),
+        target_weight: readFieldValue(exerciseItem, '[data-field="weight"]'),
+        target_rpe: readFieldValue(exerciseItem, '[data-field="rpe"]'),
+        target_rest: readFieldValue(exerciseItem, '[data-field="rest"]'),
+        target_notes: readFieldValue(exerciseItem, '[data-field="notes"]')
+      }]
+    };
+  }
+
+  function renderItems() {
+    var list = document.querySelector("[data-block-list]");
+    var filterInput = document.querySelector("[data-block-filter]");
+    var filterTypeInput = document.querySelector("[data-block-type-filter]");
+    if (!list) {
+      return;
+    }
+
+    var allItems = sortItems(state.items);
+    var availableTags = collectTags(allItems);
+
     if (filterInput) {
       filterInput.innerHTML = ['<option value="all">All tags</option>']
         .concat(availableTags.map(function (tag) {
@@ -575,52 +805,66 @@
       filterInput.value = state.filterTag;
     }
 
-    var blocks = filterBlocksByTag(allBlocks, state.filterTag);
-    if (!blocks.length) {
-      list.innerHTML = '<p class="admin-loading">No saved blocks yet.</p>';
+    if (filterTypeInput) {
+      filterTypeInput.value = state.filterType;
+    }
+
+    var items = filterItems(allItems, state.filterTag, state.filterType);
+    if (!items.length) {
+      list.innerHTML = '<p class="admin-loading">No saved library items yet.</p>';
       return;
     }
 
-    list.innerHTML = blocks.map(function (block, idx) {
-      var tags = normalizeTags(block.tags || []);
-      var tagsHtml = tags.length
-        ? '<ul class="program-builder-block-tags-list">' + tags.map(function (tag) {
-            return '<li>' + escapeHtml(tag) + '</li>';
-          }).join("") + "</ul>"
-        : "";
-      var exerciseCount = Array.isArray(block.exercises) ? block.exercises.length : 0;
-      var editingBadge = String(state.editingId || "") === String(block.id) ? '<p class="program-builder-block-item-editing">Editing</p>' : "";
+    list.innerHTML = items.map(function (item, index) {
+      var exerciseCount = Array.isArray(item.exercises) ? item.exercises.length : 0;
+      var editingBadge = String(state.editingId || "") === String(item.id) ? '<p class="program-builder-block-item-editing">Editing</p>' : "";
+      var preview = (Array.isArray(item.exercises) ? item.exercises : []).slice(0, 3).map(function (exercise) {
+        return '<li>' + escapeHtml(String(exercise && exercise.name || "Exercise")) + '</li>';
+      }).join("");
+      var typeLabel = exerciseCount === 1 ? "Single Exercise" : "Exercise Block";
 
       return (
-        '<article class="program-builder-block-item">' +
+        '<article class="program-builder-block-item block-manager-library-item">' +
           '<div class="program-builder-block-main">' +
             editingBadge +
-            '<p class="program-builder-block-name">' + escapeHtml(block.title || "Workout Block") + '</p>' +
+            '<div class="block-manager-library-head">' +
+              '<span class="block-manager-item-type">' + escapeHtml(typeLabel) + '</span>' +
+              '<p class="program-builder-block-name">' + escapeHtml(item.title || "Library Item") + '</p>' +
+            '</div>' +
             '<p class="program-builder-block-meta">' +
-              escapeHtml(String(block.section || "Workout Block")) +
-              " - " +
-              escapeHtml(String(exerciseCount)) +
-              " exercise" + (exerciseCount === 1 ? "" : "s") +
+              escapeHtml(String(item.section || DEFAULT_SECTION)) + ' - ' +
+              escapeHtml(String(exerciseCount)) + ' exercise' + (exerciseCount === 1 ? '' : 's') +
             '</p>' +
-            tagsHtml +
+            renderTags(item.tags || []) +
+            '<ul class="block-manager-preview-list">' + preview + '</ul>' +
           '</div>' +
           '<div class="program-builder-block-actions">' +
-            '<button type="button" class="btn admin-btn-small" data-block-move="up" data-block-id="' + escapeAttribute(block.id) + '"' + (idx === 0 ? " disabled" : "") + '>↑</button>' +
-            '<button type="button" class="btn admin-btn-small" data-block-move="down" data-block-id="' + escapeAttribute(block.id) + '"' + (idx === blocks.length - 1 ? " disabled" : "") + '>↓</button>' +
-            '<button type="button" class="btn admin-btn-small" data-block-edit="' + escapeAttribute(block.id) + '">Edit</button>' +
-            '<button type="button" class="btn admin-btn-delete-mini" data-block-delete="' + escapeAttribute(block.id) + '">Delete</button>' +
+            '<button type="button" class="btn admin-btn-small" data-block-move="up" data-block-id="' + escapeAttribute(item.id) + '"' + (index === 0 ? ' disabled' : '') + '>↑</button>' +
+            '<button type="button" class="btn admin-btn-small" data-block-move="down" data-block-id="' + escapeAttribute(item.id) + '"' + (index === items.length - 1 ? ' disabled' : '') + '>↓</button>' +
+            '<button type="button" class="btn admin-btn-small" data-block-edit="' + escapeAttribute(item.id) + '">Edit</button>' +
+            '<button type="button" class="btn admin-btn-delete-mini" data-block-delete="' + escapeAttribute(item.id) + '">Delete</button>' +
           '</div>' +
         '</article>'
       );
     }).join("");
   }
 
-  function buildExercisesFromSource(dayKey, sectionRaw, existing) {
-    var day = String(dayKey || "").trim();
-    var section = String(sectionRaw || "Warm Up").trim();
+  function renderTags(tags) {
+    var normalized = normalizeTags(tags || []);
+    if (!normalized.length) {
+      return "";
+    }
 
+    return '<ul class="program-builder-block-tags-list">' + normalized.map(function (tag) {
+      return '<li>' + escapeHtml(tag) + '</li>';
+    }).join("") + '</ul>';
+  }
+
+  function buildExercisesFromSource(dayKey, sectionRaw) {
+    var day = String(dayKey || "").trim();
+    var section = String(sectionRaw || DEFAULT_SECTION).trim();
     if (!day) {
-      return normalizeExercises(existing && existing.exercises || []);
+      return [];
     }
 
     var payload = readFromStorage(TEMPLATE_DRAFT_PREFIX + day);
@@ -632,41 +876,46 @@
       return [];
     }
 
-    var selected = section === "__all__"
-      ? clone(sourceExercises)
-      : clone(sourceExercises.filter(function (exercise) {
+    return (section === "__all__"
+      ? sourceExercises
+      : sourceExercises.filter(function (exercise) {
           return String(exercise && exercise.section || "").trim() === section;
-        }));
+        }))
+      .map(cloneExercise);
+  }
 
-    return normalizeExercises(selected).map(function (exercise) {
-      var nextExercise = Object.assign({}, exercise, { superset_group: null });
-      nextExercise.sets = (Array.isArray(exercise.sets) ? exercise.sets : []).map(function (set) {
-        return Object.assign({}, set, { done: false });
-      });
-      return nextExercise;
+  function filterItems(items, tag, filterType) {
+    var targetTag = String(tag || "all").trim().toLowerCase();
+    var targetType = normalizeFilterType(filterType);
+    return sortItems(items || []).filter(function (item) {
+      var exerciseCount = Array.isArray(item && item.exercises) ? item.exercises.length : 0;
+      var itemType = exerciseCount === 1 ? "exercise" : "block";
+      var tagMatch = targetTag === "all" || normalizeTags(item && item.tags || []).indexOf(targetTag) >= 0;
+      var typeMatch = targetType === "all" || itemType === targetType;
+      return tagMatch && typeMatch;
     });
   }
 
-  function findBlockById(blockId) {
-    return (Array.isArray(state.blocks) ? state.blocks : []).find(function (block) {
-      return String(block && block.id || "") === String(blockId || "");
+  function findItemById(itemId) {
+    return (Array.isArray(state.items) ? state.items : []).find(function (item) {
+      return String(item && item.id || "") === String(itemId || "");
     }) || null;
   }
 
-  function reindexBlocks() {
-    var ordered = sortBlocks(state.blocks);
-    ordered.forEach(function (block, index) {
-      if (!block) {
+  function reindexItems() {
+    var ordered = sortItems(state.items);
+    ordered.forEach(function (item, index) {
+      if (!item) {
         return;
       }
-      block.sort_order = index;
-      block.tags = normalizeTags(block.tags || []);
+      item.sort_order = index;
+      item.tags = normalizeTags(item.tags || []);
     });
-    state.blocks = ordered;
+    state.items = ordered;
   }
 
-  function sortBlocks(blocks) {
-    return (Array.isArray(blocks) ? blocks : []).slice().sort(function (a, b) {
+  function sortItems(items) {
+    return (Array.isArray(items) ? items : []).slice().sort(function (a, b) {
       var aSort = parseSortOrder(a && a.sort_order);
       var bSort = parseSortOrder(b && b.sort_order);
       if (aSort !== bSort) {
@@ -681,23 +930,17 @@
     });
   }
 
-  function normalizeCloudBlocks(rows) {
-    return (Array.isArray(rows) ? rows : [])
-      .map(function (row) {
-        return mapCloudBlock(row);
-      })
-      .filter(function (block) {
-        return !!block;
-      });
+  function normalizeCloudItems(rows) {
+    return (Array.isArray(rows) ? rows : []).map(mapCloudItem).filter(function (item) {
+      return !!item;
+    });
   }
 
-  function mapCloudBlock(row) {
+  function mapCloudItem(row) {
     var src = row && typeof row === "object" ? row : {};
     var id = String(src.id || "").trim();
     var title = String(src.title || "").trim();
-    var section = String(src.source_section || src.section || "Workout Block").trim() || "Workout Block";
     var exercises = normalizeExercises(src.exercises || []);
-
     if (!id || !title || !exercises.length) {
       return null;
     }
@@ -705,7 +948,7 @@
     return {
       id: id,
       title: title,
-      section: section,
+      section: String(src.source_section || DEFAULT_SECTION).trim() || DEFAULT_SECTION,
       tags: normalizeTags(src.tags || []),
       sort_order: parseSortOrder(src.sort_order),
       exercises: exercises,
@@ -714,7 +957,7 @@
     };
   }
 
-  function readBlocksFromStorage() {
+  function readItemsFromStorage() {
     try {
       var raw = window.localStorage.getItem(WORKOUT_BLOCK_LIBRARY_KEY);
       if (!raw) {
@@ -726,72 +969,56 @@
         return [];
       }
 
-      return parsed
-        .map(function (item) {
-          var block = item && typeof item === "object" ? item : {};
-          var id = String(block.id || "").trim();
-          var title = String(block.title || "").trim();
-          var section = String(block.section || "Workout Block").trim() || "Workout Block";
-          var exercises = normalizeExercises(block.exercises || []);
+      return parsed.map(function (item) {
+        var safe = item && typeof item === "object" ? item : {};
+        var exercises = normalizeExercises(safe.exercises || []);
+        var id = String(safe.id || "").trim();
+        var title = String(safe.title || "").trim();
+        if (!id || !title || !exercises.length) {
+          return null;
+        }
 
-          if (!id || !title || !exercises.length) {
-            return null;
-          }
-
-          return {
-            id: id,
-            title: title,
-            section: section,
-            tags: normalizeTags(block.tags || []),
-            sort_order: parseSortOrder(block.sort_order),
-            exercises: exercises,
-            created_at: String(block.created_at || ""),
-            updated_at: String(block.updated_at || "")
-          };
-        })
-        .filter(function (item) {
-          return !!item;
-        });
-    } catch (e) {
+        return {
+          id: id,
+          title: title,
+          section: String(safe.section || DEFAULT_SECTION).trim() || DEFAULT_SECTION,
+          tags: normalizeTags(safe.tags || []),
+          sort_order: parseSortOrder(safe.sort_order),
+          exercises: exercises,
+          created_at: String(safe.created_at || ""),
+          updated_at: String(safe.updated_at || "")
+        };
+      }).filter(function (item) {
+        return !!item;
+      });
+    } catch (error) {
       return [];
     }
   }
 
-  function writeBlocksToStorage(blocks) {
+  function writeItemsToStorage(items) {
     try {
-      var payload = sortBlocks(blocks).slice(0, 150);
-      window.localStorage.setItem(WORKOUT_BLOCK_LIBRARY_KEY, JSON.stringify(payload));
-    } catch (e) {
-      setStatus("Could not write local block cache.", "info");
+      window.localStorage.setItem(WORKOUT_BLOCK_LIBRARY_KEY, JSON.stringify(sortItems(items).slice(0, 150)));
+    } catch (error) {
+      setStatus("Could not write local library cache.", "info");
     }
   }
 
-  function blockSignature(block) {
-    var safe = block && typeof block === "object" ? block : {};
-    var title = String(safe.title || "").trim().toLowerCase();
-    var section = String(safe.section || "").trim().toLowerCase();
-    var tags = normalizeTags(safe.tags || []);
-    var exercises = normalizeExercises(safe.exercises || []);
-    return title + "|" + section + "|" + JSON.stringify(tags) + "|" + JSON.stringify(exercises);
+  function itemSignature(item) {
+    var safe = item && typeof item === "object" ? item : {};
+    return [
+      String(safe.title || "").trim().toLowerCase(),
+      String(safe.section || "").trim().toLowerCase(),
+      JSON.stringify(normalizeTags(safe.tags || [])),
+      JSON.stringify(normalizeExercises(safe.exercises || []))
+    ].join("|");
   }
 
-  function filterBlocksByTag(blocks, tag) {
-    var target = String(tag || "all").trim().toLowerCase();
-    var sorted = sortBlocks(blocks || []);
-    if (target === "all") {
-      return sorted;
-    }
-
-    return sorted.filter(function (block) {
-      return normalizeTags(block.tags || []).indexOf(target) >= 0;
-    });
-  }
-
-  function collectTags(blocks) {
+  function collectTags(items) {
     var seen = {};
     var tags = [];
-    (Array.isArray(blocks) ? blocks : []).forEach(function (block) {
-      normalizeTags(block.tags || []).forEach(function (tag) {
+    (Array.isArray(items) ? items : []).forEach(function (item) {
+      normalizeTags(item && item.tags || []).forEach(function (tag) {
         if (seen[tag]) {
           return;
         }
@@ -809,40 +1036,36 @@
   function normalizeTags(tags) {
     var list = Array.isArray(tags) ? tags : [];
     var seen = {};
-    return list
-      .map(function (tag) {
-        return String(tag || "").trim().toLowerCase();
-      })
-      .filter(function (tag) {
-        if (!tag || seen[tag]) {
-          return false;
-        }
-        seen[tag] = true;
-        return true;
-      })
-      .slice(0, 12);
+    return list.map(function (tag) {
+      return String(tag || "").trim().toLowerCase();
+    }).filter(function (tag) {
+      if (!tag || seen[tag]) {
+        return false;
+      }
+      seen[tag] = true;
+      return true;
+    }).slice(0, 12);
   }
 
   function normalizeExercises(exercises) {
-    var source = Array.isArray(exercises) ? exercises : [];
-    return source.map(function (exercise) {
+    return (Array.isArray(exercises) ? exercises : []).map(function (exercise) {
       var safe = exercise && typeof exercise === "object" ? exercise : {};
       return {
-        name: String(safe.name || "Exercise"),
-        section: String(safe.section || "A Block"),
-        mode: String(safe.mode || "reps"),
+        name: String(safe.name || "Exercise").trim() || "Exercise",
+        section: String(safe.section || DEFAULT_SECTION).trim() || DEFAULT_SECTION,
+        mode: String(safe.mode || DEFAULT_MODE).trim() || DEFAULT_MODE,
         superset_group: safe.superset_group || null,
         field_toggles: safe.field_toggles && typeof safe.field_toggles === "object" ? safe.field_toggles : null,
         sets: normalizeSets(safe.sets)
       };
     }).filter(function (exercise) {
-      return Array.isArray(exercise.sets) && exercise.sets.length > 0;
+      return Array.isArray(exercise.sets) && exercise.sets.length > 0 && String(exercise.name || "").trim();
     });
   }
 
   function normalizeSets(sets) {
-    var source = Array.isArray(sets) ? sets : [];
-    return source.map(function (set) {
+    var list = Array.isArray(sets) && sets.length ? sets : [{}];
+    return list.map(function (set) {
       var safe = set && typeof set === "object" ? set : {};
       return {
         reps: safe.reps != null ? safe.reps : "",
@@ -858,6 +1081,93 @@
         target_notes: safe.target_notes != null ? safe.target_notes : safe.notes
       };
     });
+  }
+
+  function createDefaultExercise() {
+    return {
+      name: "",
+      section: DEFAULT_SECTION,
+      mode: DEFAULT_MODE,
+      superset_group: null,
+      field_toggles: null,
+      sets: [{
+        reps: "",
+        weight: "",
+        rpe: "",
+        rest: "",
+        notes: "",
+        done: false,
+        target_reps: "",
+        target_weight: "",
+        target_rpe: "",
+        target_rest: "",
+        target_notes: ""
+      }]
+    };
+  }
+
+  function cloneExercise(exercise) {
+    var cloned = clone([exercise]);
+    return normalizeExercises(cloned)[0] || createDefaultExercise();
+  }
+
+  function deriveItemSection(exercises, entryType) {
+    if (!Array.isArray(exercises) || !exercises.length) {
+      return DEFAULT_SECTION;
+    }
+
+    if (entryType === "exercise") {
+      return String(exercises[0].section || DEFAULT_SECTION);
+    }
+
+    var firstSection = String(exercises[0].section || DEFAULT_SECTION);
+    var mixed = exercises.some(function (exercise) {
+      return String(exercise && exercise.section || DEFAULT_SECTION) !== firstSection;
+    });
+    return mixed ? "Mixed Block" : firstSection;
+  }
+
+  function buildCloudPayload(item) {
+    return {
+      coach_user_id: state.coachUserId,
+      title: String(item && item.title || "Library Item").trim() || "Library Item",
+      source_section: String(item && item.section || DEFAULT_SECTION).trim() || DEFAULT_SECTION,
+      tags: normalizeTags(item && item.tags || []),
+      sort_order: parseSortOrder(item && item.sort_order),
+      exercises: normalizeExercises(item && item.exercises || [])
+    };
+  }
+
+  function getSelectedEntryType() {
+    var entryTypeInput = document.querySelector("[data-block-entry-type]");
+    return String(entryTypeInput && entryTypeInput.value || "exercise").toLowerCase() === "block" ? "block" : "exercise";
+  }
+
+  function normalizeFilterType(value) {
+    var type = String(value || "all").trim().toLowerCase();
+    return type === "exercise" || type === "block" ? type : "all";
+  }
+
+  function renderSectionOptions(selected) {
+    return SECTION_OPTIONS.map(function (section) {
+      return '<option value="' + escapeAttribute(section) + '"' + (section === selected ? ' selected' : '') + '>' + escapeHtml(section) + '</option>';
+    }).join("");
+  }
+
+  function renderModeOptions(selected) {
+    return ["reps", "time", "endurance"].map(function (mode) {
+      return '<option value="' + escapeAttribute(mode) + '"' + (mode === selected ? ' selected' : '') + '>' + escapeHtml(mode) + '</option>';
+    }).join("");
+  }
+
+  function readFieldValue(root, selector) {
+    var field = root && root.querySelector ? root.querySelector(selector) : null;
+    return String(field && field.value || "").trim();
+  }
+
+  function firstSetValue(exercise, key) {
+    var firstSet = exercise && Array.isArray(exercise.sets) && exercise.sets[0] ? exercise.sets[0] : {};
+    return firstSet && firstSet[key] != null ? String(firstSet[key]) : "";
   }
 
   function parseSortOrder(value) {
@@ -909,15 +1219,14 @@
   }
 
   function isUuid(value) {
-    var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidPattern.test(String(value || ""));
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
   }
 
   function readFromStorage(key) {
     try {
       var raw = window.localStorage.getItem(key);
       return raw ? JSON.parse(raw) : null;
-    } catch (e) {
+    } catch (error) {
       return null;
     }
   }
@@ -935,7 +1244,7 @@
 
     try {
       return window.supabase.createClient(url, key);
-    } catch (e) {
+    } catch (error) {
       return null;
     }
   }
@@ -943,7 +1252,7 @@
   function clone(value) {
     try {
       return JSON.parse(JSON.stringify(value || []));
-    } catch (e) {
+    } catch (error) {
       return Array.isArray(value) ? value.slice() : [];
     }
   }
@@ -960,18 +1269,22 @@
   function escapeAttribute(value) {
     return escapeHtml(value).replace(/`/g, "&#96;");
   }
-})();
-(function () {
+})();(function () {
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
   var TEMPLATE_DRAFT_PREFIX = "nomadic_training_program_template_builder_draft_";
   var WORKOUT_BLOCK_LIBRARY_KEY = "nomadic_template_workout_blocks_v1";
+  var DEFAULT_SECTION = "A Block";
+  var DEFAULT_MODE = "reps";
+  var SECTION_OPTIONS = ["Warm Up", "A Block", "B Block", "C Block", "Cool Down"];
 
   var state = {
     client: null,
     coachUserId: null,
-    blocks: [],
+    items: [],
     editingId: null,
-    filterTag: "all"
+    filterTag: "all",
+    filterType: "all",
+    draftExercises: [createDefaultExercise()]
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -980,90 +1293,221 @@
 
   function initialize() {
     bindEvents();
+    renderDraftExercises();
 
     state.client = createSupabaseClient();
     if (!state.client) {
-      showGuardMessage("Supabase is not configured. Cannot load workout block manager.");
+      showGuardMessage("Supabase is not configured. Cannot load the exercise library.");
       return;
     }
 
-    state.client.auth.getSession().then(function (result) {
-      var session = result && result.data && result.data.session;
-      var user = session && session.user;
-      var email = String(user && user.email || "").toLowerCase();
-      var isCoach = !!email && email === ADMIN_EMAIL;
+    resolveCoachAccess()
+      .then(function (access) {
+        if (!access || !access.allowed || !access.user) {
+          showGuardMessage("Coach access is required to manage the exercise library.");
+          return;
+        }
 
-      if (!isCoach) {
-        showGuardMessage("Coach access is required to manage workout blocks.");
-        return;
+        state.coachUserId = String(access.user.id || "").trim() || null;
+        if (!state.coachUserId) {
+          showGuardMessage("Could not verify coach account.");
+          return;
+        }
+
+        showManager();
+        loadDraftDayOptions();
+        clearEditState();
+        loadLibraryItems();
+      })
+      .catch(function () {
+        showGuardMessage("Could not verify coach access.");
+      });
+  }
+
+  function resolveCoachAccess() {
+    if (!state.client || !state.client.auth) {
+      return Promise.resolve({ allowed: false, user: null });
+    }
+
+    return resolveCurrentUser().then(function (user) {
+      if (!user) {
+        return { allowed: false, user: null };
       }
 
-      state.coachUserId = String(user && user.id || "").trim() || null;
-      if (!state.coachUserId) {
-        showGuardMessage("Could not verify coach account.");
-        return;
-      }
-
-      showManager();
-      loadDraftDayOptions();
-      loadWorkoutBlocks();
-    }).catch(function () {
-      showGuardMessage("Could not verify session. Please sign in again.");
+      return resolveIsCoach(user).then(function (allowed) {
+        return {
+          allowed: !!allowed,
+          user: user
+        };
+      });
     });
+  }
+
+  function resolveCurrentUser() {
+    return state.client.auth.getSession()
+      .then(function (result) {
+        var session = result && result.data && result.data.session;
+        if (session && session.user) {
+          return session.user;
+        }
+        return resolveCurrentUserFallback();
+      })
+      .catch(function () {
+        return resolveCurrentUserFallback();
+      });
+  }
+
+  function resolveCurrentUserFallback() {
+    if (!state.client || !state.client.auth || typeof state.client.auth.getUser !== "function") {
+      return Promise.resolve(null);
+    }
+
+    return state.client.auth.getUser()
+      .then(function (result) {
+        return result && result.data && result.data.user ? result.data.user : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function resolveIsCoach(user) {
+    var email = String(user && user.email || "").toLowerCase();
+    if (email && email === ADMIN_EMAIL) {
+      return Promise.resolve(true);
+    }
+
+    if (!state.client || !state.client.rpc) {
+      return Promise.resolve(false);
+    }
+
+    return state.client.rpc("is_nomadic_admin")
+      .then(function (result) {
+        if (result && result.error) {
+          return false;
+        }
+        return !!(result && result.data === true);
+      })
+      .catch(function () {
+        return false;
+      });
   }
 
   function bindEvents() {
     var saveBtn = document.querySelector("[data-block-save]");
     var cancelBtn = document.querySelector("[data-block-cancel-edit]");
     var filterInput = document.querySelector("[data-block-filter]");
-    var list = document.querySelector("[data-block-list]");
+    var typeFilterInput = document.querySelector("[data-block-type-filter]");
+    var addExerciseBtn = document.querySelector("[data-block-add-exercise]");
+    var importBtn = document.querySelector("[data-block-import]");
+    var entryTypeInput = document.querySelector("[data-block-entry-type]");
+    var titleInput = document.querySelector("[data-block-title]");
 
     if (saveBtn) {
-      saveBtn.addEventListener("click", function () {
-        saveOrUpdateBlock();
-      });
+      saveBtn.addEventListener("click", saveOrUpdateItem);
     }
 
     if (cancelBtn) {
-      cancelBtn.addEventListener("click", function () {
-        clearEditState();
-      });
+      cancelBtn.addEventListener("click", clearEditState);
     }
 
     if (filterInput) {
       filterInput.addEventListener("change", function () {
         state.filterTag = String(filterInput.value || "all").trim() || "all";
-        renderBlocks();
+        renderItems();
       });
     }
 
-    if (list) {
-      list.addEventListener("click", function (event) {
-        var editBtn = event.target && event.target.closest("[data-block-edit]");
-        if (editBtn) {
-          startEditById(String(editBtn.getAttribute("data-block-edit") || ""));
-          return;
-        }
-
-        var deleteBtn = event.target && event.target.closest("[data-block-delete]");
-        if (deleteBtn) {
-          deleteById(String(deleteBtn.getAttribute("data-block-delete") || ""));
-          return;
-        }
-
-        var moveBtn = event.target && event.target.closest("[data-block-move]");
-        if (moveBtn) {
-          moveBlock(String(moveBtn.getAttribute("data-block-id") || ""), String(moveBtn.getAttribute("data-block-move") || ""));
-        }
+    if (typeFilterInput) {
+      typeFilterInput.addEventListener("change", function () {
+        state.filterType = normalizeFilterType(typeFilterInput.value);
+        renderItems();
       });
     }
+
+    if (addExerciseBtn) {
+      addExerciseBtn.addEventListener("click", function () {
+        if (getSelectedEntryType() === "exercise" && state.draftExercises.length >= 1) {
+          setStatus("Single exercise items can only contain one exercise.", "info");
+          return;
+        }
+
+        state.draftExercises.push(createDefaultExercise());
+        renderDraftExercises();
+      });
+    }
+
+    if (importBtn) {
+      importBtn.addEventListener("click", importExercisesFromDraft);
+    }
+
+    if (entryTypeInput) {
+      entryTypeInput.addEventListener("change", function () {
+        if (getSelectedEntryType() === "exercise" && state.draftExercises.length > 1) {
+          state.draftExercises = [cloneExercise(state.draftExercises[0] || createDefaultExercise())];
+        }
+        renderDraftExercises();
+      });
+    }
+
+    if (titleInput) {
+      titleInput.addEventListener("keydown", function (event) {
+        if (!event || event.key !== "Enter") {
+          return;
+        }
+        event.preventDefault();
+        saveOrUpdateItem();
+      });
+    }
+
+    document.addEventListener("click", function (event) {
+      var editBtn = event.target && event.target.closest("[data-block-edit]");
+      if (editBtn) {
+        startEditingItem(String(editBtn.getAttribute("data-block-edit") || ""));
+        return;
+      }
+
+      var deleteBtn = event.target && event.target.closest("[data-block-delete]");
+      if (deleteBtn) {
+        deleteItem(String(deleteBtn.getAttribute("data-block-delete") || ""));
+        return;
+      }
+
+      var moveBtn = event.target && event.target.closest("[data-block-move]");
+      if (moveBtn) {
+        moveItem(
+          String(moveBtn.getAttribute("data-block-id") || ""),
+          String(moveBtn.getAttribute("data-block-move") || "")
+        );
+        return;
+      }
+
+      var removeExerciseBtn = event.target && event.target.closest("[data-block-exercise-remove]");
+      if (removeExerciseBtn) {
+        removeDraftExercise(removeExerciseBtn.getAttribute("data-block-exercise-remove"));
+      }
+    });
+
+    document.addEventListener("input", function (event) {
+      var exerciseItem = event.target && event.target.closest && event.target.closest("[data-block-exercise-item]");
+      if (!exerciseItem) {
+        return;
+      }
+
+      var index = parseInt(exerciseItem.getAttribute("data-block-exercise-item") || "-1", 10);
+      if (!Number.isFinite(index) || index < 0 || index >= state.draftExercises.length) {
+        return;
+      }
+
+      updateDraftExerciseFromRow(index, exerciseItem);
+    });
   }
 
   function showGuardMessage(message) {
     var guard = document.querySelector("[data-block-manager-guard]");
     var content = document.querySelector("[data-block-manager-content]");
-
     if (guard) {
+      guard.hidden = false;
       guard.innerHTML = '<p class="admin-loading">' + escapeHtml(message) + '</p>';
     }
     if (content) {
@@ -1074,7 +1518,6 @@
   function showManager() {
     var guard = document.querySelector("[data-block-manager-guard]");
     var content = document.querySelector("[data-block-manager-content]");
-
     if (guard) {
       guard.hidden = true;
     }
@@ -1083,443 +1526,422 @@
     }
   }
 
-  function setStatus(message, tone) {
-    var el = document.querySelector("[data-block-status]");
-    if (!el) {
-      return;
-    }
-
-    el.textContent = String(message || "").trim();
-    el.className = tone === "error" ? "profile-status profile-status-error" : "admin-loading";
-  }
-
   function loadDraftDayOptions() {
-    var sourceSelect = document.querySelector("[data-block-source-day]");
-    if (!sourceSelect) {
+    var daySelect = document.querySelector("[data-block-source-day]");
+    if (!daySelect) {
       return;
     }
 
-    var days = readTemplateDraftDays();
-    var options = ['<option value="">Select a source day</option>']
-      .concat(days.map(function (dayKey) {
-        return '<option value="' + escapeAttribute(dayKey) + '">' + escapeHtml(labelForSlot(dayKey)) + '</option>';
+    var draftDays = getTemplateDraftDays();
+    daySelect.innerHTML = ['<option value="">Select a source day</option>']
+      .concat(draftDays.map(function (day) {
+        return '<option value="' + escapeAttribute(day) + '">' + escapeHtml(labelForSlot(day)) + '</option>';
       }))
       .join("");
-
-    sourceSelect.innerHTML = options;
   }
 
-  function loadWorkoutBlocks() {
-    var local = readBlocksFromStorage();
+  function getTemplateDraftDays() {
+    var days = [];
+    var seen = {};
+    try {
+      for (var i = 0; i < window.localStorage.length; i += 1) {
+        var key = window.localStorage.key(i);
+        if (!key || key.indexOf(TEMPLATE_DRAFT_PREFIX) !== 0) {
+          continue;
+        }
+
+        var slot = String(key).slice(TEMPLATE_DRAFT_PREFIX.length);
+        if (!parseSlotKey(slot) || seen[slot]) {
+          continue;
+        }
+
+        seen[slot] = true;
+        days.push(slot);
+      }
+    } catch (error) {
+      return [];
+    }
+
+    return days.sort(compareSlotKeysAsc);
+  }
+
+  function loadLibraryItems() {
+    state.items = readItemsFromStorage();
+    renderItems();
 
     state.client
       .from("coach_workout_blocks")
-      .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at")
+      .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at,item_type")
       .eq("coach_user_id", state.coachUserId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false })
       .then(function (result) {
         if (result.error) {
-          state.blocks = sortBlocks(local);
-          renderBlocks();
-          setStatus("Loaded local block cache. Cloud read failed.", "error");
+          setStatus("Using local cache. Cloud read failed.", "info");
           return;
         }
 
-        var cloudBlocks = normalizeCloudRows(result.data || []);
-        mergeAndBackfillLocal(cloudBlocks, local).then(function (merged) {
-          state.blocks = sortBlocks(merged);
-          writeBlocksToStorage(state.blocks);
-          renderBlocks();
+        var cloudItems = normalizeCloudItems(result.data || []);
+        mergeAndBackfillCloudItems(cloudItems).then(function (merged) {
+          state.items = sortItems(merged);
+          writeItemsToStorage(state.items);
+          renderItems();
+          setStatus("Library loaded.", "success");
         });
       })
       .catch(function () {
-        state.blocks = sortBlocks(local);
-        renderBlocks();
-        setStatus("Loaded local block cache.", "error");
+        setStatus("Using local cache. Cloud read failed.", "info");
       });
   }
 
-  function mergeAndBackfillLocal(cloudBlocks, localBlocks) {
-    var cloud = Array.isArray(cloudBlocks) ? cloudBlocks : [];
-    var local = Array.isArray(localBlocks) ? localBlocks : [];
-
+  function mergeAndBackfillCloudItems(cloudItems) {
+    var localItems = readItemsFromStorage();
     var signatures = {};
-    cloud.forEach(function (block) {
-      signatures[blockSignature(block)] = true;
+    cloudItems.forEach(function (item) {
+      signatures[itemSignature(item)] = true;
     });
 
-    var unsyncedLocal = local.filter(function (block) {
-      return !signatures[blockSignature(block)];
+    var unsyncedItems = localItems.filter(function (item) {
+      return !signatures[itemSignature(item)];
     });
 
-    if (!unsyncedLocal.length) {
-      return Promise.resolve(cloud);
+    if (!unsyncedItems.length) {
+      return Promise.resolve(cloudItems);
     }
 
-    var rows = unsyncedLocal.map(function (block) {
-      return {
-        coach_user_id: state.coachUserId,
-        title: block.title,
-        source_section: block.section,
-        tags: normalizeTags(block.tags || []),
-        sort_order: parseSortOrder(block.sort_order),
-        exercises: normalizeExercises(block.exercises)
-      };
+    var rows = unsyncedItems.map(function (item) {
+      return buildCloudPayload(item);
     });
 
     return state.client
       .from("coach_workout_blocks")
       .insert(rows)
-      .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at")
-      .then(function (insertResult) {
-        if (insertResult.error) {
-          return cloud;
+      .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at,item_type")
+      .then(function (result) {
+        if (result.error) {
+          return cloudItems;
         }
-
-        var inserted = normalizeCloudRows(insertResult.data || []);
-        return sortBlocks(cloud.concat(inserted));
+        return sortItems(cloudItems.concat(normalizeCloudItems(result.data || [])));
       })
       .catch(function () {
-        return cloud;
+        return cloudItems;
       });
   }
 
-  function saveOrUpdateBlock() {
+  function saveOrUpdateItem() {
     var titleInput = document.querySelector("[data-block-title]");
-    var sourceDayInput = document.querySelector("[data-block-source-day]");
-    var sectionInput = document.querySelector("[data-block-section]");
     var tagsInput = document.querySelector("[data-block-tags]");
-    var saveBtn = document.querySelector("[data-block-save]");
-
-    var title = String(titleInput && titleInput.value || "").trim();
-    var sourceDay = String(sourceDayInput && sourceDayInput.value || "").trim();
-    var sectionInputValue = String(sectionInput && sectionInput.value || "Warm Up").trim();
-    var sectionLabel = sectionInputValue === "__all__" ? "Entire Day" : sectionInputValue;
-    var tags = parseTags(tagsInput && tagsInput.value || "");
+    var title = String((titleInput && titleInput.value) || "").trim();
+    var tags = parseTags((tagsInput && tagsInput.value) || "");
+    var entryType = getSelectedEntryType();
+    var exercises = normalizeExercises(state.draftExercises);
 
     if (!title) {
-      setStatus("Enter a block title.", "error");
+      setStatus("Title is required.", "error");
       if (titleInput) {
         titleInput.focus();
       }
       return;
     }
 
-    var editingBlock = findBlockById(state.editingId);
-    var sourceExercises = readDraftExercisesForDay(sourceDay);
-    var exercises = [];
-
-    if (sourceDay) {
-      exercises = sectionInputValue === "__all__"
-        ? clone(sourceExercises)
-        : clone(sourceExercises.filter(function (exercise) {
-            return String(exercise && exercise.section || "").trim() === sectionInputValue;
-          }));
-    } else if (editingBlock) {
-      exercises = clone(editingBlock.exercises || []);
-    }
-
-    exercises = normalizeExercises(exercises).map(function (exercise) {
-      var nextExercise = Object.assign({}, exercise, { superset_group: null });
-      nextExercise.sets = (Array.isArray(nextExercise.sets) ? nextExercise.sets : []).map(function (set) {
-        return Object.assign({}, set, { done: false });
-      });
-      return nextExercise;
-    });
-
     if (!exercises.length) {
-      setStatus("Choose a source day with exercises for this section.", "error");
+      setStatus("Add at least one exercise before saving.", "info");
       return;
     }
 
-    if (saveBtn) {
-      saveBtn.disabled = true;
+    if (entryType === "exercise" && exercises.length !== 1) {
+      setStatus("Single exercise items must contain exactly one exercise.", "info");
+      return;
     }
 
-    var nextBlock = {
-      id: editingBlock ? editingBlock.id : ("block_" + Date.now() + "_" + Math.floor(Math.random() * 10000)),
+    var payload = {
       title: title,
-      section: sectionLabel,
+      item_type: entryType,
+      section: deriveItemSection(exercises, entryType),
       tags: tags,
-      sort_order: editingBlock ? parseSortOrder(editingBlock.sort_order) : 0,
-      exercises: exercises,
-      created_at: editingBlock ? String(editingBlock.created_at || "") : new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      exercises: exercises
     };
 
-    if (editingBlock) {
-      updateBlock(nextBlock, saveBtn);
+    if (state.editingId) {
+      updateItem(findItemById(state.editingId), payload);
       return;
     }
 
-    createBlock(nextBlock, saveBtn);
+    createItem(payload);
   }
 
-  function createBlock(block, saveBtn) {
-    var onComplete = function () {
-      if (saveBtn) {
-        saveBtn.disabled = false;
-      }
+  function createItem(payload) {
+    var localItem = {
+      id: "block_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+      title: payload.title,
+      item_type: payload.item_type,
+      section: payload.section,
+      tags: normalizeTags(payload.tags || []),
+      sort_order: 0,
+      exercises: normalizeExercises(payload.exercises || []),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     state.client
       .from("coach_workout_blocks")
-      .insert({
-        coach_user_id: state.coachUserId,
-        title: block.title,
-        source_section: block.section,
-        tags: block.tags,
-        sort_order: 0,
-        exercises: block.exercises
-      })
-      .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at")
+      .insert(buildCloudPayload(localItem))
+      .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at,item_type")
       .single()
       .then(function (result) {
         if (result.error) {
-          state.blocks.unshift(block);
-          reindexBlocks();
-          writeBlocksToStorage(state.blocks);
-          renderBlocks();
-          clearEditState();
-          setStatus("Saved locally. Cloud save failed.", "error");
-          onComplete();
+          saveLocalOnly(localItem, "Saved locally. Cloud sync failed.");
           return;
         }
 
-        var saved = mapCloudRow(result.data || {});
-        state.blocks.unshift(saved);
-        reindexBlocks();
-        writeBlocksToStorage(state.blocks);
-        renderBlocks();
+        state.items.unshift(mapCloudItem(result.data || {}));
+        reindexItems();
+        writeItemsToStorage(state.items);
+        renderItems();
         clearEditState();
-        persistOrder();
-        setStatus("Saved workout block.", "success");
-        onComplete();
+        setStatus("Saved item: " + localItem.title + ".", "success");
+        persistOrderToCloud();
       })
       .catch(function () {
-        state.blocks.unshift(block);
-        reindexBlocks();
-        writeBlocksToStorage(state.blocks);
-        renderBlocks();
-        clearEditState();
-        setStatus("Saved locally. Cloud save failed.", "error");
-        onComplete();
+        saveLocalOnly(localItem, "Saved locally. Cloud sync failed.");
       });
   }
 
-  function updateBlock(block, saveBtn) {
-    var onComplete = function () {
-      if (saveBtn) {
-        saveBtn.disabled = false;
-      }
+  function updateItem(existing, payload) {
+    if (!existing) {
+      setStatus("Library item not found.", "error");
+      clearEditState();
+      return;
+    }
+
+    var updated = {
+      id: existing.id,
+      title: payload.title,
+      item_type: payload.item_type,
+      section: payload.section,
+      tags: normalizeTags(payload.tags || []),
+      sort_order: parseSortOrder(existing.sort_order),
+      exercises: normalizeExercises(payload.exercises || existing.exercises || []),
+      created_at: existing.created_at,
+      updated_at: new Date().toISOString()
     };
 
-    if (!isUuid(block.id)) {
-      applyUpdatedBlockLocal(block);
-      onComplete();
+    var applyLocal = function () {
+      state.items = state.items.map(function (item) {
+        return String(item.id) === String(updated.id) ? updated : item;
+      });
+      reindexItems();
+      writeItemsToStorage(state.items);
+      renderItems();
+      clearEditState();
+      setStatus("Updated item: " + updated.title + ".", "success");
+      persistOrderToCloud();
+    };
+
+    if (!isUuid(existing.id)) {
+      applyLocal();
       return;
     }
 
     state.client
       .from("coach_workout_blocks")
       .update({
-        title: block.title,
-        source_section: block.section,
-        tags: block.tags,
-        exercises: block.exercises
+        title: updated.title,
+        item_type: updated.item_type,
+        source_section: updated.section,
+        tags: updated.tags,
+        exercises: updated.exercises
       })
-      .eq("id", block.id)
+      .eq("id", existing.id)
       .eq("coach_user_id", state.coachUserId)
       .then(function (result) {
         if (result.error) {
-          setStatus(result.error.message || "Could not update block.", "error");
-          onComplete();
+          setStatus(result.error.message || "Could not update item.", "error");
           return;
         }
-
-        applyUpdatedBlockLocal(block);
-        persistOrder();
-        setStatus("Updated workout block.", "success");
-        onComplete();
+        applyLocal();
       })
       .catch(function () {
-        setStatus("Could not update block.", "error");
-        onComplete();
+        setStatus("Could not update item.", "error");
       });
   }
 
-  function applyUpdatedBlockLocal(block) {
-    var idx = state.blocks.findIndex(function (entry) {
-      return String(entry && entry.id || "") === String(block.id || "");
-    });
-    if (idx < 0) {
-      return;
-    }
-
-    state.blocks[idx] = block;
-    reindexBlocks();
-    writeBlocksToStorage(state.blocks);
-    renderBlocks();
+  function saveLocalOnly(item, message) {
+    state.items.unshift(item);
+    reindexItems();
+    writeItemsToStorage(state.items);
+    renderItems();
     clearEditState();
+    setStatus(message, "info");
   }
 
-  function startEditById(blockId) {
-    var block = findBlockById(blockId);
-    if (!block) {
+  function startEditingItem(itemId) {
+    var item = findItemById(itemId);
+    var titleInput = document.querySelector("[data-block-title]");
+    var tagsInput = document.querySelector("[data-block-tags]");
+    var entryTypeInput = document.querySelector("[data-block-entry-type]");
+    var saveButton = document.querySelector("[data-block-save]");
+    var cancelButton = document.querySelector("[data-block-cancel-edit]");
+    var dayInput = document.querySelector("[data-block-source-day]");
+
+    if (!item) {
       return;
     }
 
-    state.editingId = String(block.id || "");
-
-    var titleInput = document.querySelector("[data-block-title]");
-    var sectionInput = document.querySelector("[data-block-section]");
-    var tagsInput = document.querySelector("[data-block-tags]");
-    var sourceDayInput = document.querySelector("[data-block-source-day]");
-    var saveBtn = document.querySelector("[data-block-save]");
-    var cancelBtn = document.querySelector("[data-block-cancel-edit]");
+    state.editingId = String(item.id || "");
+    state.draftExercises = normalizeExercises(item.exercises || []);
 
     if (titleInput) {
-      titleInput.value = String(block.title || "");
-    }
-    if (sectionInput) {
-      sectionInput.value = String(block.section || "") === "Entire Day" ? "__all__" : String(block.section || "Warm Up");
+      titleInput.value = String(item.title || "");
+      titleInput.focus();
     }
     if (tagsInput) {
-      tagsInput.value = normalizeTags(block.tags || []).join(", ");
+      tagsInput.value = normalizeTags(item.tags || []).join(", ");
     }
-    if (sourceDayInput) {
-      sourceDayInput.value = "";
+    if (entryTypeInput) {
+      entryTypeInput.value = normalizeItemType(item.item_type, item.exercises);
     }
-    if (saveBtn) {
-      saveBtn.textContent = "Update Block";
+    if (saveButton) {
+      saveButton.textContent = "Update Item";
     }
-    if (cancelBtn) {
-      cancelBtn.hidden = false;
+    if (cancelButton) {
+      cancelButton.hidden = false;
+    }
+    if (dayInput) {
+      dayInput.value = "";
     }
 
-    renderBlocks();
-    setStatus("Editing block: " + String(block.title || "Workout Block") + ".", "success");
+    renderDraftExercises();
+    renderItems();
+    setStatus("Editing item: " + String(item.title || "Library Item") + ".", "info");
   }
 
   function clearEditState() {
-    state.editingId = null;
-
     var titleInput = document.querySelector("[data-block-title]");
-    var sectionInput = document.querySelector("[data-block-section]");
     var tagsInput = document.querySelector("[data-block-tags]");
-    var saveBtn = document.querySelector("[data-block-save]");
-    var cancelBtn = document.querySelector("[data-block-cancel-edit]");
+    var entryTypeInput = document.querySelector("[data-block-entry-type]");
+    var dayInput = document.querySelector("[data-block-source-day]");
+    var sectionInput = document.querySelector("[data-block-section]");
+    var saveButton = document.querySelector("[data-block-save]");
+    var cancelButton = document.querySelector("[data-block-cancel-edit]");
+
+    state.editingId = null;
+    state.draftExercises = [createDefaultExercise()];
 
     if (titleInput) {
       titleInput.value = "";
     }
-    if (sectionInput) {
-      sectionInput.value = "Warm Up";
-    }
     if (tagsInput) {
       tagsInput.value = "";
     }
-    if (saveBtn) {
-      saveBtn.textContent = "Save Block";
+    if (entryTypeInput) {
+      entryTypeInput.value = "exercise";
     }
-    if (cancelBtn) {
-      cancelBtn.hidden = true;
+    if (dayInput) {
+      dayInput.value = "";
+    }
+    if (sectionInput) {
+      sectionInput.value = DEFAULT_SECTION;
+    }
+    if (saveButton) {
+      saveButton.textContent = "Save Item";
+    }
+    if (cancelButton) {
+      cancelButton.hidden = true;
     }
 
-    renderBlocks();
+    renderDraftExercises();
+    renderItems();
   }
 
-  function deleteById(blockId) {
-    var block = findBlockById(blockId);
-    if (!block) {
+  function deleteItem(itemId) {
+    var item = findItemById(itemId);
+    if (!item) {
       return;
     }
 
-    if (!confirm("Delete saved block '" + String(block.title || "Workout Block") + "'?")) {
+    if (!confirm("Delete saved item '" + String(item.title || "Library Item") + "'?")) {
       return;
     }
 
-    if (isUuid(block.id)) {
-      state.client
-        .from("coach_workout_blocks")
-        .delete()
-        .eq("id", block.id)
-        .eq("coach_user_id", state.coachUserId)
-        .then(function (result) {
-          if (result.error) {
-            setStatus(result.error.message || "Could not delete block.", "error");
-            return;
-          }
+    var removeLocal = function () {
+      state.items = state.items.filter(function (entry) {
+        return String(entry.id) !== String(itemId);
+      });
+      if (String(state.editingId || "") === String(itemId)) {
+        clearEditState();
+      }
+      reindexItems();
+      writeItemsToStorage(state.items);
+      renderItems();
+      setStatus("Library item deleted.", "info");
+      persistOrderToCloud();
+    };
 
-          removeBlockLocal(block.id);
-          persistOrder();
-          setStatus("Deleted block.", "success");
-        })
-        .catch(function () {
-          setStatus("Could not delete block.", "error");
-        });
+    if (!isUuid(itemId)) {
+      removeLocal();
       return;
     }
 
-    removeBlockLocal(block.id);
-    setStatus("Deleted local block.", "success");
+    state.client
+      .from("coach_workout_blocks")
+      .delete()
+      .eq("id", itemId)
+      .eq("coach_user_id", state.coachUserId)
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message || "Could not delete item.", "error");
+          return;
+        }
+        removeLocal();
+      })
+      .catch(function () {
+        setStatus("Could not delete item.", "error");
+      });
   }
 
-  function removeBlockLocal(blockId) {
-    var id = String(blockId || "");
-    state.blocks = (Array.isArray(state.blocks) ? state.blocks : []).filter(function (block) {
-      return String(block && block.id || "") !== id;
+  function moveItem(itemId, direction) {
+    var delta = direction === "up" ? -1 : (direction === "down" ? 1 : 0);
+    if (!delta) {
+      return;
+    }
+
+    var ordered = sortItems(state.items);
+    var index = ordered.findIndex(function (item) {
+      return String(item.id) === String(itemId);
     });
-
-    if (String(state.editingId || "") === id) {
-      clearEditState();
+    if (index < 0) {
+      return;
     }
 
-    reindexBlocks();
-    writeBlocksToStorage(state.blocks);
-    renderBlocks();
+    var target = index + delta;
+    if (target < 0 || target >= ordered.length) {
+      return;
+    }
+
+    var moved = ordered.splice(index, 1)[0];
+    ordered.splice(target, 0, moved);
+    state.items = ordered;
+    reindexItems();
+    writeItemsToStorage(state.items);
+    renderItems();
+    setStatus("Item order updated.", "success");
+    persistOrderToCloud();
   }
 
-  function moveBlock(blockId, direction) {
-    var id = String(blockId || "").trim();
-    var list = sortBlocks(state.blocks || []);
-    var idx = list.findIndex(function (block) {
-      return String(block && block.id || "") === id;
+  function persistOrderToCloud() {
+    var cloudItems = (Array.isArray(state.items) ? state.items : []).filter(function (item) {
+      return item && isUuid(item.id);
     });
-    if (idx < 0) {
+    if (!cloudItems.length) {
       return;
     }
 
-    var targetIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= list.length) {
-      return;
-    }
-
-    var moved = list.splice(idx, 1)[0];
-    list.splice(targetIdx, 0, moved);
-
-    state.blocks = list;
-    reindexBlocks();
-    writeBlocksToStorage(state.blocks);
-    renderBlocks();
-    persistOrder();
-  }
-
-  function persistOrder() {
-    var cloudBlocks = (Array.isArray(state.blocks) ? state.blocks : []).filter(function (block) {
-      return block && isUuid(block.id);
-    });
-
-    if (!cloudBlocks.length) {
-      return;
-    }
-
-    Promise.all(cloudBlocks.map(function (block) {
+    Promise.all(cloudItems.map(function (item) {
       return state.client
         .from("coach_workout_blocks")
-        .update({ sort_order: parseSortOrder(block.sort_order) })
-        .eq("id", block.id)
+        .update({ sort_order: parseSortOrder(item.sort_order) })
+        .eq("id", item.id)
         .eq("coach_user_id", state.coachUserId)
         .then(function () {
           return true;
@@ -1530,271 +1952,223 @@
     }));
   }
 
-  function renderBlocks() {
-    var container = document.querySelector("[data-block-list]");
-    var filterInput = document.querySelector("[data-block-filter]");
-    if (!container) {
+  function importExercisesFromDraft() {
+    var dayInput = document.querySelector("[data-block-source-day]");
+    var sectionInput = document.querySelector("[data-block-section]");
+    var exercises = buildExercisesFromSource(dayInput && dayInput.value, sectionInput && sectionInput.value);
+
+    if (!exercises.length) {
+      setStatus("No exercises found in that draft section.", "info");
       return;
     }
 
-    var allBlocks = sortBlocks(state.blocks || []);
-    var tags = collectTags(allBlocks);
+    if (getSelectedEntryType() === "exercise") {
+      state.draftExercises = [cloneExercise(exercises[0])];
+    } else {
+      state.draftExercises = exercises.map(cloneExercise);
+    }
+
+    renderDraftExercises();
+    setStatus("Imported " + state.draftExercises.length + " exercise" + (state.draftExercises.length === 1 ? "" : "s") + ".", "success");
+  }
+
+  function renderDraftExercises() {
+    var list = document.querySelector("[data-block-exercise-list]");
+    var addExerciseBtn = document.querySelector("[data-block-add-exercise]");
+    if (!list) {
+      return;
+    }
+
+    state.draftExercises = normalizeExercises(state.draftExercises);
+    if (!state.draftExercises.length) {
+      state.draftExercises = [createDefaultExercise()];
+    }
+
+    list.innerHTML = state.draftExercises.map(function (exercise, index) {
+      return buildDraftExerciseMarkup(exercise, index);
+    }).join("");
+
+    if (addExerciseBtn) {
+      addExerciseBtn.hidden = getSelectedEntryType() === "exercise";
+    }
+  }
+
+  function buildDraftExerciseMarkup(exercise, index) {
+    return (
+      '<article class="block-manager-exercise-item" data-block-exercise-item="' + index + '">' +
+        '<div class="block-manager-exercise-row">' +
+          '<input type="text" class="program-builder-block-title" placeholder="Exercise name" data-field="name" value="' + escapeAttribute(exercise.name || "") + '" />' +
+          '<select class="program-builder-block-section" data-field="section">' + renderSectionOptions(exercise.section) + '</select>' +
+          '<select class="program-builder-block-section" data-field="mode">' + renderModeOptions(exercise.mode) + '</select>' +
+        '</div>' +
+        '<div class="block-manager-exercise-row">' +
+          '<input type="text" class="program-builder-block-section" placeholder="Reps / Time" data-field="reps" value="' + escapeAttribute(firstSetValue(exercise, "reps")) + '" />' +
+          '<input type="text" class="program-builder-block-section" placeholder="Weight / Metric" data-field="weight" value="' + escapeAttribute(firstSetValue(exercise, "weight")) + '" />' +
+          '<input type="text" class="program-builder-block-section" placeholder="RPE" data-field="rpe" value="' + escapeAttribute(firstSetValue(exercise, "rpe")) + '" />' +
+          '<input type="text" class="program-builder-block-section" placeholder="Rest" data-field="rest" value="' + escapeAttribute(firstSetValue(exercise, "rest")) + '" />' +
+        '</div>' +
+        '<textarea class="program-builder-block-section block-manager-exercise-notes" placeholder="Notes or coaching cues" data-field="notes">' + escapeHtml(firstSetValue(exercise, "notes")) + '</textarea>' +
+        '<div class="block-manager-exercise-actions">' +
+          '<button type="button" class="btn admin-btn-delete-mini" data-block-exercise-remove="' + index + '">Remove</button>' +
+        '</div>' +
+      '</article>'
+    );
+  }
+
+  function updateDraftExerciseFromRow(index, exerciseItem) {
+    state.draftExercises[index] = {
+      name: readFieldValue(exerciseItem, '[data-field="name"]') || "Exercise",
+      section: readFieldValue(exerciseItem, '[data-field="section"]') || DEFAULT_SECTION,
+      mode: readFieldValue(exerciseItem, '[data-field="mode"]') || DEFAULT_MODE,
+      superset_group: null,
+      field_toggles: null,
+      sets: [{
+        reps: readFieldValue(exerciseItem, '[data-field="reps"]'),
+        weight: readFieldValue(exerciseItem, '[data-field="weight"]'),
+        rpe: readFieldValue(exerciseItem, '[data-field="rpe"]'),
+        rest: readFieldValue(exerciseItem, '[data-field="rest"]'),
+        notes: readFieldValue(exerciseItem, '[data-field="notes"]'),
+        done: false,
+        target_reps: readFieldValue(exerciseItem, '[data-field="reps"]'),
+        target_weight: readFieldValue(exerciseItem, '[data-field="weight"]'),
+        target_rpe: readFieldValue(exerciseItem, '[data-field="rpe"]'),
+        target_rest: readFieldValue(exerciseItem, '[data-field="rest"]'),
+        target_notes: readFieldValue(exerciseItem, '[data-field="notes"]')
+      }]
+    };
+  }
+
+  function renderItems() {
+    var list = document.querySelector("[data-block-list]");
+    var filterInput = document.querySelector("[data-block-filter]");
+    var filterTypeInput = document.querySelector("[data-block-type-filter]");
+    if (!list) {
+      return;
+    }
+
+    var allItems = sortItems(state.items);
+    var availableTags = collectTags(allItems);
 
     if (filterInput) {
-      var current = String(state.filterTag || "all");
       filterInput.innerHTML = ['<option value="all">All tags</option>']
-        .concat(tags.map(function (tag) {
+        .concat(availableTags.map(function (tag) {
           return '<option value="' + escapeAttribute(tag) + '">' + escapeHtml(tag) + '</option>';
         }))
         .join("");
 
-      if (current !== "all" && tags.indexOf(current) < 0) {
-        current = "all";
+      if (state.filterTag !== "all" && availableTags.indexOf(state.filterTag) < 0) {
         state.filterTag = "all";
       }
-      filterInput.value = current;
+      filterInput.value = state.filterTag;
     }
 
-    var visible = filterBlocks(allBlocks, state.filterTag);
-    if (!visible.length) {
-      container.innerHTML = '<p class="admin-loading">No saved blocks for this filter.</p>';
+    if (filterTypeInput) {
+      filterTypeInput.value = state.filterType;
+    }
+
+    var items = filterItems(allItems, state.filterTag, state.filterType);
+    if (!items.length) {
+      list.innerHTML = '<p class="admin-loading">No saved library items yet.</p>';
       return;
     }
 
-    container.innerHTML = visible.map(function (block, index) {
-      var count = Array.isArray(block.exercises) ? block.exercises.length : 0;
-      var tagList = normalizeTags(block.tags || []);
-      var tagsHtml = tagList.length
-        ? '<ul class="program-builder-block-tags-list">' + tagList.map(function (tag) {
-            return '<li>' + escapeHtml(tag) + '</li>';
-          }).join("") + '</ul>'
-        : "";
-      var isEditing = String(state.editingId || "") === String(block.id || "");
+    list.innerHTML = items.map(function (item, index) {
+      var exerciseCount = Array.isArray(item.exercises) ? item.exercises.length : 0;
+      var editingBadge = String(state.editingId || "") === String(item.id) ? '<p class="program-builder-block-item-editing">Editing</p>' : "";
+      var typeLabel = normalizeItemType(item.item_type, item.exercises) === "exercise" ? "Single Exercise" : "Exercise Block";
+      var preview = (Array.isArray(item.exercises) ? item.exercises : []).slice(0, 3).map(function (exercise) {
+        return '<li>' + escapeHtml(String(exercise && exercise.name || "Exercise")) + '</li>';
+      }).join("");
 
       return (
-        '<article class="program-builder-block-item">' +
+        '<article class="program-builder-block-item block-manager-library-item">' +
           '<div class="program-builder-block-main">' +
-            (isEditing ? '<p class="program-builder-block-item-editing">Editing</p>' : '') +
-            '<p class="program-builder-block-name">' + escapeHtml(block.title || "Workout Block") + '</p>' +
+            editingBadge +
+            '<div class="block-manager-library-head">' +
+              '<span class="block-manager-item-type">' + escapeHtml(typeLabel) + '</span>' +
+              '<p class="program-builder-block-name">' + escapeHtml(item.title || "Library Item") + '</p>' +
+            '</div>' +
             '<p class="program-builder-block-meta">' +
-              escapeHtml(String(block.section || "Workout Block")) +
-              ' - ' + escapeHtml(String(count)) + ' exercise' + (count === 1 ? '' : 's') +
+              escapeHtml(String(item.section || DEFAULT_SECTION)) + ' - ' +
+              escapeHtml(String(exerciseCount)) + ' exercise' + (exerciseCount === 1 ? '' : 's') +
             '</p>' +
-            tagsHtml +
+            renderTags(item.tags || []) +
+            '<ul class="block-manager-preview-list">' + preview + '</ul>' +
           '</div>' +
           '<div class="program-builder-block-actions">' +
-            '<button type="button" class="btn admin-btn-small" data-block-edit="' + escapeAttribute(String(block.id || "")) + '">Edit</button>' +
-            '<button type="button" class="btn admin-btn-small" data-block-id="' + escapeAttribute(String(block.id || "")) + '" data-block-move="up" ' + (index === 0 ? 'disabled' : '') + '>↑</button>' +
-            '<button type="button" class="btn admin-btn-small" data-block-id="' + escapeAttribute(String(block.id || "")) + '" data-block-move="down" ' + (index === visible.length - 1 ? 'disabled' : '') + '>↓</button>' +
-            '<button type="button" class="btn admin-btn-delete-mini" data-block-delete="' + escapeAttribute(String(block.id || "")) + '">Delete</button>' +
+            '<button type="button" class="btn admin-btn-small" data-block-move="up" data-block-id="' + escapeAttribute(item.id) + '"' + (index === 0 ? ' disabled' : '') + '>↑</button>' +
+            '<button type="button" class="btn admin-btn-small" data-block-move="down" data-block-id="' + escapeAttribute(item.id) + '"' + (index === items.length - 1 ? ' disabled' : '') + '>↓</button>' +
+            '<button type="button" class="btn admin-btn-small" data-block-edit="' + escapeAttribute(item.id) + '">Edit</button>' +
+            '<button type="button" class="btn admin-btn-delete-mini" data-block-delete="' + escapeAttribute(item.id) + '">Delete</button>' +
           '</div>' +
         '</article>'
       );
     }).join("");
   }
 
-  function findBlockById(blockId) {
-    var id = String(blockId || "").trim();
-    if (!id) {
-      return null;
+  function renderTags(tags) {
+    var normalized = normalizeTags(tags || []);
+    if (!normalized.length) {
+      return "";
     }
 
-    return (Array.isArray(state.blocks) ? state.blocks : []).find(function (block) {
-      return String(block && block.id || "") === id;
+    return '<ul class="program-builder-block-tags-list">' + normalized.map(function (tag) {
+      return '<li>' + escapeHtml(tag) + '</li>';
+    }).join("") + '</ul>';
+  }
+
+  function buildExercisesFromSource(dayKey, sectionRaw) {
+    var day = String(dayKey || "").trim();
+    var section = String(sectionRaw || DEFAULT_SECTION).trim();
+    if (!day) {
+      return [];
+    }
+
+    var payload = readFromStorage(TEMPLATE_DRAFT_PREFIX + day);
+    var sourceExercises = payload && Array.isArray(payload.exercises)
+      ? normalizeExercises(payload.exercises)
+      : [];
+
+    if (!sourceExercises.length) {
+      return [];
+    }
+
+    return (section === "__all__" ? sourceExercises : sourceExercises.filter(function (exercise) {
+      return String(exercise && exercise.section || "").trim() === section;
+    })).map(cloneExercise);
+  }
+
+  function filterItems(items, tag, entryType) {
+    var targetTag = String(tag || "all").trim().toLowerCase();
+    var targetType = normalizeFilterType(entryType);
+    return sortItems(items || []).filter(function (item) {
+      var tagMatch = targetTag === "all" || normalizeTags(item && item.tags || []).indexOf(targetTag) >= 0;
+      var typeMatch = targetType === "all" || normalizeItemType(item && item.item_type, item && item.exercises) === targetType;
+      return tagMatch && typeMatch;
+    });
+  }
+
+  function findItemById(itemId) {
+    return (Array.isArray(state.items) ? state.items : []).find(function (item) {
+      return String(item && item.id || "") === String(itemId || "");
     }) || null;
   }
 
-  function readTemplateDraftDays() {
-    var days = [];
-
-    try {
-      for (var i = 0; i < window.localStorage.length; i++) {
-        var key = String(window.localStorage.key(i) || "");
-        if (key.indexOf(TEMPLATE_DRAFT_PREFIX) !== 0) {
-          continue;
-        }
-
-        var dayKey = key.slice(TEMPLATE_DRAFT_PREFIX.length);
-        if (/^w\d+d\d+$/i.test(dayKey)) {
-          days.push(dayKey);
-        }
+  function reindexItems() {
+    var ordered = sortItems(state.items);
+    ordered.forEach(function (item, index) {
+      if (!item) {
+        return;
       }
-    } catch (e) {
-      return [];
-    }
-
-    days.sort(function (a, b) {
-      var pa = parseSlotKey(a);
-      var pb = parseSlotKey(b);
-      if (!pa || !pb) {
-        return String(a).localeCompare(String(b));
-      }
-      if (pa.week !== pb.week) {
-        return pa.week - pb.week;
-      }
-      return pa.day - pb.day;
+      item.sort_order = index;
+      item.tags = normalizeTags(item.tags || []);
+      item.item_type = normalizeItemType(item.item_type, item.exercises);
     });
-
-    return days;
+    state.items = ordered;
   }
 
-  function readDraftExercisesForDay(dayKey) {
-    if (!dayKey) {
-      return [];
-    }
-
-    try {
-      var raw = window.localStorage.getItem(TEMPLATE_DRAFT_PREFIX + dayKey);
-      var parsed = raw ? JSON.parse(raw) : null;
-      var exercises = parsed && Array.isArray(parsed.exercises) ? parsed.exercises : [];
-      return normalizeExercises(exercises);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function normalizeCloudRows(rows) {
-    return (Array.isArray(rows) ? rows : []).map(function (row) {
-      return mapCloudRow(row);
-    }).filter(function (row) {
-      return !!row;
-    });
-  }
-
-  function mapCloudRow(row) {
-    var source = row && typeof row === "object" ? row : {};
-    var id = String(source.id || "").trim();
-    var title = String(source.title || "").trim();
-    var section = String(source.source_section || source.section || "Workout Block").trim() || "Workout Block";
-    var exercises = normalizeExercises(source.exercises || []);
-
-    if (!id || !title || !exercises.length) {
-      return null;
-    }
-
-    return {
-      id: id,
-      title: title,
-      section: section,
-      tags: normalizeTags(source.tags || []),
-      sort_order: parseSortOrder(source.sort_order),
-      exercises: exercises,
-      created_at: String(source.created_at || ""),
-      updated_at: String(source.updated_at || "")
-    };
-  }
-
-  function readBlocksFromStorage() {
-    try {
-      var raw = window.localStorage.getItem(WORKOUT_BLOCK_LIBRARY_KEY);
-      var parsed = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-
-      return parsed.map(function (item) {
-        var block = item && typeof item === "object" ? item : {};
-        var id = String(block.id || "").trim();
-        var title = String(block.title || "").trim();
-        var exercises = normalizeExercises(block.exercises || []);
-
-        if (!id || !title || !exercises.length) {
-          return null;
-        }
-
-        return {
-          id: id,
-          title: title,
-          section: String(block.section || "Workout Block").trim() || "Workout Block",
-          tags: normalizeTags(block.tags || []),
-          sort_order: parseSortOrder(block.sort_order),
-          exercises: exercises,
-          created_at: String(block.created_at || ""),
-          updated_at: String(block.updated_at || "")
-        };
-      }).filter(function (item) {
-        return !!item;
-      });
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function writeBlocksToStorage(blocks) {
-    try {
-      var payload = sortBlocks(blocks || []).slice(0, 100);
-      window.localStorage.setItem(WORKOUT_BLOCK_LIBRARY_KEY, JSON.stringify(payload));
-    } catch (e) {
-      // Ignore local storage errors.
-    }
-  }
-
-  function normalizeExercises(exercises) {
-    return Array.isArray(exercises) ? exercises.filter(function (entry) {
-      return entry && typeof entry === "object";
-    }) : [];
-  }
-
-  function normalizeTags(tags) {
-    var list = Array.isArray(tags) ? tags : [];
-    var seen = {};
-
-    return list.map(function (tag) {
-      return String(tag || "").trim().toLowerCase();
-    }).filter(function (tag) {
-      if (!tag || seen[tag]) {
-        return false;
-      }
-      seen[tag] = true;
-      return true;
-    }).slice(0, 12);
-  }
-
-  function parseTags(raw) {
-    return normalizeTags(String(raw || "").split(","));
-  }
-
-  function collectTags(blocks) {
-    var seen = {};
-    var tags = [];
-
-    (Array.isArray(blocks) ? blocks : []).forEach(function (block) {
-      normalizeTags(block && block.tags || []).forEach(function (tag) {
-        if (seen[tag]) {
-          return;
-        }
-        seen[tag] = true;
-        tags.push(tag);
-      });
-    });
-
-    return tags.sort();
-  }
-
-  function filterBlocks(blocks, tag) {
-    var target = String(tag || "all").trim().toLowerCase();
-    var list = sortBlocks(blocks || []);
-    if (target === "all") {
-      return list;
-    }
-
-    return list.filter(function (block) {
-      return normalizeTags(block && block.tags || []).indexOf(target) >= 0;
-    });
-  }
-
-  function blockSignature(block) {
-    var safe = block && typeof block === "object" ? block : {};
-    return [
-      String(safe.title || "").trim().toLowerCase(),
-      String(safe.section || "").trim().toLowerCase(),
-      JSON.stringify(normalizeTags(safe.tags || [])),
-      JSON.stringify(normalizeExercises(safe.exercises))
-    ].join("|");
-  }
-
-  function sortBlocks(blocks) {
-    return (Array.isArray(blocks) ? blocks : []).slice().sort(function (a, b) {
+  function sortItems(items) {
+    return (Array.isArray(items) ? items : []).slice().sort(function (a, b) {
       var aSort = parseSortOrder(a && a.sort_order);
       var bSort = parseSortOrder(b && b.sort_order);
       if (aSort !== bSort) {
@@ -1809,21 +2183,271 @@
     });
   }
 
-  function reindexBlocks() {
-    var sorted = sortBlocks(state.blocks || []);
-    sorted.forEach(function (block, index) {
-      if (!block || typeof block !== "object") {
-        return;
-      }
-      block.sort_order = index;
-      block.tags = normalizeTags(block.tags || []);
+  function normalizeCloudItems(rows) {
+    return (Array.isArray(rows) ? rows : []).map(mapCloudItem).filter(function (item) {
+      return !!item;
     });
-    state.blocks = sorted;
+  }
+
+  function mapCloudItem(row) {
+    var src = row && typeof row === "object" ? row : {};
+    var id = String(src.id || "").trim();
+    var title = String(src.title || "").trim();
+    var exercises = normalizeExercises(src.exercises || []);
+    if (!id || !title || !exercises.length) {
+      return null;
+    }
+
+    return {
+      id: id,
+      title: title,
+      item_type: normalizeItemType(src.item_type, exercises),
+      section: String(src.source_section || src.section || DEFAULT_SECTION).trim() || DEFAULT_SECTION,
+      tags: normalizeTags(src.tags || []),
+      sort_order: parseSortOrder(src.sort_order),
+      exercises: exercises,
+      created_at: String(src.created_at || ""),
+      updated_at: String(src.updated_at || "")
+    };
+  }
+
+  function readItemsFromStorage() {
+    try {
+      var raw = window.localStorage.getItem(WORKOUT_BLOCK_LIBRARY_KEY);
+      if (!raw) {
+        return [];
+      }
+
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.map(function (item) {
+        var safe = item && typeof item === "object" ? item : {};
+        var id = String(safe.id || "").trim();
+        var title = String(safe.title || "").trim();
+        var exercises = normalizeExercises(safe.exercises || []);
+        if (!id || !title || !exercises.length) {
+          return null;
+        }
+
+        return {
+          id: id,
+          title: title,
+          item_type: normalizeItemType(safe.item_type, exercises),
+          section: String(safe.section || DEFAULT_SECTION).trim() || DEFAULT_SECTION,
+          tags: normalizeTags(safe.tags || []),
+          sort_order: parseSortOrder(safe.sort_order),
+          exercises: exercises,
+          created_at: String(safe.created_at || ""),
+          updated_at: String(safe.updated_at || "")
+        };
+      }).filter(function (item) {
+        return !!item;
+      });
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function writeItemsToStorage(items) {
+    try {
+      window.localStorage.setItem(WORKOUT_BLOCK_LIBRARY_KEY, JSON.stringify(sortItems(items).slice(0, 150)));
+    } catch (error) {
+      setStatus("Could not write local library cache.", "info");
+    }
+  }
+
+  function itemSignature(item) {
+    var safe = item && typeof item === "object" ? item : {};
+    return [
+      String(safe.title || "").trim().toLowerCase(),
+      String(safe.section || "").trim().toLowerCase(),
+      normalizeItemType(safe.item_type, safe.exercises),
+      JSON.stringify(normalizeTags(safe.tags || [])),
+      JSON.stringify(normalizeExercises(safe.exercises || []))
+    ].join("|");
+  }
+
+  function collectTags(items) {
+    var seen = {};
+    var tags = [];
+    (Array.isArray(items) ? items : []).forEach(function (item) {
+      normalizeTags(item && item.tags || []).forEach(function (tag) {
+        if (seen[tag]) {
+          return;
+        }
+        seen[tag] = true;
+        tags.push(tag);
+      });
+    });
+    return tags.sort();
+  }
+
+  function parseTags(raw) {
+    return normalizeTags(String(raw || "").split(","));
+  }
+
+  function normalizeTags(tags) {
+    var list = Array.isArray(tags) ? tags : [];
+    var seen = {};
+    return list.map(function (tag) {
+      return String(tag || "").trim().toLowerCase();
+    }).filter(function (tag) {
+      if (!tag || seen[tag]) {
+        return false;
+      }
+      seen[tag] = true;
+      return true;
+    }).slice(0, 12);
+  }
+
+  function normalizeExercises(exercises) {
+    return (Array.isArray(exercises) ? exercises : []).map(function (exercise) {
+      var safe = exercise && typeof exercise === "object" ? exercise : {};
+      return {
+        name: String(safe.name || "Exercise").trim() || "Exercise",
+        section: String(safe.section || DEFAULT_SECTION).trim() || DEFAULT_SECTION,
+        mode: String(safe.mode || DEFAULT_MODE).trim() || DEFAULT_MODE,
+        superset_group: safe.superset_group || null,
+        field_toggles: safe.field_toggles && typeof safe.field_toggles === "object" ? safe.field_toggles : null,
+        sets: normalizeSets(safe.sets)
+      };
+    }).filter(function (exercise) {
+      return Array.isArray(exercise.sets) && exercise.sets.length > 0 && String(exercise.name || "").trim();
+    });
+  }
+
+  function normalizeSets(sets) {
+    var list = Array.isArray(sets) && sets.length ? sets : [{}];
+    return list.map(function (set) {
+      var safe = set && typeof set === "object" ? set : {};
+      return {
+        reps: safe.reps != null ? safe.reps : "",
+        weight: safe.weight != null ? safe.weight : "",
+        rpe: safe.rpe != null ? safe.rpe : "",
+        rest: safe.rest != null ? safe.rest : "",
+        notes: safe.notes != null ? safe.notes : "",
+        done: !!safe.done,
+        target_reps: safe.target_reps != null ? safe.target_reps : safe.reps,
+        target_weight: safe.target_weight != null ? safe.target_weight : safe.weight,
+        target_rpe: safe.target_rpe != null ? safe.target_rpe : safe.rpe,
+        target_rest: safe.target_rest != null ? safe.target_rest : safe.rest,
+        target_notes: safe.target_notes != null ? safe.target_notes : safe.notes
+      };
+    });
+  }
+
+  function createDefaultExercise() {
+    return {
+      name: "",
+      section: DEFAULT_SECTION,
+      mode: DEFAULT_MODE,
+      superset_group: null,
+      field_toggles: null,
+      sets: [{
+        reps: "",
+        weight: "",
+        rpe: "",
+        rest: "",
+        notes: "",
+        done: false,
+        target_reps: "",
+        target_weight: "",
+        target_rpe: "",
+        target_rest: "",
+        target_notes: ""
+      }]
+    };
+  }
+
+  function cloneExercise(exercise) {
+    return normalizeExercises(clone([exercise]))[0] || createDefaultExercise();
+  }
+
+  function deriveItemSection(exercises, entryType) {
+    if (!Array.isArray(exercises) || !exercises.length) {
+      return DEFAULT_SECTION;
+    }
+
+    if (entryType === "exercise") {
+      return String(exercises[0].section || DEFAULT_SECTION);
+    }
+
+    var firstSection = String(exercises[0].section || DEFAULT_SECTION);
+    var mixed = exercises.some(function (exercise) {
+      return String(exercise && exercise.section || DEFAULT_SECTION) !== firstSection;
+    });
+    return mixed ? "Mixed Block" : firstSection;
+  }
+
+  function buildCloudPayload(item) {
+    return {
+      coach_user_id: state.coachUserId,
+      title: String(item && item.title || "Library Item").trim() || "Library Item",
+      item_type: normalizeItemType(item && item.item_type, item && item.exercises),
+      source_section: String(item && item.section || DEFAULT_SECTION).trim() || DEFAULT_SECTION,
+      tags: normalizeTags(item && item.tags || []),
+      sort_order: parseSortOrder(item && item.sort_order),
+      exercises: normalizeExercises(item && item.exercises || [])
+    };
+  }
+
+  function getSelectedEntryType() {
+    var entryTypeInput = document.querySelector("[data-block-entry-type]");
+    return normalizeItemType(entryTypeInput && entryTypeInput.value, state.draftExercises);
+  }
+
+  function normalizeItemType(value, exercises) {
+    var type = String(value || "").trim().toLowerCase();
+    if (type === "exercise" || type === "block") {
+      return type;
+    }
+    return Array.isArray(exercises) && exercises.length === 1 ? "exercise" : "block";
+  }
+
+  function normalizeFilterType(value) {
+    var type = String(value || "all").trim().toLowerCase();
+    return type === "exercise" || type === "block" ? type : "all";
+  }
+
+  function renderSectionOptions(selected) {
+    return SECTION_OPTIONS.map(function (section) {
+      return '<option value="' + escapeAttribute(section) + '"' + (section === selected ? ' selected' : '') + '>' + escapeHtml(section) + '</option>';
+    }).join("");
+  }
+
+  function renderModeOptions(selected) {
+    return ["reps", "time", "endurance"].map(function (mode) {
+      return '<option value="' + escapeAttribute(mode) + '"' + (mode === selected ? ' selected' : '') + '>' + escapeHtml(mode) + '</option>';
+    }).join("");
+  }
+
+  function readFieldValue(root, selector) {
+    var field = root && root.querySelector ? root.querySelector(selector) : null;
+    return String(field && field.value || "").trim();
+  }
+
+  function firstSetValue(exercise, key) {
+    var firstSet = exercise && Array.isArray(exercise.sets) && exercise.sets[0] ? exercise.sets[0] : {};
+    return firstSet && firstSet[key] != null ? String(firstSet[key]) : "";
   }
 
   function parseSortOrder(value) {
     var num = parseInt(value, 10);
     return Number.isFinite(num) ? num : 0;
+  }
+
+  function setStatus(message, tone) {
+    var status = document.querySelector("[data-block-status]");
+    if (!status) {
+      return;
+    }
+
+    status.textContent = String(message || "");
+    status.classList.remove("status-success", "status-error", "status-info");
+    status.classList.add(tone === "success" ? "status-success" : tone === "error" ? "status-error" : "status-info");
   }
 
   function parseSlotKey(slotKey) {
@@ -1834,17 +2458,41 @@
 
     return {
       week: parseInt(match[1], 10),
-      day: parseInt(match[2], 10)
+      workout: parseInt(match[2], 10)
     };
+  }
+
+  function compareSlotKeysAsc(a, b) {
+    var left = parseSlotKey(a);
+    var right = parseSlotKey(b);
+    if (!left || !right) {
+      return String(a || "").localeCompare(String(b || ""));
+    }
+    if (left.week !== right.week) {
+      return left.week - right.week;
+    }
+    return left.workout - right.workout;
   }
 
   function labelForSlot(slotKey) {
     var parsed = parseSlotKey(slotKey);
     if (!parsed) {
-      return String(slotKey || "");
+      return String(slotKey || "Workout Day");
     }
+    return "Week " + parsed.week + " - Workout " + parsed.workout;
+  }
 
-    return "Week " + parsed.week + " - Workout " + parsed.day;
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+  }
+
+  function readFromStorage(key) {
+    try {
+      var raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
   }
 
   function createSupabaseClient() {
@@ -1852,13 +2500,15 @@
       return null;
     }
 
-    if (!window.NOMADIC_SUPABASE_URL || !window.NOMADIC_SUPABASE_ANON_KEY) {
+    var url = window.NOMADIC_SUPABASE_URL;
+    var key = window.NOMADIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
       return null;
     }
 
     try {
-      return window.supabase.createClient(window.NOMADIC_SUPABASE_URL, window.NOMADIC_SUPABASE_ANON_KEY);
-    } catch (e) {
+      return window.supabase.createClient(url, key);
+    } catch (error) {
       return null;
     }
   }
@@ -1866,17 +2516,13 @@
   function clone(value) {
     try {
       return JSON.parse(JSON.stringify(value || []));
-    } catch (e) {
+    } catch (error) {
       return Array.isArray(value) ? value.slice() : [];
     }
   }
 
-  function isUuid(value) {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
-  }
-
   function escapeHtml(value) {
-    return String(value == null ? "" : value)
+    return String(value || "")
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")

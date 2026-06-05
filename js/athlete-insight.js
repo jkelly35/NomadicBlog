@@ -10,8 +10,12 @@
     authUser: null,
     metrics: [],
     programs: [],
+    scheduleRows: [],
     stravaRows: [],
-    trainingTab: "current"
+    trainingTab: "current",
+    calendarMonthKey: "",
+    draggingScheduleId: null,
+    selectedScheduleId: null
   };
 
   // ─── Sport overview field labels ─────────────────────────────────────────────
@@ -112,14 +116,12 @@
     var editUrl    = "profile.html?coachView=1&athleteId=" + id;
     var metricsUrl = "metrics-editor.html?athleteId=" + id;
     var programUrl = "profile.html?coachView=1&athleteId=" + id + "#profile-training-program-section";
-    var calendarUrl = "coach-schedule-calendar.html?athleteId=" + id;
 
     setLink("[data-insight-edit-link]",     editUrl);
     setLink("[data-insight-metrics-link]",  metricsUrl);
     setLink("[data-insight-metrics-link2]", metricsUrl);
     setLink("[data-insight-programs-link]", programUrl);
     setLink("[data-insight-programs-link2]",programUrl);
-    setLink("[data-insight-calendar-link]", calendarUrl);
   }
 
   function setLink(selector, href) {
@@ -149,11 +151,15 @@
       state.programs = results[3] || [];
       state.stravaRows = results[4] || [];
 
-      renderHero(authUser, profile);
-      renderOverviewPanel(profile);
-      renderMetricsPanel(state.metrics);
-      renderTrainingPanel(state.programs);
-      renderLoadPanel(state.stravaRows);
+      return fetchScheduleRows(state.programs).then(function (scheduleRows) {
+        state.scheduleRows = scheduleRows || [];
+
+        renderHero(authUser, profile);
+        renderOverviewPanel(profile);
+        renderMetricsPanel(state.metrics);
+        renderTrainingPanel(state.programs, state.scheduleRows);
+        renderLoadPanel(state.stravaRows);
+      });
     }).catch(function (err) {
       setStatus(err && err.message ? err.message : "Failed to load athlete data.", "error");
     });
@@ -217,6 +223,27 @@
       .eq("user_id", state.athleteId)
       .order("metric_date", { ascending: false })
       .limit(30)
+      .then(function (result) {
+        return (result && !result.error && Array.isArray(result.data)) ? result.data : [];
+      })
+      .catch(function () { return []; });
+  }
+
+  function fetchScheduleRows(programs) {
+    var assignmentIds = (Array.isArray(programs) ? programs : [])
+      .map(function (program) { return program && program.id ? String(program.id) : ""; })
+      .filter(function (id) { return !!id; });
+
+    if (!assignmentIds.length) {
+      return Promise.resolve([]);
+    }
+
+    return state.client
+      .from("athlete_program_schedule")
+      .select("id,athlete_user_id,user_training_program_id,program_id,slot_key,session_label,scheduled_for,status,notes")
+      .eq("athlete_user_id", state.athleteId)
+      .in("user_training_program_id", assignmentIds)
+      .order("scheduled_for", { ascending: true })
       .then(function (result) {
         return (result && !result.error && Array.isArray(result.data)) ? result.data : [];
       })
@@ -483,9 +510,10 @@
   }
 
   // ─── Training programs panel ──────────────────────────────────────────────────
-  function renderTrainingPanel(programs) {
+  function renderTrainingPanel(programs, scheduleRows) {
     var activeEl  = document.querySelector("[data-training-active]");
     var historyEl = document.querySelector("[data-training-history]");
+    var rows = Array.isArray(scheduleRows) ? scheduleRows : [];
 
     var active  = programs.filter(function (p) { return p.is_active; });
     var inactive = programs.filter(function (p) { return !p.is_active; });
@@ -495,11 +523,13 @@
 
     if (activeEl) {
       if (!active.length) {
-        activeEl.innerHTML = '<p class="insight-empty">No current training programs assigned. Use "Assign / Manage Programs" to add one.</p>';
+        activeEl.innerHTML =
+          '<p class="insight-empty">No current training programs assigned. Use "Assign / Manage Programs" to add one.</p>' +
+          buildCalendarManagerHtml(programs, rows);
       } else {
         activeEl.innerHTML = active.map(function (program) {
           return buildProgramCard(program, true);
-        }).join("");
+        }).join("") + buildCalendarManagerHtml(programs, rows);
       }
     }
 
@@ -514,6 +544,544 @@
     }
 
     wirePastProgramActions();
+    wireCalendarManagerActions();
+  }
+
+  function buildCalendarManagerHtml(activePrograms, scheduleRows) {
+    var programs = Array.isArray(activePrograms) ? activePrograms : [];
+    var rows = Array.isArray(scheduleRows) ? scheduleRows : [];
+    var activeIdMap = {};
+
+    programs.forEach(function (program) {
+      if (program && program.id) {
+        activeIdMap[String(program.id)] = program;
+      }
+    });
+
+    var scopedRows = rows
+      .filter(function (row) {
+        var assignmentId = String(row && row.user_training_program_id || "");
+        return !!activeIdMap[assignmentId];
+      })
+      .sort(function (a, b) {
+        var aDate = String(a && a.scheduled_for || "");
+        var bDate = String(b && b.scheduled_for || "");
+        if (aDate !== bDate) {
+          return aDate.localeCompare(bDate);
+        }
+        return String(a && a.slot_key || "").localeCompare(String(b && b.slot_key || ""));
+      });
+
+    var assignmentOptions = programs.map(function (program) {
+      var id = String(program && program.id || "");
+      var label = String(program && (program.program_name || program.name) || "Assigned Program");
+      return '<option value="' + escapeAttribute(id) + '">' + escapeHtml(label) + '</option>';
+    }).join("");
+
+    if (!state.calendarMonthKey) {
+      var firstDate = scopedRows.length ? String(scopedRows[0].scheduled_for || "") : "";
+      state.calendarMonthKey = toMonthKey(firstDate) || toMonthKey(getTodayDateInputValue());
+    }
+
+    if (state.selectedScheduleId) {
+      var selectedStillExists = scopedRows.some(function (row) {
+        return String(row && row.id || "") === String(state.selectedScheduleId);
+      });
+      if (!selectedStillExists) {
+        state.selectedScheduleId = null;
+      }
+    }
+
+    if (!state.selectedScheduleId && scopedRows.length) {
+      state.selectedScheduleId = String(scopedRows[0].id || "");
+    }
+
+    var monthLabel = formatMonthLabel(state.calendarMonthKey);
+    var gridHtml = buildCalendarMonthGridHtml(state.calendarMonthKey, scopedRows, activeIdMap, state.selectedScheduleId);
+    var editorHtml = buildCalendarEditorHtml(scopedRows, activeIdMap, state.selectedScheduleId);
+
+    return [
+      '<section class="insight-section insight-calendar-manager">',
+      '<h2 class="insight-section-title">Training Calendar Manager</h2>',
+      '<p class="insight-calendar-help">Adjust dates, labels, and statuses directly from insights. Changes save automatically.</p>',
+      '<div class="insight-calendar-add-row">',
+      '<select class="insight-calendar-input" data-cal-new-assignment>' + assignmentOptions + '</select>',
+      '<input type="date" class="insight-calendar-input" data-cal-new-date value="' + escapeAttribute(getTodayDateInputValue()) + '" />',
+      '<input type="text" class="insight-calendar-input" data-cal-new-slot placeholder="w1d1" value="w1d1" />',
+      '<input type="text" class="insight-calendar-input" data-cal-new-label placeholder="Session label" />',
+      '<button type="button" class="btn insight-action-btn" data-cal-add>Add Session</button>',
+      '</div>',
+      '<div class="insight-calendar-nav">',
+      '<button type="button" class="btn insight-back-btn" data-cal-month-prev>←</button>',
+      '<strong class="insight-calendar-month-label" data-cal-month-label>' + escapeHtml(monthLabel) + '</strong>',
+      '<button type="button" class="btn insight-back-btn" data-cal-month-next>→</button>',
+      '<button type="button" class="btn insight-action-btn-sm" data-cal-month-today>Today</button>',
+      '</div>',
+      '<div class="insight-calendar-month-wrap">' + gridHtml + '</div>',
+      editorHtml,
+      '</section>'
+    ].join("");
+  }
+
+  function buildCalendarMonthGridHtml(monthKey, scopedRows, activeIdMap, selectedScheduleId) {
+    var monthStart = parseMonthKey(monthKey);
+    if (!monthStart) {
+      return '<p class="insight-empty">Could not render calendar month.</p>';
+    }
+
+    var daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+    var firstWeekday = monthStart.getDay();
+    var weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    var groupedByDate = {};
+
+    (Array.isArray(scopedRows) ? scopedRows : []).forEach(function (row) {
+      var key = String(row && row.scheduled_for || "");
+      if (!groupedByDate[key]) {
+        groupedByDate[key] = [];
+      }
+      groupedByDate[key].push(row);
+    });
+
+    var cells = [];
+    for (var i = 0; i < firstWeekday; i++) {
+      cells.push('<div class="insight-cal-day insight-cal-day-empty" aria-hidden="true"></div>');
+    }
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      var dateValue = new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
+      var dateKey = formatDateInputFromDate(dateValue);
+      var rows = groupedByDate[dateKey] || [];
+
+      var cardsHtml = rows.map(function (row) {
+        var assignmentId = String(row && row.user_training_program_id || "");
+        var program = activeIdMap[assignmentId] || {};
+        var programName = String(program.program_name || program.name || "Program");
+        var rowId = String(row && row.id || "");
+        var isSelected = String(selectedScheduleId || "") === rowId;
+        var status = String(row && row.status || "scheduled");
+
+        return [
+          '<article class="insight-cal-session' + (isSelected ? ' is-selected' : '') + '" data-cal-select="' + escapeAttribute(rowId) + '">',
+          '<div class="insight-cal-topline">',
+          '<span class="insight-cal-drag-handle" draggable="true" data-cal-drag="' + escapeAttribute(rowId) + '" title="Drag to move this session">Move</span>',
+          '<span class="insight-cal-status is-' + escapeAttribute(status) + '">' + escapeHtml(capitalize(status)) + '</span>',
+          '</div>',
+          '<p class="insight-cal-title">' + escapeHtml(String(row && row.slot_key || "")) + ' · ' + escapeHtml(String(row && row.session_label || 'Workout')) + '</p>',
+          '<div class="insight-cal-bottomline">',
+          '<span class="insight-cal-program">' + escapeHtml(shortName(programName)) + '</span>',
+          '</div>',
+          '</article>'
+        ].join('');
+      }).join("");
+
+      cells.push(
+        '<div class="insight-cal-day' + (rows.length ? ' has-session' : '') + '" data-cal-day-date="' + escapeAttribute(dateKey) + '">' +
+          '<div class="insight-cal-day-number">' + day + '</div>' +
+          '<div class="insight-cal-day-content">' + cardsHtml + '</div>' +
+        '</div>'
+      );
+    }
+
+    return [
+      '<div class="insight-cal-weekdays">' + weekdayLabels.map(function (label) {
+        return '<span>' + label + '</span>';
+      }).join("") + '</div>',
+      '<div class="insight-cal-grid" data-cal-grid>' + cells.join("") + '</div>'
+    ].join("");
+  }
+
+  function buildCalendarEditorHtml(scopedRows, activeIdMap, selectedScheduleId) {
+    var selected = (Array.isArray(scopedRows) ? scopedRows : []).find(function (row) {
+      return String(row && row.id || "") === String(selectedScheduleId || "");
+    });
+
+    if (!selected) {
+      return [
+        '<section class="insight-cal-editor insight-cal-editor-empty">',
+        '<h3>Session Editor</h3>',
+        '<p class="insight-empty">Select a session in the calendar to edit details.</p>',
+        '</section>'
+      ].join("");
+    }
+
+    var assignmentId = String(selected.user_training_program_id || "");
+    var program = activeIdMap[assignmentId] || {};
+    var programName = String(program.program_name || program.name || "Program");
+    var rowId = String(selected.id || "");
+    var dayUrl =
+      'training-program-example.html?program=' + encodeURIComponent(programName) +
+      (program.program_id ? '&templateId=' + encodeURIComponent(program.program_id) : '') +
+      (assignmentId ? '&assignmentId=' + encodeURIComponent(assignmentId) : '') +
+      '&athleteName=' + encodeURIComponent((state.profile && state.profile.name) || 'Athlete') +
+      '&day=' + encodeURIComponent(String(selected.slot_key || ''));
+
+    return [
+      '<section class="insight-cal-editor" data-cal-editor-wrap>',
+      '<h3>Session Editor</h3>',
+      '<p class="insight-calendar-help">Selected: ' + escapeHtml(String(selected.slot_key || "")) + ' on ' + escapeHtml(formatDate(String(selected.scheduled_for || ""))) + '</p>',
+      '<div class="insight-cal-editor-grid">',
+      '<label><span>Date</span><input type="date" class="insight-calendar-input" data-cal-date="' + escapeAttribute(rowId) + '" value="' + escapeAttribute(String(selected.scheduled_for || '')) + '" /></label>',
+      '<label><span>Slot</span><input type="text" class="insight-calendar-input" data-cal-slot="' + escapeAttribute(rowId) + '" value="' + escapeAttribute(String(selected.slot_key || '')) + '" /></label>',
+      '<label><span>Session Label</span><input type="text" class="insight-calendar-input" data-cal-label="' + escapeAttribute(rowId) + '" value="' + escapeAttribute(String(selected.session_label || 'Workout')) + '" /></label>',
+      '<label><span>Status</span><select class="insight-calendar-input" data-cal-status="' + escapeAttribute(rowId) + '">' +
+        '<option value="scheduled"' + (selected.status === 'scheduled' ? ' selected' : '') + '>Scheduled</option>' +
+        '<option value="completed"' + (selected.status === 'completed' ? ' selected' : '') + '>Completed</option>' +
+        '<option value="missed"' + (selected.status === 'missed' ? ' selected' : '') + '>Missed</option>' +
+        '<option value="skipped"' + (selected.status === 'skipped' ? ' selected' : '') + '>Skipped</option>' +
+      '</select></label>',
+      '</div>',
+      '<div class="insight-cal-editor-actions">',
+      '<span class="insight-cal-program">' + escapeHtml(programName) + '</span>',
+      '<a class="btn insight-action-btn-sm" href="' + dayUrl + '">Open Workout</a>',
+      '<button type="button" class="insight-program-delete-btn" data-cal-delete="' + escapeAttribute(rowId) + '">Delete Session</button>',
+      '</div>',
+      '</section>'
+    ].join("");
+  }
+
+  function wireCalendarManagerActions() {
+    var addBtn = document.querySelector("[data-cal-add]");
+    if (addBtn && addBtn.getAttribute("data-cal-add-wired") !== "1") {
+      addBtn.setAttribute("data-cal-add-wired", "1");
+      addBtn.addEventListener("click", onAddCalendarSession);
+    }
+
+    var prevBtn = document.querySelector("[data-cal-month-prev]");
+    if (prevBtn && prevBtn.getAttribute("data-cal-month-prev-wired") !== "1") {
+      prevBtn.setAttribute("data-cal-month-prev-wired", "1");
+      prevBtn.addEventListener("click", function () {
+        state.calendarMonthKey = shiftMonthKey(state.calendarMonthKey, -1);
+        renderTrainingPanel(state.programs, state.scheduleRows);
+      });
+    }
+
+    var nextBtn = document.querySelector("[data-cal-month-next]");
+    if (nextBtn && nextBtn.getAttribute("data-cal-month-next-wired") !== "1") {
+      nextBtn.setAttribute("data-cal-month-next-wired", "1");
+      nextBtn.addEventListener("click", function () {
+        state.calendarMonthKey = shiftMonthKey(state.calendarMonthKey, 1);
+        renderTrainingPanel(state.programs, state.scheduleRows);
+      });
+    }
+
+    var todayBtn = document.querySelector("[data-cal-month-today]");
+    if (todayBtn && todayBtn.getAttribute("data-cal-month-today-wired") !== "1") {
+      todayBtn.setAttribute("data-cal-month-today-wired", "1");
+      todayBtn.addEventListener("click", function () {
+        state.calendarMonthKey = toMonthKey(getTodayDateInputValue());
+        renderTrainingPanel(state.programs, state.scheduleRows);
+      });
+    }
+
+    document.querySelectorAll("[data-cal-select]").forEach(function (card) {
+      if (card.getAttribute("data-cal-select-wired") === "1") {
+        return;
+      }
+      card.setAttribute("data-cal-select-wired", "1");
+      card.addEventListener("click", function (event) {
+        if (event && event.target && event.target.closest("[data-cal-drag]")) {
+          return;
+        }
+        var rowId = String(card.getAttribute("data-cal-select") || "").trim();
+        if (!rowId || rowId === state.selectedScheduleId) {
+          return;
+        }
+        state.selectedScheduleId = rowId;
+        renderTrainingPanel(state.programs, state.scheduleRows);
+      });
+    });
+
+    document.querySelectorAll("[data-cal-delete]").forEach(function (btn) {
+      if (btn.getAttribute("data-cal-delete-wired") === "1") {
+        return;
+      }
+      btn.setAttribute("data-cal-delete-wired", "1");
+      btn.addEventListener("click", function () {
+        var rowId = String(btn.getAttribute("data-cal-delete") || "").trim();
+        if (!rowId) {
+          return;
+        }
+        deleteCalendarSession(rowId);
+      });
+    });
+
+    bindCalendarAutoSave("[data-cal-date]", "data-cal-date", "scheduled_for");
+    bindCalendarAutoSave("[data-cal-slot]", "data-cal-slot", "slot_key");
+    bindCalendarAutoSave("[data-cal-label]", "data-cal-label", "session_label");
+    bindCalendarAutoSave("[data-cal-status]", "data-cal-status", "status");
+    bindCalendarDragAndDrop();
+  }
+
+  function bindCalendarDragAndDrop() {
+    var grid = document.querySelector("[data-cal-grid]");
+    if (!grid) {
+      return;
+    }
+
+    if (grid.getAttribute("data-cal-grid-wired") !== "1") {
+      grid.setAttribute("data-cal-grid-wired", "1");
+
+      grid.addEventListener("dragover", function (event) {
+        var dayCell = event.target && event.target.closest("[data-cal-day-date]");
+        if (!dayCell || !state.draggingScheduleId) {
+          return;
+        }
+
+        event.preventDefault();
+        dayCell.classList.add("is-drop-target");
+      });
+
+      grid.addEventListener("dragenter", function (event) {
+        var dayCell = event.target && event.target.closest("[data-cal-day-date]");
+        if (!dayCell || !state.draggingScheduleId) {
+          return;
+        }
+
+        dayCell.classList.add("is-drop-target");
+      });
+
+      grid.addEventListener("dragleave", function (event) {
+        var dayCell = event.target && event.target.closest("[data-cal-day-date]");
+        if (!dayCell) {
+          return;
+        }
+
+        dayCell.classList.remove("is-drop-target");
+      });
+
+      grid.addEventListener("drop", function (event) {
+        var dayCell = event.target && event.target.closest("[data-cal-day-date]");
+        if (!dayCell || !state.draggingScheduleId) {
+          return;
+        }
+
+        event.preventDefault();
+        dayCell.classList.remove("is-drop-target");
+
+        var targetDate = String(dayCell.getAttribute("data-cal-day-date") || "").trim();
+        if (!targetDate) {
+          return;
+        }
+
+        moveCalendarSessionToDate(state.draggingScheduleId, targetDate);
+      });
+    }
+
+    document.querySelectorAll("[data-cal-drag]").forEach(function (handle) {
+      if (handle.getAttribute("data-cal-drag-wired") === "1") {
+        return;
+      }
+
+      handle.setAttribute("data-cal-drag-wired", "1");
+      handle.addEventListener("dragstart", function (event) {
+        var rowId = String(handle.getAttribute("data-cal-drag") || "").trim();
+        if (!rowId) {
+          return;
+        }
+
+        state.draggingScheduleId = rowId;
+        handle.classList.add("is-dragging");
+        if (event && event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", rowId);
+        }
+      });
+
+      handle.addEventListener("dragend", function () {
+        state.draggingScheduleId = null;
+        handle.classList.remove("is-dragging");
+        document.querySelectorAll("[data-cal-day-date].is-drop-target").forEach(function (dayCell) {
+          dayCell.classList.remove("is-drop-target");
+        });
+      });
+    });
+  }
+
+  function moveCalendarSessionToDate(rowId, targetDate) {
+    var row = (state.scheduleRows || []).find(function (item) {
+      return String(item && item.id || "") === String(rowId || "");
+    });
+
+    var currentDate = String(row && row.scheduled_for || "").trim();
+    if (!targetDate || targetDate === currentDate) {
+      return;
+    }
+
+    updateCalendarSession(rowId, { scheduled_for: targetDate });
+  }
+
+  function bindCalendarAutoSave(selector, attr, fieldName) {
+    document.querySelectorAll(selector).forEach(function (input) {
+      if (input.getAttribute(attr + "-wired") === "1") {
+        return;
+      }
+
+      input.setAttribute(attr + "-wired", "1");
+      input.addEventListener("change", function () {
+        var rowId = String(input.getAttribute(attr) || "").trim();
+        if (!rowId) {
+          return;
+        }
+
+        var patch = {};
+        patch[fieldName] = String(input.value || "").trim();
+        updateCalendarSession(rowId, patch);
+      });
+    });
+  }
+
+  function onAddCalendarSession() {
+    var assignmentInput = document.querySelector("[data-cal-new-assignment]");
+    var dateInput = document.querySelector("[data-cal-new-date]");
+    var slotInput = document.querySelector("[data-cal-new-slot]");
+    var labelInput = document.querySelector("[data-cal-new-label]");
+
+    var assignmentId = String(assignmentInput && assignmentInput.value || "").trim();
+    var scheduledFor = String(dateInput && dateInput.value || "").trim();
+    var slotKey = String(slotInput && slotInput.value || "").trim();
+    var sessionLabel = String(labelInput && labelInput.value || "").trim() || "Workout";
+
+    if (!assignmentId) {
+      setStatus("Choose an active program for this session.", "error");
+      return;
+    }
+    if (!scheduledFor) {
+      setStatus("Choose a calendar date for the new session.", "error");
+      return;
+    }
+    if (!slotKey) {
+      setStatus("Enter a slot key (for example: w1d1).", "error");
+      return;
+    }
+
+    var program = (state.programs || []).find(function (row) {
+      return String(row && row.id || "") === assignmentId;
+    }) || {};
+
+    state.client
+      .from("athlete_program_schedule")
+      .insert({
+        athlete_user_id: state.athleteId,
+        user_training_program_id: assignmentId,
+        program_id: program.program_id || null,
+        slot_key: slotKey,
+        session_label: sessionLabel,
+        scheduled_for: scheduledFor,
+        status: "scheduled",
+        scheduled_by: state.authUser && state.authUser.id ? state.authUser.id : null,
+        notes: null
+      })
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        setStatus("Session added to training calendar.", "success");
+        refreshPrograms();
+      })
+      .catch(function (err) {
+        setStatus(err && err.message ? err.message : "Failed to add training session.", "error");
+      });
+  }
+
+  function updateCalendarSession(rowId, patch) {
+    var updates = patch || {};
+
+    state.client
+      .from("athlete_program_schedule")
+      .update(updates)
+      .eq("id", rowId)
+      .eq("athlete_user_id", state.athleteId)
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          refreshPrograms();
+          return;
+        }
+
+        setStatus("Calendar session updated.", "success");
+        refreshPrograms();
+      })
+      .catch(function (err) {
+        setStatus(err && err.message ? err.message : "Failed to update training session.", "error");
+        refreshPrograms();
+      });
+  }
+
+  function deleteCalendarSession(rowId) {
+    if (!window.confirm("Delete this scheduled session?")) {
+      return;
+    }
+
+    state.client
+      .from("athlete_program_schedule")
+      .delete()
+      .eq("id", rowId)
+      .eq("athlete_user_id", state.athleteId)
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        setStatus("Scheduled session deleted.", "success");
+        refreshPrograms();
+      })
+      .catch(function (err) {
+        setStatus(err && err.message ? err.message : "Failed to delete training session.", "error");
+      });
+  }
+
+  function toMonthKey(dateString) {
+    var parts = String(dateString || "").split("-");
+    if (parts.length < 2) {
+      return "";
+    }
+    var year = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10);
+    if (isNaN(year) || isNaN(month)) {
+      return "";
+    }
+    return String(year) + "-" + String(month).padStart(2, "0");
+  }
+
+  function parseMonthKey(monthKey) {
+    var parts = String(monthKey || "").split("-");
+    if (parts.length !== 2) {
+      return null;
+    }
+    var year = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10);
+    if (isNaN(year) || isNaN(month)) {
+      return null;
+    }
+    var date = new Date(year, month - 1, 1);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  function shiftMonthKey(monthKey, offset) {
+    var base = parseMonthKey(monthKey) || new Date();
+    var next = new Date(base.getFullYear(), base.getMonth() + (parseInt(offset, 10) || 0), 1);
+    return String(next.getFullYear()) + "-" + String(next.getMonth() + 1).padStart(2, "0");
+  }
+
+  function formatMonthLabel(monthKey) {
+    var date = parseMonthKey(monthKey);
+    if (!date) {
+      return "Calendar";
+    }
+    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+
+  function formatDateInputFromDate(date) {
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      return "";
+    }
+    var year = date.getFullYear();
+    var month = String(date.getMonth() + 1).padStart(2, "0");
+    var day = String(date.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
   }
 
   function buildProgramCard(program, isCurrent) {
@@ -657,7 +1225,10 @@
   function refreshPrograms() {
     fetchPrograms().then(function (programs) {
       state.programs = programs || [];
-      renderTrainingPanel(state.programs);
+      return fetchScheduleRows(state.programs).then(function (scheduleRows) {
+        state.scheduleRows = scheduleRows || [];
+        renderTrainingPanel(state.programs, state.scheduleRows);
+      });
     }).catch(function (err) {
       setStatus(err && err.message ? err.message : "Failed to refresh training programs.", "error");
     });
@@ -809,6 +1380,14 @@
     return String(key).replace(/_/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
   }
 
+  function capitalize(value) {
+    var text = String(value || "").trim();
+    if (!text) {
+      return "";
+    }
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
   function formatDate(dateString) {
     if (!dateString) return "N/A";
     try {
@@ -816,6 +1395,15 @@
       if (Number.isNaN(d.getTime())) return String(dateString);
       return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
     } catch (e) { return String(dateString); }
+  }
+
+  function getTodayDateInputValue() {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    var year = d.getFullYear();
+    var month = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
   }
 
   function formatInteger(value) {

@@ -1304,7 +1304,6 @@
       .map(function (athlete) {
         var athleteId = String(athlete.user_id || "");
         var insightsHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
-        var calendarHref = "coach-schedule-calendar.html?athleteId=" + encodeURIComponent(athleteId);
         return (
           "<tr>" +
           "<td>" + escapeHtml(athlete.email || "N/A") + "</td>" +
@@ -1314,9 +1313,7 @@
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
           "<td><div class='admin-table-actions'><a class='btn admin-btn-small' href='" +
           insightsHref +
-          "' target='_blank'>Insights</a><a class='btn admin-btn-small' href='" +
-          calendarHref +
-          "' target='_blank'>Calendar</a><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
+          "' target='_blank'>Insights</a><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
           escapeAttribute(athleteId) +
           "'>Delete</button></div></td>" +
           "</tr>"
@@ -3844,7 +3841,6 @@
     }
 
     var listHtml = filteredRows.slice(0, 10).map(function (row) {
-      var calendarHref = "coach-schedule-calendar.html?athleteId=" + encodeURIComponent(row.user_id || "");
       var insightsHref = "athlete-insight.html?athleteId=" + encodeURIComponent(row.user_id || "");
       var primaryHref = row.primary_action_href || insightsHref;
       var primaryLabel = row.primary_action_label || "View Insights";
@@ -3862,7 +3858,6 @@
           '<div class="admin-risk-actions">' +
             '<a class="btn admin-btn-small" href="' + escapeAttribute(primaryHref) + '">' + escapeHtml(primaryLabel) + '</a>' +
             '<a class="btn admin-btn-small" href="' + escapeAttribute(insightsHref) + '">Insights</a>' +
-            '<a class="btn admin-btn-small" href="' + escapeAttribute(calendarHref) + '">Calendar</a>' +
           '</div>' +
         '</div>'
       );
@@ -3902,7 +3897,6 @@
         ? "is-warning"
         : (row.status === "assessment-above" ? "is-info" : "is-ok");
       var insightHref = "athlete-insight.html?athleteId=" + encodeURIComponent(row.user_id || "");
-      var calendarHref = "coach-schedule-calendar.html?athleteId=" + encodeURIComponent(row.user_id || "");
 
       return (
         '<div class="admin-overview-item admin-climb-row">' +
@@ -3913,7 +3907,6 @@
           '<p class="admin-overview-item-meta">Self-report: ' + escapeHtml(row.self_grade_label) + ' • Assessment: ' + escapeHtml(row.assessment_label) + ' • Signal: ' + escapeHtml(row.signal_label) + '</p>' +
           '<div class="admin-risk-actions">' +
             '<a class="btn admin-btn-small" href="' + escapeAttribute(insightHref) + '">Insights</a>' +
-            '<a class="btn admin-btn-small" href="' + escapeAttribute(calendarHref) + '">Calendar</a>' +
           '</div>' +
         '</div>'
       );

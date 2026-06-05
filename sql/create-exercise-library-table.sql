@@ -12,9 +12,13 @@ create table if not exists public.exercise_library (
   custom_tags text[] not null default '{}',
   description text,
   coaching_cues text,
+  video_demo_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.exercise_library
+  add column if not exists video_demo_url text;
 
 create index if not exists exercise_library_updated_at_idx
   on public.exercise_library (updated_at desc);

@@ -4868,39 +4868,143 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       );
     }
 
-    var calendarItems = list.map(function (item) {
-      var program = item && item.program ? item.program : {};
-      var programName =
-        (program.training_program && program.training_program.name) ||
-        program.program_name ||
-        (program.program_id ? "Program " + String(program.program_id).slice(0, 8) : "Assigned Program");
-      var athleteName =
-        (state.profile && state.profile.name) ||
-        (state.viewUser && state.viewUser.email) ||
-        "Athlete";
-      var url =
-        "training-program-example.html?program=" + encodeURIComponent(programName) +
-        (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "") +
-        (program.id ? "&assignmentId=" + encodeURIComponent(program.id) : "") +
-        "&athleteName=" + encodeURIComponent(athleteName) +
-        "&day=" + encodeURIComponent(String(item.slot_key || ""));
-
-      return (
-        '<li class="training-calendar-item">' +
-          '<span class="training-calendar-date">' + escapeHtml(formatDate(item.scheduled_for)) + '</span>' +
-          '<p class="training-calendar-title"><a href="' + url + '">' + escapeHtml(String(item.session_label || "Workout")) + '</a></p>' +
-          '<p class="training-calendar-meta">' + escapeHtml(programName) + '</p>' +
-        '</li>'
-      );
-    }).join("");
-
     return (
       '<article class="training-calendar-card">' +
         '<h3>Upcoming Workout Calendar</h3>' +
         '<p>These sessions are scheduled by your coach. Open any workout to log it.</p>' +
-        '<ul class="training-calendar-list">' + calendarItems + '</ul>' +
+        buildTrainingCalendarMonthsHtml(list) +
       '</article>'
     );
+  }
+
+  function buildTrainingCalendarMonthsHtml(items) {
+    var list = Array.isArray(items) ? items : [];
+    if (!list.length) {
+      return "";
+    }
+
+    var months = {};
+    var monthKeys = [];
+
+    list.forEach(function (item) {
+      var scheduled = parseDateInputValue(item && item.scheduled_for);
+      if (!scheduled) {
+        return;
+      }
+
+      var monthKey = scheduled.getFullYear() + "-" + String(scheduled.getMonth() + 1).padStart(2, "0");
+      if (!months[monthKey]) {
+        months[monthKey] = {};
+        monthKeys.push(monthKey);
+      }
+
+      var dateKey = formatDateInputValue(scheduled);
+      if (!months[monthKey][dateKey]) {
+        months[monthKey][dateKey] = [];
+      }
+
+      months[monthKey][dateKey].push(item);
+    });
+
+    monthKeys.sort();
+
+    return '<div class="training-calendar-months">' + monthKeys.map(function (monthKey) {
+      return buildTrainingCalendarMonthHtml(monthKey, months[monthKey]);
+    }).join("") + '</div>';
+  }
+
+  function buildTrainingCalendarMonthHtml(monthKey, itemsByDate) {
+    var parts = String(monthKey || "").split("-");
+    var year = parseInt(parts[0], 10);
+    var monthIndex = parseInt(parts[1], 10) - 1;
+    var monthDate = new Date(year, monthIndex, 1);
+    if (isNaN(monthDate.getTime())) {
+      return "";
+    }
+
+    var weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    var firstWeekday = monthDate.getDay();
+    var daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    var gridCells = [];
+
+    for (var blankIdx = 0; blankIdx < firstWeekday; blankIdx++) {
+      gridCells.push('<div class="training-calendar-day training-calendar-day-empty" aria-hidden="true"></div>');
+    }
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      var dateValue = new Date(year, monthIndex, day);
+      var dateKey = formatDateInputValue(dateValue);
+      var entries = itemsByDate && itemsByDate[dateKey] ? itemsByDate[dateKey] : [];
+      var sessionsHtml = entries.map(function (item) {
+        var program = item && item.program ? item.program : {};
+        var programName =
+          (program.training_program && program.training_program.name) ||
+          program.program_name ||
+          (program.program_id ? "Program " + String(program.program_id).slice(0, 8) : "Assigned Program");
+        var athleteName =
+          (state.profile && state.profile.name) ||
+          (state.viewUser && state.viewUser.email) ||
+          "Athlete";
+        var url =
+          "training-program-example.html?program=" + encodeURIComponent(programName) +
+          (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "") +
+          (program.id ? "&assignmentId=" + encodeURIComponent(program.id) : "") +
+          "&athleteName=" + encodeURIComponent(athleteName) +
+          "&day=" + encodeURIComponent(String(item.slot_key || ""));
+
+        return (
+          '<a class="training-calendar-session" href="' + url + '">' +
+            '<span class="training-calendar-session-title">' + escapeHtml(String(item.session_label || "Workout")) + '</span>' +
+            '<span class="training-calendar-session-program">' + escapeHtml(programName) + '</span>' +
+          '</a>'
+        );
+      }).join("");
+
+      gridCells.push(
+        '<div class="training-calendar-day' + (entries.length ? ' has-session' : '') + '">' +
+          '<div class="training-calendar-day-number">' + day + '</div>' +
+          '<div class="training-calendar-day-sessions">' + sessionsHtml + '</div>' +
+        '</div>'
+      );
+    }
+
+    return (
+      '<section class="training-calendar-month">' +
+        '<div class="training-calendar-month-header">' + escapeHtml(monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })) + '</div>' +
+        '<div class="training-calendar-weekdays">' + weekdayLabels.map(function (label) {
+          return '<span>' + label + '</span>';
+        }).join("") + '</div>' +
+        '<div class="training-calendar-grid">' + gridCells.join("") + '</div>' +
+      '</section>'
+    );
+  }
+
+  function parseDateInputValue(dateString) {
+    var parts = String(dateString || "").split("-");
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    var year = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10);
+    var day = parseInt(parts[2], 10);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      return null;
+    }
+
+    var value = new Date(year, month - 1, day);
+    return isNaN(value.getTime()) ? null : value;
+  }
+
+  function formatDateInputValue(dateValue) {
+    if (!(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
+      return "";
+    }
+
+    var year = dateValue.getFullYear();
+    var month = String(dateValue.getMonth() + 1).padStart(2, "0");
+    var day = String(dateValue.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
   }
 
   function getDateOffsetInputValue(offsetDays) {
@@ -5016,9 +5120,17 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
                     }
 
                     setTrainingProgramStatus("Opened athlete-specific program editor.", "success");
+                    var athleteNameParam =
+                      (state.profile && state.profile.name) ||
+                      (state.viewUser && state.viewUser.email) ||
+                      "Athlete";
                     window.location.href =
                       "training-program-example.html?builder=1&templateId=" +
-                      encodeURIComponent(customProgram.id);
+                      encodeURIComponent(customProgram.id) +
+                      "&athleteId=" +
+                      encodeURIComponent(viewedUserId) +
+                      "&athleteName=" +
+                      encodeURIComponent(athleteNameParam);
                   })
                   .catch(function (error) {
                     setTrainingProgramStatus(

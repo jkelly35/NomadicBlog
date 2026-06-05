@@ -17,12 +17,14 @@
     isAthleteLockedView: false,
     isProgramReadOnly: false,
     coachUserId: null,
+    targetAthleteId: null,
     structure: {
       weeks: 1,
       workoutsPerWeek: 3
     },
     templateFocus: "strength",
     savedWorkoutBlocks: [],
+    exerciseLibrary: [],
     daySessionTypes: {},
     customDayNames: {},
     customDayNameMode: "legacy-suffix",
@@ -38,6 +40,8 @@
   var TEMPLATE_DRAFT_PREFIX = "nomadic_training_program_template_builder_draft_";
   var TEMPLATE_MARKER = "__NOMADIC_TEMPLATE__";
   var WORKOUT_BLOCK_LIBRARY_KEY = "nomadic_template_workout_blocks_v1";
+  var EXERCISE_LIBRARY_KEY = "nomadic_exercise_library_v1";
+  var EXERCISE_LIBRARY_TABLE = "exercise_library";
 
   var dayLabels = {
     "w1d1": "Lower Body Power",
@@ -167,6 +171,7 @@
     }
 
     setupExerciseEditorModal();
+    loadExerciseLibraryForEditor();
     bindTemplateWorkspaceEvents();
     bindTemplateKeyboardShortcuts();
 
@@ -236,6 +241,8 @@
       var params = new URLSearchParams(window.location.search);
       var wantsTemplateBuilder = params.get("builder") === "1";
       state.templateId = params.get("templateId") || null;
+      var builderAthleteId = String(params.get("athleteId") || "").trim();
+      state.targetAthleteId = isUuid(builderAthleteId) ? builderAthleteId : null;
 
       if (state.templateId && !isUuid(state.templateId)) {
         // Legacy local-storage template IDs (e.g. tpl_123) are not valid Supabase UUIDs.
@@ -256,13 +263,9 @@
         return;
       }
 
-      state.client.auth.getSession().then(function (result) {
-        var session = result && result.data && result.data.session;
-        var user = session && session.user;
-        var email = String(user && user.email || "").toLowerCase();
-        var isCoach = !!email && email === ADMIN_EMAIL;
-
-        if (!isCoach) {
+      resolveTemplateBuilderCoachAccess().then(function (result) {
+        var user = result && result.user ? result.user : null;
+        if (!result || !result.allowed || !user) {
           state.isTemplateBuilder = false;
           lockBuilderToReadOnly();
           refreshTemplateDayTools();
@@ -270,20 +273,16 @@
           return;
         }
 
-        state.isTemplateBuilder = true;
-        state.coachUserId = user && user.id ? String(user.id) : null;
-        state.storagePrefix = TEMPLATE_DRAFT_PREFIX;
-        clearBuilderDrafts();
-
-        if (state.templateId) {
-          hydrateDraftFromTemplate(state.templateId);
+        try {
+          activateTemplateBuilder(user);
+        } catch (error) {
+          state.isTemplateBuilder = false;
+          state.coachUserId = null;
+          lockBuilderToReadOnly();
+          refreshTemplateDayTools();
+          setStatus("Template editor could not be initialized.", "error");
+          console.error("Template builder initialization failed", error);
         }
-
-        applyBuilderModeUi();
-        loadSavedWorkoutBlocksFromCloud();
-        ensureDaySessionTypesForStructure();
-        refreshTemplateDayTools();
-        updateDayInfo();
       }).catch(function () {
         state.isTemplateBuilder = false;
         state.coachUserId = null;
@@ -294,6 +293,92 @@
     } catch (e) {
       // Ignore malformed query parameters.
     }
+  }
+
+  function resolveTemplateBuilderCoachAccess() {
+    if (!state.client || !state.client.auth) {
+      return Promise.resolve({ allowed: false, user: null });
+    }
+
+    return resolveTemplateBuilderUser().then(function (user) {
+      if (!user) {
+        return { allowed: false, user: null };
+      }
+
+      return resolveCoachAdminAccessForUser(user).then(function (allowed) {
+        return {
+          allowed: !!allowed,
+          user: user
+        };
+      });
+    });
+  }
+
+  function resolveTemplateBuilderUser() {
+    return state.client.auth.getSession()
+      .then(function (result) {
+        var session = result && result.data && result.data.session;
+        if (session && session.user) {
+          return session.user;
+        }
+        return resolveTemplateBuilderUserFallback();
+      })
+      .catch(function () {
+        return resolveTemplateBuilderUserFallback();
+      });
+  }
+
+  function resolveTemplateBuilderUserFallback() {
+    if (!state.client || !state.client.auth || typeof state.client.auth.getUser !== "function") {
+      return Promise.resolve(null);
+    }
+
+    return state.client.auth.getUser()
+      .then(function (result) {
+        return result && result.data && result.data.user ? result.data.user : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function resolveCoachAdminAccessForUser(user) {
+    var email = String(user && user.email || "").toLowerCase();
+    if (email && email === ADMIN_EMAIL) {
+      return Promise.resolve(true);
+    }
+
+    if (!state.client || !state.client.rpc) {
+      return Promise.resolve(false);
+    }
+
+    return state.client.rpc("is_nomadic_admin")
+      .then(function (result) {
+        if (result && result.error) {
+          return false;
+        }
+        return !!(result && result.data === true);
+      })
+      .catch(function () {
+        return false;
+      });
+  }
+
+  function activateTemplateBuilder(user) {
+    state.isTemplateBuilder = true;
+    state.coachUserId = user && user.id ? String(user.id) : null;
+    state.storagePrefix = TEMPLATE_DRAFT_PREFIX;
+    clearBuilderDrafts();
+
+    if (state.templateId) {
+      hydrateDraftFromTemplate(state.templateId);
+    }
+
+    applyBuilderModeUi();
+    loadSavedWorkoutBlocksFromCloud();
+    ensureDaySessionTypesForStructure();
+    refreshTemplateDayTools();
+    updateDayInfo();
   }
 
   function configureAssignedTemplateMode() {
@@ -351,6 +436,10 @@
     var dayTools = document.querySelector("[data-template-day-tools]");
     var dayTypeControls = document.querySelector("[data-template-day-type-controls]");
     var templateWorkspace = document.querySelector("[data-template-workspace]");
+    var athleteScheduleRow = document.querySelector("[data-template-athlete-schedule]");
+    var athleteScheduleName = document.querySelector("[data-template-athlete-name]");
+    var athleteScheduleStartInput = document.querySelector("[data-template-schedule-start-date]");
+    var athleteScheduleBtn = document.querySelector("[data-template-schedule-athlete]");
 
     if (document.body) {
       document.body.classList.add("athlete-locked-view");
@@ -423,6 +512,10 @@
     var subtitle = document.querySelector(".program-demo-subtitle");
     var kicker = document.querySelector(".program-demo-kicker");
     var templateWorkspace = document.querySelector("[data-template-workspace]");
+    var athleteScheduleRow = document.querySelector("[data-template-athlete-schedule]");
+    var athleteScheduleName = document.querySelector("[data-template-athlete-name]");
+    var athleteScheduleStartInput = document.querySelector("[data-template-schedule-start-date]");
+    var athleteScheduleBtn = document.querySelector("[data-template-schedule-athlete]");
 
     state.isAthleteLockedView = false;
     if (document.body) {
@@ -530,6 +623,26 @@
         applyDayTypeToCurrentDay(nextType);
       });
     });
+
+    if (athleteScheduleRow) {
+      var canScheduleAthlete = !!state.targetAthleteId;
+      athleteScheduleRow.hidden = !canScheduleAthlete;
+      if (canScheduleAthlete) {
+        if (athleteScheduleName) {
+          athleteScheduleName.textContent = state.athleteName || "this athlete";
+        }
+        if (athleteScheduleStartInput && !athleteScheduleStartInput.value) {
+          athleteScheduleStartInput.value = formatDateInputValue(new Date());
+        }
+      }
+    }
+
+    if (athleteScheduleBtn) {
+      athleteScheduleBtn.addEventListener("click", function () {
+        var startDate = athleteScheduleStartInput ? athleteScheduleStartInput.value : "";
+        scheduleTemplateToAthleteCalendar(startDate);
+      });
+    }
   }
 
   function setProgramTitleFromQuery() {
@@ -1904,6 +2017,8 @@
     var closeBtn = document.querySelector(".exercise-editor-close-btn");
     var cancelBtn = document.querySelector("[data-exercise-editor-cancel]");
     var submitBtn = document.querySelector("[data-exercise-editor-submit]");
+    var nameInput = document.querySelector("[data-exercise-name-input]");
+    var suggestions = document.querySelector("[data-exercise-suggestions]");
 
     if (!modal || !overlay || !closeBtn || !cancelBtn || !submitBtn) {
       console.warn("Exercise editor modal elements not found");
@@ -1915,10 +2030,40 @@
     cancelBtn.addEventListener("click", closeExerciseEditor);
     submitBtn.addEventListener("click", submitExerciseEditor);
 
+    if (nameInput) {
+      nameInput.addEventListener("input", function () {
+        handleExerciseNameInput(nameInput.value || "");
+      });
+      nameInput.addEventListener("focus", function () {
+        renderExerciseSuggestions(nameInput.value || "");
+      });
+    }
+
+    if (suggestions) {
+      suggestions.addEventListener("click", function (event) {
+        var option = event.target && event.target.closest("[data-exercise-suggestion-id]");
+        if (!option) {
+          return;
+        }
+
+        applyExerciseLibrarySelection(option.getAttribute("data-exercise-suggestion-id"));
+      });
+    }
+
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !modal.hasAttribute("hidden")) {
         closeExerciseEditor();
       }
+    });
+
+    document.addEventListener("click", function (event) {
+      if (!modal || modal.hasAttribute("hidden")) {
+        return;
+      }
+      if (event.target && event.target.closest("[data-exercise-editor-form]")) {
+        return;
+      }
+      hideExerciseSuggestions();
     });
   }
 
@@ -1937,6 +2082,7 @@
     var rpeToggle = document.querySelector("[data-exercise-toggle-rpe]");
     var restToggle = document.querySelector("[data-exercise-toggle-rest]");
     var notesInput = document.querySelector("[data-exercise-notes-input]");
+    var libraryIdInput = document.querySelector("[data-exercise-library-id]");
 
     if (!modal) return;
 
@@ -1951,6 +2097,11 @@
     rpeToggle.checked = true;
     restToggle.checked = false;
     notesInput.value = "";
+    if (libraryIdInput) {
+      libraryIdInput.value = "";
+    }
+    updateExerciseLibraryPreview(null);
+    hideExerciseSuggestions();
 
     if (exerciseIdx !== null && state.exercises[exerciseIdx]) {
       // Edit mode
@@ -1967,6 +2118,14 @@
       restToggle.checked = toggles.showRest;
 
       notesInput.value = exercise.notes || "";
+      if (libraryIdInput) {
+        libraryIdInput.value = String(exercise.library_id || "");
+      }
+      if (exercise.library_id) {
+        updateExerciseLibraryPreview(findExerciseLibraryItemById(exercise.library_id));
+      } else {
+        updateExerciseLibraryPreview(findExerciseLibraryItemByName(exercise.name || ""));
+      }
     } else {
       // Add mode
       title.textContent = "Add Exercise";
@@ -1983,6 +2142,7 @@
       modal.style.display = "none";
        modal.setAttribute("hidden", "");
     }
+    hideExerciseSuggestions();
     state.editingExerciseIdx = null;
   }
 
@@ -2023,6 +2183,7 @@
     var rpeToggle = document.querySelector("[data-exercise-toggle-rpe]");
     var restToggle = document.querySelector("[data-exercise-toggle-rest]");
     var notesInput = document.querySelector("[data-exercise-notes-input]");
+    var libraryIdInput = document.querySelector("[data-exercise-library-id]");
 
     var name = String(nameInput.value || "").trim();
     if (!name) {
@@ -2035,6 +2196,8 @@
     var mode = String(modeSelect.value || "reps");
     var numSets = Math.max(1, Math.min(10, parseInt(setsInput.value, 10) || 3));
     var notes = String(notesInput.value || "").trim();
+    var libraryId = String(libraryIdInput && libraryIdInput.value || "").trim();
+    var libraryItem = findExerciseLibraryItemById(libraryId) || findExerciseLibraryItemByName(name);
 
     var fieldToggles = {
       showWeight: !!weightToggle.checked,
@@ -2051,6 +2214,8 @@
       exercise.mode = mode;
       exercise.field_toggles = fieldToggles;
       exercise.notes = notes;
+      exercise.library_id = libraryItem ? libraryItem.id : null;
+      exercise.video_demo_url = libraryItem ? libraryItem.video_demo_url || "" : "";
       // Keep existing sets, just update metadata
 
       setStatus("Updated " + name + ".", "success");
@@ -2061,6 +2226,8 @@
         section: section,
         mode: mode,
         superset_group: null,
+        library_id: libraryItem ? libraryItem.id : null,
+        video_demo_url: libraryItem ? libraryItem.video_demo_url || "" : "",
         field_toggles: fieldToggles,
         notes: notes,
         sets: []
@@ -2086,6 +2253,224 @@
 
     closeExerciseEditor();
     renderRows();
+  }
+
+  function loadExerciseLibraryForEditor() {
+    if (!state.client) {
+      state.exerciseLibrary = readExerciseLibraryFromStorage();
+      return;
+    }
+
+    state.client
+      .from(EXERCISE_LIBRARY_TABLE)
+      .select("id,name,movement_pattern,equipment,primary_muscle,training_goal,sport_tags,custom_tags,description,coaching_cues,video_demo_url,updated_at")
+      .order("name", { ascending: true })
+      .then(function (result) {
+        if (result.error) {
+          state.exerciseLibrary = readExerciseLibraryFromStorage();
+          return;
+        }
+
+        state.exerciseLibrary = (result.data || []).map(normalizeExerciseLibraryItem);
+        if (!state.exerciseLibrary.length) {
+          state.exerciseLibrary = readExerciseLibraryFromStorage();
+        }
+      })
+      .catch(function () {
+        state.exerciseLibrary = readExerciseLibraryFromStorage();
+      });
+  }
+
+  function normalizeExerciseLibraryItem(item) {
+    return {
+      id: item && item.id ? String(item.id) : "",
+      name: item && item.name ? String(item.name) : "",
+      movement_pattern: item && item.movement_pattern ? String(item.movement_pattern) : "",
+      equipment: item && item.equipment ? String(item.equipment) : "",
+      primary_muscle: item && item.primary_muscle ? String(item.primary_muscle) : "",
+      training_goal: item && item.training_goal ? String(item.training_goal) : "",
+      sport_tags: item && Array.isArray(item.sport_tags) ? item.sport_tags : [],
+      custom_tags: item && Array.isArray(item.custom_tags) ? item.custom_tags : [],
+      description: item && item.description ? String(item.description) : "",
+      coaching_cues: item && item.coaching_cues ? String(item.coaching_cues) : "",
+      video_demo_url: item && item.video_demo_url ? String(item.video_demo_url) : ""
+    };
+  }
+
+  function readExerciseLibraryFromStorage() {
+    try {
+      var raw = window.localStorage.getItem(EXERCISE_LIBRARY_KEY);
+      if (!raw) {
+        return [];
+      }
+
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.map(normalizeExerciseLibraryItem) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function handleExerciseNameInput(rawValue) {
+    var nameValue = String(rawValue || "").trim();
+    var libraryIdInput = document.querySelector("[data-exercise-library-id]");
+    var selectedItem = libraryIdInput ? findExerciseLibraryItemById(libraryIdInput.value) : null;
+
+    if (selectedItem && selectedItem.name !== nameValue) {
+      if (libraryIdInput) {
+        libraryIdInput.value = "";
+      }
+      updateExerciseLibraryPreview(findExerciseLibraryItemByName(nameValue));
+    }
+
+    renderExerciseSuggestions(nameValue);
+  }
+
+  function renderExerciseSuggestions(rawValue) {
+    var suggestions = document.querySelector("[data-exercise-suggestions]");
+    if (!suggestions) {
+      return;
+    }
+
+    var query = String(rawValue || "").trim().toLowerCase();
+    if (!query) {
+      suggestions.hidden = true;
+      suggestions.innerHTML = "";
+      return;
+    }
+
+    var matches = (Array.isArray(state.exerciseLibrary) ? state.exerciseLibrary : [])
+      .filter(function (item) {
+        var haystack = [
+          item.name,
+          item.movement_pattern,
+          item.equipment,
+          item.primary_muscle,
+          item.training_goal,
+          item.description,
+          item.coaching_cues,
+          (item.custom_tags || []).join(" "),
+          (item.sport_tags || []).join(" ")
+        ].join(" ").toLowerCase();
+
+        return haystack.indexOf(query) >= 0;
+      })
+      .slice(0, 8);
+
+    if (!matches.length) {
+      suggestions.hidden = true;
+      suggestions.innerHTML = "";
+      return;
+    }
+
+    suggestions.hidden = false;
+    suggestions.innerHTML = matches.map(function (item) {
+      var meta = [item.movement_pattern, item.equipment, item.training_goal]
+        .filter(function (value) { return !!value; })
+        .join(" • ");
+      return (
+        '<button type="button" class="exercise-editor-suggestion" data-exercise-suggestion-id="' + escapeAttribute(item.id) + '">' +
+        '<strong>' + escapeHtml(item.name) + '</strong>' +
+        (meta ? '<span>' + escapeHtml(meta) + '</span>' : '') +
+        '</button>'
+      );
+    }).join("");
+  }
+
+  function hideExerciseSuggestions() {
+    var suggestions = document.querySelector("[data-exercise-suggestions]");
+    if (!suggestions) {
+      return;
+    }
+    suggestions.hidden = true;
+    suggestions.innerHTML = "";
+  }
+
+  function applyExerciseLibrarySelection(libraryId) {
+    var item = findExerciseLibraryItemById(libraryId);
+    var nameInput = document.querySelector("[data-exercise-name-input]");
+    var notesInput = document.querySelector("[data-exercise-notes-input]");
+    var libraryIdInput = document.querySelector("[data-exercise-library-id]");
+
+    if (!item || !nameInput) {
+      return;
+    }
+
+    nameInput.value = item.name || "";
+    if (libraryIdInput) {
+      libraryIdInput.value = item.id || "";
+    }
+
+    if (notesInput && !String(notesInput.value || "").trim()) {
+      notesInput.value = buildExerciseLibraryNotes(item);
+    }
+
+    updateExerciseLibraryPreview(item);
+    hideExerciseSuggestions();
+  }
+
+  function buildExerciseLibraryNotes(item) {
+    var parts = [];
+    if (item && item.description) {
+      parts.push(String(item.description).trim());
+    }
+    if (item && item.coaching_cues) {
+      parts.push("Cues: " + String(item.coaching_cues).trim());
+    }
+    return parts.join("\n\n").trim();
+  }
+
+  function updateExerciseLibraryPreview(item) {
+    var preview = document.querySelector("[data-exercise-library-preview]");
+    var meta = document.querySelector("[data-exercise-library-meta]");
+    var videoLink = document.querySelector("[data-exercise-library-video-link]");
+    var entry = item && item.id ? item : null;
+
+    if (!preview || !meta || !videoLink) {
+      return;
+    }
+
+    if (!entry) {
+      preview.hidden = true;
+      meta.textContent = "";
+      videoLink.hidden = true;
+      videoLink.removeAttribute("href");
+      return;
+    }
+
+    preview.hidden = false;
+    meta.textContent = [entry.movement_pattern, entry.equipment, entry.primary_muscle, entry.training_goal]
+      .filter(function (value) { return !!value; })
+      .map(function (value) { return capitalize(String(value).replace(/-/g, " ")); })
+      .join(" • ");
+
+    if (entry.video_demo_url) {
+      videoLink.hidden = false;
+      videoLink.href = entry.video_demo_url;
+    } else {
+      videoLink.hidden = true;
+      videoLink.removeAttribute("href");
+    }
+  }
+
+  function findExerciseLibraryItemById(libraryId) {
+    var id = String(libraryId || "").trim();
+    if (!id) {
+      return null;
+    }
+    return (Array.isArray(state.exerciseLibrary) ? state.exerciseLibrary : []).find(function (item) {
+      return String(item && item.id || "") === id;
+    }) || null;
+  }
+
+  function findExerciseLibraryItemByName(nameValue) {
+    var target = String(nameValue || "").trim().toLowerCase();
+    if (!target) {
+      return null;
+    }
+    return (Array.isArray(state.exerciseLibrary) ? state.exerciseLibrary : []).find(function (item) {
+      return String(item && item.name || "").trim().toLowerCase() === target;
+    }) || null;
   }
 
   function updateTemplateStructure(weeks, workoutsPerWeek) {
@@ -2470,99 +2855,18 @@
   }
 
   function saveTemplateProgram() {
-    saveExercisesForDay(true);
-
-    var nameInput = document.querySelector("[data-template-name]");
-    var templateName = String((nameInput && nameInput.value) || state.templateName || "").trim();
-    if (!templateName) {
-      templateName = prompt("Enter a template name:", state.templateName || "");
-      templateName = String(templateName || "").trim();
-    }
-
-    if (!templateName) {
-      setStatus("Template name is required before saving.", "error");
-      return;
-    }
-
-    state.templateName = templateName;
-    if (nameInput) {
-      nameInput.value = templateName;
-    }
-
-    var payload = {
-      archived: false,
-      focus: state.templateFocus,
-      day_session_types: state.daySessionTypes || {},
-      custom_day_names: state.customDayNames || {},
-      custom_day_name_mode: state.customDayNameMode,
-      structure: state.structure,
-      days: {
-        
-      }
-    };
-
-    getAllSlotKeys().forEach(function (slotKey) {
-      payload.days[slotKey] = syncTemplateTargetsFromPlannerValues(readExercisesForDayFromStorage(slotKey));
+    var saveData = buildTemplateSaveData({
+      promptForName: true,
+      showErrors: true
     });
-
-    if (!state.client) {
-      setStatus("Supabase unavailable. Template could not be saved to shared library.", "error");
+    if (!saveData) {
       return;
     }
 
     setStatus("Saving template...", "info");
 
-    var templateIdForUpdate = state.templateId && isUuid(state.templateId) ? state.templateId : null;
-
-    var saveOperation;
-    var isEditingExistingTemplate = !!templateIdForUpdate;
-    if (templateIdForUpdate) {
-      saveOperation = state.client
-        .from("training_programs")
-        .update({
-          name: templateName,
-          description: serializeTemplatePayload(payload)
-        })
-        .eq("id", templateIdForUpdate)
-        .select("id")
-        .single();
-    } else {
-      saveOperation = state.client
-        .from("training_programs")
-        .insert({
-          name: templateName,
-          description: serializeTemplatePayload(payload)
-        })
-        .select("id")
-        .single();
-    }
-
-    saveOperation
-      .then(function (result) {
-        if (result.error) {
-          setStatus(result.error.message, "error");
-          return;
-        }
-
-        state.templateId = result.data && result.data.id ? result.data.id : state.templateId;
-
-        // Keep active athlete assignment names aligned when a template is renamed.
-        var syncPromise = Promise.resolve();
-        if (isEditingExistingTemplate && state.templateId) {
-          syncPromise = state.client
-            .from("user_training_programs")
-            .update({ program_name: templateName })
-            .eq("program_id", state.templateId)
-            .eq("is_active", true)
-            .then(function () {
-              return true;
-            })
-            .catch(function () {
-              return false;
-            });
-        }
-
-        syncPromise.then(function () {
+    saveTemplateToLibrary(saveData)
+      .then(function () {
         setProgramTitleFromQuery();
         setStatus("Template saved. Active athlete programs now use the latest template version.", "success");
 
@@ -2577,10 +2881,353 @@
             // Ignore history update errors.
           }
         }
-        });
       })
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Failed to save template.", "error");
+      });
+  }
+
+  function buildTemplateSaveData(options) {
+    var config = options || {};
+
+    saveExercisesForDay(true);
+
+    var nameInput = document.querySelector("[data-template-name]");
+    var templateName = String((nameInput && nameInput.value) || state.templateName || "").trim();
+    if (!templateName && config.promptForName !== false) {
+      templateName = prompt("Enter a template name:", state.templateName || "");
+      templateName = String(templateName || "").trim();
+    }
+
+    if (!templateName) {
+      if (config.showErrors !== false) {
+        setStatus("Template name is required before saving.", "error");
+      }
+      return null;
+    }
+
+    if (!state.client) {
+      if (config.showErrors !== false) {
+        setStatus("Supabase unavailable. Template could not be saved to shared library.", "error");
+      }
+      return null;
+    }
+
+    state.templateName = templateName;
+    if (nameInput) {
+      nameInput.value = templateName;
+    }
+
+    var payload = {
+      archived: false,
+      focus: state.templateFocus,
+      day_session_types: state.daySessionTypes || {},
+      custom_day_names: state.customDayNames || {},
+      custom_day_name_mode: state.customDayNameMode,
+      structure: state.structure,
+      days: {}
+    };
+
+    getAllSlotKeys().forEach(function (slotKey) {
+      payload.days[slotKey] = syncTemplateTargetsFromPlannerValues(readExercisesForDayFromStorage(slotKey));
+    });
+
+    return {
+      templateName: templateName,
+      payload: payload
+    };
+  }
+
+  function saveTemplateToLibrary(saveData) {
+    var templateIdForUpdate = state.templateId && isUuid(state.templateId) ? state.templateId : null;
+    var isEditingExistingTemplate = !!templateIdForUpdate;
+    var saveOperation;
+
+    if (templateIdForUpdate) {
+      saveOperation = state.client
+        .from("training_programs")
+        .update({
+          name: saveData.templateName,
+          description: serializeTemplatePayload(saveData.payload)
+        })
+        .eq("id", templateIdForUpdate)
+        .select("id")
+        .single();
+    } else {
+      saveOperation = state.client
+        .from("training_programs")
+        .insert({
+          name: saveData.templateName,
+          description: serializeTemplatePayload(saveData.payload)
+        })
+        .select("id")
+        .single();
+    }
+
+    return saveOperation.then(function (result) {
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to save template.");
+      }
+
+      state.templateId = result.data && result.data.id ? result.data.id : state.templateId;
+
+      if (!isEditingExistingTemplate || !state.templateId) {
+        return {
+          templateId: state.templateId,
+          templateName: saveData.templateName
+        };
+      }
+
+      return state.client
+        .from("user_training_programs")
+        .update({ program_name: saveData.templateName })
+        .eq("program_id", state.templateId)
+        .eq("is_active", true)
+        .then(function () {
+          return {
+            templateId: state.templateId,
+            templateName: saveData.templateName
+          };
+        })
+        .catch(function () {
+          return {
+            templateId: state.templateId,
+            templateName: saveData.templateName
+          };
+        });
+    });
+  }
+
+  function scheduleTemplateToAthleteCalendar(startDateInput) {
+    if (!state.isTemplateBuilder || !state.targetAthleteId || !isUuid(state.targetAthleteId)) {
+      setStatus("Open this editor from an athlete profile to schedule directly to their calendar.", "error");
+      return;
+    }
+
+    var startDate = String(startDateInput || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      setStatus("Choose a valid start date before scheduling.", "error");
+      return;
+    }
+
+    var saveData = buildTemplateSaveData({
+      promptForName: true,
+      showErrors: true
+    });
+    if (!saveData) {
+      return;
+    }
+
+    var blueprint = buildTemplateScheduleBlueprint(saveData.payload);
+    if (!blueprint.length) {
+      setStatus("Add at least one workout day before scheduling this template.", "error");
+      return;
+    }
+
+    setStatus("Saving template and scheduling to athlete calendar...", "info");
+
+    saveTemplateToLibrary(saveData)
+      .then(function (saveResult) {
+        return ensureAthleteTemplateAssignment(state.targetAthleteId, saveResult.templateId, saveResult.templateName).then(
+          function (assignment) {
+            return {
+              assignment: assignment,
+              templateName: saveResult.templateName
+            };
+          }
+        );
+      })
+      .then(function (result) {
+        var scheduledDates = generateScheduledDates(startDate, blueprint.length);
+        if (!scheduledDates.length) {
+          throw new Error("Could not generate scheduled dates.");
+        }
+
+        var rows = blueprint.map(function (slot, index) {
+          return {
+            user_training_program_id: result.assignment.id,
+            scheduled_for: scheduledDates[index],
+            slot_key: slot.slotKey,
+            session_label: slot.label,
+            status: "scheduled",
+            scheduled_by: state.coachUserId,
+            notes: null
+          };
+        });
+
+        return state.client
+          .from("athlete_program_schedule")
+          .upsert(rows, {
+            onConflict: "user_training_program_id,slot_key,scheduled_for"
+          })
+          .then(function (insertResult) {
+            if (insertResult.error) {
+              throw new Error(insertResult.error.message || "Failed to schedule template to athlete calendar.");
+            }
+
+            return rows.length;
+          });
+      })
+      .then(function (totalRows) {
+        setStatus(
+          "Template saved and " + String(totalRows) + " calendar session" + (totalRows === 1 ? "" : "s") + " scheduled.",
+          "success"
+        );
+
+        setProgramTitleFromQuery();
+
+        if (state.templateId) {
+          try {
+            var params = new URLSearchParams(window.location.search || "");
+            params.set("builder", "1");
+            params.set("templateId", state.templateId);
+            if (state.targetAthleteId) {
+              params.set("athleteId", state.targetAthleteId);
+            }
+            if (state.athleteName) {
+              params.set("athleteName", state.athleteName);
+            }
+            window.history.replaceState({}, "", window.location.pathname + "?" + params.toString());
+          } catch (e) {
+            // Ignore history update errors.
+          }
+        }
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to schedule template.", "error");
+      });
+  }
+
+  function buildTemplateScheduleBlueprint(payload) {
+    var structure = normalizeStructure(payload && payload.structure);
+    var customNames = normalizeCustomDayNames(payload && payload.custom_day_names);
+    var dayTypes = normalizeDaySessionTypes(payload && payload.day_session_types);
+    var days = normalizeTemplateDays(payload && payload.days);
+    var slots = [];
+
+    for (var week = 1; week <= structure.weeks; week++) {
+      for (var workout = 1; workout <= structure.workoutsPerWeek; workout++) {
+        var slotKey = "w" + week + "d" + workout;
+        var exercises = Array.isArray(days[slotKey]) ? days[slotKey] : [];
+        if (!exercises.length) {
+          continue;
+        }
+
+        slots.push({
+          slotKey: slotKey,
+          label: resolveTemplateSlotLabel(slotKey, customNames, dayTypes)
+        });
+      }
+    }
+
+    return slots;
+  }
+
+  function resolveTemplateSlotLabel(slotKey, customNames, dayTypes) {
+    var parsed = parseSlotKey(slotKey);
+    var base = parsed ? "Week " + parsed.week + " - Workout " + parsed.workout : "Workout";
+    var customLabel = customNames && customNames[slotKey] ? String(customNames[slotKey]).trim() : "";
+
+    if (customLabel) {
+      return customLabel;
+    }
+
+    if (dayLabels[slotKey]) {
+      return dayLabels[slotKey];
+    }
+
+    var dayType = dayTypes && dayTypes[slotKey] ? String(dayTypes[slotKey]).trim() : "";
+    if (dayType) {
+      return base + " - " + capitalize(dayType) + " Day";
+    }
+
+    return base;
+  }
+
+  function generateScheduledDates(startDate, count) {
+    var total = Math.max(0, parseInt(count, 10) || 0);
+    if (!total) {
+      return [];
+    }
+
+    var parts = String(startDate || "").split("-");
+    if (parts.length !== 3) {
+      return [];
+    }
+
+    var year = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10);
+    var day = parseInt(parts[2], 10);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      return [];
+    }
+
+    var cursor = new Date(year, month - 1, day);
+    if (isNaN(cursor.getTime())) {
+      return [];
+    }
+
+    var dates = [];
+    for (var i = 0; i < total; i++) {
+      dates.push(formatDateInputValue(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return dates;
+  }
+
+  function formatDateInputValue(dateValue) {
+    if (!(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
+      return "";
+    }
+
+    var year = dateValue.getFullYear();
+    var month = String(dateValue.getMonth() + 1).padStart(2, "0");
+    var day = String(dateValue.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
+  }
+
+  function ensureAthleteTemplateAssignment(userId, programId, programName) {
+    return state.client
+      .from("user_training_programs")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("program_id", programId)
+      .eq("is_active", true)
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .then(function (lookupResult) {
+        if (lookupResult.error) {
+          throw new Error(lookupResult.error.message || "Failed to lookup athlete template assignment.");
+        }
+
+        if (lookupResult.data && lookupResult.data.length && lookupResult.data[0].id) {
+          return lookupResult.data[0];
+        }
+
+        return state.client
+          .from("user_training_programs")
+          .insert({
+            user_id: userId,
+            program_id: programId,
+            program_name: programName,
+            is_active: true,
+            assigned_at: new Date().toISOString(),
+            assigned_by: state.coachUserId
+          })
+          .select("id")
+          .single()
+          .then(function (insertResult) {
+            if (insertResult.error || !insertResult.data || !insertResult.data.id) {
+              throw new Error(
+                insertResult && insertResult.error && insertResult.error.message
+                  ? insertResult.error.message
+                  : "Failed to assign template to athlete before scheduling."
+              );
+            }
+
+            return insertResult.data;
+          });
       });
   }
 
@@ -2827,6 +3474,8 @@
         section: exercise && exercise.section ? exercise.section : "A Block",
         mode: exercise && exercise.mode ? exercise.mode : "reps",
         superset_group: exercise ? exercise.superset_group || null : null,
+        library_id: exercise ? exercise.library_id || null : null,
+        video_demo_url: exercise ? exercise.video_demo_url || "" : "",
         field_toggles: normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode),
         sets: sets.map(function (set) {
           var source = set || {};
@@ -2880,6 +3529,8 @@
         section: templateExercise && templateExercise.section ? templateExercise.section : "A Block",
         mode: templateExercise && templateExercise.mode ? templateExercise.mode : "reps",
         superset_group: templateExercise ? templateExercise.superset_group || null : null,
+        library_id: templateExercise ? templateExercise.library_id || null : null,
+        video_demo_url: templateExercise ? templateExercise.video_demo_url || "" : "",
         field_toggles: normalizeExerciseFieldToggles(templateExercise && templateExercise.field_toggles, templateExercise && templateExercise.mode),
         sets: templateSets.map(function (templateSet, setIdx) {
           var storedSet = storedSets[setIdx] && typeof storedSets[setIdx] === "object" ? storedSets[setIdx] : {};
@@ -2919,6 +3570,8 @@
         section: exercise && exercise.section ? exercise.section : "A Block",
         mode: exercise && exercise.mode ? exercise.mode : "reps",
         superset_group: exercise ? exercise.superset_group || null : null,
+        library_id: exercise ? exercise.library_id || null : null,
+        video_demo_url: exercise ? exercise.video_demo_url || "" : "",
         field_toggles: normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode),
         sets: sets.map(function (set) {
           var source = set || {};
@@ -2989,7 +3642,7 @@
 
   function buildWorkoutPrintDocument() {
     var exercises = Array.isArray(state.exercises) ? state.exercises : [];
-    var programTitle = String(state.templateName || "Workout Program").trim();
+    var programTitle = resolvePrintProgramTitle("Workout Program");
     var dayTitle = String(labelForSlot(state.day) || "Workout Day").trim();
     var generatedAt = new Date().toLocaleDateString();
     var athleteLabel = resolvePrintAthleteLabel();
@@ -3244,7 +3897,7 @@
 
   function buildFullPlanPrintDocument() {
     var slotKeys = getAllSlotKeys();
-    var programTitle = String(state.templateName || "Training Plan").trim();
+    var programTitle = resolvePrintProgramTitle("Training Plan");
     var generatedAt = new Date().toLocaleDateString();
     var athleteLabel = resolvePrintAthleteLabel();
     var dayEntries = slotKeys
@@ -3432,6 +4085,33 @@
     }
 
     return "Athlete";
+  }
+
+  function resolvePrintProgramTitle(fallbackTitle) {
+    var fallback = String(fallbackTitle || "Workout Program").trim() || "Workout Program";
+    var heading = document.querySelector("[data-program-title]");
+    var headingText = String(heading && heading.textContent || "").trim();
+
+    if (headingText && headingText.toLowerCase() !== "loading...") {
+      return headingText;
+    }
+
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      var programName = String(params.get("program") || "").trim();
+      if (programName) {
+        return programName;
+      }
+    } catch (e) {
+      // Ignore malformed query parameters.
+    }
+
+    var templateName = String(state.templateName || "").trim();
+    if (templateName) {
+      return templateName;
+    }
+
+    return fallback;
   }
 
   function buildFullPlanOverviewCard(slotKey, exercises) {
@@ -5333,6 +6013,8 @@
         section: safeExercise.section || "A Block",
         mode: safeExercise.mode || "reps",
         superset_group: safeExercise.superset_group || null,
+        library_id: safeExercise.library_id || null,
+        video_demo_url: safeExercise.video_demo_url || "",
         field_toggles: normalizeExerciseFieldToggles(safeExercise.field_toggles, safeExercise.mode),
         sets: sets.map(function (set) {
           var source = set && typeof set === "object" ? set : {};

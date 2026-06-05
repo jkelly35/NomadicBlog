@@ -4654,6 +4654,74 @@ footer a:hover {
   min-height: 80px;
 }
 
+.exercise-editor-suggestions {
+  margin-top: 0.45rem;
+  border: 1px solid #d8ccbd;
+  border-radius: 8px;
+  background: #fffdf9;
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  gap: 0;
+}
+
+.exercise-editor-suggestion {
+  border: none;
+  border-bottom: 1px solid #eee4d8;
+  background: transparent;
+  text-align: left;
+  padding: 0.7rem 0.8rem;
+  cursor: pointer;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.exercise-editor-suggestion:last-child {
+  border-bottom: none;
+}
+
+.exercise-editor-suggestion:hover {
+  background: #f7f1e8;
+}
+
+.exercise-editor-suggestion strong {
+  font-size: 0.9rem;
+  color: #153838;
+}
+
+.exercise-editor-suggestion span {
+  font-size: 0.76rem;
+  color: #637575;
+  text-transform: capitalize;
+}
+
+.exercise-editor-library-preview {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #e1d4c5;
+  border-radius: 8px;
+  background: #f9f6f1;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.exercise-editor-library-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #4f5e5e;
+}
+
+.exercise-editor-library-preview a {
+  font-size: 0.8rem;
+  color: #0e4749;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.exercise-editor-library-preview a:hover {
+  color: #c56a2c;
+}
+
 .exercise-editor-toggles {
   background: #f9f6f1;
   border-radius: 8px;
@@ -7057,6 +7125,24 @@ body.template-builder-mode .program-demo-actions-section .btn {
   align-items: end;
 }
 
+.program-builder-schedule-row {
+  margin-top: 0.7rem;
+  border: 1px solid #dcccc0;
+  border-radius: 10px;
+  background: #fff9f2;
+  padding: 0.6rem;
+  display: grid;
+  grid-template-columns: 1fr minmax(170px, 220px) auto;
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.program-builder-schedule-copy {
+  margin: 0;
+  color: #204545;
+  font-size: 0.86rem;
+}
+
 .program-builder-structure-row .btn {
   white-space: nowrap;
 }
@@ -7090,6 +7176,11 @@ body.template-builder-mode .program-demo-actions-section .btn {
 
 @media (max-width: 700px) {
   .program-builder-structure-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .program-builder-schedule-row {
     grid-template-columns: 1fr;
     align-items: stretch;
   }
@@ -8140,6 +8231,23 @@ body.template-builder-mode .program-demo-actions-section .btn {
   font-size: 0.88rem;
 }
 
+.admin-library-video-row {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+}
+
+.admin-library-video-row a,
+.admin-library-video-preview a {
+  color: #0e4749;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-library-video-row a:hover,
+.admin-library-video-preview a:hover {
+  color: #c56a2c;
+}
+
 .admin-library-tags {
   display: flex;
   flex-wrap: wrap;
@@ -8162,6 +8270,20 @@ body.template-builder-mode .program-demo-actions-section .btn {
 .admin-library-form {
   display: grid;
   gap: 0.65rem;
+}
+
+.admin-library-help {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: #5f7373;
+}
+
+.admin-library-video-preview {
+  margin-top: -0.15rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #d9cec0;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .admin-add-athlete-form {
@@ -8731,6 +8853,278 @@ body.template-builder-mode .program-demo-actions-section .btn {
 .insight-badge-active   { background: #d4edda; color: #155724; }
 .insight-badge-inactive { background: #e9ecef; color: #495057; }
 
+.insight-calendar-manager {
+  margin-top: 0.9rem;
+}
+
+.insight-calendar-help {
+  margin: 0 0 0.7rem;
+  color: #4d5f5f;
+  font-size: 0.84rem;
+}
+
+.insight-calendar-add-row {
+  display: grid;
+  grid-template-columns: 1.2fr minmax(130px, 170px) minmax(90px, 120px) 1fr auto;
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+}
+
+.insight-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.insight-calendar-month-label {
+  font-size: 0.92rem;
+  color: #123535;
+  min-width: 170px;
+}
+
+.insight-calendar-month-wrap {
+  overflow-x: auto;
+}
+
+.insight-cal-weekdays {
+  min-width: 880px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.insight-cal-weekdays span {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.68rem;
+  color: #6b7d7d;
+  font-weight: 700;
+}
+
+.insight-cal-grid {
+  min-width: 880px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.insight-cal-day {
+  border: 1px solid #e2d8ca;
+  border-radius: 10px;
+  background: #fff;
+  min-height: 120px;
+  padding: 0.38rem;
+  display: grid;
+  align-content: start;
+  gap: 0.3rem;
+}
+
+.insight-cal-day.has-session {
+  border-color: #d9c0a2;
+  background: linear-gradient(180deg, #fff 0%, #fef8ef 100%);
+}
+
+.insight-cal-day-empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+.insight-cal-day-number {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #4b6161;
+}
+
+.insight-cal-day-content {
+  display: grid;
+  gap: 0.24rem;
+  max-height: 132px;
+  overflow-y: auto;
+  padding-right: 0.08rem;
+}
+
+.insight-cal-session {
+  border: 1px solid #d9d0c3;
+  border-radius: 8px;
+  background: #fffdf9;
+  padding: 0.26rem;
+  display: grid;
+  gap: 0.16rem;
+  cursor: pointer;
+}
+
+.insight-cal-session.is-selected {
+  border-color: #0e4749;
+  box-shadow: inset 0 0 0 1px rgba(14, 71, 73, 0.28);
+}
+
+.insight-cal-topline,
+.insight-cal-bottomline {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.insight-cal-topline {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.insight-cal-bottomline {
+  grid-template-columns: 1fr;
+  align-items: center;
+}
+
+.insight-cal-drag-handle {
+  display: inline-block;
+  font-size: 0.56rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5a6e6e;
+  border: 1px dashed #cdbfae;
+  background: #f6f1e9;
+  border-radius: 999px;
+  padding: 0.1rem 0.38rem;
+  cursor: grab;
+  user-select: none;
+}
+
+.insight-cal-drag-handle.is-dragging {
+  opacity: 0.6;
+}
+
+.insight-cal-status {
+  justify-self: end;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 0.08rem 0.36rem;
+  border: 1px solid #cdbfae;
+  background: #f6f1e9;
+  color: #4d5f5f;
+}
+
+.insight-cal-status.is-completed {
+  border-color: #99c8aa;
+  background: #e5f4eb;
+  color: #1f6a3c;
+}
+
+.insight-cal-status.is-missed,
+.insight-cal-status.is-skipped {
+  border-color: #e2b5a8;
+  background: #fdecea;
+  color: #a33a2d;
+}
+
+.insight-cal-title {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: #173b3b;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insight-cal-day.is-drop-target {
+  border-color: #0e4749;
+  box-shadow: inset 0 0 0 2px rgba(14, 71, 73, 0.24);
+}
+
+.insight-cal-input {
+  width: 100%;
+  min-width: 0;
+  font-size: 0.7rem;
+  padding: 0.22rem 0.32rem;
+}
+
+.insight-cal-program {
+  font-size: 0.65rem;
+  color: #4d5f5f;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insight-cal-editor {
+  margin-top: 0.75rem;
+  border: 1px solid #e2d8ca;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.7rem;
+}
+
+.insight-cal-editor h3 {
+  margin: 0;
+  color: #133838;
+  font-size: 0.9rem;
+}
+
+.insight-cal-editor-grid {
+  margin-top: 0.55rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.insight-cal-editor-grid label {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.insight-cal-editor-grid label span {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5a6d6d;
+  font-weight: 700;
+}
+
+.insight-cal-editor-actions {
+  margin-top: 0.55rem;
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.insight-cal-editor-empty {
+  text-align: left;
+}
+
+.insight-calendar-input {
+  border: 1px solid #ccbfae;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f2d2d;
+  font-size: 0.82rem;
+  padding: 0.42rem 0.5rem;
+}
+
+.insight-calendar-input:focus {
+  outline: 2px solid rgba(14, 71, 73, 0.25);
+  outline-offset: 1px;
+  border-color: #0e4749;
+}
+
+.insight-calendar-actions {
+  display: flex;
+  gap: 0.38rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.insight-calendar-empty-cell {
+  font-style: italic;
+  color: #6b7d7d;
+}
+
 /* ---- Load panel ---- */
 .insight-load-summary-cards {
   display: grid;
@@ -8841,6 +9235,18 @@ body.template-builder-mode .program-demo-actions-section .btn {
   .insight-dl-row { grid-template-columns: 1fr; }
   .insight-dl-row dt { color: #4d5f5f; font-size: 0.74rem; margin-bottom: 0; }
   .insight-recovery-row { grid-template-columns: 60px repeat(4, 1fr); font-size: 0.7rem; }
+
+  .insight-calendar-add-row {
+    grid-template-columns: 1fr;
+  }
+
+  .insight-calendar-nav {
+    flex-wrap: wrap;
+  }
+
+  .insight-cal-editor-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ---- Coach Notes Panel ---- */
@@ -9088,6 +9494,108 @@ body.template-builder-mode .program-demo-actions-section .btn {
   color: #556868;
 }
 
+.training-calendar-months {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.training-calendar-month {
+  border: 1px solid #e5dbce;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.65rem;
+  overflow-x: auto;
+}
+
+.training-calendar-month-header {
+  margin-bottom: 0.55rem;
+  color: #153838;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.training-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  min-width: 700px;
+}
+
+.training-calendar-weekdays span {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #627474;
+  font-weight: 700;
+}
+
+.training-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+  min-width: 700px;
+}
+
+.training-calendar-day {
+  min-height: 112px;
+  border: 1px solid #ece3d8;
+  border-radius: 10px;
+  background: #fffdf9;
+  padding: 0.4rem;
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+}
+
+.training-calendar-day.has-session {
+  border-color: #d9c0a2;
+  background: linear-gradient(180deg, #fffdf9 0%, #fff6ea 100%);
+}
+
+.training-calendar-day-empty {
+  background: transparent;
+  border-style: dashed;
+  min-height: 112px;
+}
+
+.training-calendar-day-number {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #4b6161;
+}
+
+.training-calendar-day-sessions {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.training-calendar-session {
+  display: grid;
+  gap: 0.12rem;
+  border-radius: 8px;
+  background: #135454;
+  color: #f8f3ea;
+  text-decoration: none;
+  padding: 0.38rem 0.42rem;
+}
+
+.training-calendar-session:hover {
+  background: #c56a2c;
+}
+
+.training-calendar-session-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.training-calendar-session-program {
+  font-size: 0.64rem;
+  line-height: 1.2;
+  color: rgba(248, 243, 234, 0.86);
+}
+
 .training-calendar-list {
   list-style: none;
   margin: 0;
@@ -9133,6 +9641,12 @@ body.template-builder-mode .program-demo-actions-section .btn {
   margin: 0;
   font-size: 0.78rem;
   color: #667878;
+}
+
+@media (max-width: 900px) {
+  .training-calendar-day {
+    min-height: 96px;
+  }
 }
 
 .calendar-editor-panel {

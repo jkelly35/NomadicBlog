@@ -66,6 +66,7 @@
     var form = document.querySelector("[data-library-form]");
     var clearBtn = document.querySelector("[data-library-clear]");
     var list = document.querySelector("[data-library-list]");
+    var videoInput = document.querySelector("[data-library-video-url]");
 
     if (search) {
       search.addEventListener("input", renderExercises);
@@ -81,6 +82,11 @@
     }
     if (clearBtn) {
       clearBtn.addEventListener("click", clearForm);
+    }
+    if (videoInput) {
+      videoInput.addEventListener("input", function () {
+        updateVideoPreview(videoInput.value || "");
+      });
     }
     if (list) {
       list.addEventListener("click", function (event) {
@@ -116,7 +122,7 @@
 
     state.client
       .from(EXERCISE_LIBRARY_TABLE)
-      .select("id,name,movement_pattern,equipment,primary_muscle,training_goal,sport_tags,custom_tags,description,coaching_cues,created_at,updated_at")
+      .select("id,name,movement_pattern,equipment,primary_muscle,training_goal,sport_tags,custom_tags,description,coaching_cues,video_demo_url,created_at,updated_at")
       .order("updated_at", { ascending: false })
       .then(function (result) {
         if (result.error) {
@@ -227,6 +233,9 @@
           '</div>' +
           '</div>' +
           '<p>' + escapeHtml(item.description || "No description yet.") + '</p>' +
+          (item.video_demo_url
+            ? '<p class="admin-library-video-row"><a href="' + escapeAttribute(item.video_demo_url) + '" target="_blank" rel="noopener">Open demonstration video</a></p>'
+            : '') +
           '<div class="admin-library-tags">' +
           tags
             .map(function (tag) {
@@ -282,6 +291,7 @@
         }),
       description: String((document.querySelector("[data-library-description]") || {}).value || "").trim(),
       coaching_cues: String((document.querySelector("[data-library-cues]") || {}).value || "").trim(),
+      video_demo_url: String((document.querySelector("[data-library-video-url]") || {}).value || "").trim(),
       created_at: existing ? existing.created_at : now,
       updated_at: now
     };
@@ -351,6 +361,8 @@
     setInputValue("[data-library-custom-tags]", Array.isArray(entry.custom_tags) ? entry.custom_tags.join(", ") : "");
     setInputValue("[data-library-description]", entry.description || "");
     setInputValue("[data-library-cues]", entry.coaching_cues || "");
+    setInputValue("[data-library-video-url]", entry.video_demo_url || "");
+    updateVideoPreview(entry.video_demo_url || "");
 
     var sports = Array.isArray(entry.sport_tags) ? entry.sport_tags : [];
     document.querySelectorAll("[data-library-sport]").forEach(function (checkbox) {
@@ -418,6 +430,8 @@
     }
 
     setInputValue("[data-library-id]", "");
+    setInputValue("[data-library-video-url]", "");
+    updateVideoPreview("");
     var title = document.querySelector("[data-library-form-title]");
     if (title) {
       title.textContent = "Add Exercise";
@@ -456,9 +470,29 @@
       custom_tags: item && Array.isArray(item.custom_tags) ? item.custom_tags : [],
       description: item && item.description ? item.description : "",
       coaching_cues: item && item.coaching_cues ? item.coaching_cues : "",
+      video_demo_url: item && item.video_demo_url ? item.video_demo_url : "",
       created_at: item && item.created_at,
       updated_at: item && item.updated_at
     };
+  }
+
+  function updateVideoPreview(urlValue) {
+    var wrap = document.querySelector("[data-library-video-preview]");
+    var link = document.querySelector("[data-library-video-link]");
+    var url = String(urlValue || "").trim();
+
+    if (!wrap || !link) {
+      return;
+    }
+
+    if (!url) {
+      wrap.hidden = true;
+      link.removeAttribute("href");
+      return;
+    }
+
+    wrap.hidden = false;
+    link.href = url;
   }
 
   function readLocal() {
