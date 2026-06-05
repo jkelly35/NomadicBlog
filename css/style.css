@@ -9247,6 +9247,93 @@ body.template-builder-mode .program-demo-actions-section .btn {
   .insight-cal-editor-grid {
     grid-template-columns: 1fr;
   }
+
+  .training-calendar-card {
+    padding: 0.75rem;
+    border-radius: 16px;
+  }
+
+  .training-calendar-card h3 {
+    font-size: 1.05rem;
+  }
+
+  .training-calendar-card p {
+    margin-bottom: 0.55rem;
+    line-height: 1.5;
+  }
+
+  .training-calendar-month {
+    padding: 0.55rem;
+    overflow-x: visible;
+  }
+
+  .training-calendar-month-header {
+    font-size: 0.98rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .training-calendar-weekdays {
+    display: none;
+  }
+
+  .training-calendar-grid {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .training-calendar-day-empty {
+    display: none;
+  }
+
+  .training-calendar-day {
+    min-height: 0;
+    grid-template-columns: 2rem 1fr;
+    align-items: start;
+    gap: 0.55rem;
+    padding: 0.55rem;
+    border-radius: 14px;
+  }
+
+  .training-calendar-day-number {
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: #f2ece3;
+    font-size: 0.7rem;
+    line-height: 1;
+  }
+
+  .training-calendar-day-sessions {
+    gap: 0.4rem;
+  }
+
+  .training-calendar-session {
+    padding: 0.48rem 0.52rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(19, 72, 72, 0.08);
+  }
+
+  .training-calendar-session-title {
+    font-size: 0.78rem;
+    line-height: 1.2;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .training-calendar-session-program {
+    font-size: 0.68rem;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
 
 /* ---- Coach Notes Panel ---- */
