@@ -222,9 +222,7 @@
     }
 
     if (startWorkoutBtn) {
-      startWorkoutBtn.addEventListener("click", function () {
-        startWorkoutWalkthrough();
-      });
+      wireStartWorkoutButton(startWorkoutBtn);
     }
 
     if (clearBtn) {
@@ -251,6 +249,29 @@
     updateDayInfo();
     refreshTemplateDayTools();
     updateStats();
+  }
+
+  function bindPress(target, handler) {
+    if (!target || typeof handler !== "function") {
+      return;
+    }
+
+    target.addEventListener("click", handler);
+    target.addEventListener("touchend", function (event) {
+      event.preventDefault();
+      handler(event);
+    }, { passive: false });
+  }
+
+  function wireStartWorkoutButton(button) {
+    if (!button || button.getAttribute("data-start-workout-wired") === "1") {
+      return;
+    }
+
+    button.setAttribute("data-start-workout-wired", "1");
+    bindPress(button, function () {
+      startWorkoutWalkthrough();
+    });
   }
 
   function configureBuilderMode() {
@@ -4611,12 +4632,32 @@
     return state.isAthleteLockedView && !state.isProgramReadOnly && !state.isTemplateBuilder;
   }
 
+  function syncStartWorkoutButtonState() {
+    var startBtn = document.querySelector("[data-start-workout]");
+    var hasExercises = Array.isArray(state.exercises) && state.exercises.length > 0;
+    var shouldShow = shouldShowStartWorkoutButton() && !state.workoutWalkthroughActive;
+
+    if (!startBtn) {
+      return;
+    }
+
+    startBtn.hidden = !shouldShow;
+    startBtn.style.display = shouldShow ? "inline-flex" : "none";
+    startBtn.disabled = !hasExercises;
+    startBtn.setAttribute("aria-disabled", startBtn.disabled ? "true" : "false");
+  }
+
   function startWorkoutWalkthrough() {
     if (!shouldShowStartWorkoutButton()) {
       return;
     }
 
     var steps = buildWorkoutWalkthroughSteps();
+    if (!steps.length) {
+      loadExercisesForDay();
+      steps = buildWorkoutWalkthroughSteps();
+    }
+
     if (!steps.length) {
       setStatus("No exercises found for this day. Add a workout first.", "info");
       return;
@@ -4627,8 +4668,7 @@
     state.workoutWalkthroughActive = true;
     state.workoutWalkthroughStartedAt = Date.now();
     state.workoutCompletionSummary = null;
-    renderWorkoutWalkthrough();
-    renderWorkoutCompletionSummary();
+    renderRows();
     setStatus("Workout walkthrough started.", "info");
   }
 
@@ -5019,7 +5059,6 @@
     var tableWrap = document.querySelector(".program-demo-table-wrap");
     var mobileLog = document.querySelector("[data-athlete-mobile-log]");
     var emptyState = document.querySelector("[data-empty-state]");
-    var startBtn = document.querySelector("[data-start-workout]");
 
     if (!container) {
       return;
@@ -5031,9 +5070,7 @@
       if (section) {
         section.classList.remove("is-walkthrough-active");
       }
-      if (startBtn) {
-        startBtn.hidden = !shouldShowStartWorkoutButton();
-      }
+      syncStartWorkoutButtonState();
       return;
     }
 
@@ -5080,9 +5117,7 @@
       section.classList.add("is-walkthrough-active");
     }
 
-    if (startBtn) {
-      startBtn.hidden = true;
-    }
+    syncStartWorkoutButtonState();
 
     if (tableWrap) {
       tableWrap.style.display = "none";
@@ -5142,19 +5177,19 @@
     bindSetInputListeners(container);
 
     container.querySelectorAll("[data-workout-walkthrough-prev]").forEach(function (btn) {
-      btn.addEventListener("click", onWorkoutWalkthroughPrev);
+      bindPress(btn, onWorkoutWalkthroughPrev);
     });
 
     container.querySelectorAll("[data-workout-walkthrough-next]").forEach(function (btn) {
-      btn.addEventListener("click", onWorkoutWalkthroughNext);
+      bindPress(btn, onWorkoutWalkthroughNext);
     });
 
     container.querySelectorAll("[data-workout-walkthrough-complete]").forEach(function (btn) {
-      btn.addEventListener("click", completeWorkoutFromWalkthrough);
+      bindPress(btn, completeWorkoutFromWalkthrough);
     });
 
     container.querySelectorAll("[data-workout-walkthrough-exit]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
+      bindPress(btn, function () {
         stopWorkoutWalkthrough();
       });
     });
