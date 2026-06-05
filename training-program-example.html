@@ -194,7 +194,14 @@
 
       <!-- Workout Logger Table -->
       <div class="program-demo-section">
-        <h2 class="section-title">Workout Log</h2>
+        <div class="workout-overview-header">
+          <h2 class="section-title">Workout Overview</h2>
+          <button type="button" class="btn btn-primary workout-start-btn" data-start-workout>
+            <span>▶</span> Start Workout
+          </button>
+        </div>
+        <section class="workout-walkthrough" data-workout-walkthrough hidden></section>
+        <section class="workout-completion-summary" data-workout-summary hidden></section>
         <div class="program-demo-table-wrap">
           <table class="program-demo-table">
             <thead>

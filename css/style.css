@@ -4022,13 +4022,198 @@ footer a:hover {
   margin-bottom: 2.5rem;
 }
 
+.workout-overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 0.8rem;
+}
+
 .section-title {
   color: #0f2d2d;
   font-size: 1.3rem;
-  margin: 0 0 1.25rem 0;
+  margin: 0;
   font-weight: 700;
   border-bottom: 2px solid #e6dfd7;
   padding-bottom: 0.75rem;
+  flex: 1;
+}
+
+.workout-start-btn {
+  display: none;
+  flex: 0 0 auto;
+  min-width: 170px;
+}
+
+.workout-walkthrough {
+  margin: 0 0 1rem;
+}
+
+.workout-completion-summary {
+  margin: 0 0 1rem;
+}
+
+.workout-summary-card {
+  border: 1px solid #d9d0c2;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbf8f2 0%, #f4eee4 100%);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.workout-summary-title {
+  margin: 0;
+  color: #173737;
+  font-size: 1.08rem;
+}
+
+.workout-summary-stats {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.workout-summary-stat {
+  border: 1px solid #ded3c3;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.55rem;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.workout-summary-stat-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #60716c;
+  font-weight: 700;
+}
+
+.workout-summary-stat-value {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #173737;
+}
+
+.workout-summary-comments {
+  margin: 0;
+  color: #2d4944;
+  font-size: 0.87rem;
+  line-height: 1.45;
+}
+
+.workout-summary-pr-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  color: #204b33;
+  font-size: 0.84rem;
+}
+
+.workout-summary-pr-empty {
+  margin: 0;
+  color: #6a7c77;
+  font-size: 0.82rem;
+}
+
+.workout-walkthrough-card {
+  border: 1px solid #ded4c8;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffcf7 0%, #f8f3ea 100%);
+  padding: 0.95rem;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.workout-walkthrough-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.workout-walkthrough-step {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #48615c;
+}
+
+.workout-walkthrough-meta {
+  margin: 0;
+  color: #5b6f69;
+  font-size: 0.8rem;
+}
+
+.workout-walkthrough-title {
+  margin: 0;
+  color: #143434;
+  font-size: 1.2rem;
+}
+
+.workout-walkthrough-mode {
+  margin: 0;
+  color: #405e58;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.workout-walkthrough-demo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #0f3c3a;
+  text-decoration: none;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.workout-walkthrough-demo-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dce9e6;
+  color: #1f5555;
+}
+
+.workout-walkthrough-demo-none {
+  margin: 0;
+  color: #768681;
+  font-size: 0.78rem;
+}
+
+.workout-walkthrough-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.58rem;
+}
+
+.workout-walkthrough-done {
+  grid-column: 1 / -1;
+}
+
+.workout-walkthrough-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.program-demo-section.is-walkthrough-active .program-demo-table-wrap,
+.program-demo-section.is-walkthrough-active .athlete-mobile-log,
+.program-demo-section.is-walkthrough-active [data-empty-state] {
+  display: none !important;
 }
 
 .program-demo-table-wrap {
@@ -4848,6 +5033,26 @@ footer a:hover {
 
   .section-title {
     font-size: 1.1rem;
+  }
+
+  .workout-overview-header {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 0.95rem;
+  }
+
+  .workout-start-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .workout-walkthrough-fields,
+  .workout-walkthrough-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .workout-summary-stats {
+    grid-template-columns: 1fr;
   }
 
   .program-demo-table-wrap {
