@@ -5194,10 +5194,10 @@ footer a:hover {
   }
 
   body.athlete-locked-view .program-demo-progress-card {
-    position: sticky;
-    top: 0.5rem;
-    z-index: 20;
-    box-shadow: 0 8px 24px rgba(15, 45, 45, 0.18);
+    position: static;
+    top: auto;
+    z-index: auto;
+    box-shadow: 0 3px 10px rgba(15, 45, 45, 0.1);
   }
 
   body.athlete-locked-view .program-demo-table-wrap {
