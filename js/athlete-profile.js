@@ -4421,7 +4421,6 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       .select("id,user_training_program_id,slot_key,session_label,scheduled_for,status")
       .eq("athlete_user_id", getViewedUserId())
       .in("user_training_program_id", activeAssignmentIds)
-      .gte("scheduled_for", getDateOffsetInputValue(-2))
       .order("scheduled_for", { ascending: true })
       .then(function (scheduleResult) {
         if (scheduleResult.error) {
@@ -4469,6 +4468,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       : {};
 
     var upcomingScheduledItems = collectUpcomingScheduledItems(activePrograms, safeScheduleMap, 14);
+    var calendarScheduledItems = collectTrainingCalendarItems(activePrograms, safeScheduleMap);
 
     updateQuickGlanceTraining(activePrograms.length, pastPrograms.length, upcomingScheduledItems);
 
@@ -4488,7 +4488,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     html += '<div class="training-program-tab-panel" data-training-program-panel="current">';
     if (activePrograms.length) {
-      html += buildTrainingCalendarCardHtml(upcomingScheduledItems);
+      html += buildTrainingCalendarCardHtml(calendarScheduledItems);
     }
 
     if (!activePrograms.length) {
@@ -4841,6 +4841,51 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     return allItems.slice(0, Math.max(0, parseInt(maxItems, 10) || 0));
   }
 
+  function collectTrainingCalendarItems(activePrograms, scheduleByAssignment) {
+    var programsById = {};
+    (Array.isArray(activePrograms) ? activePrograms : []).forEach(function (program) {
+      programsById[String(program && program.id || "")] = program;
+    });
+
+    var allItems = [];
+
+    Object.keys(scheduleByAssignment || {}).forEach(function (assignmentId) {
+      var rows = Array.isArray(scheduleByAssignment[assignmentId]) ? scheduleByAssignment[assignmentId] : [];
+      var program = programsById[String(assignmentId || "")];
+      if (!program) {
+        return;
+      }
+
+      rows.forEach(function (row) {
+        var dateValue = String(row && row.scheduled_for || "");
+        if (!dateValue) {
+          return;
+        }
+
+        allItems.push({
+          program: program,
+          assignment_id: assignmentId,
+          scheduled_for: dateValue,
+          slot_key: String(row && row.slot_key || ""),
+          session_label: String(row && row.session_label || row && row.slot_key || "Workout").trim() || "Workout",
+          status: String(row && row.status || "scheduled")
+        });
+      });
+    });
+
+    allItems.sort(function (a, b) {
+      if (a.scheduled_for !== b.scheduled_for) {
+        return a.scheduled_for.localeCompare(b.scheduled_for);
+      }
+      if (String(a.slot_key || "") !== String(b.slot_key || "")) {
+        return String(a.slot_key || "").localeCompare(String(b.slot_key || ""));
+      }
+      return String(a.session_label || "").localeCompare(String(b.session_label || ""));
+    });
+
+    return allItems;
+  }
+
   function getNextScheduledSession(rows) {
     var todayKey = getTodayDateInputValue();
     var sorted = (Array.isArray(rows) ? rows : []).slice().sort(function (a, b) {
@@ -4862,7 +4907,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (!list.length) {
       return (
         '<article class="training-calendar-card">' +
-          '<h3>Upcoming Workout Calendar</h3>' +
+          '<h3>Workout Calendar</h3>' +
           '<p>Your coach has not scheduled specific workout dates yet.</p>' +
         '</article>'
       );
@@ -4870,8 +4915,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     return (
       '<article class="training-calendar-card">' +
-        '<h3>Upcoming Workout Calendar</h3>' +
-        '<p>These sessions are scheduled by your coach. Open any workout to log it.</p>' +
+        '<h3>Workout Calendar</h3>' +
+        '<p>Completed, missed, today, and future sessions stay visible on the month view.</p>' +
         buildTrainingCalendarMonthsHtml(list) +
       '</article>'
     );
@@ -4925,6 +4970,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     var firstWeekday = monthDate.getDay();
     var daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    var todayKey = getTodayDateInputValue();
     var gridCells = [];
 
     for (var blankIdx = 0; blankIdx < firstWeekday; blankIdx++) {
@@ -4951,9 +4997,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           (program.id ? "&assignmentId=" + encodeURIComponent(program.id) : "") +
           "&athleteName=" + encodeURIComponent(athleteName) +
           "&day=" + encodeURIComponent(String(item.slot_key || ""));
+        var sessionStatus = getTrainingCalendarStatusClass(item, dateKey, todayKey);
 
         return (
-          '<a class="training-calendar-session" href="' + url + '">' +
+          '<a class="training-calendar-session ' + sessionStatus + '" href="' + url + '">' +
             '<span class="training-calendar-session-title">' + escapeHtml(String(item.session_label || "Workout")) + '</span>' +
             '<span class="training-calendar-session-program">' + escapeHtml(programName) + '</span>' +
           '</a>'
@@ -4961,7 +5008,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       }).join("");
 
       gridCells.push(
-        '<div class="training-calendar-day' + (entries.length ? ' has-session' : '') + '">' +
+        '<div class="training-calendar-day' + (entries.length ? ' has-session' : '') + (dateKey === todayKey ? ' is-today' : '') + '">' +
           '<div class="training-calendar-day-number">' + day + '</div>' +
           '<div class="training-calendar-day-sessions">' + sessionsHtml + '</div>' +
         '</div>'
@@ -4977,6 +5024,27 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         '<div class="training-calendar-grid">' + gridCells.join("") + '</div>' +
       '</section>'
     );
+  }
+
+  function getTrainingCalendarStatusClass(item, dateKey, todayKey) {
+    var status = String(item && item.status || "scheduled");
+    if (status === "completed") {
+      return "is-completed";
+    }
+
+    if (status === "missed" || status === "skipped") {
+      return "is-missed";
+    }
+
+    if (dateKey === todayKey) {
+      return "is-today";
+    }
+
+    if (dateKey < todayKey) {
+      return "is-missed";
+    }
+
+    return "is-future";
   }
 
   function parseDateInputValue(dateString) {

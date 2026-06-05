@@ -4882,7 +4882,7 @@ footer a:hover {
 
   body.athlete-locked-view .program-demo-main {
     margin-top: 0.85rem;
-    padding-bottom: 7.5rem;
+    padding-bottom: 0.75rem;
   }
 
   body.athlete-locked-view header {
@@ -5002,23 +5002,24 @@ footer a:hover {
   }
 
   body.athlete-locked-view .program-demo-actions-section {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 45;
-    margin: 0;
-    padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom));
-    background: linear-gradient(to top, rgba(245, 240, 232, 0.98), rgba(245, 240, 232, 0.9));
-    border-top: 1px solid #e6dfd7;
-    box-shadow: 0 -6px 18px rgba(15, 45, 45, 0.12);
+    position: static;
+    z-index: auto;
+    margin: 1rem 0 0;
+    padding: 0.8rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+    background: #fff;
+    border: 1px solid #e6dfd7;
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(15, 45, 45, 0.08);
   }
 
   body.athlete-locked-view .program-demo-actions-section .btn {
     width: 100%;
-    min-height: 50px;
-    font-size: 1rem;
-    border-radius: 12px;
+    min-height: 48px;
+    font-size: 0.92rem;
+    border-radius: 11px;
   }
 
   .btn {
@@ -9661,14 +9662,35 @@ body.template-builder-mode .program-demo-actions-section .btn {
   display: grid;
   gap: 0.12rem;
   border-radius: 8px;
-  background: #135454;
-  color: #f8f3ea;
+  background: #eaf2ff;
+  color: #14313b;
   text-decoration: none;
   padding: 0.38rem 0.42rem;
+  border: 1px solid #c9d8f2;
 }
 
 .training-calendar-session:hover {
-  background: #c56a2c;
+  background: #dce9ff;
+}
+
+.training-calendar-session.is-future {
+  background: #eef4ff;
+  border-color: #c7d5ee;
+}
+
+.training-calendar-session.is-today {
+  background: #fff2cd;
+  border-color: #e0c170;
+}
+
+.training-calendar-session.is-completed {
+  background: #e7f5ec;
+  border-color: #a9d1b6;
+}
+
+.training-calendar-session.is-missed {
+  background: #fdeaea;
+  border-color: #e5b0a3;
 }
 
 .training-calendar-session-title {
@@ -9680,7 +9702,38 @@ body.template-builder-mode .program-demo-actions-section .btn {
 .training-calendar-session-program {
   font-size: 0.64rem;
   line-height: 1.2;
-  color: rgba(248, 243, 234, 0.86);
+  color: rgba(20, 49, 59, 0.72);
+}
+
+.training-calendar-session.is-future .training-calendar-session-title,
+.training-calendar-session.is-future .training-calendar-session-program {
+  color: #12303d;
+}
+
+.training-calendar-session.is-today .training-calendar-session-title,
+.training-calendar-session.is-today .training-calendar-session-program {
+  color: #3f2c00;
+}
+
+.training-calendar-session.is-completed .training-calendar-session-title,
+.training-calendar-session.is-completed .training-calendar-session-program {
+  color: #184f2b;
+}
+
+.training-calendar-session.is-missed .training-calendar-session-title,
+.training-calendar-session.is-missed .training-calendar-session-program {
+  color: #7b2f24;
+}
+
+.training-calendar-day.is-today {
+  border-color: #e0c170;
+  background: linear-gradient(180deg, #fffdf9 0%, #fff8e8 100%);
+  box-shadow: inset 0 0 0 1px rgba(224, 193, 112, 0.35);
+}
+
+.training-calendar-day.is-today .training-calendar-day-number {
+  background: #f3d98b;
+  color: #3f2c00;
 }
 
 .training-calendar-list {
