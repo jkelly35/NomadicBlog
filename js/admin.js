@@ -2044,7 +2044,7 @@
         user_id: athleteId,
         is_active: !!shouldActivate,
         updated_at: new Date().toISOString()
-      })
+      }, { onConflict: "user_id" })
       .then(function (result) {
         if (result.error) {
           setDeleteStatus(result.error.message || "Could not update member status.", "error", fromModal);
@@ -2696,7 +2696,7 @@
 
     state.client
       .from("athlete_profiles")
-      .upsert(payload)
+      .upsert(payload, { onConflict: "user_id" })
       .then(function () {
         // Ignore profile upsert errors here so account creation flow stays simple.
       })
