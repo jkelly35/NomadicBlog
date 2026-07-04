@@ -1275,6 +1275,7 @@
           state.athletes = athletesWithState.filter(function (athlete) {
             return !hiddenAthleteIds[athlete.user_id];
           });
+          renderFlagAthleteOptions();
           state.currentPage = 1;
           renderAthletesTable();
           loadCoachOverviewData();
@@ -2064,8 +2065,10 @@
           populateModal(state.currentAthlete);
         }
 
+        renderFlagAthleteOptions();
         state.currentPage = 1;
         renderAthletesTable();
+        renderCoachOverview();
         updateStats();
 
         setDeleteStatus(shouldActivate ? "Athlete marked active." : "Athlete marked inactive.", "success", fromModal);
@@ -3509,21 +3512,32 @@
     event.preventDefault();
     var input = document.querySelector("[data-admin-flag-input]");
     var severityInput = document.querySelector("[data-admin-flag-severity]");
+    var athleteInput = document.querySelector("[data-admin-flag-athlete]");
     var text = String(input && input.value || "").trim();
     if (!text) {
       return;
     }
 
+    var athleteId = String(athleteInput && athleteInput.value || "").trim();
+    var athlete = athleteId
+      ? (state.athletes || []).find(function (item) { return String(item && item.user_id || "") === athleteId; })
+      : null;
+
     state.coachFlags.unshift({
       id: "flag_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
       text: text,
       severity: String(severityInput && severityInput.value || "medium"),
+      athlete_user_id: athleteId || null,
+      athlete_name: athlete && (athlete.name || athlete.email) ? String(athlete.name || athlete.email) : null,
       source: "manual",
       created_at: new Date().toISOString()
     });
 
     if (input) {
       input.value = "";
+    }
+    if (athleteInput) {
+      athleteInput.value = "";
     }
 
     writeCoachFlags(state.coachFlags);
@@ -3945,7 +3959,7 @@
             '<span class="admin-flag-severity is-' + escapeAttribute(severity) + '">' + escapeHtml(severity) + '</span>' +
             '<div>' +
               '<p class="admin-overview-item-title">' + escapeHtml(flag.text || "Flag") + '</p>' +
-              '<p class="admin-overview-item-meta">' + escapeHtml(flag.source === "auto" ? "Auto-detected" : "Manual") + '</p>' +
+              '<p class="admin-overview-item-meta">' + escapeHtml(getFlagMetaLabel(flag)) + '</p>' +
             '</div>' +
             (flag.source === "manual"
               ? '<button type="button" class="btn admin-btn-delete-mini" data-flag-remove="' + escapeAttribute(flag.id) + '">Clear</button>'
@@ -4479,7 +4493,7 @@
   }
 
   function buildAthleteRiskRows() {
-    var athletes = Array.isArray(state.athletes) ? state.athletes : [];
+    var athletes = getActiveAthletes();
     var activePrograms = Array.isArray(state.activePrograms) ? state.activePrograms : [];
     var goals = Array.isArray(state.athleteGoalEvents) ? state.athleteGoalEvents : [];
     var todayKey = formatDateKey(new Date());
@@ -4793,15 +4807,38 @@
   }
 
   function getOpenFlags() {
-    return buildAutoFlags().concat(state.coachFlags || []);
+    var activeAthletes = getActiveAthletes();
+    var activeAthleteById = {};
+    activeAthletes.forEach(function (athlete) {
+      var athleteId = String(athlete && athlete.user_id || "").trim();
+      if (athleteId) {
+        activeAthleteById[athleteId] = true;
+      }
+    });
+
+    var manualFlags = (state.coachFlags || []).filter(function (flag) {
+      if (!flag || flag.source !== "manual") {
+        return false;
+      }
+
+      var athleteId = String(flag.athlete_user_id || "").trim();
+      if (!athleteId) {
+        return true;
+      }
+
+      return !!activeAthleteById[athleteId];
+    });
+
+    return buildAutoFlags().concat(manualFlags);
   }
 
   function buildAutoFlags() {
     var autoFlags = [];
     var now = Date.now();
     var athleteById = {};
+    var activeAthletes = getActiveAthletes();
 
-    state.athletes.forEach(function (athlete) {
+    activeAthletes.forEach(function (athlete) {
       athleteById[String(athlete.user_id || "")] = athlete;
       var athleteName = String(athlete && (athlete.name || athlete.email) || "Athlete");
 
@@ -4841,6 +4878,9 @@
       }
 
       var athlete = athleteById[String(goalItem.user_id || "")];
+      if (!athlete) {
+        return;
+      }
       var athleteName = athlete && (athlete.name || athlete.email) ? (athlete.name || athlete.email) : "Athlete";
 
       autoFlags.push({
@@ -4852,6 +4892,54 @@
     });
 
     return autoFlags;
+  }
+
+  function getActiveAthletes() {
+    var athletes = Array.isArray(state.athletes) ? state.athletes : [];
+    return athletes.filter(function (athlete) {
+      return athlete && athlete.is_active !== false;
+    });
+  }
+
+  function renderFlagAthleteOptions() {
+    var select = document.querySelector("[data-admin-flag-athlete]");
+    if (!select) {
+      return;
+    }
+
+    var currentValue = String(select.value || "").trim();
+    var options = ['<option value="">General Flag (not athlete-specific)</option>'];
+
+    getActiveAthletes()
+      .slice()
+      .sort(function (a, b) {
+        var aName = String((a && (a.name || a.email)) || "");
+        var bName = String((b && (b.name || b.email)) || "");
+        return aName.localeCompare(bName);
+      })
+      .forEach(function (athlete) {
+        var athleteId = String(athlete && athlete.user_id || "").trim();
+        if (!athleteId) {
+          return;
+        }
+        var athleteLabel = String((athlete && (athlete.name || athlete.email)) || "Athlete");
+        options.push('<option value="' + escapeAttribute(athleteId) + '">' + escapeHtml(athleteLabel) + '</option>');
+      });
+
+    select.innerHTML = options.join("");
+
+    if (currentValue && select.querySelector('option[value="' + currentValue.replace(/"/g, '&quot;') + '"]')) {
+      select.value = currentValue;
+    }
+  }
+
+  function getFlagMetaLabel(flag) {
+    var source = flag && flag.source === "auto" ? "Auto-detected" : "Manual";
+    var athleteName = String(flag && flag.athlete_name || "").trim();
+    if (athleteName) {
+      return source + " • " + athleteName;
+    }
+    return source;
   }
 
   function readCoachTodos() {
@@ -4882,7 +4970,23 @@
         return [];
       }
       var parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.map(function (flag) {
+        return {
+          id: String(flag && flag.id || ""),
+          text: String(flag && flag.text || "").trim(),
+          severity: String(flag && flag.severity || "medium").toLowerCase(),
+          source: flag && flag.source === "auto" ? "auto" : "manual",
+          athlete_user_id: flag && flag.athlete_user_id ? String(flag.athlete_user_id) : null,
+          athlete_name: flag && flag.athlete_name ? String(flag.athlete_name) : null,
+          created_at: String(flag && flag.created_at || "")
+        };
+      }).filter(function (flag) {
+        return !!flag.id && !!flag.text;
+      });
     } catch (e) {
       return [];
     }

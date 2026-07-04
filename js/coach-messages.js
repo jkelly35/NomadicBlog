@@ -173,6 +173,19 @@
       state.threadFormEl.addEventListener("submit", onSendThreadReply);
     }
 
+    if (state.threadEl) {
+      state.threadEl.addEventListener("click", function (event) {
+        var deleteBtn = event.target && event.target.closest("[data-msg-delete]");
+        if (!deleteBtn) return;
+
+        event.preventDefault();
+        var messageId = String(deleteBtn.getAttribute("data-msg-delete") || "").trim();
+        if (!messageId) return;
+
+        onDeleteThreadMessage(messageId);
+      });
+    }
+
     if (state.bodyEl) {
       state.bodyEl.addEventListener("keydown", function (event) {
         if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && state.formEl) {
@@ -436,11 +449,15 @@
     state.threadEl.innerHTML = threadMessages
       .map(function (msg) {
         var mine = msg.sender_role === "coach";
+        var deleteAction = state.isCoachAdmin
+          ? '<button type="button" class="btn admin-btn-delete-mini" data-msg-delete="' + escapeAttribute(String(msg.id || "")) + '">Delete</button>'
+          : '';
         return (
           '<article class="coach-thread-message' + (mine ? ' is-outbound' : ' is-inbound') + '">' +
             '<div class="coach-thread-message-meta">' +
               '<span>' + escapeHtml(mine ? 'You' : athleteLabel) + '</span>' +
               '<time>' + escapeHtml(formatDateTime(msg.created_at)) + '</time>' +
+              deleteAction +
             '</div>' +
             '<p>' + escapeHtml(String(msg.body || "")) + '</p>' +
           '</article>'
@@ -649,6 +666,48 @@
         if (result && result.error) {
           throw result.error;
         }
+      });
+  }
+
+  function onDeleteThreadMessage(messageId) {
+    if (!state.client || !state.user || !messageId) {
+      setStatus("Unable to delete this message right now.", "error");
+      return;
+    }
+
+    var match = (state.messages || []).find(function (msg) {
+      return String(msg && msg.id || "") === messageId;
+    });
+    var preview = String(match && match.body || "message").trim();
+    var promptText = preview ? ('Delete message: "' + (preview.length > 90 ? preview.slice(0, 90) + "..." : preview) + '"?') : "Delete this message?";
+    if (!confirm(promptText)) {
+      return;
+    }
+
+    setStatus("Deleting message...", "info");
+
+    state.client
+      .from("coach_athlete_messages")
+      .delete()
+      .eq("id", messageId)
+      .eq("coach_user_id", state.user.id)
+      .then(function (result) {
+        if (result && result.error) {
+          setStatus(result.error.message || "Failed to delete message.", "error");
+          return;
+        }
+
+        state.messages = (state.messages || []).filter(function (msg) {
+          return String(msg && msg.id || "") !== messageId;
+        });
+
+        renderSummary();
+        renderInbox();
+        renderThread();
+        setStatus("Message deleted.", "success");
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to delete message.", "error");
       });
   }
 
