@@ -11,3 +11,18 @@ verify_jwt = true
 
 [functions.strava-connect-callback]
 verify_jwt = false
+
+[functions.whoop-connect-start]
+verify_jwt = true
+
+[functions.whoop-sync-latest]
+verify_jwt = true
+
+[functions.whoop-disconnect]
+verify_jwt = true
+
+[functions.whoop-manual-connect]
+verify_jwt = true
+
+[functions.whoop-connect-callback]
+verify_jwt = false

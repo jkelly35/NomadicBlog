@@ -147,6 +147,7 @@
     exerciseLibrary: [],
     assignmentTemplateId: null,
     templateFilter: "active",
+    memberFilter: "active",
     currentPage: 1,
     pageSize: 10,
     searchTerm: "",
@@ -228,6 +229,15 @@
     if (searchInput) {
       searchInput.addEventListener("input", function (e) {
         state.searchTerm = e.target.value.toLowerCase();
+        state.currentPage = 1;
+        renderAthletesTable();
+      });
+    }
+
+    var memberFilterInput = document.querySelector("[data-admin-member-filter]");
+    if (memberFilterInput) {
+      memberFilterInput.addEventListener("change", function (event) {
+        state.memberFilter = String((event && event.target && event.target.value) || "active").trim() || "active";
         state.currentPage = 1;
         renderAthletesTable();
       });
@@ -387,6 +397,11 @@
       deleteBtn.addEventListener("click", onDeleteAthlete);
     }
 
+    var toggleActiveBtn = document.querySelector("[data-admin-modal-toggle-active]");
+    if (toggleActiveBtn) {
+      toggleActiveBtn.addEventListener("click", onToggleCurrentAthleteActive);
+    }
+
     var customizeMetricsBtn = document.querySelector("[data-admin-customize-metrics]");
     if (customizeMetricsBtn) {
       customizeMetricsBtn.addEventListener("click", function () {
@@ -418,6 +433,19 @@
     var tableBody = document.querySelector("[data-admin-table-body]");
     if (tableBody) {
       tableBody.addEventListener("click", function (event) {
+        var toggleBtn = event.target && event.target.closest("[data-admin-toggle-active]");
+        if (toggleBtn) {
+          var toggleAthleteId = String(toggleBtn.getAttribute("data-athlete-id") || "").trim();
+          var toggleAthleteActive = String(toggleBtn.getAttribute("data-athlete-active") || "true") === "true";
+          if (!toggleAthleteId) {
+            setStatus("Could not find athlete id.", "error");
+            return;
+          }
+
+          onToggleAthleteActive(toggleAthleteId, !toggleAthleteActive, false);
+          return;
+        }
+
         var deleteBtn = event.target && event.target.closest("[data-admin-delete-athlete]");
         if (!deleteBtn) {
           return;
@@ -1235,18 +1263,27 @@
           return;
         }
 
-        var hiddenAthleteIds = readHiddenAthleteIds();
-        state.athletes = (result.data || []).filter(function (athlete) {
-          return !hiddenAthleteIds[athlete.user_id];
+        var athletes = result.data || [];
+        var userIds = athletes
+          .map(function (athlete) {
+            return athlete && athlete.user_id ? String(athlete.user_id) : "";
+          })
+          .filter(Boolean);
+
+        return hydrateAthleteActiveStates(athletes, userIds).then(function (athletesWithState) {
+          var hiddenAthleteIds = readHiddenAthleteIds();
+          state.athletes = athletesWithState.filter(function (athlete) {
+            return !hiddenAthleteIds[athlete.user_id];
+          });
+          state.currentPage = 1;
+          renderAthletesTable();
+          loadCoachOverviewData();
+          updateStats();
+          setStatus("Users loaded successfully.", "success");
+          setTimeout(function () {
+            clearStatus();
+          }, 1500);
         });
-        state.currentPage = 1;
-        renderAthletesTable();
-        loadCoachOverviewData();
-        updateStats();
-        setStatus("Users loaded successfully.", "success");
-        setTimeout(function () {
-          clearStatus();
-        }, 1500);
       })
       .catch(function (error) {
         setStatus(
@@ -1254,6 +1291,52 @@
           "error"
         );
       });
+  }
+
+  function hydrateAthleteActiveStates(athletes, userIds) {
+    if (!state.client || !Array.isArray(athletes) || !userIds.length) {
+      return Promise.resolve(Array.isArray(athletes) ? athletes : []);
+    }
+
+    return state.client
+      .from("athlete_profiles")
+      .select("user_id,is_active")
+      .in("user_id", userIds)
+      .then(function (profileResult) {
+        if (profileResult.error) {
+          return athletes.map(function (athlete) {
+            return assignAthleteActiveState(athlete, true);
+          });
+        }
+
+        var activeByUserId = {};
+        (profileResult.data || []).forEach(function (profileRow) {
+          if (!profileRow || !profileRow.user_id) {
+            return;
+          }
+
+          activeByUserId[String(profileRow.user_id)] = profileRow.is_active !== false;
+        });
+
+        return athletes.map(function (athlete) {
+          var athleteId = String((athlete && athlete.user_id) || "");
+          var isActive = Object.prototype.hasOwnProperty.call(activeByUserId, athleteId)
+            ? !!activeByUserId[athleteId]
+            : true;
+          return assignAthleteActiveState(athlete, isActive);
+        });
+      })
+      .catch(function () {
+        return athletes.map(function (athlete) {
+          return assignAthleteActiveState(athlete, true);
+        });
+      });
+  }
+
+  function assignAthleteActiveState(athlete, isActive) {
+    var copy = athlete || {};
+    copy.is_active = isActive !== false;
+    return copy;
   }
 
   function renderAthletesTable() {
@@ -1264,6 +1347,14 @@
     }
 
     var filtered = state.athletes.filter(function (a) {
+      if (state.memberFilter === "active" && a.is_active === false) {
+        return false;
+      }
+
+      if (state.memberFilter === "inactive" && a.is_active !== false) {
+        return false;
+      }
+
       if (!state.searchTerm) return true;
       return (
         (a.email && a.email.toLowerCase().includes(state.searchTerm)) ||
@@ -1289,13 +1380,17 @@
           String(pageEnd) +
           " of " +
           String(filtered.length) +
-          " athletes";
+          " athletes (" +
+          String(getActiveAthleteCount()) +
+          " active, " +
+          String(getInactiveAthleteCount()) +
+          " inactive)";
       }
     }
 
     if (!paginated.length) {
       tbody.innerHTML =
-        '<tr class="admin-table-loading"><td colspan="6" style="text-align: center; padding: 2rem;">No athletes found for this view.</td></tr>';
+        '<tr class="admin-table-loading"><td colspan="7" style="text-align: center; padding: 2rem;">No athletes found for this view.</td></tr>';
       renderPagination(filtered.length);
       return;
     }
@@ -1303,6 +1398,8 @@
     tbody.innerHTML = paginated
       .map(function (athlete) {
         var athleteId = String(athlete.user_id || "");
+        var isActive = athlete.is_active !== false;
+        var statusLabel = isActive ? "Active" : "Inactive";
         var insightsHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
         return (
           "<tr>" +
@@ -1310,10 +1407,17 @@
           "<td>" + (athlete.name ? escapeHtml(athlete.name) : "—") + "</td>" +
           "<td>" + (athlete.sport ? escapeHtml(athlete.sport) : "—") + "</td>" +
           "<td>" + (athlete.level ? escapeHtml(athlete.level) : "—") + "</td>" +
+          "<td><span class='admin-risk-chip " + (isActive ? "is-stable" : "") + "'>" + escapeHtml(statusLabel) + "</span></td>" +
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
           "<td><div class='admin-table-actions'><a class='btn admin-btn-small' href='" +
           insightsHref +
-          "' target='_blank'>Insights</a><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
+          "' target='_blank'>Insights</a><button type='button' class='btn admin-btn-small' data-admin-toggle-active='1' data-athlete-active='" +
+          (isActive ? "true" : "false") +
+          "' data-athlete-id='" +
+          escapeAttribute(athleteId) +
+          "'>" +
+          (isActive ? "Deactivate" : "Activate") +
+          "</button><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
           escapeAttribute(athleteId) +
           "'>Delete</button></div></td>" +
           "</tr>"
@@ -1414,6 +1518,13 @@
     }
 
     renderCoachInsightsLoading();
+
+    var toggleBtn = document.querySelector("[data-admin-modal-toggle-active]");
+    if (toggleBtn) {
+      var isActive = athlete.is_active !== false;
+      toggleBtn.textContent = isActive ? "Deactivate Account" : "Activate Account";
+      toggleBtn.setAttribute("data-athlete-active", isActive ? "true" : "false");
+    }
 
     clearModalStatus();
   }
@@ -1907,6 +2018,65 @@
     }
 
     executeAthleteDelete(state.currentAthlete, true);
+  }
+
+  function onToggleCurrentAthleteActive() {
+    if (!state.currentAthlete || !state.currentAthlete.user_id) {
+      setModalStatus("No athlete selected.", "error");
+      return;
+    }
+
+    var isCurrentlyActive = state.currentAthlete.is_active !== false;
+    onToggleAthleteActive(String(state.currentAthlete.user_id), !isCurrentlyActive, true);
+  }
+
+  function onToggleAthleteActive(athleteId, shouldActivate, fromModal) {
+    if (!state.client) {
+      setDeleteStatus("Client not ready.", "error", fromModal);
+      return;
+    }
+
+    setDeleteStatus(shouldActivate ? "Activating account..." : "Deactivating account...", "info", fromModal);
+
+    state.client
+      .from("athlete_profiles")
+      .upsert({
+        user_id: athleteId,
+        is_active: !!shouldActivate,
+        updated_at: new Date().toISOString()
+      })
+      .then(function (result) {
+        if (result.error) {
+          setDeleteStatus(result.error.message || "Could not update member status.", "error", fromModal);
+          return;
+        }
+
+        state.athletes = state.athletes.map(function (athlete) {
+          if (!athlete || String(athlete.user_id || "") !== athleteId) {
+            return athlete;
+          }
+          athlete.is_active = !!shouldActivate;
+          return athlete;
+        });
+
+        if (state.currentAthlete && String(state.currentAthlete.user_id || "") === athleteId) {
+          state.currentAthlete.is_active = !!shouldActivate;
+          populateModal(state.currentAthlete);
+        }
+
+        state.currentPage = 1;
+        renderAthletesTable();
+        updateStats();
+
+        setDeleteStatus(shouldActivate ? "Athlete marked active." : "Athlete marked inactive.", "success", fromModal);
+      })
+      .catch(function (error) {
+        setDeleteStatus(
+          error && error.message ? error.message : "Could not update member status.",
+          "error",
+          fromModal
+        );
+      });
   }
 
   function executeAthleteDelete(athlete, fromModal) {
@@ -2520,6 +2690,7 @@
       level: profile && profile.level ? profile.level : null,
        sex: profile && profile.sex ? profile.sex : null,
        height_cm: profile && profile.height_cm ? profile.height_cm : null,
+      is_active: profile && profile.is_active === false ? false : true,
       updated_at: new Date().toISOString()
     };
 
@@ -4785,7 +4956,7 @@
     var openFlagsEl = document.querySelector("[data-stat-open-flags]");
 
     if (totalEl) {
-      totalEl.textContent = state.athletes.length;
+      totalEl.textContent = String(getActiveAthleteCount());
     }
 
     var withProfiles = state.athletes.filter(function (a) {
@@ -4825,6 +4996,18 @@
     if (openFlagsEl) {
       openFlagsEl.textContent = String(getOpenFlags().length);
     }
+  }
+
+  function getActiveAthleteCount() {
+    return state.athletes.filter(function (athlete) {
+      return athlete && athlete.is_active !== false;
+    }).length;
+  }
+
+  function getInactiveAthleteCount() {
+    return state.athletes.filter(function (athlete) {
+      return athlete && athlete.is_active === false;
+    }).length;
   }
 
   function readTemplateLibrary() {

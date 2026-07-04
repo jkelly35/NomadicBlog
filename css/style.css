@@ -2859,6 +2859,42 @@ footer a:hover {
   margin-top: 0.65rem;
 }
 
+.profile-onboarding-content {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.profile-onboarding-card {
+  border: 1px solid #e2d5c5;
+  border-radius: 12px;
+  background: #fffdfa;
+  padding: 0.85rem 0.95rem;
+}
+
+.profile-onboarding-card .form-group {
+  margin-bottom: 0.7rem;
+}
+
+.profile-onboarding-card .form-group label {
+  display: block;
+  font-weight: 700;
+  color: #234242;
+  margin-bottom: 0.3rem;
+  font-size: 0.86rem;
+}
+
+.profile-onboarding-card .form-group input,
+.profile-onboarding-card .form-group textarea,
+.profile-onboarding-card .form-group select {
+  width: 100%;
+  border: 1px solid #d7c9b7;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.48rem 0.52rem;
+  color: #163d3d;
+  font-size: 0.86rem;
+}
+
 .profile-goals-empty-action {
   display: inline-flex;
   margin-top: 0.6rem;
@@ -6792,6 +6828,79 @@ footer a:hover {
 .strava-metric-value {
   font-size: 1.06rem;
   color: #0f2d2d;
+}
+
+.profile-wearables-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.profile-wearable-card {
+  border: 1px solid #d8c9b5;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.85rem;
+}
+
+.profile-wearable-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+
+.profile-wearable-head h3 {
+  margin: 0;
+  color: #174646;
+  font-size: 1rem;
+}
+
+.profile-whoop-manual {
+  border: 1px dashed #d8c9b5;
+  border-radius: 10px;
+  background: #fcfaf7;
+  padding: 0.7rem;
+  margin-bottom: 0.7rem;
+}
+
+.profile-whoop-manual-copy {
+  margin: 0 0 0.45rem;
+  color: #4e6363;
+  font-size: 0.84rem;
+}
+
+.profile-whoop-manual-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.profile-whoop-manual-grid input {
+  border: 1px solid #d8c9b5;
+  border-radius: 8px;
+  padding: 0.48rem 0.55rem;
+  font-size: 0.82rem;
+  color: #1f4444;
+  background: #fff;
+}
+
+.profile-whoop-manual-actions {
+  margin-top: 0.55rem;
+  display: flex;
+  gap: 0.45rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+  .profile-wearables-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-whoop-manual-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-programs {

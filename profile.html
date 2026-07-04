@@ -55,10 +55,12 @@
         </div>
         <nav class="profile-dashboard-nav" aria-label="Dashboard quick navigation">
           <a href="#profile-training-program-section" class="profile-dashboard-nav-link">Training</a>
+          <a href="#profile-onboarding-section" class="profile-dashboard-nav-link">Onboarding</a>
           <a href="#profile-goals-section" class="profile-dashboard-nav-link">Goals</a>
           <a href="athlete-messages.html" class="profile-dashboard-nav-link" data-profile-messages-open>Messages</a>
           <a href="#profile-overview-section" class="profile-dashboard-nav-link">Profile</a>
           <a href="#profile-metrics-section" class="profile-dashboard-nav-link">Metrics</a>
+          <a href="#profile-strava-section" class="profile-dashboard-nav-link">Wearables</a>
           <a href="#profile-nutrition-section" class="profile-dashboard-nav-link">Nutrition</a>
         </nav>
 
@@ -95,6 +97,24 @@
           <div id="profile-training-program-content">
             <p class="profile-training-loading">Loading your training programs...</p>
           </div>
+        </div>
+
+        <div class="profile-section" id="profile-onboarding-section">
+          <div class="profile-section-header">
+            <div>
+              <h2>Onboarding Intake</h2>
+              <p class="profile-section-copy">Complete your assigned onboarding form so your coach can tailor your plan.</p>
+            </div>
+            <div class="profile-section-actions" data-onboarding-coach-actions hidden>
+              <button type="button" class="btn profile-btn-edit-profile" data-coach-intake-open>Assign Intake Form</button>
+            </div>
+          </div>
+
+          <div class="profile-onboarding-content" data-onboarding-content>
+            <p class="profile-loading">Loading onboarding intake forms...</p>
+          </div>
+
+          <p class="profile-status" role="status" aria-live="polite" data-onboarding-status></p>
         </div>
 
         <div class="profile-section" id="profile-nutrition-section">
@@ -281,6 +301,82 @@
           </div>
         </div>
 
+        <div class="profile-section" id="profile-strava-section">
+          <div class="profile-section-header">
+            <div>
+              <h2>Wearables Sync</h2>
+              <p class="profile-section-copy">Connect Strava and Whoop to pull training load and recovery metrics into your dashboard.</p>
+            </div>
+            <div class="profile-section-actions">
+              <button
+                type="button"
+                class="btn profile-btn-cancel profile-btn-section-toggle"
+                data-section-collapse-toggle="strava"
+                aria-expanded="false"
+                aria-controls="profile-strava-content"
+              >
+                Show Wearables
+              </button>
+            </div>
+          </div>
+
+          <div id="profile-strava-content" data-section-collapse-content="strava" hidden>
+            <div class="profile-wearables-grid">
+              <section class="profile-wearable-card" aria-label="Strava Sync">
+                <div class="profile-wearable-head">
+                  <h3>Strava</h3>
+                  <div class="profile-section-actions">
+                    <button type="button" class="btn profile-btn-edit-profile" data-strava-connect>Connect Strava</button>
+                    <button type="button" class="btn profile-btn-cancel" data-strava-sync hidden>Sync Strava</button>
+                    <button type="button" class="btn profile-btn-cancel" data-strava-disconnect hidden>Disconnect</button>
+                  </div>
+                </div>
+                <div class="strava-connection-meta" data-strava-connection-meta>
+                  <p class="profile-loading">Checking Strava connection...</p>
+                </div>
+                <div class="strava-metrics-grid" data-strava-metrics-grid>
+                  <p class="profile-loading">Loading Strava metrics...</p>
+                </div>
+                <p class="profile-status" role="status" aria-live="polite" data-strava-status></p>
+              </section>
+
+              <section class="profile-wearable-card" aria-label="Whoop Sync">
+                <div class="profile-wearable-head">
+                  <h3>Whoop</h3>
+                  <div class="profile-section-actions">
+                    <button type="button" class="btn profile-btn-edit-profile" data-whoop-connect>Connect Whoop</button>
+                    <button type="button" class="btn profile-btn-cancel" data-whoop-manual-toggle>Enter Whoop Info</button>
+                    <button type="button" class="btn profile-btn-cancel" data-whoop-sync hidden>Sync Whoop</button>
+                    <button type="button" class="btn profile-btn-cancel" data-whoop-disconnect hidden>Disconnect</button>
+                  </div>
+                </div>
+
+                <form class="profile-whoop-manual" data-whoop-manual-form hidden>
+                  <p class="profile-whoop-manual-copy">Paste Whoop token details to connect manually.</p>
+                  <div class="profile-whoop-manual-grid">
+                    <input type="text" placeholder="Whoop Access Token" data-whoop-manual-access-token required />
+                    <input type="text" placeholder="Whoop Refresh Token" data-whoop-manual-refresh-token required />
+                    <input type="number" min="1" step="1" placeholder="Token Expires In (seconds)" data-whoop-manual-expires-in />
+                    <input type="text" placeholder="Whoop User ID (optional)" data-whoop-manual-user-id />
+                  </div>
+                  <div class="profile-whoop-manual-actions">
+                    <button type="submit" class="btn profile-btn-save">Save Whoop Info</button>
+                    <button type="button" class="btn profile-btn-cancel" data-whoop-manual-cancel>Cancel</button>
+                  </div>
+                </form>
+
+                <div class="strava-connection-meta" data-whoop-connection-meta>
+                  <p class="profile-loading">Checking Whoop connection...</p>
+                </div>
+                <div class="strava-metrics-grid" data-whoop-metrics-grid>
+                  <p class="profile-loading">Loading Whoop metrics...</p>
+                </div>
+                <p class="profile-status" role="status" aria-live="polite" data-whoop-status></p>
+              </section>
+            </div>
+          </div>
+        </div>
+
         <div class="profile-section" id="profile-overview-section">
           <div class="profile-section-header">
             <h2>Athlete Overview</h2>
@@ -371,6 +467,42 @@
         </div>
 
         <p class="admin-modal-status" role="status" aria-live="polite" data-coach-program-status></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-modal" data-coach-intake-modal hidden>
+    <div class="admin-modal-backdrop" data-coach-intake-close></div>
+    <div class="admin-modal-panel admin-assign-modal-panel" role="dialog" aria-modal="true" aria-labelledby="coach-intake-title">
+      <button type="button" class="admin-modal-close" data-coach-intake-close aria-label="Close">&times;</button>
+      <h2 id="coach-intake-title">Assign Onboarding Intake Form</h2>
+
+      <div class="admin-modal-content">
+        <div class="admin-modal-section">
+          <h3 data-coach-intake-athlete-label>Selected Athlete</h3>
+          <input
+            type="text"
+            class="admin-search"
+            placeholder="Search intake forms by name..."
+            data-coach-intake-search
+          />
+          <div class="admin-assign-list" data-coach-intake-list>
+            <p class="admin-loading">Loading intake forms...</p>
+          </div>
+          <div class="admin-modal-info-row">
+            <label for="coach-intake-due-date">Due Date (optional)</label>
+            <input id="coach-intake-due-date" type="date" data-coach-intake-due-date />
+          </div>
+        </div>
+
+        <div class="admin-modal-section">
+          <div class="admin-modal-actions">
+            <button type="button" class="btn admin-btn-primary" data-coach-intake-assign>Assign Intake Form</button>
+            <button type="button" class="btn admin-btn-reset-password" data-coach-intake-close>Cancel</button>
+          </div>
+        </div>
+
+        <p class="admin-modal-status" role="status" aria-live="polite" data-coach-intake-status></p>
       </div>
     </div>
   </div>

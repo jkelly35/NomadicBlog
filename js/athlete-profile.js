@@ -576,6 +576,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   var NUTRITION_TARGETS_FALLBACK_KEY = "nomadic_athlete_nutrition_targets_v1";
   var STRAVA_REDIRECT_STATUS_PARAM = "strava_status";
   var STRAVA_REDIRECT_MESSAGE_PARAM = "strava_message";
+  var WHOOP_REDIRECT_STATUS_PARAM = "whoop_status";
+  var WHOOP_REDIRECT_MESSAGE_PARAM = "whoop_message";
   var state = {
     client: null,
     user: null,
@@ -587,6 +589,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     metricsLatest: [],
     stravaConnection: null,
     stravaDailyMetrics: [],
+    whoopConnection: null,
+    whoopDailyMetrics: [],
     guardElement: null,
     contentElement: null,
     form: null,
@@ -607,6 +611,25 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     stravaConnectionMeta: null,
     stravaMetricsGrid: null,
     stravaStatusElement: null,
+    whoopConnectBtn: null,
+    whoopSyncBtn: null,
+    whoopDisconnectBtn: null,
+    whoopManualToggleBtn: null,
+    whoopManualForm: null,
+    whoopManualAccessToken: null,
+    whoopManualRefreshToken: null,
+    whoopManualExpiresIn: null,
+    whoopManualUserId: null,
+    whoopManualCancelBtn: null,
+    whoopConnectionMeta: null,
+    whoopMetricsGrid: null,
+    whoopStatusElement: null,
+    onboardingContent: null,
+    onboardingStatus: null,
+    onboardingCoachActions: null,
+    coachIntakeSearch: null,
+    coachIntakeDueDate: null,
+    onboardingAssignments: [],
     goalsManageLink: null,
     goalsToggleButton: null,
     goalsGlanceLink: null,
@@ -845,8 +868,76 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       ]
     },
     trainingTemplates: [],
-    selectedTrainingTemplateId: ""
+    selectedTrainingTemplateId: "",
+    onboardingTemplates: [],
+    selectedOnboardingTemplateId: ""
   };
+
+  function getDefaultOnboardingTemplates() {
+    return [
+      {
+        id: "founding-member-intake-v1",
+        name: "Founding Member Intake",
+        description: "Baseline onboarding form to align goals, history, equipment, and schedule.",
+        questions: [
+          { key: "primary_goal", label: "Primary Performance Goal", type: "text", required: true, placeholder: "What is your #1 goal for this cohort?" },
+          { key: "event_date", label: "Key Event / Race Date", type: "date" },
+          { key: "training_days", label: "Preferred Training Days", type: "text", required: true, placeholder: "e.g. Mon, Wed, Fri" },
+          { key: "minutes_per_session", label: "Typical Session Length (minutes)", type: "number", min: 10, max: 240 },
+          { key: "injury_history", label: "Recent Injury History", type: "textarea", rows: 3, placeholder: "Any injuries, pain, or limitations in the last 12 months?" },
+          { key: "equipment_access", label: "Equipment Access", type: "textarea", rows: 3, placeholder: "Gym, home setup, trail access, wearables, etc." },
+          { key: "experience_level", label: "Current Experience Level", type: "select", options: ["Beginner", "Intermediate", "Advanced"] },
+          { key: "coaching_preferences", label: "Coaching Preferences", type: "textarea", rows: 3, placeholder: "How do you prefer feedback and accountability?" }
+        ]
+      },
+      {
+        id: "performance-readiness-screen-v1",
+        name: "Performance Readiness Screen",
+        description: "Quick readiness and lifestyle intake before plan build.",
+        questions: [
+          { key: "sleep_hours", label: "Average Sleep (hours/night)", type: "number", min: 0, max: 14, step: 0.5, required: true },
+          { key: "stress_level", label: "Current Life Stress", type: "select", options: ["Low", "Moderate", "High"], required: true },
+          { key: "work_schedule", label: "Work / School Schedule Constraints", type: "textarea", rows: 3 },
+          { key: "nutrition_notes", label: "Nutrition Notes", type: "textarea", rows: 3, placeholder: "Allergies, restrictions, fueling challenges" },
+          { key: "confidence_score", label: "Confidence Score (1-10)", type: "number", min: 1, max: 10 }
+        ]
+      }
+    ];
+  }
+
+  function shouldAutoOpenMetricReport() {
+    try {
+      return new URLSearchParams(window.location.search || "").get("printMetricReport") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function clearAutoMetricReportFlag() {
+    var url;
+    try {
+      url = new URL(window.location.href);
+    } catch (e) {
+      return;
+    }
+
+    if (!url.searchParams.has("printMetricReport")) {
+      return;
+    }
+
+    url.searchParams.delete("printMetricReport");
+    window.history.replaceState({}, document.title, url.toString());
+  }
+
+  function maybeAutoOpenMetricReport() {
+    if (!state.metricsReportAutoPending || !state.metricsLatest || !state.metricsLatest.length) {
+      return;
+    }
+
+    state.metricsReportAutoPending = false;
+    clearAutoMetricReportFlag();
+    onGenerateMetricSummaryPdf();
+  }
 
   document.addEventListener("DOMContentLoaded", function () {
     initializeProfile();
@@ -873,6 +964,25 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.stravaConnectionMeta = document.querySelector("[data-strava-connection-meta]");
     state.stravaMetricsGrid = document.querySelector("[data-strava-metrics-grid]");
     state.stravaStatusElement = document.querySelector("[data-strava-status]");
+    state.whoopConnectBtn = document.querySelector("[data-whoop-connect]");
+    state.whoopManualToggleBtn = document.querySelector("[data-whoop-manual-toggle]");
+    state.whoopManualForm = document.querySelector("[data-whoop-manual-form]");
+    state.whoopManualAccessToken = document.querySelector("[data-whoop-manual-access-token]");
+    state.whoopManualRefreshToken = document.querySelector("[data-whoop-manual-refresh-token]");
+    state.whoopManualExpiresIn = document.querySelector("[data-whoop-manual-expires-in]");
+    state.whoopManualUserId = document.querySelector("[data-whoop-manual-user-id]");
+    state.whoopManualCancelBtn = document.querySelector("[data-whoop-manual-cancel]");
+    state.whoopSyncBtn = document.querySelector("[data-whoop-sync]");
+    state.whoopDisconnectBtn = document.querySelector("[data-whoop-disconnect]");
+    state.whoopConnectionMeta = document.querySelector("[data-whoop-connection-meta]");
+    state.whoopMetricsGrid = document.querySelector("[data-whoop-metrics-grid]");
+    state.whoopStatusElement = document.querySelector("[data-whoop-status]");
+    state.onboardingContent = document.querySelector("[data-onboarding-content]");
+    state.onboardingStatus = document.querySelector("[data-onboarding-status]");
+    state.onboardingCoachActions = document.querySelector("[data-onboarding-coach-actions]");
+    state.coachIntakeSearch = document.querySelector("[data-coach-intake-search]");
+    state.coachIntakeDueDate = document.querySelector("[data-coach-intake-due-date]");
+    state.onboardingTemplates = getDefaultOnboardingTemplates();
     state.goalsManageLink = document.querySelector("[data-goals-manage-link]");
     state.goalsToggleButton = document.querySelector("[data-goals-toggle-list]");
     state.goalsGlanceLink = document.querySelector("[data-glance-goals-link]");
@@ -898,6 +1008,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.nutritionList = document.querySelector("[data-nutrition-list]");
     state.nutritionStatus = document.querySelector("[data-nutrition-status]");
     state.passwordStatus = document.querySelector("[data-password-status]");
+    state.metricsReportAutoPending = shouldAutoOpenMetricReport();
     state.editToggleButton = document.querySelector("[data-profile-edit-toggle]");
     state.editorSection = document.querySelector("[data-profile-editor]");
     state.sportOverviewEditor = document.querySelector("[data-sport-overview-editor]");
@@ -1013,8 +1124,13 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     loadProfileData();
     loadMetricsData();
     loadCurrentTrainingProgram();
+    loadOnboardingIntake();
     loadGoalItems();
     loadNutritionData();
+    loadStravaOverview();
+    loadWhoopOverview();
+    maybeShowStravaRedirectStatus();
+    maybeShowWhoopRedirectStatus();
   }
 
   function applyCoachViewUi() {
@@ -1039,7 +1155,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     var stravaCopy = document.querySelector("#profile-strava-section .profile-section-copy");
     if (stravaCopy) {
-      stravaCopy.textContent = "Coach view: monitor this athlete's latest Strava sync and summary metrics.";
+      stravaCopy.textContent = "Coach view: monitor this athlete's latest Strava and Whoop sync status and summary metrics.";
     }
 
     if (headingRow && !headingRow.querySelector("[data-coach-back-link]")) {
@@ -1071,6 +1187,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (state.nutritionManageLink) {
       state.nutritionManageLink.style.display = "";
       state.nutritionManageLink.textContent = "View Nutrition Log";
+    }
+
+    if (state.onboardingCoachActions) {
+      state.onboardingCoachActions.hidden = false;
     }
 
     if (state.nutritionGoalsLink) {
@@ -1368,6 +1488,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         state.metricsLatest = getLatestMetrics(state.metrics);
         renderMetricsCards();
         renderMetricRowsFromData(state.metricsLatest);
+        maybeAutoOpenMetricReport();
       })
       .catch(function (error) {
         setMetricsStatus(error && error.message ? error.message : "Failed to load metrics.", "error");
@@ -1633,6 +1754,49 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
     }
 
+    if (state.whoopConnectBtn) {
+      state.whoopConnectBtn.addEventListener("click", onWhoopConnect);
+    }
+
+    if (state.whoopManualToggleBtn) {
+      state.whoopManualToggleBtn.addEventListener("click", function () {
+        setWhoopManualFormVisible(true);
+      });
+    }
+
+    if (state.whoopManualCancelBtn) {
+      state.whoopManualCancelBtn.addEventListener("click", function () {
+        setWhoopManualFormVisible(false);
+      });
+    }
+
+    if (state.whoopManualForm) {
+      state.whoopManualForm.addEventListener("submit", onWhoopManualSubmit);
+    }
+
+    if (state.whoopSyncBtn) {
+      state.whoopSyncBtn.addEventListener("click", onWhoopSync);
+    }
+
+    if (state.whoopDisconnectBtn) {
+      state.whoopDisconnectBtn.addEventListener("click", onWhoopDisconnect);
+    }
+
+    if (state.whoopMetricsGrid) {
+      state.whoopMetricsGrid.addEventListener("click", function (event) {
+        var connectBtn = event.target && event.target.closest("[data-inline-whoop-connect]");
+        if (connectBtn) {
+          onWhoopConnect();
+          return;
+        }
+
+        var syncBtn = event.target && event.target.closest("[data-inline-whoop-sync]");
+        if (syncBtn) {
+          onWhoopSync();
+        }
+      });
+    }
+
     if (state.nutritionTargetsForm) {
       state.nutritionTargetsForm.addEventListener("submit", onNutritionTargetsSubmit);
     }
@@ -1880,6 +2044,44 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
     }
 
+    if (state.onboardingContent) {
+      state.onboardingContent.addEventListener("submit", function (event) {
+        var formEl = event && event.target;
+        if (!formEl || !formEl.matches("[data-onboarding-response-form]")) {
+          return;
+        }
+
+        event.preventDefault();
+        var assignmentId = String(formEl.getAttribute("data-assignment-id") || "").trim();
+        if (!assignmentId) {
+          setOnboardingStatus("Could not find intake assignment.", "error");
+          return;
+        }
+
+        onSubmitOnboardingResponse(assignmentId, formEl);
+      });
+    }
+
+    var coachIntakeOpenBtn = document.querySelector("[data-coach-intake-open]");
+    if (coachIntakeOpenBtn) {
+      coachIntakeOpenBtn.addEventListener("click", openCoachIntakeModal);
+    }
+
+    document.querySelectorAll("[data-coach-intake-close]").forEach(function (btn) {
+      btn.addEventListener("click", closeCoachIntakeModal);
+    });
+
+    if (state.coachIntakeSearch) {
+      state.coachIntakeSearch.addEventListener("input", function () {
+        renderCoachIntakeTemplateList(String(state.coachIntakeSearch.value || ""));
+      });
+    }
+
+    var coachIntakeAssignBtn = document.querySelector("[data-coach-intake-assign]");
+    if (coachIntakeAssignBtn) {
+      coachIntakeAssignBtn.addEventListener("click", onAssignIntakeToCurrentAthlete);
+    }
+
     var coachProgramCloseButtons = document.querySelectorAll("[data-coach-program-close]");
     coachProgramCloseButtons.forEach(function (btn) {
       btn.addEventListener("click", closeCoachProgramModal);
@@ -1900,6 +2102,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     document.addEventListener("keydown", function (event) {
       if (event && event.key === "Escape") {
         closeCoachProgramModal();
+        closeCoachIntakeModal();
       }
     });
   }
@@ -2302,7 +2505,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   function getSectionToggleText(sectionName, collapsed) {
     var section = String(sectionName || "").trim().toLowerCase();
     if (section === "strava") {
-      return collapsed ? "Show Strava" : "Hide Strava";
+      return collapsed ? "Show Wearables" : "Hide Wearables";
     }
     if (section === "danger") {
       return collapsed ? "Show Danger Zone" : "Hide Danger Zone";
@@ -2596,6 +2799,459 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     // Always use the non-join version to avoid ambiguous relationship embeds.
     loadCurrentTrainingProgramWithoutJoin(content);
+  }
+
+  function loadOnboardingIntake() {
+    if (!state.client || !getViewedUserId() || !state.onboardingContent) {
+      return;
+    }
+
+    state.onboardingContent.innerHTML = '<p class="profile-loading">Loading onboarding intake forms...</p>';
+    setOnboardingStatus("", "info");
+
+    state.client
+      .from("athlete_onboarding_intake_assignments")
+      .select("id,athlete_user_id,form_id,form_name,form_schema,response_data,status,assigned_at,assigned_by,due_date,submitted_at,updated_at")
+      .eq("athlete_user_id", getViewedUserId())
+      .order("assigned_at", { ascending: false })
+      .limit(20)
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingRelationError(result.error)) {
+            state.onboardingAssignments = [];
+            renderOnboardingAssignments();
+            setOnboardingStatus(
+              "Onboarding intake tables are not installed yet. Run sql/create-athlete-onboarding-intake.sql in Supabase.",
+              "error"
+            );
+            return;
+          }
+
+          setOnboardingStatus(result.error.message, "error");
+          return;
+        }
+
+        state.onboardingAssignments = (result.data || []).map(normalizeOnboardingAssignment);
+        renderOnboardingAssignments();
+      })
+      .catch(function (error) {
+        setOnboardingStatus(error && error.message ? error.message : "Failed to load onboarding intake.", "error");
+      });
+  }
+
+  function normalizeOnboardingAssignment(row) {
+    var schema = row && row.form_schema && typeof row.form_schema === "object" ? row.form_schema : {};
+    var response = row && row.response_data && typeof row.response_data === "object" ? row.response_data : {};
+    return {
+      id: String(row && row.id || ""),
+      athlete_user_id: String(row && row.athlete_user_id || ""),
+      form_id: String(row && row.form_id || ""),
+      form_name: String(row && row.form_name || "Onboarding Intake"),
+      form_schema: schema,
+      response_data: response,
+      status: String(row && row.status || "assigned"),
+      assigned_at: String(row && row.assigned_at || ""),
+      due_date: row && row.due_date ? String(row.due_date) : "",
+      submitted_at: row && row.submitted_at ? String(row.submitted_at) : "",
+      updated_at: row && row.updated_at ? String(row.updated_at) : ""
+    };
+  }
+
+  function renderOnboardingAssignments() {
+    if (!state.onboardingContent) {
+      return;
+    }
+
+    var assignments = (state.onboardingAssignments || []).filter(function (assignment) {
+      return !!assignment;
+    });
+
+    if (!assignments.length) {
+      state.onboardingContent.innerHTML =
+        '<div class="profile-empty-state">' +
+          '<p class="profile-empty-state-title">No onboarding intake assigned</p>' +
+          '<p class="profile-empty-state-copy">' +
+            (state.isCoachView
+              ? "Assign an intake form so this athlete can complete onboarding."
+              : "Your coach has not assigned an onboarding intake form yet.") +
+          "</p>" +
+        "</div>";
+      return;
+    }
+
+    var visibleAssignments = state.isCoachView
+      ? assignments
+      : assignments.filter(function (assignment) {
+          return assignment.status !== "archived";
+        });
+
+    if (!visibleAssignments.length) {
+      state.onboardingContent.innerHTML =
+        '<div class="profile-empty-state">' +
+          '<p class="profile-empty-state-title">No active onboarding forms</p>' +
+          '<p class="profile-empty-state-copy">All onboarding forms are archived.</p>' +
+        "</div>";
+      return;
+    }
+
+    state.onboardingContent.innerHTML = visibleAssignments
+      .map(function (assignment) {
+        var schemaQuestions = Array.isArray(assignment.form_schema && assignment.form_schema.questions)
+          ? assignment.form_schema.questions
+          : [];
+        var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
+        var submittedLabel = assignment.submitted_at ? formatDate(assignment.submitted_at) : "Not submitted";
+        var statusLabel = assignment.status === "submitted" ? "Submitted" : (assignment.status === "archived" ? "Archived" : "Assigned");
+
+        var html = '';
+        html += '<article class="profile-nutrition-card profile-onboarding-card">';
+        html += '<div class="profile-section-header">';
+        html += '<div><h3>' + escapeHtml(assignment.form_name) + '</h3>';
+        html += '<p class="profile-section-copy">Assigned ' + escapeHtml(formatDate(assignment.assigned_at)) + ' • Due ' + escapeHtml(dueLabel) + '</p></div>';
+        html += '<span class="admin-risk-chip ' + (assignment.status === "submitted" ? "is-stable" : "") + '">' + escapeHtml(statusLabel) + '</span>';
+        html += '</div>';
+
+        if (state.isCoachView) {
+          html += '<p class="profile-section-copy"><strong>Submission:</strong> ' + escapeHtml(submittedLabel) + '</p>';
+          if (assignment.response_data && Object.keys(assignment.response_data).length) {
+            html += '<div class="profile-goals-list">';
+            html += Object.keys(assignment.response_data)
+              .map(function (key) {
+                return '<div class="goal-list-item"><strong>' + escapeHtml(formatQuestionKeyLabel(key)) + '</strong><span>' + escapeHtml(String(assignment.response_data[key] || "—")) + '</span></div>';
+              })
+              .join('');
+            html += '</div>';
+          } else {
+            html += '<p class="profile-empty-state-copy">No athlete responses submitted yet.</p>';
+          }
+          html += '</article>';
+          return html;
+        }
+
+        html += '<form data-onboarding-response-form data-assignment-id="' + escapeAttribute(assignment.id) + '">';
+        if (!schemaQuestions.length) {
+          html += '<p class="profile-empty-state-copy">This intake form has no questions configured.</p>';
+        } else {
+          html += schemaQuestions
+            .map(function (question) {
+              return buildOnboardingQuestionField(question, assignment.response_data || {});
+            })
+            .join('');
+        }
+
+        html += '<div class="profile-section-actions">';
+        html += '<button type="submit" class="btn profile-btn-save">Save Intake Responses</button>';
+        html += '</div>';
+        html += '</form>';
+        html += '</article>';
+        return html;
+      })
+      .join("");
+  }
+
+  function formatQuestionKeyLabel(key) {
+    return String(key || "")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, function (char) {
+        return char.toUpperCase();
+      });
+  }
+
+  function buildOnboardingQuestionField(question, responseData) {
+    var q = question && typeof question === "object" ? question : {};
+    var key = String(q.key || "").trim();
+    if (!key) {
+      return "";
+    }
+
+    var label = String(q.label || formatQuestionKeyLabel(key));
+    var type = String(q.type || "text").toLowerCase();
+    var required = !!q.required;
+    var value = responseData && Object.prototype.hasOwnProperty.call(responseData, key)
+      ? String(responseData[key] || "")
+      : "";
+
+    var html = '';
+    html += '<div class="form-group">';
+    html += '<label>' + escapeHtml(label) + (required ? " *" : "") + '</label>';
+
+    if (type === "textarea") {
+      html += '<textarea name="q:' + escapeAttribute(key) + '" rows="' + escapeAttribute(String(q.rows || 3)) + '" placeholder="' + escapeAttribute(String(q.placeholder || "")) + '"' + (required ? ' required' : '') + '>' + escapeHtml(value) + '</textarea>';
+    } else if (type === "select") {
+      var options = Array.isArray(q.options) ? q.options : [];
+      html += '<select name="q:' + escapeAttribute(key) + '"' + (required ? ' required' : '') + '>';
+      html += '<option value="">Select...</option>';
+      options.forEach(function (optionValue) {
+        var optionText = String(optionValue || "");
+        var selected = value === optionText ? ' selected' : '';
+        html += '<option value="' + escapeAttribute(optionText) + '"' + selected + '>' + escapeHtml(optionText) + '</option>';
+      });
+      html += '</select>';
+    } else {
+      var inputType = ["number", "date", "email"].indexOf(type) > -1 ? type : "text";
+      var minAttr = q.min != null ? ' min="' + escapeAttribute(String(q.min)) + '"' : "";
+      var maxAttr = q.max != null ? ' max="' + escapeAttribute(String(q.max)) + '"' : "";
+      var stepAttr = q.step != null ? ' step="' + escapeAttribute(String(q.step)) + '"' : "";
+      html += '<input type="' + escapeAttribute(inputType) + '" name="q:' + escapeAttribute(key) + '" value="' + escapeAttribute(value) + '" placeholder="' + escapeAttribute(String(q.placeholder || "")) + '"' + minAttr + maxAttr + stepAttr + (required ? ' required' : '') + ' />';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function onSubmitOnboardingResponse(assignmentId, formEl) {
+    if (!state.client || !getViewedUserId() || !assignmentId || !formEl || state.isCoachView) {
+      setOnboardingStatus("You cannot submit intake responses from this view.", "error");
+      return;
+    }
+
+    var assignment = (state.onboardingAssignments || []).find(function (item) {
+      return String(item && item.id || "") === assignmentId;
+    });
+
+    if (!assignment) {
+      setOnboardingStatus("Intake assignment not found.", "error");
+      return;
+    }
+
+    var formData = new FormData(formEl);
+    var responses = {};
+    formData.forEach(function (value, key) {
+      if (String(key || "").indexOf("q:") !== 0) {
+        return;
+      }
+      var responseKey = String(key).slice(2);
+      responses[responseKey] = String(value || "").trim();
+    });
+
+    var requiredQuestions = Array.isArray(assignment.form_schema && assignment.form_schema.questions)
+      ? assignment.form_schema.questions.filter(function (question) {
+          return !!(question && question.required && question.key);
+        })
+      : [];
+
+    var missingQuestion = requiredQuestions.find(function (question) {
+      var key = String(question.key || "");
+      return !String(responses[key] || "").trim();
+    });
+    if (missingQuestion) {
+      setOnboardingStatus("Please complete required field: " + String(missingQuestion.label || missingQuestion.key), "error");
+      return;
+    }
+
+    setOnboardingStatus("Saving intake responses...", "info");
+
+    state.client
+      .from("athlete_onboarding_intake_assignments")
+      .update({
+        response_data: responses,
+        status: "submitted",
+        submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", assignmentId)
+      .eq("athlete_user_id", getViewedUserId())
+      .then(function (result) {
+        if (result.error) {
+          setOnboardingStatus(result.error.message, "error");
+          return;
+        }
+
+        setOnboardingStatus("Intake responses saved.", "success");
+        loadOnboardingIntake();
+      })
+      .catch(function (error) {
+        setOnboardingStatus(error && error.message ? error.message : "Failed to save intake responses.", "error");
+      });
+  }
+
+  function openCoachIntakeModal() {
+    if (!state.isCoachView || !state.client || !getViewedUserId()) {
+      setOnboardingStatus("Unable to manage intake forms right now.", "error");
+      return;
+    }
+
+    var modal = document.querySelector("[data-coach-intake-modal]");
+    if (!modal) {
+      return;
+    }
+
+    var athleteLabel = document.querySelector("[data-coach-intake-athlete-label]");
+    if (athleteLabel) {
+      athleteLabel.textContent =
+        "Athlete: " +
+        ((state.profile && state.profile.name) || (state.viewUser && state.viewUser.email) || "Selected athlete");
+    }
+
+    if (state.coachIntakeSearch) {
+      state.coachIntakeSearch.value = "";
+    }
+    if (state.coachIntakeDueDate) {
+      state.coachIntakeDueDate.value = "";
+    }
+
+    state.selectedOnboardingTemplateId = "";
+    setCoachIntakeStatus("", "info");
+    modal.hidden = false;
+    document.body.classList.add("admin-modal-open");
+    renderCoachIntakeTemplateList("");
+  }
+
+  function closeCoachIntakeModal() {
+    var modal = document.querySelector("[data-coach-intake-modal]");
+    if (!modal || modal.hidden) {
+      return;
+    }
+
+    modal.hidden = true;
+    document.body.classList.remove("admin-modal-open");
+    state.selectedOnboardingTemplateId = "";
+    setCoachIntakeStatus("", "info");
+  }
+
+  function renderCoachIntakeTemplateList(searchTerm) {
+    var list = document.querySelector("[data-coach-intake-list]");
+    if (!list) {
+      return;
+    }
+
+    var query = String(searchTerm || "").trim().toLowerCase();
+    var filtered = (state.onboardingTemplates || []).filter(function (template) {
+      if (!query) {
+        return true;
+      }
+      return String(template && template.name || "").toLowerCase().indexOf(query) > -1;
+    });
+
+    if (!filtered.length) {
+      list.innerHTML = '<p class="admin-loading">No intake forms match this search.</p>';
+      return;
+    }
+
+    list.innerHTML = filtered
+      .map(function (template) {
+        var checked = state.selectedOnboardingTemplateId === template.id ? " checked" : "";
+        return (
+          '<label class="admin-assign-item">' +
+          '<input type="radio" name="coach-intake-template" data-coach-intake-template value="' +
+          escapeAttribute(template.id) +
+          '"' +
+          checked +
+          ' />' +
+          '<span class="admin-assign-item-main">' +
+          '<strong>' + escapeHtml(template.name || "Onboarding Intake") + '</strong>' +
+          '<small>' + escapeHtml(template.description || "") + '</small>' +
+          '</span>' +
+          '</label>'
+        );
+      })
+      .join("");
+
+    list.querySelectorAll("[data-coach-intake-template]").forEach(function (radio) {
+      radio.addEventListener("change", function () {
+        state.selectedOnboardingTemplateId = String(radio.value || "");
+      });
+    });
+  }
+
+  function onAssignIntakeToCurrentAthlete() {
+    var viewedUserId = getViewedUserId();
+    if (!state.isCoachView || !viewedUserId || !state.client) {
+      setCoachIntakeStatus("Unable to assign intake form right now.", "error");
+      return;
+    }
+
+    if (!state.selectedOnboardingTemplateId) {
+      setCoachIntakeStatus("Select an intake form to assign.", "error");
+      return;
+    }
+
+    var template = (state.onboardingTemplates || []).find(function (item) {
+      return item.id === state.selectedOnboardingTemplateId;
+    });
+    if (!template) {
+      setCoachIntakeStatus("Intake form not found.", "error");
+      return;
+    }
+
+    var dueDate = state.coachIntakeDueDate ? String(state.coachIntakeDueDate.value || "").trim() : "";
+    var nowIso = new Date().toISOString();
+    setCoachIntakeStatus("Assigning intake form...", "info");
+
+    state.client
+      .from("athlete_onboarding_intake_assignments")
+      .insert({
+        athlete_user_id: viewedUserId,
+        form_id: template.id,
+        form_name: template.name,
+        form_schema: {
+          description: template.description || "",
+          questions: template.questions || []
+        },
+        response_data: {},
+        status: "assigned",
+        assigned_at: nowIso,
+        assigned_by: state.user ? state.user.id : null,
+        due_date: dueDate || null,
+        updated_at: nowIso
+      })
+      .then(function (result) {
+        if (result.error) {
+          setCoachIntakeStatus(result.error.message, "error");
+          return;
+        }
+
+        setCoachIntakeStatus("Intake form assigned.", "success");
+        setOnboardingStatus("Intake form assigned to athlete.", "success");
+        setTimeout(function () {
+          closeCoachIntakeModal();
+          loadOnboardingIntake();
+        }, 400);
+      })
+      .catch(function (error) {
+        setCoachIntakeStatus(error && error.message ? error.message : "Failed to assign intake form.", "error");
+      });
+  }
+
+  function setOnboardingStatus(message, variant) {
+    if (!state.onboardingStatus) {
+      return;
+    }
+
+    state.onboardingStatus.textContent = message || "";
+    state.onboardingStatus.classList.remove("is-error", "is-success", "is-info");
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      state.onboardingStatus.classList.add("is-error");
+    } else if (variant === "success") {
+      state.onboardingStatus.classList.add("is-success");
+    } else {
+      state.onboardingStatus.classList.add("is-info");
+    }
+  }
+
+  function setCoachIntakeStatus(message, variant) {
+    var statusEl = document.querySelector("[data-coach-intake-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
   }
 
   function loadGoalItems() {
@@ -4227,6 +4883,509 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     return message || ("Failed calling " + functionName + ".");
   }
 
+  function loadWhoopOverview() {
+    if (!state.client || !getViewedUserId()) {
+      return;
+    }
+
+    renderWhoopConnection(null, true);
+
+    state.client
+      .from("athlete_whoop_connections")
+      .select("user_id,whoop_user_id,connected_at,last_sync_at,sync_status,updated_at")
+      .eq("user_id", getViewedUserId())
+      .maybeSingle()
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingRelationError(result.error)) {
+            setWhoopStatus(
+              "Whoop tables are not set up yet. Run sql/create-whoop-integration.sql in Supabase first.",
+              "error"
+            );
+            renderWhoopConnection(null, false);
+            renderWhoopMetrics([]);
+            return;
+          }
+
+          if (isRlsError(result.error)) {
+            setWhoopStatus(
+              "Whoop data is blocked by row-level security policy. Ask your admin to enable access.",
+              "error"
+            );
+            renderWhoopConnection(null, false);
+            renderWhoopMetrics([]);
+            return;
+          }
+
+          setWhoopStatus(result.error.message, "error");
+          renderWhoopConnection(null, false);
+          renderWhoopMetrics([]);
+          return;
+        }
+
+        state.whoopConnection = result.data || null;
+        renderWhoopConnection(state.whoopConnection, false);
+        loadWhoopDailyMetrics();
+      })
+      .catch(function (error) {
+        setWhoopStatus(error && error.message ? error.message : "Failed to load Whoop connection.", "error");
+        renderWhoopConnection(null, false);
+        renderWhoopMetrics([]);
+      });
+  }
+
+  function loadWhoopDailyMetrics() {
+    if (!state.client || !getViewedUserId()) {
+      return;
+    }
+
+    state.client
+      .from("athlete_whoop_daily_metrics")
+      .select("metric_date,recovery_score,resting_hr,hrv_ms,sleep_hours,day_strain,workout_count,workout_duration_sec")
+      .eq("user_id", getViewedUserId())
+      .order("metric_date", { ascending: false })
+      .limit(30)
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingRelationError(result.error)) {
+            renderWhoopMetrics([]);
+            return;
+          }
+
+          if (isRlsError(result.error)) {
+            setWhoopStatus(
+              "Cannot read Whoop metrics due to row-level security policy.",
+              "error"
+            );
+            renderWhoopMetrics([]);
+            return;
+          }
+
+          setWhoopStatus(result.error.message, "error");
+          renderWhoopMetrics([]);
+          return;
+        }
+
+        state.whoopDailyMetrics = Array.isArray(result.data) ? result.data : [];
+        renderWhoopMetrics(state.whoopDailyMetrics);
+      })
+      .catch(function (error) {
+        setWhoopStatus(error && error.message ? error.message : "Failed to load Whoop metrics.", "error");
+        renderWhoopMetrics([]);
+      });
+  }
+
+  function renderWhoopConnection(connection, isLoading) {
+    if (!state.whoopConnectionMeta) {
+      return;
+    }
+
+    if (isLoading) {
+      state.whoopConnectionMeta.innerHTML = '<p class="profile-loading">Checking Whoop connection...</p>';
+      return;
+    }
+
+    var canManage = canManageWhoopConnection();
+    var isConnected = !!connection;
+
+    if (state.whoopConnectBtn) {
+      state.whoopConnectBtn.hidden = !canManage || isConnected;
+      state.whoopConnectBtn.disabled = !canManage;
+    }
+    if (state.whoopManualToggleBtn) {
+      state.whoopManualToggleBtn.hidden = !canManage || isConnected;
+      state.whoopManualToggleBtn.disabled = !canManage;
+    }
+    if (state.whoopSyncBtn) {
+      state.whoopSyncBtn.hidden = !isConnected;
+      state.whoopSyncBtn.disabled = !isConnected;
+    }
+    if (state.whoopDisconnectBtn) {
+      state.whoopDisconnectBtn.hidden = !canManage || !isConnected;
+      state.whoopDisconnectBtn.disabled = !canManage || !isConnected;
+    }
+
+    if (!isConnected) {
+      setWhoopManualFormVisible(false);
+      var coachHint = state.isCoachView
+        ? "This athlete has not connected Whoop yet."
+        : "Connect your Whoop account to pull recovery, sleep, and strain metrics.";
+      state.whoopConnectionMeta.innerHTML =
+        '<p class="strava-connection-empty">' + escapeHtml(coachHint) + "</p>";
+      return;
+    }
+
+    var whoopLabel = connection.whoop_user_id ? "Whoop User " + connection.whoop_user_id : "Connected account";
+    var syncLabel = connection.last_sync_at ? formatDate(connection.last_sync_at) : "Not synced yet";
+    var statusText = connection.sync_status || "connected";
+
+    state.whoopConnectionMeta.innerHTML =
+      '<div class="strava-connection-grid">' +
+      '<div class="strava-connection-item"><span>Account</span><strong>' + escapeHtml(whoopLabel) + "</strong></div>" +
+      '<div class="strava-connection-item"><span>Connection Status</span><strong>' + escapeHtml(statusText) + "</strong></div>" +
+      '<div class="strava-connection-item"><span>Last Sync</span><strong>' + escapeHtml(syncLabel) + "</strong></div>" +
+      "</div>";
+    setWhoopManualFormVisible(false);
+  }
+
+  function onWhoopManualSubmit(event) {
+    if (event) {
+      event.preventDefault();
+    }
+
+    if (!canManageWhoopConnection()) {
+      setWhoopStatus("Only the athlete can set Whoop credentials from this view.", "info");
+      return;
+    }
+
+    if (!state.client || !state.client.functions) {
+      setWhoopStatus("Supabase Functions are not available in this build.", "error");
+      return;
+    }
+
+    var accessToken = String((state.whoopManualAccessToken && state.whoopManualAccessToken.value) || "").trim();
+    var refreshToken = String((state.whoopManualRefreshToken && state.whoopManualRefreshToken.value) || "").trim();
+    var userId = String((state.whoopManualUserId && state.whoopManualUserId.value) || "").trim();
+    var expiresInRaw = String((state.whoopManualExpiresIn && state.whoopManualExpiresIn.value) || "").trim();
+    var expiresIn = expiresInRaw ? Number(expiresInRaw) : null;
+
+    if (!accessToken || !refreshToken) {
+      setWhoopStatus("Access token and refresh token are required.", "error");
+      return;
+    }
+
+    setWhoopStatus("Saving Whoop info...", "info");
+
+    state.client.functions
+      .invoke("whoop-manual-connect", {
+        body: {
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          expires_in: Number.isFinite(expiresIn) ? expiresIn : null,
+          whoop_user_id: userId || null
+        }
+      })
+      .then(function (result) {
+        if (result.error) {
+          handleWhoopEdgeError(result.error, "whoop-manual-connect");
+          return;
+        }
+
+        setWhoopStatus("Whoop credentials saved. Syncing latest metrics...", "success");
+        setWhoopManualFormVisible(false);
+        if (state.whoopManualAccessToken) state.whoopManualAccessToken.value = "";
+        if (state.whoopManualRefreshToken) state.whoopManualRefreshToken.value = "";
+        if (state.whoopManualExpiresIn) state.whoopManualExpiresIn.value = "";
+        if (state.whoopManualUserId) state.whoopManualUserId.value = "";
+        loadWhoopOverview();
+      })
+      .catch(function (error) {
+        handleWhoopEdgeError(error, "whoop-manual-connect");
+      });
+  }
+
+  function setWhoopManualFormVisible(visible) {
+    if (!state.whoopManualForm) {
+      return;
+    }
+
+    var shouldShow = !!visible && canManageWhoopConnection();
+    state.whoopManualForm.hidden = !shouldShow;
+  }
+
+  function renderWhoopMetrics(rows) {
+    if (!state.whoopMetricsGrid) {
+      return;
+    }
+
+    var data = Array.isArray(rows) ? rows : [];
+    if (!data.length) {
+      state.whoopMetricsGrid.innerHTML =
+        '<div class="profile-empty-state">' +
+          '<p class="profile-empty-state-title">No Whoop metrics yet</p>' +
+          '<p class="profile-empty-state-copy">Connect and sync Whoop to unlock recovery and sleep trends.</p>' +
+          (state.whoopConnection
+            ? '<button type="button" class="btn profile-btn-cancel" data-inline-whoop-sync>Sync Whoop</button>'
+            : (canManageWhoopConnection()
+              ? '<button type="button" class="btn profile-btn-edit-profile" data-inline-whoop-connect>Connect Whoop</button>'
+              : '')) +
+        '</div>';
+      return;
+    }
+
+    var recentSeven = data.slice(0, 7);
+    var latest = data[0] || null;
+    var avgRecovery = averageNumeric(recentSeven, "recovery_score");
+    var avgSleep = averageNumeric(recentSeven, "sleep_hours");
+    var totalWorkoutCount = sumNumeric(recentSeven, "workout_count");
+    var totalWorkoutHours = sumNumeric(recentSeven, "workout_duration_sec") / 3600;
+    var avgStrain = averageNumeric(recentSeven, "day_strain");
+
+    var cards = [
+      { label: "7-Day Avg Recovery", value: formatNullableNumber(avgRecovery) },
+      { label: "7-Day Avg Sleep", value: formatNullableNumber(avgSleep, " h") },
+      { label: "7-Day Workouts", value: formatInteger(totalWorkoutCount) },
+      { label: "7-Day Workout Time", value: formatDecimal(totalWorkoutHours, 1) + " h" },
+      { label: "7-Day Avg Strain", value: formatNullableNumber(avgStrain) },
+      { label: "Resting HR", value: formatNullableNumber(latest && latest.resting_hr, " bpm") },
+      { label: "HRV", value: formatNullableNumber(latest && latest.hrv_ms, " ms") },
+      { label: "Latest Sleep", value: formatNullableNumber(latest && latest.sleep_hours, " h") }
+    ];
+
+    if (!Number.isFinite(state.readinessRecoveryScore)) {
+      var whoopRecoveryScore = Number(latest && latest.recovery_score);
+      if (Number.isFinite(whoopRecoveryScore)) {
+        state.readinessRecoveryScore = whoopRecoveryScore;
+        updateDailyReadinessCard();
+      }
+    }
+
+    state.whoopMetricsGrid.innerHTML = cards
+      .map(function (item) {
+        return (
+          '<article class="strava-metric-card">' +
+          '<span class="strava-metric-label">' + escapeHtml(item.label) + "</span>" +
+          '<strong class="strava-metric-value">' + escapeHtml(item.value) + "</strong>" +
+          "</article>"
+        );
+      })
+      .join("");
+  }
+
+  function onWhoopConnect() {
+    if (!canManageWhoopConnection()) {
+      setWhoopStatus("Only the athlete can connect a Whoop account from this view.", "info");
+      return;
+    }
+
+    if (!state.client || !state.client.functions) {
+      setWhoopStatus("Supabase Functions are not available in this build.", "error");
+      return;
+    }
+
+    setWhoopStatus("Generating Whoop authorization link...", "info");
+
+    state.client.functions
+      .invoke("whoop-connect-start", {
+        body: {
+          redirectTo: getWhoopRedirectUrl()
+        }
+      })
+      .then(function (result) {
+        if (result.error) {
+          handleWhoopEdgeError(result.error, "whoop-connect-start");
+          return;
+        }
+
+        var data = result.data || {};
+        var authUrl = data.auth_url || data.authUrl || data.url || "";
+        if (!authUrl) {
+          setWhoopStatus("Whoop auth URL was not returned by whoop-connect-start.", "error");
+          return;
+        }
+
+        window.location.href = authUrl;
+      })
+      .catch(function (error) {
+        handleWhoopEdgeError(error, "whoop-connect-start");
+      });
+  }
+
+  function onWhoopSync() {
+    if (!state.client || !state.client.functions) {
+      setWhoopStatus("Supabase Functions are not available in this build.", "error");
+      return;
+    }
+
+    if (!state.whoopConnection) {
+      setWhoopStatus("Connect Whoop before requesting a sync.", "info");
+      return;
+    }
+
+    setWhoopStatus("Syncing latest Whoop metrics...", "info");
+
+    state.client.functions
+      .invoke("whoop-sync-latest", {
+        body: {
+          days: 30
+        }
+      })
+      .then(function (result) {
+        if (result.error) {
+          handleWhoopEdgeError(result.error, "whoop-sync-latest");
+          return;
+        }
+
+        setWhoopStatus("Whoop sync complete.", "success");
+        loadWhoopOverview();
+      })
+      .catch(function (error) {
+        handleWhoopEdgeError(error, "whoop-sync-latest");
+      });
+  }
+
+  function onWhoopDisconnect() {
+    if (!canManageWhoopConnection()) {
+      setWhoopStatus("Only the athlete can disconnect a Whoop account from this view.", "info");
+      return;
+    }
+
+    if (!state.client || !state.client.functions) {
+      setWhoopStatus("Supabase Functions are not available in this build.", "error");
+      return;
+    }
+
+    if (!state.whoopConnection) {
+      setWhoopStatus("No Whoop account is currently connected.", "info");
+      return;
+    }
+
+    if (!confirm("Disconnect Whoop from this athlete profile?")) {
+      return;
+    }
+
+    setWhoopStatus("Disconnecting Whoop account...", "info");
+
+    state.client.functions
+      .invoke("whoop-disconnect", { body: {} })
+      .then(function (result) {
+        if (result.error) {
+          handleWhoopEdgeError(result.error, "whoop-disconnect");
+          return;
+        }
+
+        state.whoopConnection = null;
+        state.whoopDailyMetrics = [];
+        renderWhoopConnection(null, false);
+        renderWhoopMetrics([]);
+        setWhoopStatus("Whoop disconnected.", "success");
+      })
+      .catch(function (error) {
+        handleWhoopEdgeError(error, "whoop-disconnect");
+      });
+  }
+
+  function handleWhoopEdgeError(error, functionName) {
+    resolveWhoopEdgeError(error, functionName)
+      .then(function (message) {
+        setWhoopStatus(message, "error");
+      })
+      .catch(function () {
+        setWhoopStatus(formatWhoopEdgeError(error, functionName), "error");
+      });
+  }
+
+  function resolveWhoopEdgeError(error, functionName) {
+    var baseMessage = formatWhoopEdgeError(error, functionName);
+    var context = error && error.context;
+
+    if (!context || typeof context.clone !== "function") {
+      return Promise.resolve(baseMessage);
+    }
+
+    return context
+      .clone()
+      .json()
+      .then(function (payload) {
+        var detail = "";
+        if (payload && typeof payload.error === "string") {
+          detail = payload.error;
+        } else if (payload && typeof payload.message === "string") {
+          detail = payload.message;
+        } else if (payload && typeof payload.code === "string") {
+          detail = payload.code;
+        }
+
+        if (!detail) {
+          return buildWhoopStatusMessageFromHttp(context.status, baseMessage, functionName);
+        }
+
+        return buildWhoopStatusMessageFromDetail(detail, context.status, functionName, baseMessage);
+      })
+      .catch(function () {
+        return buildWhoopStatusMessageFromHttp(context.status, baseMessage, functionName);
+      });
+  }
+
+  function buildWhoopStatusMessageFromHttp(status, fallbackMessage, functionName) {
+    if (status === 401) {
+      return "You are not authenticated. Sign in again and retry " + functionName + ".";
+    }
+
+    if (status === 404) {
+      return (
+        "Could not reach " +
+        functionName +
+        ". Deploy Supabase Edge Functions and confirm project secrets are set. See supabase/functions/README.md."
+      );
+    }
+
+    return fallbackMessage;
+  }
+
+  function buildWhoopStatusMessageFromDetail(detail, status, functionName, fallbackMessage) {
+    var cleanDetail = String(detail || "").trim();
+    var normalized = cleanDetail.toLowerCase();
+
+    if (
+      normalized.indexOf("missing authorization header") !== -1 ||
+      normalized.indexOf("missing authorization bearer token") !== -1 ||
+      normalized.indexOf("unable to authenticate user") !== -1
+    ) {
+      return "Your login session is missing or expired. Sign in again and retry " + functionName + ".";
+    }
+
+    if (normalized.indexOf("missing required environment variable") !== -1) {
+      return functionName + " is missing a required secret: " + cleanDetail;
+    }
+
+    if (status === 401) {
+      return "You are not authenticated. Sign in again and retry " + functionName + ".";
+    }
+
+    return functionName + " error: " + cleanDetail;
+  }
+
+  function formatWhoopEdgeError(error, functionName) {
+    var message = String((error && error.message) || "").trim();
+    var normalized = message.toLowerCase();
+
+    if (
+      normalized.indexOf("failed to send a request to the edge function") !== -1 ||
+      normalized.indexOf("requested function was not found") !== -1 ||
+      normalized.indexOf("not_found") !== -1
+    ) {
+      return (
+        "Could not reach " +
+        functionName +
+        ". Deploy Supabase Edge Functions and confirm project secrets are set. See supabase/functions/README.md."
+      );
+    }
+
+    if (normalized.indexOf("non-2xx") !== -1) {
+      return (
+        functionName +
+        " returned an error response. Check function logs in Supabase and verify WHOOP_* secrets are configured."
+      );
+    }
+
+    return message || ("Failed calling " + functionName + ".");
+  }
+
+  function canManageWhoopConnection() {
+    if (state.isCoachView) {
+      return false;
+    }
+    if (!state.user || !state.viewUser) {
+      return false;
+    }
+    return String(state.user.id || "") === String(state.viewUser.id || "");
+  }
+
+  function getWhoopRedirectUrl() {
+    return window.location.origin + "/profile.html";
+  }
+
   function maybeShowStravaRedirectStatus() {
     var params;
     try {
@@ -4261,6 +5420,40 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
   }
 
+  function maybeShowWhoopRedirectStatus() {
+    var params;
+    try {
+      params = new URLSearchParams(window.location.search || "");
+    } catch (e) {
+      return;
+    }
+
+    var status = String(params.get(WHOOP_REDIRECT_STATUS_PARAM) || "").trim();
+    if (!status) {
+      return;
+    }
+
+    var message = String(params.get(WHOOP_REDIRECT_MESSAGE_PARAM) || "").trim();
+    if (!message) {
+      if (status === "connected") {
+        message = "Whoop account connected. Run a sync to pull your latest metrics.";
+      } else if (status === "synced") {
+        message = "Whoop metrics synced successfully.";
+      } else {
+        message = "There was an issue completing Whoop connection.";
+      }
+    }
+
+    setWhoopStatus(message, status === "error" ? "error" : "success");
+    params.delete(WHOOP_REDIRECT_STATUS_PARAM);
+    params.delete(WHOOP_REDIRECT_MESSAGE_PARAM);
+    if (window.history && window.history.replaceState) {
+      var cleanQuery = params.toString();
+      var cleanUrl = window.location.pathname + (cleanQuery ? "?" + cleanQuery : "") + window.location.hash;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }
+
   function setStravaStatus(message, variant) {
     if (!state.stravaStatusElement) {
       return;
@@ -4279,6 +5472,27 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       state.stravaStatusElement.classList.add("is-success");
     } else {
       state.stravaStatusElement.classList.add("is-info");
+    }
+  }
+
+  function setWhoopStatus(message, variant) {
+    if (!state.whoopStatusElement) {
+      return;
+    }
+
+    state.whoopStatusElement.textContent = message || "";
+    state.whoopStatusElement.classList.remove("is-error", "is-success", "is-info");
+
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      state.whoopStatusElement.classList.add("is-error");
+    } else if (variant === "success") {
+      state.whoopStatusElement.classList.add("is-success");
+    } else {
+      state.whoopStatusElement.classList.add("is-info");
     }
   }
 

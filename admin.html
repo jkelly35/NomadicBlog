@@ -58,7 +58,7 @@
         <div class="admin-stats">
           <div class="admin-stat-card">
             <div class="admin-stat-value" data-stat-total-athletes>0</div>
-            <div class="admin-stat-label">Total Athletes</div>
+            <div class="admin-stat-label">Active Athletes</div>
           </div>
           <div class="admin-stat-card">
             <div class="admin-stat-value" data-stat-profiles>0</div>
@@ -247,6 +247,11 @@
                 placeholder="Search athletes by email, name, or sport..." 
                 data-admin-search 
               />
+              <select class="admin-search" data-admin-member-filter aria-label="Member status filter">
+                <option value="active" selected>Active Members</option>
+                <option value="inactive">Inactive Members</option>
+                <option value="all">All Members</option>
+              </select>
               <p class="admin-results-summary" data-admin-results-summary>Loading athletes...</p>
             </div>
             <div class="admin-controls-actions">
@@ -274,13 +279,14 @@
                   <th>Name</th>
                   <th>Sport</th>
                   <th>Level</th>
+                  <th>Status</th>
                   <th>Joined</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody data-admin-table-body>
                 <tr class="admin-table-loading">
-                  <td colspan="6" style="text-align: center; padding: 2rem;">Loading athletes...</td>
+                  <td colspan="7" style="text-align: center; padding: 2rem;">Loading athletes...</td>
                 </tr>
               </tbody>
             </table>
@@ -509,6 +515,7 @@
           <h3>Account Actions</h3>
           <div class="admin-modal-actions">
             <button type="button" class="btn admin-btn-primary" data-admin-edit-athlete>📝 Edit Profile</button>
+            <button type="button" class="btn admin-btn-refresh" data-admin-modal-toggle-active>Deactivate Account</button>
             <button class="btn admin-btn-reset-password" data-admin-modal-reset>Reset Password</button>
             <button class="btn admin-btn-delete" data-admin-modal-delete>Delete Account</button>
           </div>
