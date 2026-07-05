@@ -5,10 +5,244 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nomadic Performance – Home</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .home-main {
+      max-width: 1100px;
+      margin: 2.4rem auto 3.2rem auto;
+      padding: 0 1.2rem;
+    }
+
+    .home-hero-metrics {
+      margin-top: 1.3rem;
+      display: flex;
+      gap: 0.7rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+
+    .home-hero-metrics span {
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      background: rgba(10, 28, 28, 0.34);
+      color: #f5f0e8;
+      border-radius: 999px;
+      padding: 0.38rem 0.75rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      justify-content: center;
+      gap: 0.9rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-cta-btn {
+      min-width: 240px;
+      justify-content: center;
+      background: linear-gradient(145deg, #f8f1e6 0%, #efdcc3 100%);
+      color: #143a3a;
+      border: 1px solid rgba(255, 255, 255, 0.36);
+      border-bottom: 3px solid #c56a2c;
+      border-radius: 12px;
+      padding: 0.85rem 1.1rem;
+      font-size: 0.98rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      box-shadow: 0 10px 24px rgba(9, 28, 28, 0.28);
+      transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+      text-decoration: none;
+    }
+
+    .hero-cta-btn:hover {
+      transform: translateY(-3px);
+      filter: brightness(1.03);
+      box-shadow: 0 14px 28px rgba(9, 28, 28, 0.34);
+      text-decoration: none;
+    }
+
+    .hero-cta-btn:focus-visible {
+      outline: 2px solid #f5f0e8;
+      outline-offset: 2px;
+    }
+
+    .home-section {
+      background: #fff;
+      border: 1px solid #e4d8c8;
+      border-radius: 16px;
+      padding: 1.35rem;
+      box-shadow: 0 10px 26px rgba(18, 53, 53, 0.09);
+      margin-bottom: 1.4rem;
+    }
+
+    .home-section h2 {
+      margin-top: 0;
+      color: #0f2d2d;
+      letter-spacing: -0.01em;
+    }
+
+    .home-path-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.95rem;
+      margin-top: 1rem;
+    }
+
+    .home-path-card {
+      border: 1px solid #e7ded1;
+      border-radius: 12px;
+      padding: 1rem 0.95rem;
+      background: linear-gradient(160deg, #ffffff 0%, #f7f2ea 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      transition: transform 0.24s ease, box-shadow 0.24s ease;
+    }
+
+    .home-path-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 24px rgba(197, 106, 44, 0.18);
+    }
+
+    .home-path-card h3 {
+      margin: 0;
+      font-size: 1.02rem;
+      color: #113636;
+    }
+
+    .home-path-card p {
+      margin: 0;
+      color: #4b5a57;
+      font-size: 0.93rem;
+      line-height: 1.55;
+      flex: 1;
+    }
+
+    .home-path-card .btn {
+      margin-top: auto;
+      align-self: flex-start;
+      background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%);
+      color: #fff;
+      border: 1px solid #a05620;
+      border-radius: 9px;
+      padding: 0.62rem 0.92rem;
+      font-size: 0.88rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      text-decoration: none;
+      box-shadow: 0 5px 14px rgba(197, 106, 44, 0.25);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+
+    .home-path-card .btn:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.05);
+      box-shadow: 0 8px 18px rgba(197, 106, 44, 0.35);
+      text-decoration: none;
+    }
+
+    .home-path-card .btn:focus-visible {
+      outline: 2px solid #0f2d2d;
+      outline-offset: 2px;
+    }
+
+    .home-about {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 1.2rem;
+      align-items: start;
+    }
+
+    .home-about img {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid #dac9b3;
+      box-shadow: 0 8px 24px rgba(12, 36, 36, 0.18);
+    }
+
+    .home-about p {
+      margin: 0 0 0.75rem 0;
+      color: #344746;
+    }
+
+    .home-signature {
+      margin-top: 0.2rem;
+      font-weight: 800;
+      color: #0f2d2d;
+      letter-spacing: 0.02em;
+    }
+
+    .home-blog-highlight {
+      background: linear-gradient(145deg, #0f2d2d 0%, #1f5555 100%);
+      color: #f8f3ed;
+      border-color: #0f2d2d;
+    }
+
+    .home-blog-highlight p {
+      color: #e8d5c4;
+    }
+
+    .home-blog-highlight .btn {
+      background: #fff;
+      color: #143a3a;
+      border: 1px solid #fff;
+    }
+
+    @media (max-width: 980px) {
+      .home-path-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .home-about {
+        grid-template-columns: 1fr;
+      }
+
+      .home-about img {
+        max-width: 260px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .hero-cta-row {
+        gap: 0.65rem;
+      }
+
+      .hero-cta-btn {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .home-path-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .home-main {
+        margin-top: 1.3rem;
+      }
+
+      .hero h2 {
+        font-size: 2.1rem;
+      }
+
+      .hero p {
+        font-size: 1.05rem;
+      }
+    }
+  </style>
   <script defer src="js/analytics.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js"></script>
   <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/auth-gated-ctas.js"></script>
 </head>
 <body>
 
@@ -21,16 +255,27 @@
     </div>
     <nav>
       <a href="index.html" class="active">Home</a>
-      <a href="about.html">About</a>
-      <a href="field-guides.html">Field Guides</a>
       <a href="services.html">Services</a>
+      <a href="blog.html">Blog</a>
+      <a href="about.html">About</a>
     </nav>
   </header>
 
   <!-- ===== Hero ===== -->
   <section class="hero">
-    <h2>Freedom to Move. Power to Perform.</h2>
-    <p>Evidence-based physical therapy, training, and performance optimization for outdoor athletes.</p>
+    <h2>Year-Round Performance Coaching and PT for Mountain Athletes</h2>
+    <p>Train smarter across seasons with integrated coaching, physical therapy, and mountain-sport programming built for real life.</p>
+    <div class="hero-cta-row">
+      <a class="btn hero-cta-btn" href="services.html">Explore Services</a>
+      <a class="btn hero-cta-btn" href="founding-member.html" data-auth-gated-href>Apply for Founding Cohort</a>
+    </div>
+    <p data-auth-gate-status style="margin-top: 0.6rem; min-height: 1.2em; font-size: 0.92rem; color: #e8d5c4;"></p>
+    <div class="home-hero-metrics">
+      <span>Doctor of Physical Therapy</span>
+      <span>Strength and Conditioning</span>
+      <span>Mountain Sport Focused</span>
+      <span>Injury Prevention and Performance</span>
+    </div>
     <!-- Mountain/Wave SVG Accent -->
     <div class="hero-accent">
       <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
@@ -41,80 +286,54 @@
     </div>
   </section>
 
-  <!-- ===== Blog Posts ===== -->
-  <main>
-    <h2 class="section-heading">Latest Posts</h2>
-
-    <div class="posts-section-accent">
-      <div class="posts-grid">
-        <!-- Card 0 -->
-        <article class="card" style="position: relative;">
-          <div style="position: absolute; top: 12px; right: 12px; background: linear-gradient(135deg, #c56a2c 0%, #a05620 100%); color: #fff; padding: 0.35rem 0.8rem; border-radius: 6px; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; z-index: 10;">Featured</div>
-          <img src="img/SeasonalShifts.png" alt="Collage of skiing, biking, climbing, and gym training across mountain sport seasons" class="card-cover" />
-          <div class="card-body">
-            <p class="card-meta">Performance Training &bull; April 2026</p>
-            <h3>Adapting Training for Seasonal Shifts (Ski -&gt; Bike -&gt; Climb)</h3>
-            <p>Transition smoothly between ski, bike, and climb seasons with smarter programming for strength, mobility, and recovery.</p>
-            <a class="btn" href="posts/post-8.html">Read more →</a>
-          </div>
+  <!-- ===== Main ===== -->
+  <main class="home-main">
+    <section class="home-section">
+      <h2>Start with the Right Path</h2>
+      <p>Whether you need a full coaching relationship, a focused custom plan, or direct rehab support, every path is built around long-term performance in mountain sports.</p>
+      <div class="home-path-grid">
+        <article class="home-path-card">
+          <h3>Year-Round Coaching</h3>
+          <p>For athletes who want accountability, progression, and support through every season.</p>
+          <a class="btn" href="founding-member.html" data-auth-gated-href>See Founding Cohort</a>
         </article>
-
-        <article class="card">
-          <img src="img/climbing1.png" alt="Climber on a sandstone wall representing the rehab-to-performance continuum" class="card-cover" />
-          <div class="card-body">
-            <p class="card-meta">Performance Physical Therapy &bull; March 2026</p>
-            <h3>From Rehab to Optimization: The New Continuum of Care</h3>
-            <p>Pain-free is not performance-ready. Explore the modern continuum from rehab to rebuild to sustained high performance.</p>
-            <a class="btn" href="posts/post-7.html">Read more →</a>
-          </div>
+        <article class="home-path-card">
+          <h3>Custom Training Block</h3>
+          <p>One-time custom programming based on your goals, schedule, and equipment setup.</p>
+          <a class="btn" href="services.html">Request a Custom Plan</a>
         </article>
-
-        <!-- Card 1 -->
-        <article class="card">
-          <img src="img/proactiveHealthInAction.png" alt="Real preventive care in action" class="card-cover" />
-          <div class="card-body">
-            <p class="card-meta">Preventive Health &bull; March 2026</p>
-            <h3>What Real Preventive Care Looks Like in Action</h3>
-            <p>Preventive care is more than annual checkups. Learn how daily movement, strength, recovery, and proactive health habits build resilience for the long haul.</p>
-            <a class="btn" href="posts/post-6.html">Read more →</a>
-          </div>
+        <article class="home-path-card">
+          <h3>Pre-Made Programs</h3>
+          <p>Structured plans for ski, snowboard, climbing, MTB, and trail athletes.</p>
+          <a class="btn" href="training-programs.html">Browse Programs</a>
         </article>
-        <!-- Card 1 -->
-        <article class="card">
-          <img src="img/npProactiveHealthImg.png" alt="Proactive Health" class="card-cover" />
-          <div class="card-body">
-            <p class="card-meta">Healthcare & Performance &bull; February 2026</p>
-            <h3>Proactive Health Is the Future of Healthcare</h3>
-            <p>Discover why preventative health and lifestyle medicine are reshaping modern healthcare, and how you can take control of your health today.</p>
-            <a class="btn" href="posts/post-4.html">Read more →</a>
-          </div>
-        </article>
-        <!-- Card 2 -->
-        <article class="card">
-          <img src="img/npSameInjuryImg.png" alt="Recurring Injuries" class="card-cover" />
-          <div class="card-body">
-            <p class="card-meta">Injury Prevention & Recovery &bull; February 2026</p>
-            <h3>Why You Keep Getting the Same Injury Over and Over</h3>
-            <p>Break the cycle of recurring pain. Learn the 5 reasons injuries come back and exactly how to fix them for good.</p>
-            <a class="btn" href="posts/post-5.html">Read more →</a>
-          </div>
-        </article>
-        <!-- Card 3: 12-Week Performance Outcomes Report -->
-        <article class="card">
-          <img src="img/12WeekTrainingCaseThumb.png" alt="12-Week Performance Outcomes Report" class="card-cover" />
-          <div class="card-body">
-            <p class="card-meta">Performance Outcomes &bull; February 2026</p>
-            <h3>12-Week Performance Outcomes Report</h3>
-            <p>A comprehensive analysis of power, stability, symmetry, and durability after a 12-week training cycle with 13 athletes.</p>
-            <a class="btn" href="posts/12-week-performance-outcomes.html">Read more →</a>
-          </div>
+        <article class="home-path-card">
+          <h3>Physical Therapy</h3>
+          <p>Evaluation and rehab progressions to reduce pain and restore high-level movement.</p>
+          <a class="btn" href="services.html">Book PT Consultation</a>
         </article>
       </div>
-    </div>
+    </section>
 
-    <div style="text-align: center; margin-top: 4rem; margin-bottom: 2rem;">
-      <a href="blog.html" class="btn" style="display: inline-flex; align-items: center; gap: 0.6rem; font-size: 1.05rem; padding: 1rem 2.2rem; border-radius: 10px;"><span>Browse all posts</span> <span style="font-size: 1.2rem;">→</span></a>
-    </div>
+    <section class="home-section">
+      <h2>About Me</h2>
+      <div class="home-about">
+        <img src="img/IMG_5478.jpeg" alt="Joe Kelly" />
+        <div>
+          <p><strong>Hi, I am Joe.</strong> I am a Doctor of Physical Therapy, Strength and Conditioning Coach, and lifelong outdoor athlete.</p>
+          <p>I built Nomadic Performance to bridge the gap between rehab and performance so athletes can stop bouncing between pain and random training plans.</p>
+          <p>My approach is simple: train with purpose, build durable movement patterns, and prepare your body for the real demands of skiing, climbing, mountain biking, and trail adventures.</p>
+          <p class="home-signature">Joe Kelly, DPT</p>
+          <a class="btn" href="about.html">Read Full Story</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-section home-blog-highlight">
+      <h2>From the Blog</h2>
+      <p>Explore practical guides on rehab-to-performance training, injury prevention, and seasonal planning for mountain athletes.</p>
+      <a href="blog.html" class="btn">Visit the Blog</a>
+    </section>
   </main>
 
 

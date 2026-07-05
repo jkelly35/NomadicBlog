@@ -1,4 +1,6 @@
 (function () {
+  var ADMIN_EMAIL = "joe@nomadicperformance.com";
+
   var state = {
     client: null,
     user: null,
@@ -14,25 +16,25 @@
     initializeAuth();
   });
   function mountLoginButton() {
-    var nav = document.querySelector("header nav");
-    if (!nav) {
+    var header = document.querySelector("header");
+    if (!header) {
       return null;
     }
 
-    var existingButton = nav.querySelector("[data-auth-trigger]");
+    var existingButton = header.querySelector("[data-auth-trigger]");
     if (existingButton) {
       return existingButton;
     }
 
     var button = document.createElement("button");
     button.type = "button";
-    button.className = "auth-nav-button";
+    button.className = "auth-nav-button is-corner";
     button.dataset.authTrigger = "true";
-    button.textContent = "Login";
+    button.textContent = "Log In";
     button.setAttribute("aria-haspopup", "dialog");
     button.addEventListener("click", onAuthButtonClick);
 
-    nav.appendChild(button);
+    header.appendChild(button);
     return button;
   }
 
@@ -127,16 +129,34 @@
 
   function setUser(user) {
     state.user = user;
+    var header = document.querySelector("header");
     var nav = document.querySelector("header nav");
-    if (nav) {
-      var btn = nav.querySelector("[data-auth-trigger]");
+    if (header && nav) {
+      var btn = header.querySelector("[data-auth-trigger]");
       var profileLink = nav.querySelector("[data-profile-link]");
-      // Remove Login button if logged in
-      if (btn && user && user.email) btn.remove();
+
+      if (!btn) {
+        state.authButton = mountLoginButton();
+        btn = header.querySelector("[data-auth-trigger]");
+      }
+
+      if (btn) {
+        btn.textContent = user && user.email ? "Log Out" : "Log In";
+        btn.setAttribute("aria-haspopup", user && user.email ? "false" : "dialog");
+      }
+
+      var isCoachUser = !!(user && user.email && String(user.email).toLowerCase() === ADMIN_EMAIL);
+      var adminBtn = nav.querySelector("[data-admin-link]");
+
       // Remove profile link if present
       if (profileLink) profileLink.remove();
-      // Add Athlete Dashboard button for all logged-in users
-      if (user && user.email) {
+
+      if (adminBtn) {
+        adminBtn.remove();
+      }
+
+      // Add Athlete Dashboard only for athlete users (not coach account)
+      if (user && user.email && !isCoachUser) {
         if (!nav.querySelector("[data-profile-link]")) {
           var pBtn = document.createElement("a");
           pBtn.href = "profile.html";
@@ -145,24 +165,16 @@
           pBtn.dataset.profileLink = "true";
           nav.appendChild(pBtn);
         }
-        // Add Coaching Dashboard button for admin/coach
-        if (user.email === "joe@nomadicperformance.com" && !nav.querySelector("[data-admin-link]")) {
-          var aBtn = document.createElement("a");
-          aBtn.href = "admin.html";
-          aBtn.textContent = "Coaching Dashboard";
-          aBtn.className = "auth-nav-button";
-          aBtn.dataset.adminLink = "true";
-          nav.appendChild(aBtn);
-        }
       }
-      // Remove Admin Dashboard button if not admin
-      if (!user || !user.email || user.email !== "joe@nomadicperformance.com") {
-        var adminBtn = nav.querySelector("[data-admin-link]");
-        if (adminBtn) adminBtn.remove();
-      }
-      // If logged out, restore Login button
-      if (!user || !user.email) {
-        if (!btn) state.authButton = mountLoginButton();
+
+      // Add Coaching Dashboard only for coach account
+      if (user && user.email && isCoachUser && !nav.querySelector("[data-admin-link]")) {
+        var aBtn = document.createElement("a");
+        aBtn.href = "admin.html";
+        aBtn.textContent = "Coaching Dashboard";
+        aBtn.className = "auth-nav-button";
+        aBtn.dataset.adminLink = "true";
+        nav.appendChild(aBtn);
       }
     }
 
@@ -190,6 +202,11 @@
   }
 
   function onAuthButtonClick() {
+    if (state.user) {
+      onLogout();
+      return;
+    }
+
     if (!state.modal) {
       return;
     }
@@ -304,9 +321,22 @@
           return;
         }
 
+        var postLoginRedirect = consumePostLoginRedirect();
+        if (postLoginRedirect) {
+          window.location.href = postLoginRedirect;
+          return;
+        }
+
+        var onFoundingMemberPage = window.location.pathname.indexOf("founding-member.html") > -1;
+        if (onFoundingMemberPage) {
+          setStatus("Signed in successfully. Continue to checkout.", "success");
+          closeModal();
+          return;
+        }
+
         // On successful sign in, redirect based on email
         var userEmail = (result.data && result.data.user && result.data.user.email) || email;
-        if (userEmail === "joe@nomadicperformance.com") {
+        if (String(userEmail || "").toLowerCase() === ADMIN_EMAIL) {
           window.location.href = "admin.html";
         } else {
           window.location.href = "profile.html";
@@ -315,6 +345,37 @@
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Authentication failed.", "error");
       });
+  }
+
+  function consumePostLoginRedirect() {
+    try {
+      var raw = sessionStorage.getItem("nomadic_post_login_redirect");
+      if (!raw) {
+        return "";
+      }
+
+      sessionStorage.removeItem("nomadic_post_login_redirect");
+      var target = String(raw).trim();
+      if (!target) {
+        return "";
+      }
+
+      if (/^mailto:/i.test(target)) {
+        return target;
+      }
+
+      if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(target)) {
+        var parsed = new URL(target);
+        if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+          return parsed.toString();
+        }
+        return "";
+      }
+
+      return target;
+    } catch (_error) {
+      return "";
+    }
   }
 
   function onLogout() {

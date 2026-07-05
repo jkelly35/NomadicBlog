@@ -239,6 +239,13 @@ nav a.active {
   padding: 0.38rem 0.92rem;
 }
 
+.auth-nav-button.is-corner {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.95rem;
+  z-index: 3;
+}
+
 .auth-nav-button:hover {
   color: #c56a2c;
   border-color: #c56a2c;
@@ -248,6 +255,13 @@ nav a.active {
 .auth-nav-button.is-disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .auth-nav-button.is-corner {
+    position: static;
+    margin-left: auto;
+  }
 }
 
 .auth-modal-open {
@@ -662,6 +676,18 @@ main {
   font-weight: 700;
   text-align: center;
   letter-spacing: 0.02em;
+}
+
+.status-info {
+  color: #174f4f;
+}
+
+.status-success {
+  color: #1f6f2c;
+}
+
+.status-error {
+  color: #9f2d20;
 }
 
 .sr-only {

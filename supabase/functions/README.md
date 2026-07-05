@@ -37,6 +37,15 @@ It also contains nutrition catalog enrichment used by `athlete-nutrition.html` /
 - `whoop-manual-connect`
   - Auth required
   - Stores user-provided Whoop access/refresh token pair and connection row
+- `stripe-create-checkout`
+  - Auth required
+  - Creates Stripe Checkout Session for Founding Member subscription
+  - Returns redirect URL to hosted Stripe checkout
+- `stripe-webhook`
+  - Public (no auth required)
+  - Verifies Stripe webhook signatures
+  - Upserts founding member subscription events
+  - Activates matching `athlete_profiles.is_active` rows when paid/active events arrive
 - `nutrition-food-search`
   - Auth required
   - Searches local `nutrition_foods`
@@ -73,6 +82,11 @@ Set these in Supabase project secrets:
 - `WHOOP_START_PARAM` (optional, default: `start_date`)
 - `WHOOP_END_PARAM` (optional, default: `end_date`)
 - `WHOOP_REVOKE_URL` (optional; if unset, disconnect only clears local rows)
+- `STRIPE_SECRET_KEY`
+- `STRIPE_FOUNDING_MEMBER_PRICE_ID` (Stripe recurring price id for founding cohort)
+- `STRIPE_WEBHOOK_SECRET` (Stripe signing secret for webhook endpoint)
+- `STRIPE_SUCCESS_URL` (optional, default: `https://nomadicperformance.com/founding-member.html?checkout=success`)
+- `STRIPE_CANCEL_URL` (optional, default: `https://nomadicperformance.com/founding-member.html?checkout=cancelled`)
 - `USDA_FOODDATA_API_KEY` (required for USDA import; function still works without it)
 - `OPENFOODFACTS_USER_AGENT` (optional but recommended, e.g. `NomadicPerformance/1.0 (support@nomadicperformance.com)`)
 
@@ -98,6 +112,8 @@ supabase functions deploy whoop-connect-callback
 supabase functions deploy whoop-sync-latest
 supabase functions deploy whoop-disconnect
 supabase functions deploy whoop-manual-connect
+supabase functions deploy stripe-create-checkout
+supabase functions deploy stripe-webhook
 supabase functions deploy nutrition-food-search
 ```
 
@@ -107,6 +123,7 @@ Run:
 
 - `sql/create-strava-integration.sql`
 - `sql/create-whoop-integration.sql`
+- `sql/create-founding-member-payments.sql`
 - `sql/create-athlete-nutrition-tracking-tables.sql`
 
 before using these functions.

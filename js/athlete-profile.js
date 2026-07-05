@@ -1077,6 +1077,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var isAdminUser =
       !!state.user.email && String(state.user.email).toLowerCase() === ADMIN_EMAIL;
 
+    if (isAdminUser && (!wantsCoachView || !athleteId)) {
+      window.location.href = "admin.html";
+      return Promise.resolve(false);
+    }
+
     if (!wantsCoachView || !athleteId) {
       return Promise.resolve(true);
     }

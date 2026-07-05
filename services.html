@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nomadic Performance – Services</title>
+  <title>Nomadic Performance - Services</title>
   <link rel="stylesheet" href="css/style.css" />
   <script defer src="js/analytics.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js"></script>
   <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/auth-gated-ctas.js"></script>
 </head>
 <body>
 
@@ -21,60 +22,76 @@
     </div>
     <nav>
       <a href="index.html">Home</a>
-      <a href="about.html">About</a>
-      <a href="field-guides.html">Field Guides</a>
       <a href="services.html" class="active">Services</a>
+      <a href="blog.html">Blog</a>
+      <a href="about.html">About</a>
     </nav>
   </header>
 
   <!-- ===== Main Content ===== -->
   <main>
-    <section class="services-hero" style="max-width:900px;margin:2.5rem auto;">
-      <h1>Train for the Mountains</h1>
-      <p class="lead">Programs and coaching built for outdoor athletes: practical strength, mobility, and resilience to handle steep terrain, long days, and unpredictable conditions.</p>
+    <section class="services-hero" style="max-width: 960px; margin: 2.5rem auto 1.25rem auto;">
+      <h1>Choose the Best Path for Your Goal</h1>
+      <p class="lead">Whether you need full coaching, a custom block, a pre-made program, or direct physical therapy support, this page helps you choose the right next step in under 60 seconds.</p>
+      <p data-auth-gate-status style="margin-top: 0.55rem; min-height: 1.2em; font-size: 0.92rem; color: #194848;"></p>
     </section>
 
-    <section style="max-width:1000px;margin:2rem auto;">
+    <section style="max-width: 1080px; margin: 1rem auto 2.5rem auto;">
       <div class="services-grid">
-        <div class="service-card">
-          <h3>Training Programs</h3>
-          <p>Self-guided performance programs designed to prepare your body for the demands of mountain sports. Ideal for athletes who want a clear, effective plan they can follow independently.</p>
-          <p><strong>Includes:</strong></p>
+        <article class="service-card">
+          <h3>1) Year-Round Coaching Membership</h3>
+          <p><strong>Best for:</strong> Athletes who want ongoing support, accountability, and adjustments across seasons.</p>
           <ul>
-            <li>Weekly progressions</li>
-            <li>Strength &amp; conditioning workouts</li>
-            <li>Mobility &amp; injury prevention</li>
-            <li>Performance insights from a DPT</li>
+            <li>Assessment and training roadmap</li>
+            <li>Monthly reviews and progression updates</li>
+            <li>Messaging support and plan adjustments</li>
+            <li>Recovery and injury-risk guidance</li>
           </ul>
-          <a href="training-programs.html" class="btn">View Programs →</a>
-        </div>
+          <a class="btn" href="founding-member.html" data-auth-gated-href>See Founding Cohort</a>
+        </article>
 
-        <div class="service-card">
-          <h3>Training Community</h3>
-          <p>Ongoing programming, accountability, and progression through Everfit. Track workouts, access demos, and follow periodized plans tuned to seasonal sports.</p>
-          <p><strong>Community members get:</strong></p>
+        <article class="service-card">
+          <h3>2) Custom Training Block</h3>
+          <p><strong>Best for:</strong> Athletes who want a one-time individualized plan without monthly coaching.</p>
           <ul>
-            <li>Regular program updates</li>
-            <li>Workout tracking &amp; video demos</li>
-            <li>Seasonal sport programming</li>
-            <li>Access to an active athlete community</li>
+            <li>Goal and schedule-based design</li>
+            <li>Sport-specific strength and mobility focus</li>
+            <li>Built for available equipment and constraints</li>
+            <li>Clear progression to follow independently</li>
           </ul>
-          <a href="#" class="btn">Join the Community →</a>
-        </div>
+          <a class="btn" href="mailto:joe@nomadicperformance.com?subject=Custom%20Program%20Design%20Request" data-auth-gated-href>Request a Custom Plan</a>
+        </article>
 
-        <div class="service-card">
-          <h3>1:1 Performance Coaching</h3>
-          <p>Individualized coaching that blends physical therapy and performance programming—ideal for event prep, return-to-sport, or high-performance goals.</p>
-          <p><strong>Coaching may include:</strong></p>
+        <article class="service-card">
+          <h3>3) Pre-Made Programs</h3>
+          <p><strong>Best for:</strong> Athletes who want structure at lower cost and can self-manage.</p>
           <ul>
-            <li>Personalized training plans</li>
-            <li>Movement analysis &amp; assessments</li>
-            <li>Injury prevention strategies</li>
-            <li>Progress feedback</li>
+            <li>Ski, snowboard, climbing, MTB, and trail-ready options</li>
+            <li>Simple progression and practical exercise selection</li>
+            <li>Injury-prevention and durability emphasis</li>
+            <li>Immediate access and self-paced execution</li>
           </ul>
-          <a href="#" class="btn">Coming Soon</a>
-        </div>
+          <a class="btn" href="training-programs.html">Browse Programs</a>
+        </article>
+
+        <article class="service-card">
+          <h3>4) Physical Therapy Services</h3>
+          <p><strong>Best for:</strong> Athletes with pain, injury, movement limitations, or return-to-sport needs.</p>
+          <ul>
+            <li>Evaluation and movement assessment</li>
+            <li>Corrective exercise and rehab progression</li>
+            <li>Manual therapy and dry needling when appropriate</li>
+            <li>Performance-informed return-to-sport planning</li>
+          </ul>
+          <a class="btn" href="mailto:joe@nomadicperformance.com?subject=Physical%20Therapy%20Consult" data-auth-gated-href>Book PT Consultation</a>
+        </article>
       </div>
+    </section>
+
+    <section style="max-width: 960px; margin: 0 auto 3rem auto; background: #fff; border: 1px solid #e4d8c8; border-radius: 14px; padding: 1.25rem 1.3rem;">
+      <h2 style="margin-top: 0;">Not Sure Which Option Fits You?</h2>
+      <p style="margin-bottom: 0.4rem;">Send a quick summary of your sport, main goal, and current challenge. You will get a recommendation on the best fit path.</p>
+      <a class="btn" href="mailto:joe@nomadicperformance.com?subject=Help%20Me%20Choose%20the%20Right%20Nomadic%20Path" data-auth-gated-href>Get a Recommendation</a>
     </section>
 
   </main>
