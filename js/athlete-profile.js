@@ -578,6 +578,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   var STRAVA_REDIRECT_MESSAGE_PARAM = "strava_message";
   var WHOOP_REDIRECT_STATUS_PARAM = "whoop_status";
   var WHOOP_REDIRECT_MESSAGE_PARAM = "whoop_message";
+  var FOUNDING_PAYMENT_STATUS_PARAM = "founding_payment";
+  var FOUNDING_PAYMENT_MESSAGE_PARAM = "founding_payment_message";
   var state = {
     client: null,
     user: null,
@@ -629,7 +631,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     onboardingCoachActions: null,
     coachIntakeSearch: null,
     coachIntakeDueDate: null,
+    coachTaskTitle: null,
+    coachTaskDescription: null,
     onboardingAssignments: [],
+    foundingOnboardingRow: null,
+    dashboardTaskBoard: null,
     goalsManageLink: null,
     goalsToggleButton: null,
     goalsGlanceLink: null,
@@ -666,6 +672,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     nutritionLogsAvailable: true,
     nutritionTargetsAvailable: true,
     passwordStatus: null,
+    welcomeMessageEl: null,
     editToggleButton: null,
     editorSection: null,
     sportOverviewEditor: null,
@@ -980,8 +987,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.onboardingContent = document.querySelector("[data-onboarding-content]");
     state.onboardingStatus = document.querySelector("[data-onboarding-status]");
     state.onboardingCoachActions = document.querySelector("[data-onboarding-coach-actions]");
+    state.dashboardTaskBoard = document.querySelector("[data-dashboard-task-board]") || document.querySelector("[data-dashboard-glance]");
+    state.welcomeMessageEl = document.querySelector("[data-profile-welcome-message]");
     state.coachIntakeSearch = document.querySelector("[data-coach-intake-search]");
     state.coachIntakeDueDate = document.querySelector("[data-coach-intake-due-date]");
+    state.coachTaskTitle = document.querySelector("[data-coach-task-title]");
+    state.coachTaskDescription = document.querySelector("[data-coach-task-description]");
     state.onboardingTemplates = getDefaultOnboardingTemplates();
     state.goalsManageLink = document.querySelector("[data-goals-manage-link]");
     state.goalsToggleButton = document.querySelector("[data-goals-toggle-list]");
@@ -1121,6 +1132,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     hideGuard();
     showContent();
+    renderWelcomeMessage();
+    renderDashboardCoachTasks();
     renderDashboardQuickGlanceDefaults();
     applyCoachViewUi();
     configureGoalsLink();
@@ -1136,6 +1149,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     loadWhoopOverview();
     maybeShowStravaRedirectStatus();
     maybeShowWhoopRedirectStatus();
+    maybeShowFoundingPaymentStatus();
   }
 
   function applyCoachViewUi() {
@@ -1144,7 +1158,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     var heading = document.querySelector(".section-heading");
-    var subtitle = document.querySelector(".profile-dashboard-subtitle");
+    var subtitle = document.querySelector("[data-profile-dashboard-copy]");
     var headingRow = document.querySelector(".profile-dashboard-heading-row");
     var resetBtn = document.querySelector("[data-profile-reset-password]");
     var deleteSection = document.querySelector(".profile-section-danger");
@@ -1287,6 +1301,47 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (emailEl) {
       emailEl.textContent = state.viewUser.email || "—";
     }
+
+    renderWelcomeMessage();
+  }
+
+  function renderWelcomeMessage() {
+    if (!state.welcomeMessageEl) {
+      return;
+    }
+
+    var displayName = getDashboardDisplayName();
+    if (state.isCoachView) {
+      state.welcomeMessageEl.textContent = "Viewing athlete: " + displayName;
+      return;
+    }
+
+    state.welcomeMessageEl.textContent = "Welcome " + displayName;
+  }
+
+  function getDashboardDisplayName() {
+    var fullName = String(state.profile && state.profile.name || "").trim();
+    if (fullName) {
+      return fullName;
+    }
+
+    var email = String(state.viewUser && state.viewUser.email || "").trim();
+    if (email && email.indexOf("@") > 0) {
+      return titleCaseWords(email.split("@")[0].replace(/[._-]+/g, " "));
+    }
+
+    return "Athlete";
+  }
+
+  function titleCaseWords(value) {
+    return String(value || "")
+      .split(/\s+/)
+      .filter(function (part) { return !!part; })
+      .map(function (part) {
+        var lower = part.toLowerCase();
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      })
+      .join(" ");
   }
 
   function loadProfileData() {
@@ -1368,6 +1423,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (sportEl) sportEl.textContent = formatSportsDisplay(sports);
     if (locationEl) locationEl.textContent = normalizeDisplayValue(profile && profile.location);
     if (dobAgeEl) dobAgeEl.textContent = formatDobAgeDisplay(profile);
+
+    renderWelcomeMessage();
 
     renderSportOverviewSummary(profile);
   }
@@ -2065,11 +2122,31 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
         onSubmitOnboardingResponse(assignmentId, formEl);
       });
+
+      state.onboardingContent.addEventListener("click", function (event) {
+        var completeTaskBtn = event.target && event.target.closest("[data-onboarding-complete-task]");
+        if (!completeTaskBtn) {
+          return;
+        }
+
+        var assignmentId = String(completeTaskBtn.getAttribute("data-onboarding-complete-task") || "").trim();
+        if (!assignmentId) {
+          setOnboardingStatus("Could not find task assignment.", "error");
+          return;
+        }
+
+        onMarkOnboardingTaskComplete(assignmentId);
+      });
     }
 
     var coachIntakeOpenBtn = document.querySelector("[data-coach-intake-open]");
     if (coachIntakeOpenBtn) {
       coachIntakeOpenBtn.addEventListener("click", openCoachIntakeModal);
+    }
+
+    var coachTaskOpenBtn = document.querySelector("[data-coach-task-open]");
+    if (coachTaskOpenBtn) {
+      coachTaskOpenBtn.addEventListener("click", openCoachIntakeModal);
     }
 
     document.querySelectorAll("[data-coach-intake-close]").forEach(function (btn) {
@@ -2085,6 +2162,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var coachIntakeAssignBtn = document.querySelector("[data-coach-intake-assign]");
     if (coachIntakeAssignBtn) {
       coachIntakeAssignBtn.addEventListener("click", onAssignIntakeToCurrentAthlete);
+    }
+
+    var coachTaskAssignBtn = document.querySelector("[data-coach-intake-assign-quick]");
+    if (coachTaskAssignBtn) {
+      coachTaskAssignBtn.addEventListener("click", onAssignQuickTaskToCurrentAthlete);
     }
 
     var coachProgramCloseButtons = document.querySelectorAll("[data-coach-program-close]");
@@ -2833,14 +2915,51 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           }
 
           setOnboardingStatus(result.error.message, "error");
+          loadFoundingOnboardingTaskContext();
           return;
         }
 
         state.onboardingAssignments = (result.data || []).map(normalizeOnboardingAssignment);
         renderOnboardingAssignments();
+        loadFoundingOnboardingTaskContext();
       })
       .catch(function (error) {
         setOnboardingStatus(error && error.message ? error.message : "Failed to load onboarding intake.", "error");
+        loadFoundingOnboardingTaskContext();
+      });
+  }
+
+  function loadFoundingOnboardingTaskContext() {
+    if (!state.client || !getViewedUserId()) {
+      state.foundingOnboardingRow = null;
+      renderDashboardCoachTasks();
+      return;
+    }
+
+    state.client
+      .from("founding_member_onboarding")
+      .select("athlete_user_id,is_founding_member,stage,payment_completed_at,docs_signed_at,welcome_completed_at")
+      .eq("athlete_user_id", getViewedUserId())
+      .maybeSingle()
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingRelationError(result.error)) {
+            state.foundingOnboardingRow = null;
+            renderDashboardCoachTasks();
+            return;
+          }
+
+          state.foundingOnboardingRow = null;
+          renderDashboardCoachTasks();
+          return;
+        }
+
+        state.foundingOnboardingRow = result.data || null;
+        renderDashboardCoachTasks();
+      })
+      .catch(function () {
+        state.foundingOnboardingRow = null;
+        renderDashboardCoachTasks();
       });
   }
 
@@ -2862,6 +2981,208 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     };
   }
 
+  function renderDashboardCoachTasks(assignmentsInput) {
+    if (!state.dashboardTaskBoard) {
+      return;
+    }
+
+    state.dashboardTaskBoard.setAttribute("data-dashboard-task-board", "");
+
+    var assignments = Array.isArray(assignmentsInput)
+      ? assignmentsInput
+      : (state.onboardingAssignments || []);
+
+    var visibleAssignments = assignments.filter(function (assignment) {
+      return assignment && assignment.status !== "archived";
+    });
+
+    var pendingAssignments = visibleAssignments.filter(function (assignment) {
+      return String(assignment.status || "") !== "submitted";
+    });
+
+    pendingAssignments.sort(compareOnboardingTaskPriority);
+
+    var cards = [];
+
+    pendingAssignments.forEach(function (assignment) {
+      var dueDays = assignment.due_date ? getDaysUntilDate(assignment.due_date) : null;
+      var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
+      var dueMeta = "Due " + dueLabel;
+
+      if (typeof dueDays === "number") {
+        if (dueDays > 0) {
+          dueMeta += " (" + dueDays + " day" + (dueDays === 1 ? "" : "s") + " left)";
+        } else if (dueDays === 0) {
+          dueMeta += " (due today)";
+        } else {
+          dueMeta += " (" + Math.abs(dueDays) + " day" + (Math.abs(dueDays) === 1 ? "" : "s") + " overdue)";
+        }
+      }
+
+      cards.push({
+        label: "Coach Task",
+        title: assignment.form_name || "Onboarding Intake",
+        meta: dueMeta,
+        href: "#profile-onboarding-section",
+        actionLabel: state.isCoachView ? "Review Intake" : "Complete Intake",
+        tone: typeof dueDays === "number" && dueDays < 0 ? "alert" : "",
+        priority: getAssignmentTaskPriority(assignment)
+      });
+    });
+
+    var stageTaskCard = getFoundingStageTaskCard(state.foundingOnboardingRow, pendingAssignments.length);
+    if (stageTaskCard) {
+      cards.push(stageTaskCard);
+    }
+
+    cards.sort(function (a, b) {
+      return (Number(a.priority) || 999) - (Number(b.priority) || 999);
+    });
+
+    if (!visibleAssignments.length && !stageTaskCard) {
+      state.dashboardTaskBoard.innerHTML =
+        '<article class="profile-glance-card profile-today-card">' +
+          '<p class="profile-glance-label">Coach Tasks</p>' +
+          '<strong class="profile-glance-value">No Tasks Assigned</strong>' +
+          '<p class="profile-glance-meta">Your coach has not assigned intake forms yet.</p>' +
+          '<a class="profile-glance-action" href="#profile-onboarding-section">Open Onboarding</a>' +
+        '</article>';
+      return;
+    }
+
+    if (!cards.length) {
+      state.dashboardTaskBoard.innerHTML =
+        '<article class="profile-glance-card profile-today-card is-good">' +
+          '<p class="profile-glance-label">Coach Tasks</p>' +
+          '<strong class="profile-glance-value">All Tasks Complete</strong>' +
+          '<p class="profile-glance-meta">You have submitted all currently assigned onboarding forms.</p>' +
+          '<a class="profile-glance-action" href="#profile-onboarding-section">Review Submissions</a>' +
+        '</article>';
+      return;
+    }
+
+    state.dashboardTaskBoard.innerHTML = cards.slice(0, 4)
+      .map(function (card) {
+        var toneClass = card.tone === "alert" ? " is-alert" : (card.tone === "good" ? " is-good" : "");
+        return (
+          '<article class="profile-glance-card profile-today-card' + toneClass + '">' +
+            '<p class="profile-glance-label">' + escapeHtml(card.label || "Coach Task") + '</p>' +
+            '<strong class="profile-glance-value">' + escapeHtml(card.title || "Task") + '</strong>' +
+            '<p class="profile-glance-meta">' + escapeHtml(card.meta || "") + '</p>' +
+            '<a class="profile-glance-action" href="' + escapeAttribute(card.href || "#profile-onboarding-section") + '">' + escapeHtml(card.actionLabel || "Open Task") + '</a>' +
+          '</article>'
+        );
+      })
+      .join("");
+  }
+
+  function compareOnboardingTaskPriority(a, b) {
+    return getAssignmentTaskPriority(a) - getAssignmentTaskPriority(b);
+  }
+
+  function getAssignmentTaskPriority(assignment) {
+    var dueDays = assignment && assignment.due_date ? getDaysUntilDate(assignment.due_date) : null;
+    if (typeof dueDays !== "number") {
+      return 700;
+    }
+    if (dueDays < 0) {
+      return 100 + Math.abs(dueDays);
+    }
+    if (dueDays === 0) {
+      return 200;
+    }
+    return 300 + dueDays;
+  }
+
+  function getFoundingStageTaskCard(onboardingRow, pendingIntakeCount) {
+    if (!onboardingRow || onboardingRow.is_founding_member !== true) {
+      return null;
+    }
+
+    var stage = String(onboardingRow.stage || "").trim();
+    if (!stage) {
+      return null;
+    }
+
+    if (stage === "docs_signed_pending_payment" || stage === "payment_pending") {
+      return null;
+    }
+
+    if (stage === "welcome_pending_intakes" && pendingIntakeCount > 0) {
+      return {
+        label: "Coach Follow-up",
+        title: "Submit Assigned Intake Forms",
+        meta: String(pendingIntakeCount) + " intake task" + (pendingIntakeCount === 1 ? "" : "s") + " remaining.",
+        href: "#profile-onboarding-section",
+        actionLabel: state.isCoachView ? "Review Tasks" : "Open Intake",
+        tone: "",
+        priority: 350
+      };
+    }
+
+    if (stage === "intakes_completed_assessment_pending") {
+      return {
+        label: "Coach Follow-up",
+        title: "Assessment Prep Pending",
+        meta: "Your intake is complete. Coach will start your assessment plan next.",
+        href: "#profile-metrics-section",
+        actionLabel: "View Metrics",
+        tone: "",
+        priority: 400
+      };
+    }
+
+    if (stage === "assessment_in_progress") {
+      return {
+        label: "Coach Task",
+        title: "Complete Assessment Tasks",
+        meta: "Finish assigned assessment work and keep coach updated.",
+        href: "#profile-metrics-section",
+        actionLabel: "Open Assessment",
+        tone: "",
+        priority: 420
+      };
+    }
+
+    if (stage === "assessment_published_pending_review") {
+      return {
+        label: "Coach Follow-up",
+        title: "Review Assessment Results",
+        meta: "Coach published your assessment. Review takeaways before your check-in.",
+        href: "#profile-metrics-section",
+        actionLabel: "Review Results",
+        tone: "",
+        priority: 430
+      };
+    }
+
+    if (stage === "review_scheduled") {
+      return {
+        label: "Coach Follow-up",
+        title: "Prepare For Review Session",
+        meta: "Bring your questions and recent training notes to the scheduled review.",
+        href: "athlete-messages.html",
+        actionLabel: "Open Messages",
+        tone: "",
+        priority: 440
+      };
+    }
+
+    if (stage === "active_training" && pendingIntakeCount === 0) {
+      return {
+        label: "Coach Tasks",
+        title: "Onboarding Complete",
+        meta: "Stay consistent with your active training plan and weekly check-ins.",
+        href: "#profile-training-program-section",
+        actionLabel: "Open Training",
+        tone: "good",
+        priority: 800
+      };
+    }
+
+    return null;
+  }
+
   function renderOnboardingAssignments() {
     if (!state.onboardingContent) {
       return;
@@ -2870,6 +3191,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var assignments = (state.onboardingAssignments || []).filter(function (assignment) {
       return !!assignment;
     });
+
+    renderDashboardCoachTasks(assignments);
 
     if (!assignments.length) {
       state.onboardingContent.innerHTML =
@@ -2901,6 +3224,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     state.onboardingContent.innerHTML = visibleAssignments
       .map(function (assignment) {
+        var isCustomTask = isCustomCoachTaskAssignment(assignment);
         var schemaQuestions = Array.isArray(assignment.form_schema && assignment.form_schema.questions)
           ? assignment.form_schema.questions
           : [];
@@ -2915,6 +3239,33 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         html += '<p class="profile-section-copy">Assigned ' + escapeHtml(formatDate(assignment.assigned_at)) + ' • Due ' + escapeHtml(dueLabel) + '</p></div>';
         html += '<span class="admin-risk-chip ' + (assignment.status === "submitted" ? "is-stable" : "") + '">' + escapeHtml(statusLabel) + '</span>';
         html += '</div>';
+
+        if (isCustomTask) {
+          var taskDescription = String(assignment.form_schema && assignment.form_schema.description || "").trim();
+          if (taskDescription) {
+            html += '<p class="profile-section-copy">' + escapeHtml(taskDescription) + '</p>';
+          }
+
+          if (state.isCoachView) {
+            html += '<p class="profile-section-copy"><strong>Submission:</strong> ' + escapeHtml(submittedLabel) + '</p>';
+            if (assignment.response_data && assignment.response_data.task_completed_at) {
+              html += '<p class="profile-section-copy"><strong>Completed:</strong> ' + escapeHtml(formatDate(String(assignment.response_data.task_completed_at || ""))) + '</p>';
+            }
+            html += '</article>';
+            return html;
+          }
+
+          if (assignment.status === "submitted") {
+            html += '<p class="profile-section-copy"><strong>Status:</strong> Completed ' + escapeHtml(submittedLabel) + '</p>';
+          } else {
+            html += '<div class="profile-section-actions">';
+            html += '<button type="button" class="btn profile-btn-save" data-onboarding-complete-task="' + escapeAttribute(assignment.id) + '">Mark Task Complete</button>';
+            html += '</div>';
+          }
+
+          html += '</article>';
+          return html;
+        }
 
         if (state.isCoachView) {
           html += '<p class="profile-section-copy"><strong>Submission:</strong> ' + escapeHtml(submittedLabel) + '</p>';
@@ -2952,6 +3303,17 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         return html;
       })
       .join("");
+  }
+
+  function isCustomCoachTaskAssignment(assignment) {
+    if (!assignment) {
+      return false;
+    }
+
+    var formId = String(assignment.form_id || "").trim();
+    var taskType = String(assignment.form_schema && assignment.form_schema.task_type || "").trim().toLowerCase();
+
+    return taskType === "custom_task" || formId.indexOf("coach-task-") === 0;
   }
 
   function formatQuestionKeyLabel(key) {
@@ -3062,11 +3424,163 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           return;
         }
 
-        setOnboardingStatus("Intake responses saved.", "success");
-        loadOnboardingIntake();
+        maybeAdvanceFoundingStageAfterIntakeSubmission()
+          .then(function (advanced) {
+            if (advanced) {
+              setOnboardingStatus("Intake responses saved. Onboarding advanced to assessment pending review.", "success");
+            } else {
+              setOnboardingStatus("Intake responses saved.", "success");
+            }
+            loadOnboardingIntake();
+          })
+          .catch(function () {
+            setOnboardingStatus("Intake responses saved.", "success");
+            loadOnboardingIntake();
+          });
       })
       .catch(function (error) {
         setOnboardingStatus(error && error.message ? error.message : "Failed to save intake responses.", "error");
+      });
+  }
+
+  function onMarkOnboardingTaskComplete(assignmentId) {
+    if (!state.client || !getViewedUserId() || !assignmentId || state.isCoachView) {
+      setOnboardingStatus("You cannot complete tasks from this view.", "error");
+      return;
+    }
+
+    var assignment = (state.onboardingAssignments || []).find(function (item) {
+      return String(item && item.id || "") === String(assignmentId || "");
+    });
+
+    if (!assignment) {
+      setOnboardingStatus("Task assignment not found.", "error");
+      return;
+    }
+
+    setOnboardingStatus("Marking task complete...", "info");
+
+    var nowIso = new Date().toISOString();
+    var isCustomTask = isCustomCoachTaskAssignment(assignment);
+    var nextStatus = isCustomTask ? "archived" : "submitted";
+
+    state.client
+      .from("athlete_onboarding_intake_assignments")
+      .update({
+        response_data: {
+          task_completed_at: nowIso,
+          completion_type: "athlete_marked_complete"
+        },
+        status: nextStatus,
+        submitted_at: nowIso,
+        updated_at: nowIso
+      })
+      .eq("id", assignmentId)
+      .eq("athlete_user_id", getViewedUserId())
+      .then(function (result) {
+        if (result.error) {
+          setOnboardingStatus(result.error.message, "error");
+          return;
+        }
+
+        maybeAdvanceFoundingStageAfterIntakeSubmission()
+          .then(function (advanced) {
+            if (advanced) {
+              setOnboardingStatus("Task completed. Onboarding advanced to assessment pending review.", "success");
+            } else if (isCustomTask) {
+              setOnboardingStatus("Task completed and archived.", "success");
+            } else {
+              setOnboardingStatus("Task completed.", "success");
+            }
+            loadOnboardingIntake();
+          });
+      })
+      .catch(function (error) {
+        setOnboardingStatus(error && error.message ? error.message : "Failed to complete task.", "error");
+      });
+  }
+
+  function maybeAdvanceFoundingStageAfterIntakeSubmission() {
+    if (!state.client || state.isCoachView || !getViewedUserId()) {
+      return Promise.resolve(false);
+    }
+
+    var athleteUserId = getViewedUserId();
+
+    return state.client
+      .from("athlete_onboarding_intake_assignments")
+      .select("id,status")
+      .eq("athlete_user_id", athleteUserId)
+      .then(function (assignmentsResult) {
+        if (assignmentsResult.error) {
+          throw assignmentsResult.error;
+        }
+
+        var allAssignments = Array.isArray(assignmentsResult.data) ? assignmentsResult.data : [];
+        var activeAssignments = allAssignments.filter(function (item) {
+          return String(item && item.status || "").toLowerCase() !== "archived";
+        });
+
+        if (!activeAssignments.length) {
+          return false;
+        }
+
+        var hasPending = activeAssignments.some(function (item) {
+          return String(item && item.status || "").toLowerCase() !== "submitted";
+        });
+
+        if (hasPending) {
+          return false;
+        }
+
+        return state.client
+          .from("founding_member_onboarding")
+          .select("athlete_user_id,stage,is_founding_member")
+          .eq("athlete_user_id", athleteUserId)
+          .maybeSingle();
+      })
+      .then(function (onboardingResult) {
+        if (onboardingResult === false) {
+          return false;
+        }
+
+        if (!onboardingResult || onboardingResult.error) {
+          if (onboardingResult && onboardingResult.error) {
+            throw onboardingResult.error;
+          }
+          return false;
+        }
+
+        var onboardingRow = onboardingResult.data || null;
+        if (!onboardingRow || onboardingRow.is_founding_member !== true) {
+          return false;
+        }
+
+        var currentStage = String(onboardingRow.stage || "").trim();
+        if (currentStage !== "welcome_pending_intakes") {
+          return false;
+        }
+
+        return state.client
+          .from("founding_member_onboarding")
+          .update({
+            stage: "intakes_completed_assessment_pending",
+            welcome_completed_at: new Date().toISOString()
+          })
+          .eq("athlete_user_id", athleteUserId)
+          .eq("stage", "welcome_pending_intakes")
+          .select("athlete_user_id")
+          .maybeSingle()
+          .then(function (updateResult) {
+            if (updateResult.error) {
+              throw updateResult.error;
+            }
+
+            return !!(updateResult.data && updateResult.data.athlete_user_id);
+          });
+      })
+      .catch(function () {
+        return false;
       });
   }
 
@@ -3094,6 +3608,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (state.coachIntakeDueDate) {
       state.coachIntakeDueDate.value = "";
     }
+    if (state.coachTaskTitle) {
+      state.coachTaskTitle.value = "";
+    }
+    if (state.coachTaskDescription) {
+      state.coachTaskDescription.value = "";
+    }
 
     state.selectedOnboardingTemplateId = "";
     setCoachIntakeStatus("", "info");
@@ -3111,6 +3631,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     modal.hidden = true;
     document.body.classList.remove("admin-modal-open");
     state.selectedOnboardingTemplateId = "";
+    if (state.coachTaskTitle) {
+      state.coachTaskTitle.value = "";
+    }
+    if (state.coachTaskDescription) {
+      state.coachTaskDescription.value = "";
+    }
     setCoachIntakeStatus("", "info");
   }
 
@@ -3215,6 +3741,62 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       })
       .catch(function (error) {
         setCoachIntakeStatus(error && error.message ? error.message : "Failed to assign intake form.", "error");
+      });
+  }
+
+  function onAssignQuickTaskToCurrentAthlete() {
+    var viewedUserId = getViewedUserId();
+    if (!state.isCoachView || !viewedUserId || !state.client) {
+      setCoachIntakeStatus("Unable to assign quick task right now.", "error");
+      return;
+    }
+
+    var taskTitle = String(state.coachTaskTitle && state.coachTaskTitle.value || "").trim();
+    var taskDescription = String(state.coachTaskDescription && state.coachTaskDescription.value || "").trim();
+    if (!taskTitle) {
+      setCoachIntakeStatus("Enter a quick task title.", "error");
+      return;
+    }
+
+    var dueDate = state.coachIntakeDueDate ? String(state.coachIntakeDueDate.value || "").trim() : "";
+    var nowIso = new Date().toISOString();
+    var taskFormId = "coach-task-" + Date.now();
+
+    setCoachIntakeStatus("Assigning quick task...", "info");
+
+    state.client
+      .from("athlete_onboarding_intake_assignments")
+      .insert({
+        athlete_user_id: viewedUserId,
+        form_id: taskFormId,
+        form_name: taskTitle,
+        form_schema: {
+          task_type: "custom_task",
+          description: taskDescription,
+          questions: []
+        },
+        response_data: {},
+        status: "assigned",
+        assigned_at: nowIso,
+        assigned_by: state.user ? state.user.id : null,
+        due_date: dueDate || null,
+        updated_at: nowIso
+      })
+      .then(function (result) {
+        if (result.error) {
+          setCoachIntakeStatus(result.error.message, "error");
+          return;
+        }
+
+        setCoachIntakeStatus("Quick task assigned.", "success");
+        setOnboardingStatus("Quick coach task assigned to athlete.", "success");
+        setTimeout(function () {
+          closeCoachIntakeModal();
+          loadOnboardingIntake();
+        }, 400);
+      })
+      .catch(function (error) {
+        setCoachIntakeStatus(error && error.message ? error.message : "Failed to assign quick task.", "error");
       });
   }
 
@@ -5452,6 +6034,49 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     setWhoopStatus(message, status === "error" ? "error" : "success");
     params.delete(WHOOP_REDIRECT_STATUS_PARAM);
     params.delete(WHOOP_REDIRECT_MESSAGE_PARAM);
+    if (window.history && window.history.replaceState) {
+      var cleanQuery = params.toString();
+      var cleanUrl = window.location.pathname + (cleanQuery ? "?" + cleanQuery : "") + window.location.hash;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }
+
+  function maybeShowFoundingPaymentStatus() {
+    var params;
+    try {
+      params = new URLSearchParams(window.location.search || "");
+    } catch (e) {
+      return;
+    }
+
+    var status = String(params.get(FOUNDING_PAYMENT_STATUS_PARAM) || "").trim().toLowerCase();
+    if (!status) {
+      return;
+    }
+
+    var message = String(params.get(FOUNDING_PAYMENT_MESSAGE_PARAM) || "").trim();
+    if (!message) {
+      if (status === "success") {
+        message = "Payment complete. Next step: complete your onboarding intake form below.";
+      } else if (status === "cancelled") {
+        message = "Payment was cancelled. You can return to the founding member page anytime to finish checkout.";
+      } else {
+        message = "There was an issue verifying payment status.";
+      }
+    }
+
+    setOnboardingStatus(message, status === "success" ? "success" : "info");
+
+    if (status === "success") {
+      var onboardingSection = document.getElementById("profile-onboarding-section");
+      if (onboardingSection && typeof onboardingSection.scrollIntoView === "function") {
+        onboardingSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    params.delete(FOUNDING_PAYMENT_STATUS_PARAM);
+    params.delete(FOUNDING_PAYMENT_MESSAGE_PARAM);
+
     if (window.history && window.history.replaceState) {
       var cleanQuery = params.toString();
       var cleanUrl = window.location.pathname + (cleanQuery ? "?" + cleanQuery : "") + window.location.hash;

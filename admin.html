@@ -122,6 +122,36 @@
 
           <article class="admin-overview-card">
             <div class="admin-overview-card-head">
+              <h2>Founding Onboarding</h2>
+              <p>Track legal signing status for founding members.</p>
+            </div>
+            <div class="admin-overview-list" data-admin-founding-onboarding>
+              <p class="admin-loading">Loading onboarding queue...</p>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Membership Inquiries</h2>
+              <p>Review interest requests, approve candidates, and assign payment tasks.</p>
+            </div>
+            <div class="admin-overview-list" data-admin-membership-inquiries>
+              <p class="admin-loading">Loading membership inquiries...</p>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Phase 2 Verification</h2>
+              <p>Live launch checks for onboarding, payment, and intake progression.</p>
+            </div>
+            <div class="admin-overview-list" data-admin-founding-verification>
+              <p class="admin-loading">Loading verification checks...</p>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
               <h2>Athlete Flags</h2>
               <p>Surface issues and coaching risks fast.</p>
             </div>
@@ -251,9 +281,19 @@
                 data-admin-search 
               />
               <select class="admin-search" data-admin-member-filter aria-label="Member status filter">
-                <option value="active" selected>Active Members</option>
+                <option value="all" selected>All Membership Statuses</option>
+                <option value="active">Active Members</option>
                 <option value="inactive">Inactive Members</option>
-                <option value="all">All Members</option>
+              </select>
+              <select class="admin-search" data-admin-program-filter aria-label="Program filter">
+                <option value="all" selected>All Program States</option>
+                <option value="individualized">Individualized Programs</option>
+                <option value="no_individualized">No Individualized Program</option>
+              </select>
+              <select class="admin-search" data-admin-purchase-filter aria-label="Purchase filter">
+                <option value="all" selected>All Purchase States</option>
+                <option value="purchased">Purchased Programs</option>
+                <option value="no_purchases">No Purchases</option>
               </select>
               <p class="admin-results-summary" data-admin-results-summary>Loading athletes...</p>
             </div>
@@ -375,6 +415,11 @@
 
           <div class="admin-modal-section">
             <h3>Login Setup</h3>
+
+            <label class="admin-add-athlete-checkbox">
+              <input type="checkbox" checked data-admin-add-athlete-founding-member />
+              <span>Enroll as Full Founding Member (legal docs + payment flow)</span>
+            </label>
 
             <label class="admin-add-athlete-checkbox">
               <input type="checkbox" checked data-admin-add-athlete-generate-password />

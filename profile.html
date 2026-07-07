@@ -45,7 +45,8 @@
         <div class="profile-dashboard-heading-row">
           <div>
             <h1 class="section-heading">Athlete Dashboard</h1>
-            <p class="profile-dashboard-subtitle">Today at a glance: what to do next and what needs attention.</p>
+            <p class="profile-dashboard-subtitle" data-profile-welcome-message>Welcome Athlete</p>
+            <p class="profile-dashboard-subtitle" data-profile-dashboard-copy>Coach task queue: complete these steps to keep onboarding moving.</p>
           </div>
           <aside class="profile-header-messages-widget" aria-label="Message Notifications">
             <p class="profile-header-messages-label">Messages</p>
@@ -64,30 +65,12 @@
           <a href="#profile-nutrition-section" class="profile-dashboard-nav-link">Nutrition</a>
         </nav>
 
-        <div class="profile-dashboard-glance profile-today-strip" data-dashboard-glance>
-          <article class="profile-glance-card profile-today-card" data-glance-card="training">
-            <p class="profile-glance-label">Today's Training</p>
-            <strong class="profile-glance-value" data-glance-training>Loading...</strong>
-            <p class="profile-glance-meta" data-glance-training-meta>Checking your current session focus</p>
-            <a class="profile-glance-action" href="#profile-training-program-section">Open Training</a>
-          </article>
-          <article class="profile-glance-card profile-today-card" data-glance-card="goals">
-            <p class="profile-glance-label">Next Event</p>
-            <strong class="profile-glance-value" data-glance-goals>Loading...</strong>
-            <p class="profile-glance-meta" data-glance-goals-meta>Finding your next race or event</p>
-            <a class="profile-glance-action" href="athlete-goals.html" data-glance-goals-link>View Goals</a>
-          </article>
-          <article class="profile-glance-card profile-today-card" data-glance-card="nutrition">
-            <p class="profile-glance-label">Nutrition Progress</p>
-            <strong class="profile-glance-value" data-glance-nutrition>Loading...</strong>
-            <p class="profile-glance-meta" data-glance-nutrition-meta>Checking today's intake</p>
-            <a class="profile-glance-action" href="athlete-nutrition.html" data-glance-nutrition-link>Log Food</a>
-          </article>
-          <article class="profile-glance-card profile-today-card" data-glance-card="strava">
-            <p class="profile-glance-label">Daily Readiness</p>
-            <strong class="profile-glance-value" data-glance-strava>Loading...</strong>
-            <p class="profile-glance-meta" data-glance-strava-meta>Combining training, nutrition, events, and recovery</p>
-            <a class="profile-glance-action" href="#profile-metrics-section">View Signals</a>
+        <div class="profile-dashboard-glance profile-today-strip" data-dashboard-task-board>
+          <article class="profile-glance-card profile-today-card">
+            <p class="profile-glance-label">Coach Tasks</p>
+            <strong class="profile-glance-value">Loading...</strong>
+            <p class="profile-glance-meta">Checking assigned tasks from your coach.</p>
+            <a class="profile-glance-action" href="#profile-onboarding-section">Open Onboarding</a>
           </article>
         </div>
 
@@ -107,6 +90,7 @@
             </div>
             <div class="profile-section-actions" data-onboarding-coach-actions hidden>
               <button type="button" class="btn profile-btn-edit-profile" data-coach-intake-open>Assign Intake Form</button>
+              <button type="button" class="btn profile-btn-cancel" data-coach-task-open>Assign Quick Task</button>
             </div>
           </div>
 
@@ -490,6 +474,14 @@
             <p class="admin-loading">Loading intake forms...</p>
           </div>
           <div class="admin-modal-info-row">
+            <label for="coach-task-title">Quick Task Title (optional)</label>
+            <input id="coach-task-title" type="text" placeholder="e.g. Upload mobility video" data-coach-task-title />
+          </div>
+          <div class="admin-modal-info-row">
+            <label for="coach-task-description">Quick Task Details (optional)</label>
+            <textarea id="coach-task-description" rows="3" placeholder="What should the athlete do, and how should they confirm completion?" data-coach-task-description></textarea>
+          </div>
+          <div class="admin-modal-info-row">
             <label for="coach-intake-due-date">Due Date (optional)</label>
             <input id="coach-intake-due-date" type="date" data-coach-intake-due-date />
           </div>
@@ -498,6 +490,7 @@
         <div class="admin-modal-section">
           <div class="admin-modal-actions">
             <button type="button" class="btn admin-btn-primary" data-coach-intake-assign>Assign Intake Form</button>
+            <button type="button" class="btn profile-btn-cancel" data-coach-intake-assign-quick>Assign Quick Task</button>
             <button type="button" class="btn admin-btn-reset-password" data-coach-intake-close>Cancel</button>
           </div>
         </div>

@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
 
     const defaultSuccessUrl =
       sanitizeUrl(Deno.env.get("STRIPE_SUCCESS_URL")) ||
-      "https://nomadicperformance.com/founding-member.html?checkout=success";
+      "https://nomadicperformance.com/founding-payment-success.html";
 
     const defaultCancelUrl =
       sanitizeUrl(Deno.env.get("STRIPE_CANCEL_URL")) ||

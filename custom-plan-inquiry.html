@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom Plan Inquiry - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/custom-plan-inquiry.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="blog.html">Blog</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main style="max-width: 980px; margin: 2.3rem auto 3rem auto; padding: 0 1rem;">
+    <section class="service-card" style="border-top-color: #0f4749;">
+      <h1 style="margin-top: 0;">Inquire About a Custom Plan</h1>
+      <p>Tell us your sport and schedule constraints, and we will recommend next steps for a one-time individualized training block.</p>
+      <p style="font-size: 0.92rem; color: #194848; margin-top: 0.35rem;">This is for athletes who want a custom plan without monthly coaching membership.</p>
+    </section>
+
+    <section class="service-card">
+      <form data-custom-plan-inquiry-form>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="custom-plan-name">Full Name</label>
+            <input id="custom-plan-name" name="name" type="text" required />
+          </div>
+          <div class="form-group">
+            <label for="custom-plan-email">Email</label>
+            <input id="custom-plan-email" name="email" type="email" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="custom-plan-sports">Primary Sport(s)</label>
+          <input id="custom-plan-sports" name="sports" type="text" placeholder="Climbing, skiing, trail running, etc." required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="custom-plan-duration">Desired Plan Duration (weeks)</label>
+            <input id="custom-plan-duration" name="duration_weeks" type="number" min="2" max="24" step="1" placeholder="e.g. 8" />
+          </div>
+          <div class="form-group">
+            <label for="custom-plan-days">Training Days Per Week</label>
+            <input id="custom-plan-days" name="days_per_week" type="number" min="1" max="7" step="1" placeholder="e.g. 4" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="custom-plan-goal">Primary Goal</label>
+          <input id="custom-plan-goal" name="goal" type="text" placeholder="What are you preparing for?" required />
+        </div>
+
+        <div class="form-group">
+          <label for="custom-plan-constraints">Constraints / Notes</label>
+          <textarea id="custom-plan-constraints" name="notes" rows="4" placeholder="Current injuries, available equipment, schedule constraints, key dates, etc."></textarea>
+        </div>
+
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-top: 0.8rem;">
+          <button type="submit" class="btn" data-custom-plan-inquiry-submit>Submit Inquiry</button>
+          <a class="btn profile-btn-cancel" href="services.html">Back to Services</a>
+        </div>
+      </form>
+
+      <p data-custom-plan-inquiry-status class="status-info" role="status" aria-live="polite" style="margin-top:0.8rem; min-height:1.2em;"></p>
+
+      <div data-custom-plan-create-account-prompt hidden style="margin-top: 0.9rem; padding: 0.85rem 0.9rem; border: 1px solid #d8c7b2; border-radius: 10px; background: #f9f4ee;">
+        <p style="margin: 0 0 0.55rem 0; color: #173f3f;">Inquiry received. Create your account now so we can send custom plan follow-up tasks to your dashboard.</p>
+        <button type="button" class="btn" data-custom-plan-create-account-button>Create Account</button>
+      </div>
+    </section>
+  </main>
+
+  <footer style="background: #0e4749; color: #fff; padding: 24px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 10px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Instagram</a>
+      <a href="https://x.com/NomadPerformCo" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">X</a>
+      <a href="https://strava.app.link/XGMKMXacL1b" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Strava</a>
+    </div>
+    <p style="font-size: 1rem; opacity: 0.85;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
+  </footer>
+</body>
+</html>

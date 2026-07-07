@@ -33,6 +33,7 @@ type NormalizedEvent = {
   metadata: Record<string, unknown>;
   shouldActivateMember: boolean;
   foundingSignal: boolean;
+  metadataUserId: string | null;
 };
 
 function jsonResponse(data: unknown, status = 200) {
@@ -243,6 +244,7 @@ function normalizeEvent(event: StripeEvent, foundingMemberPriceId: string): Norm
   const metadata = getMetadata(object);
   const plan = String(metadata.plan || "").trim().toLowerCase();
   const source = String(metadata.source || "").trim().toLowerCase();
+  const metadataUserId = getString(metadata.user_id);
 
   let stripeCustomerId: string | null = null;
   let stripeSubscriptionId: string | null = null;
@@ -314,8 +316,69 @@ function normalizeEvent(event: StripeEvent, foundingMemberPriceId: string): Norm
     cancelAtPeriodEnd,
     metadata,
     shouldActivateMember,
-    foundingSignal
+    foundingSignal,
+    metadataUserId
   };
+}
+
+function getOnboardingStageRank(stage: string | null): number {
+  const value = String(stage || "").trim();
+  const lookup: Record<string, number> = {
+    invited: 1,
+    first_login_pending_docs: 2,
+    docs_signed_pending_payment: 3,
+    payment_pending: 4,
+    welcome_pending_intakes: 5,
+    intakes_completed_assessment_pending: 6,
+    assessment_in_progress: 7,
+    assessment_published_pending_review: 8,
+    review_scheduled: 9,
+    active_training: 10
+  };
+
+  return lookup[value] || 0;
+}
+
+async function advanceFoundingOnboardingAfterPayment(
+  admin: ReturnType<typeof createServiceClient>,
+  userId: string
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+
+  const { data: row, error: selectError } = await admin
+    .from("founding_member_onboarding")
+    .select("athlete_user_id,stage,payment_completed_at")
+    .eq("athlete_user_id", userId)
+    .maybeSingle();
+
+  if (selectError) {
+    throw new Error(selectError.message);
+  }
+
+  if (!row) {
+    return;
+  }
+
+  const currentStage = getString((row as { stage?: unknown }).stage) || "";
+  const currentRank = getOnboardingStageRank(currentStage);
+  const welcomeRank = getOnboardingStageRank("welcome_pending_intakes");
+
+  const updates: Record<string, unknown> = {
+    payment_completed_at: nowIso
+  };
+
+  if (currentRank > 0 && currentRank < welcomeRank) {
+    updates.stage = "welcome_pending_intakes";
+  }
+
+  const { error: updateError } = await admin
+    .from("founding_member_onboarding")
+    .update(updates)
+    .eq("athlete_user_id", userId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
 }
 
 async function lookupUserIdByEmail(admin: ReturnType<typeof createServiceClient>, email: string | null): Promise<string | null> {
@@ -364,7 +427,7 @@ Deno.serve(async (req) => {
     }
 
     const admin = createServiceClient();
-    const userId = await lookupUserIdByEmail(admin, normalized.customerEmail);
+    const userId = getString(normalized.metadataUserId) || await lookupUserIdByEmail(admin, normalized.customerEmail);
 
     const upsertPayload = {
       stripe_customer_id: normalized.stripeCustomerId,
@@ -415,6 +478,8 @@ Deno.serve(async (req) => {
       if (activationError) {
         throw new Error(activationError.message);
       }
+
+      await advanceFoundingOnboardingAfterPayment(admin, userId);
     }
 
     return jsonResponse({

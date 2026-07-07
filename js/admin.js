@@ -147,7 +147,9 @@
     exerciseLibrary: [],
     assignmentTemplateId: null,
     templateFilter: "active",
-    memberFilter: "active",
+    memberFilter: "all",
+    programFilter: "all",
+    purchaseFilter: "all",
     currentPage: 1,
     pageSize: 10,
     searchTerm: "",
@@ -160,6 +162,11 @@
     coachStravaRows: [],
     coachTodos: [],
     coachFlags: [],
+    foundingOnboardingRows: [],
+    membershipInquiries: [],
+    foundingSignatureSummaryByAthlete: {},
+    foundingSubscriptionRows: [],
+    foundingIntakeAssignmentRows: [],
     climbingComparisonRows: [],
     athleteProfilesById: {},
     latestMetricRowsByAthlete: {}
@@ -237,7 +244,25 @@
     var memberFilterInput = document.querySelector("[data-admin-member-filter]");
     if (memberFilterInput) {
       memberFilterInput.addEventListener("change", function (event) {
-        state.memberFilter = String((event && event.target && event.target.value) || "active").trim() || "active";
+        state.memberFilter = String((event && event.target && event.target.value) || "all").trim() || "all";
+        state.currentPage = 1;
+        renderAthletesTable();
+      });
+    }
+
+    var programFilterInput = document.querySelector("[data-admin-program-filter]");
+    if (programFilterInput) {
+      programFilterInput.addEventListener("change", function (event) {
+        state.programFilter = String((event && event.target && event.target.value) || "all").trim() || "all";
+        state.currentPage = 1;
+        renderAthletesTable();
+      });
+    }
+
+    var purchaseFilterInput = document.querySelector("[data-admin-purchase-filter]");
+    if (purchaseFilterInput) {
+      purchaseFilterInput.addEventListener("change", function (event) {
+        state.purchaseFilter = String((event && event.target && event.target.value) || "all").trim() || "all";
         state.currentPage = 1;
         renderAthletesTable();
       });
@@ -292,6 +317,16 @@
     var riskFilter = document.querySelector("[data-admin-risk-filter]");
     if (riskFilter) {
       riskFilter.addEventListener("click", onCoachRiskFilterClick);
+    }
+
+    var foundingOnboardingList = document.querySelector("[data-admin-founding-onboarding]");
+    if (foundingOnboardingList) {
+      foundingOnboardingList.addEventListener("click", onFoundingOnboardingActionClick);
+    }
+
+    var membershipInquiryList = document.querySelector("[data-admin-membership-inquiries]");
+    if (membershipInquiryList) {
+      membershipInquiryList.addEventListener("click", onMembershipInquiryActionClick);
     }
 
     var addAthleteBtn = document.querySelector("[data-admin-add-athlete]");
@@ -1347,12 +1382,49 @@
       return;
     }
 
+    var activeProgramByUserId = {};
+    (state.activePrograms || []).forEach(function (row) {
+      if (!row || row.is_active === false || !row.user_id) {
+        return;
+      }
+      activeProgramByUserId[String(row.user_id)] = true;
+    });
+
+    var purchasedByUserId = {};
+    (state.foundingSubscriptionRows || []).forEach(function (row) {
+      var userId = String(row && row.user_id || "").trim();
+      if (!userId) {
+        return;
+      }
+      purchasedByUserId[userId] = true;
+    });
+
     var filtered = state.athletes.filter(function (a) {
       if (state.memberFilter === "active" && a.is_active === false) {
         return false;
       }
 
       if (state.memberFilter === "inactive" && a.is_active !== false) {
+        return false;
+      }
+
+      var athleteId = String(a && a.user_id || "");
+      var hasIndividualizedProgram = !!activeProgramByUserId[athleteId];
+      var hasPurchase = !!purchasedByUserId[athleteId];
+
+      if (state.programFilter === "individualized" && !hasIndividualizedProgram) {
+        return false;
+      }
+
+      if (state.programFilter === "no_individualized" && hasIndividualizedProgram) {
+        return false;
+      }
+
+      if (state.purchaseFilter === "purchased" && !hasPurchase) {
+        return false;
+      }
+
+      if (state.purchaseFilter === "no_purchases" && hasPurchase) {
         return false;
       }
 
@@ -1374,6 +1446,12 @@
       } else {
         var pageStart = start + 1;
         var pageEnd = Math.min(end, filtered.length);
+        var filteredPurchasedCount = filtered.filter(function (athlete) {
+          return !!purchasedByUserId[String(athlete && athlete.user_id || "")];
+        }).length;
+        var filteredIndividualizedCount = filtered.filter(function (athlete) {
+          return !!activeProgramByUserId[String(athlete && athlete.user_id || "")];
+        }).length;
         resultsSummary.textContent =
           "Showing " +
           String(pageStart) +
@@ -1385,7 +1463,11 @@
           String(getActiveAthleteCount()) +
           " active, " +
           String(getInactiveAthleteCount()) +
-          " inactive)";
+          " inactive, " +
+          String(filteredIndividualizedCount) +
+          " individualized, " +
+          String(filteredPurchasedCount) +
+          " purchased)";
       }
     }
 
@@ -2200,6 +2282,7 @@
     var levelField = document.querySelector("[data-admin-add-athlete-level]");
     var sexField = document.querySelector("[data-admin-add-athlete-sex]");
     var heightField = document.querySelector("[data-admin-add-athlete-height]");
+    var foundingMemberField = document.querySelector("[data-admin-add-athlete-founding-member]");
     var autoPasswordField = document.querySelector("[data-admin-add-athlete-generate-password]");
     var customPasswordField = document.querySelector("[data-admin-add-athlete-password]");
 
@@ -2230,6 +2313,7 @@
     var level = String((levelField && levelField.value) || "").trim();
     var sex = String((sexField && sexField.value) || "").trim() || null;
     var height = parseFloat((heightField && heightField.value) || "") || null;
+    var enrollAsFoundingMember = !!(foundingMemberField && foundingMemberField.checked);
 
     var useGeneratedPassword = !autoPasswordField || !!autoPasswordField.checked;
     var defaultPassword = useGeneratedPassword
@@ -2286,23 +2370,59 @@
              height_cm: height
           });
 
-          saveInitialAthleteMetrics(createdUserId, initialMetrics)
-            .then(function () {
-              if (initialMetrics.length) {
-                setAddAthleteStatus(
-                  "Athlete account created with " + initialMetrics.length + " baseline metric(s). Share login details below.",
-                  "success"
-                );
+          Promise.allSettled([
+            saveInitialAthleteMetrics(createdUserId, initialMetrics),
+            upsertFoundingMemberOnboarding(createdUserId, enrollAsFoundingMember)
+          ])
+            .then(function (settled) {
+              var metricsResult = settled[0];
+              var foundingResult = settled[1];
+              var statusParts = [];
+              var hasWarning = false;
+
+              if (metricsResult.status === "fulfilled") {
+                if (initialMetrics.length) {
+                  statusParts.push(initialMetrics.length + " baseline metric(s) saved");
+                }
               } else {
-                setAddAthleteStatus("Athlete account created. Share temporary login details below.", "success");
+                hasWarning = true;
+                statusParts.push(
+                  "baseline metrics were not saved: " +
+                    (metricsResult.reason && metricsResult.reason.message
+                      ? metricsResult.reason.message
+                      : "Unknown error")
+                );
               }
-            })
-            .catch(function (metricsError) {
-              setAddAthleteStatus(
-                "Athlete account created, but baseline metrics were not saved: " +
-                  (metricsError && metricsError.message ? metricsError.message : "Unknown error"),
-                "info"
-              );
+
+              if (enrollAsFoundingMember) {
+                if (foundingResult.status === "fulfilled") {
+                  var enrolled = foundingResult.value && foundingResult.value.enrolled;
+                  if (enrolled) {
+                    statusParts.push("founding onboarding enrolled");
+                  } else {
+                    statusParts.push("founding onboarding already exists");
+                  }
+                } else {
+                  hasWarning = true;
+                  statusParts.push(
+                    "founding onboarding enrollment failed: " +
+                      (foundingResult.reason && foundingResult.reason.message
+                        ? foundingResult.reason.message
+                        : "Unknown error")
+                  );
+                }
+              }
+
+              if (!statusParts.length) {
+                setAddAthleteStatus("Athlete account created. Share temporary login details below.", "success");
+                return;
+              }
+
+              var prefix = hasWarning
+                ? "Athlete account created with warnings: "
+                : "Athlete account created: ";
+
+              setAddAthleteStatus(prefix + statusParts.join("; ") + ".", hasWarning ? "info" : "success");
             });
         } else {
           setAddAthleteStatus(
@@ -2379,6 +2499,11 @@
     var autoField = document.querySelector("[data-admin-add-athlete-generate-password]");
     if (autoField) {
       autoField.checked = true;
+    }
+
+    var foundingField = document.querySelector("[data-admin-add-athlete-founding-member]");
+    if (foundingField) {
+      foundingField.checked = true;
     }
 
     toggleAddAthletePasswordMode();
@@ -2708,6 +2833,34 @@
       });
   }
 
+  function upsertFoundingMemberOnboarding(userId, shouldEnroll) {
+    if (!state.client || !userId || !shouldEnroll) {
+      return Promise.resolve({ enrolled: false });
+    }
+
+    var payload = {
+      athlete_user_id: userId,
+      coach_user_id: state.user && state.user.id ? state.user.id : null,
+      is_founding_member: true,
+      stage: "first_login_pending_docs",
+      updated_at: new Date().toISOString()
+    };
+
+    return state.client
+      .from("founding_member_onboarding")
+      .upsert(payload, {
+        onConflict: "athlete_user_id",
+        ignoreDuplicates: true
+      })
+      .then(function (result) {
+        if (result.error) {
+          throw result.error;
+        }
+
+        return { enrolled: true };
+      });
+  }
+
   function createIsolatedAuthClient() {
     if (!window.supabase || !window.supabase.createClient) {
       return null;
@@ -2809,6 +2962,11 @@
       state.athleteGoalEvents = [];
       state.coachReadinessByAthlete = {};
       state.coachStravaRows = [];
+      state.foundingOnboardingRows = [];
+      state.membershipInquiries = [];
+      state.foundingSignatureSummaryByAthlete = {};
+      state.foundingSubscriptionRows = [];
+      state.foundingIntakeAssignmentRows = [];
       state.climbingComparisonRows = [];
       state.athleteProfilesById = {};
       state.latestMetricRowsByAthlete = {};
@@ -2855,7 +3013,38 @@
 
     var athleteProfilesRequest = state.client
       .from("athlete_profiles")
-      .select("user_id,name,sport,level,sports,sport_overview,height_cm,arm_span_cm");
+      .select("user_id,name,sport,level,sports,sport_overview,height_cm,arm_span_cm,is_active");
+
+    var foundingOnboardingRequest = state.client
+      .from("founding_member_onboarding")
+      .select("athlete_user_id,stage,is_founding_member,docs_signed_at,payment_completed_at,welcome_completed_at,created_at,updated_at")
+      .eq("is_founding_member", true)
+      .order("updated_at", { ascending: false })
+      .limit(500);
+
+    var foundingSignaturesRequest = state.client
+      .from("founding_member_legal_signatures")
+      .select("athlete_user_id,document_id,document_version,signed_at")
+      .order("signed_at", { ascending: false })
+      .limit(5000);
+
+    var membershipInquiriesRequest = state.client
+      .from("membership_inquiries")
+      .select("id,user_id,full_name,email,primary_sports,primary_goal,notes,status,created_at,updated_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    var foundingSubscriptionsRequest = state.client
+      .from("founding_member_subscriptions")
+      .select("user_id,status,last_event_type,last_event_created_at,updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1000);
+
+    var foundingIntakeAssignmentsRequest = state.client
+      .from("athlete_onboarding_intake_assignments")
+      .select("athlete_user_id,status,updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(5000);
 
     Promise.all([
       activeProgramsRequest,
@@ -2864,7 +3053,12 @@
       nutritionLogsRequest,
       stravaMetricsRequest,
       athleteMetricsRequest,
-      athleteProfilesRequest
+      athleteProfilesRequest,
+      foundingOnboardingRequest,
+      foundingSignaturesRequest,
+      membershipInquiriesRequest,
+      foundingSubscriptionsRequest,
+      foundingIntakeAssignmentsRequest
     ])
       .then(function (results) {
         var programsResult = results[0];
@@ -2874,6 +3068,11 @@
         var stravaResult = results[4];
         var metricsResult = results[5];
         var profilesResult = results[6];
+        var foundingOnboardingResult = results[7];
+        var foundingSignaturesResult = results[8];
+        var membershipInquiriesResult = results[9];
+        var foundingSubscriptionsResult = results[10];
+        var foundingIntakeAssignmentsResult = results[11];
 
         if (programsResult && !programsResult.error) {
           state.activePrograms = programsResult.data || [];
@@ -2940,7 +3139,8 @@
               sports: Array.isArray(profile && profile.sports) ? profile.sports.slice() : [],
               sport_overview: profile && profile.sport_overview ? profile.sport_overview : null,
               height_cm: profile && profile.height_cm != null ? profile.height_cm : null,
-              arm_span_cm: profile && profile.arm_span_cm != null ? profile.arm_span_cm : null
+              arm_span_cm: profile && profile.arm_span_cm != null ? profile.arm_span_cm : null,
+              is_active: !(profile && profile.is_active === false)
             };
           });
         } else if (profilesResult && profilesResult.error && !isMissingTableError(profilesResult.error)) {
@@ -2948,6 +3148,101 @@
         }
 
         state.athleteProfilesById = athleteProfilesById;
+
+        if (foundingOnboardingResult && !foundingOnboardingResult.error) {
+          state.foundingOnboardingRows = Array.isArray(foundingOnboardingResult.data)
+            ? foundingOnboardingResult.data.map(function (row) {
+                return {
+                  athlete_user_id: String(row && row.athlete_user_id || ""),
+                  stage: String(row && row.stage || "invited"),
+                  is_founding_member: row && row.is_founding_member === true,
+                  docs_signed_at: row && row.docs_signed_at ? String(row.docs_signed_at) : "",
+                  payment_completed_at: row && row.payment_completed_at ? String(row.payment_completed_at) : "",
+                  welcome_completed_at: row && row.welcome_completed_at ? String(row.welcome_completed_at) : "",
+                  created_at: row && row.created_at ? String(row.created_at) : "",
+                  updated_at: row && row.updated_at ? String(row.updated_at) : ""
+                };
+              }).filter(function (row) {
+                return !!row.athlete_user_id;
+              })
+            : [];
+        } else {
+          state.foundingOnboardingRows = [];
+          if (foundingOnboardingResult && foundingOnboardingResult.error && !isMissingTableError(foundingOnboardingResult.error)) {
+            console.warn("Founding onboarding load failed:", foundingOnboardingResult.error);
+          }
+        }
+
+        if (foundingSignaturesResult && !foundingSignaturesResult.error) {
+          state.foundingSignatureSummaryByAthlete = buildFoundingSignatureSummaryByAthlete(foundingSignaturesResult.data || []);
+        } else {
+          state.foundingSignatureSummaryByAthlete = {};
+          if (foundingSignaturesResult && foundingSignaturesResult.error && !isMissingTableError(foundingSignaturesResult.error)) {
+            console.warn("Founding legal signatures load failed:", foundingSignaturesResult.error);
+          }
+        }
+
+        if (membershipInquiriesResult && !membershipInquiriesResult.error) {
+          state.membershipInquiries = Array.isArray(membershipInquiriesResult.data)
+            ? membershipInquiriesResult.data.map(function (row) {
+                return {
+                  id: String(row && row.id || ""),
+                  user_id: String(row && row.user_id || ""),
+                  full_name: String(row && row.full_name || ""),
+                  email: String(row && row.email || ""),
+                  primary_sports: String(row && row.primary_sports || ""),
+                  primary_goal: String(row && row.primary_goal || ""),
+                  notes: String(row && row.notes || ""),
+                  status: String(row && row.status || "new").toLowerCase(),
+                  created_at: String(row && row.created_at || ""),
+                  updated_at: String(row && row.updated_at || "")
+                };
+              })
+            : [];
+        } else {
+          state.membershipInquiries = [];
+          if (membershipInquiriesResult && membershipInquiriesResult.error && !isMissingTableError(membershipInquiriesResult.error)) {
+            console.warn("Membership inquiries load failed:", membershipInquiriesResult.error);
+          }
+        }
+
+        if (foundingSubscriptionsResult && !foundingSubscriptionsResult.error) {
+          state.foundingSubscriptionRows = Array.isArray(foundingSubscriptionsResult.data)
+            ? foundingSubscriptionsResult.data.map(function (row) {
+                return {
+                  user_id: String(row && row.user_id || ""),
+                  status: String(row && row.status || "").toLowerCase(),
+                  last_event_type: String(row && row.last_event_type || ""),
+                  last_event_created_at: String(row && row.last_event_created_at || ""),
+                  updated_at: String(row && row.updated_at || "")
+                };
+              })
+            : [];
+        } else {
+          state.foundingSubscriptionRows = [];
+          if (foundingSubscriptionsResult && foundingSubscriptionsResult.error && !isMissingTableError(foundingSubscriptionsResult.error)) {
+            console.warn("Founding subscriptions load failed:", foundingSubscriptionsResult.error);
+          }
+        }
+
+        if (foundingIntakeAssignmentsResult && !foundingIntakeAssignmentsResult.error) {
+          state.foundingIntakeAssignmentRows = Array.isArray(foundingIntakeAssignmentsResult.data)
+            ? foundingIntakeAssignmentsResult.data.map(function (row) {
+                return {
+                  athlete_user_id: String(row && row.athlete_user_id || ""),
+                  status: String(row && row.status || "").toLowerCase(),
+                  updated_at: String(row && row.updated_at || "")
+                };
+              }).filter(function (row) {
+                return !!row.athlete_user_id;
+              })
+            : [];
+        } else {
+          state.foundingIntakeAssignmentRows = [];
+          if (foundingIntakeAssignmentsResult && foundingIntakeAssignmentsResult.error && !isMissingTableError(foundingIntakeAssignmentsResult.error)) {
+            console.warn("Founding intake assignments load failed:", foundingIntakeAssignmentsResult.error);
+          }
+        }
 
         state.coachReadinessByAthlete = buildCoachReadinessByAthlete(
           state.athletes,
@@ -2961,6 +3256,7 @@
         state.climbingComparisonRows = buildClimbingComparisonRows(state.athletes, athleteMetrics, athleteProfilesById);
         state.latestMetricRowsByAthlete = buildLatestMetricRowsByAthlete(athleteMetrics);
 
+        renderAthletesTable();
         renderCoachOverview();
         updateStats();
       })
@@ -2969,9 +3265,15 @@
         state.athleteGoalEvents = [];
         state.coachReadinessByAthlete = {};
         state.coachStravaRows = [];
+        state.foundingOnboardingRows = [];
+        state.membershipInquiries = [];
+        state.foundingSignatureSummaryByAthlete = {};
+        state.foundingSubscriptionRows = [];
+        state.foundingIntakeAssignmentRows = [];
         state.climbingComparisonRows = [];
         state.athleteProfilesById = {};
         state.latestMetricRowsByAthlete = {};
+        renderAthletesTable();
         renderCoachOverview();
         updateStats();
       });
@@ -2982,10 +3284,626 @@
     renderCalendarDayList();
     renderUpcomingTimeline();
     renderCoachTodoList();
+    renderFoundingOnboardingQueue();
+    renderMembershipInquiries();
+    renderFoundingVerificationBoard();
     renderCoachFlagsList();
     renderCoachRiskBoard();
     renderCoachPerformanceWidgets();
     renderClimbingComparison();
+  }
+
+  function renderMembershipInquiries() {
+    var container = document.querySelector("[data-admin-membership-inquiries]");
+    if (!container) {
+      return;
+    }
+
+    var inquiries = Array.isArray(state.membershipInquiries) ? state.membershipInquiries.slice() : [];
+    if (!inquiries.length) {
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No inquiries yet</p>' +
+          '<p class="admin-empty-state-copy">New membership requests will appear here once submitted.</p>' +
+        '</div>';
+      return;
+    }
+
+    var athleteByEmail = {};
+    (state.athletes || []).forEach(function (athlete) {
+      var email = String(athlete && athlete.email || "").trim().toLowerCase();
+      if (!email) {
+        return;
+      }
+      athleteByEmail[email] = athlete;
+    });
+
+    container.innerHTML = inquiries
+      .slice(0, 12)
+      .map(function (inquiry) {
+        var status = String(inquiry.status || "new").toLowerCase();
+        var statusToneClass = status === "approved" ? "is-stable" : "";
+        var matchedAthlete = athleteByEmail[String(inquiry.email || "").trim().toLowerCase()] || null;
+        var athleteId = String(inquiry.user_id || (matchedAthlete && matchedAthlete.user_id) || "");
+        var canAssignPaymentTask = !!athleteId;
+        var submittedLabel = inquiry.created_at ? formatDate(inquiry.created_at) : "Unknown";
+
+        return (
+          '<div class="admin-overview-item">' +
+            '<div>' +
+              '<p class="admin-overview-item-title">' + escapeHtml(inquiry.full_name || inquiry.email || "Prospect") + '</p>' +
+              '<p class="admin-overview-item-meta">' +
+                escapeHtml(inquiry.email || "") +
+                ' • ' +
+                escapeHtml(inquiry.primary_sports || "") +
+                ' • Goal: ' +
+                escapeHtml(inquiry.primary_goal || "") +
+              '</p>' +
+              '<p class="admin-overview-item-meta">Submitted ' + escapeHtml(submittedLabel) + (inquiry.notes ? ' • Notes: ' + escapeHtml(inquiry.notes) : '') + '</p>' +
+            '</div>' +
+            '<div style="display:flex; flex-direction:column; align-items:flex-end; gap:0.4rem;">' +
+              '<span class="admin-risk-chip ' + statusToneClass + '">' + escapeHtml(status) + '</span>' +
+              '<div style="display:flex; gap:0.35rem; flex-wrap:wrap; justify-content:flex-end;">' +
+                '<button type="button" class="btn admin-btn-small" data-membership-inquiry-action="approve" data-membership-inquiry-id="' + escapeAttribute(inquiry.id) + '">Approve</button>' +
+                '<button type="button" class="btn admin-btn-small" data-membership-inquiry-action="decline" data-membership-inquiry-id="' + escapeAttribute(inquiry.id) + '">Decline</button>' +
+                '<button type="button" class="btn admin-btn-delete-mini" data-membership-inquiry-action="archive" data-membership-inquiry-id="' + escapeAttribute(inquiry.id) + '">Archive</button>' +
+                '<button type="button" class="btn admin-btn-refresh" data-membership-inquiry-action="assign_payment" data-membership-inquiry-id="' + escapeAttribute(inquiry.id) + '" data-membership-athlete-id="' + escapeAttribute(athleteId) + '" ' + (canAssignPaymentTask ? '' : 'disabled title="No athlete account found for this email yet."') + '>Assign Payment Task</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      })
+      .join("");
+  }
+
+  function onMembershipInquiryActionClick(event) {
+    var actionBtn = event.target && event.target.closest("[data-membership-inquiry-action]");
+    if (!actionBtn || !state.client) {
+      return;
+    }
+
+    var action = String(actionBtn.getAttribute("data-membership-inquiry-action") || "").trim().toLowerCase();
+    var inquiryId = String(actionBtn.getAttribute("data-membership-inquiry-id") || "").trim();
+    if (!action || !inquiryId) {
+      return;
+    }
+
+    if (action === "assign_payment") {
+      var athleteUserId = String(actionBtn.getAttribute("data-membership-athlete-id") || "").trim();
+      assignMembershipPaymentTask(inquiryId, athleteUserId);
+      return;
+    }
+
+    if (action === "approve" || action === "decline" || action === "archive") {
+      updateMembershipInquiryStatus(inquiryId, action === "approve" ? "approved" : (action === "decline" ? "declined" : "archived"));
+    }
+  }
+
+  function updateMembershipInquiryStatus(inquiryId, status) {
+    if (!state.client || !inquiryId || !status) {
+      return;
+    }
+
+    setStatus("Updating membership inquiry status...", "info");
+
+    state.client
+      .from("membership_inquiries")
+      .update({
+        status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", inquiryId)
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        state.membershipInquiries = (state.membershipInquiries || []).map(function (inquiry) {
+          if (String(inquiry && inquiry.id || "") !== inquiryId) {
+            return inquiry;
+          }
+          return Object.assign({}, inquiry, { status: status, updated_at: new Date().toISOString() });
+        });
+
+        renderMembershipInquiries();
+        setStatus("Membership inquiry updated.", "success");
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to update inquiry.", "error");
+      });
+  }
+
+  function assignMembershipPaymentTask(inquiryId, athleteUserId) {
+    if (!state.client || !inquiryId || !athleteUserId) {
+      setStatus("Cannot assign payment task: no athlete account found.", "error");
+      return;
+    }
+
+    var nowIso = new Date().toISOString();
+    var taskId = "membership-payment-" + Date.now();
+
+    setStatus("Assigning membership payment task...", "info");
+
+    state.client
+      .from("athlete_onboarding_intake_assignments")
+      .insert({
+        athlete_user_id: athleteUserId,
+        form_id: taskId,
+        form_name: "Complete Membership Payment",
+        form_schema: {
+          task_type: "custom_task",
+          description: "You are approved for membership. Complete payment to activate coaching access.",
+          questions: []
+        },
+        response_data: {},
+        status: "assigned",
+        assigned_at: nowIso,
+        assigned_by: state.user ? state.user.id : null,
+        due_date: null,
+        updated_at: nowIso
+      })
+      .then(function (insertResult) {
+        if (insertResult.error) {
+          setStatus(insertResult.error.message, "error");
+          return;
+        }
+
+        updateMembershipInquiryStatus(inquiryId, "approved");
+        setStatus("Payment task assigned to athlete dashboard.", "success");
+        loadCoachOverviewData();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to assign payment task.", "error");
+      });
+  }
+
+  function renderFoundingVerificationBoard() {
+    var container = document.querySelector("[data-admin-founding-verification]");
+    if (!container) {
+      return;
+    }
+
+    var foundingRows = Array.isArray(state.foundingOnboardingRows) ? state.foundingOnboardingRows : [];
+    if (!foundingRows.length) {
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No verification data yet</p>' +
+          '<p class="admin-empty-state-copy">Add founding members and run the Phase 2 flow to populate verification checks.</p>' +
+        '</div>';
+      return;
+    }
+
+    var foundedIds = {};
+    foundingRows.forEach(function (row) {
+      var id = String(row && row.athlete_user_id || "").trim();
+      if (id) {
+        foundedIds[id] = true;
+      }
+    });
+
+    var foundedIdList = Object.keys(foundedIds);
+    var totalFounding = foundedIdList.length;
+
+    var docsSignedCount = foundingRows.filter(function (row) {
+      return !!(row && row.docs_signed_at);
+    }).length;
+
+    var paymentRecordedCount = foundingRows.filter(function (row) {
+      return !!(row && row.payment_completed_at);
+    }).length;
+
+    var activeProfileCount = foundedIdList.filter(function (id) {
+      var profile = state.athleteProfilesById[id];
+      return !!(profile && profile.is_active !== false);
+    }).length;
+
+    var subscriptionsByUser = {};
+    (state.foundingSubscriptionRows || []).forEach(function (row) {
+      var userId = String(row && row.user_id || "").trim();
+      if (!userId || !foundedIds[userId]) {
+        return;
+      }
+      if (!subscriptionsByUser[userId]) {
+        subscriptionsByUser[userId] = [];
+      }
+      subscriptionsByUser[userId].push(row);
+    });
+
+    var subscriptionCapturedCount = foundedIdList.filter(function (id) {
+      return Array.isArray(subscriptionsByUser[id]) && subscriptionsByUser[id].length > 0;
+    }).length;
+
+    var paidLikeStatuses = { active: true, trialing: true, paid: true, past_due: true };
+    var paymentStatusCount = foundedIdList.filter(function (id) {
+      var rows = subscriptionsByUser[id] || [];
+      return rows.some(function (row) {
+        var status = String(row && row.status || "").toLowerCase();
+        return !!paidLikeStatuses[status];
+      });
+    }).length;
+
+    var stageProgressRank = {
+      invited: 1,
+      first_login_pending_docs: 2,
+      docs_signed_pending_payment: 3,
+      payment_pending: 4,
+      welcome_pending_intakes: 5,
+      intakes_completed_assessment_pending: 6,
+      assessment_in_progress: 7,
+      assessment_published_pending_review: 8,
+      review_scheduled: 9,
+      active_training: 10
+    };
+
+    var assessmentPendingCount = foundingRows.filter(function (row) {
+      var stage = String(row && row.stage || "").trim();
+      var rank = stageProgressRank[stage] || 0;
+      return rank >= stageProgressRank.intakes_completed_assessment_pending;
+    }).length;
+
+    var intakeByAthlete = {};
+    (state.foundingIntakeAssignmentRows || []).forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      if (!athleteId || !foundedIds[athleteId]) {
+        return;
+      }
+
+      if (!intakeByAthlete[athleteId]) {
+        intakeByAthlete[athleteId] = [];
+      }
+
+      intakeByAthlete[athleteId].push(row);
+    });
+
+    var intakeCompletedCount = 0;
+    foundedIdList.forEach(function (id) {
+      var rows = intakeByAthlete[id] || [];
+      var activeRows = rows.filter(function (row) {
+        return String(row && row.status || "") !== "archived";
+      });
+
+      if (!activeRows.length) {
+        return;
+      }
+
+      var allSubmitted = activeRows.every(function (row) {
+        return String(row && row.status || "") === "submitted";
+      });
+
+      if (allSubmitted) {
+        intakeCompletedCount += 1;
+      }
+    });
+
+    var checks = [
+      { label: "Legal Docs Signed", value: docsSignedCount, total: totalFounding, target: totalFounding },
+      { label: "Payment Recorded", value: paymentRecordedCount, total: totalFounding, target: totalFounding },
+      { label: "Subscription Ingested", value: subscriptionCapturedCount, total: totalFounding, target: totalFounding },
+      { label: "Paid-like Status", value: paymentStatusCount, total: totalFounding, target: totalFounding },
+      { label: "Athlete Active", value: activeProfileCount, total: totalFounding, target: totalFounding },
+      { label: "Intake Fully Submitted", value: intakeCompletedCount, total: totalFounding, target: totalFounding },
+      { label: "Assessment Pending+", value: assessmentPendingCount, total: totalFounding, target: totalFounding }
+    ];
+
+    var html =
+      '<div class="admin-overview-item admin-widget-summary">' +
+        '<p class="admin-overview-item-title">Founding Verification Snapshot</p>' +
+        '<p class="admin-overview-item-meta">Founding members tracked: ' + escapeHtml(String(totalFounding)) + '</p>' +
+      '</div>';
+
+    checks.forEach(function (check) {
+      var isPass = check.total > 0 && check.value >= check.target;
+      var toneClass = isPass ? "is-stable" : "is-watch";
+      html +=
+        '<div class="admin-overview-item admin-widget-row">' +
+          '<div>' +
+            '<p class="admin-overview-item-title">' + escapeHtml(check.label) + '</p>' +
+            '<p class="admin-overview-item-meta">' + escapeHtml(String(check.value)) + ' / ' + escapeHtml(String(check.total)) + '</p>' +
+          '</div>' +
+          '<span class="admin-risk-chip ' + toneClass + '">' + (isPass ? 'PASS' : 'CHECK') + '</span>' +
+        '</div>';
+    });
+
+    html +=
+      '<div class="admin-overview-item">' +
+        '<p class="admin-overview-item-meta">Detailed SQL checks: sql/founding-member-phase2-verification.sql</p>' +
+      '</div>';
+
+    container.innerHTML = html;
+  }
+
+  function renderFoundingOnboardingQueue() {
+    var container = document.querySelector("[data-admin-founding-onboarding]");
+    if (!container) {
+      return;
+    }
+
+    var rows = Array.isArray(state.foundingOnboardingRows) ? state.foundingOnboardingRows.slice() : [];
+    if (!rows.length) {
+      container.innerHTML =
+        '<div class="admin-empty-state">' +
+          '<p class="admin-empty-state-title">No founding onboarding rows yet</p>' +
+          '<p class="admin-empty-state-copy">Run the onboarding migration and add founding members to begin tracking this queue.</p>' +
+        '</div>';
+      return;
+    }
+
+    var athleteById = {};
+    (state.athletes || []).forEach(function (athlete) {
+      var id = String(athlete && athlete.user_id || "").trim();
+      if (id) {
+        athleteById[id] = athlete;
+      }
+    });
+
+    rows.sort(function (a, b) {
+      var aPriority = getFoundingOnboardingStagePriority(a && a.stage);
+      var bPriority = getFoundingOnboardingStagePriority(b && b.stage);
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
+
+      var aUpdated = String(a && (a.updated_at || a.created_at) || "");
+      var bUpdated = String(b && (b.updated_at || b.created_at) || "");
+      return bUpdated.localeCompare(aUpdated);
+    });
+
+    var pendingDocs = rows.filter(function (row) {
+      return String(row && row.stage || "") === "first_login_pending_docs";
+    }).length;
+
+    var docsSigned = rows.filter(function (row) {
+      return !!(row && row.docs_signed_at);
+    }).length;
+
+    var html =
+      '<div class="admin-overview-item admin-widget-summary">' +
+        '<p class="admin-overview-item-title">Founding Cohort Snapshot</p>' +
+        '<p class="admin-overview-item-meta">Total: ' + escapeHtml(String(rows.length)) + ' • Pending docs: ' + escapeHtml(String(pendingDocs)) + ' • Docs signed: ' + escapeHtml(String(docsSigned)) + '</p>' +
+      '</div>';
+
+    rows.slice(0, 12).forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      var athlete = athleteById[athleteId] || null;
+      var athleteLabel = athlete && (athlete.name || athlete.email)
+        ? String(athlete.name || athlete.email)
+        : athleteId.slice(0, 8);
+      var currentStage = String(row && row.stage || "").trim();
+      var stageText = formatFoundingOnboardingStage(currentStage);
+      var nextStage = getNextFoundingOnboardingStage(currentStage);
+      var previousStage = getPreviousFoundingOnboardingStage(currentStage);
+      var stageOptions = getFoundingOnboardingStages().map(function (stageValue) {
+        var selected = stageValue === currentStage ? ' selected' : '';
+        return '<option value="' + escapeAttribute(stageValue) + '"' + selected + '>' + escapeHtml(formatFoundingOnboardingStage(stageValue)) + '</option>';
+      }).join('');
+      var signedAtText = row && row.docs_signed_at ? formatDate(row.docs_signed_at) : "Not signed";
+      var signatureSummary = state.foundingSignatureSummaryByAthlete[athleteId] || { count: 0 };
+      var signatureCountText = String(signatureSummary.count || 0) + " docs";
+      var insightHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
+      var actionHtml = "";
+      var backHtml = "";
+
+      if (nextStage) {
+        actionHtml =
+          '<button type="button" class="btn admin-btn-small" data-founding-advance="1" data-athlete-id="' + escapeAttribute(athleteId) + '" data-current-stage="' + escapeAttribute(currentStage) + '">Advance to ' + escapeHtml(formatFoundingOnboardingStage(nextStage)) + '</button>';
+      } else {
+        actionHtml = '<span class="admin-risk-chip is-stable">Final Stage</span>';
+      }
+
+      if (previousStage) {
+        backHtml = '<button type="button" class="btn admin-btn-small" data-founding-back="1" data-athlete-id="' + escapeAttribute(athleteId) + '" data-current-stage="' + escapeAttribute(currentStage) + '">Move Back</button>';
+      }
+
+      html +=
+        '<div class="admin-overview-item admin-widget-row">' +
+          '<div>' +
+            '<p class="admin-overview-item-title">' + escapeHtml(athleteLabel) + '</p>' +
+            '<p class="admin-overview-item-meta">' + escapeHtml(stageText) + ' • ' + escapeHtml(signatureCountText) + ' • ' + escapeHtml(signedAtText) + '</p>' +
+            '<div style="display:flex; gap:0.45rem; flex-wrap:wrap; align-items:center; margin-top:0.45rem;">' +
+              '<select class="admin-search" style="min-width:210px; max-width:240px;" data-founding-stage-select="1" data-athlete-id="' + escapeAttribute(athleteId) + '">' +
+                stageOptions +
+              '</select>' +
+              '<button type="button" class="btn admin-btn-small" data-founding-set-stage="1" data-athlete-id="' + escapeAttribute(athleteId) + '" data-current-stage="' + escapeAttribute(currentStage) + '">Save Stage</button>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex; gap:0.45rem; flex-wrap:wrap; justify-content:flex-end;">' +
+            '<a class="btn admin-btn-small" href="' + escapeAttribute(insightHref) + '">Insights</a>' +
+            backHtml +
+            actionHtml +
+          '</div>' +
+        '</div>';
+    });
+
+    if (rows.length > 12) {
+      html += '<div class="admin-overview-item"><p class="admin-overview-item-meta">Showing 12 of ' + escapeHtml(String(rows.length)) + ' founding members.</p></div>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  function buildFoundingSignatureSummaryByAthlete(rows) {
+    var source = Array.isArray(rows) ? rows : [];
+    var summary = {};
+
+    source.forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      if (!athleteId) {
+        return;
+      }
+
+      if (!summary[athleteId]) {
+        summary[athleteId] = {
+          count: 0,
+          docs: {},
+          latest_signed_at: ""
+        };
+      }
+
+      var bucket = summary[athleteId];
+      var docKey = String(row && row.document_id || "") + "::" + String(row && row.document_version || "");
+      if (docKey !== "::" && !bucket.docs[docKey]) {
+        bucket.docs[docKey] = true;
+        bucket.count += 1;
+      }
+
+      var signedAt = String(row && row.signed_at || "");
+      if (signedAt && (!bucket.latest_signed_at || signedAt > bucket.latest_signed_at)) {
+        bucket.latest_signed_at = signedAt;
+      }
+    });
+
+    return summary;
+  }
+
+  function getFoundingOnboardingStagePriority(stage) {
+    var value = String(stage || "").trim();
+    var lookup = {
+      first_login_pending_docs: 1,
+      docs_signed_pending_payment: 2,
+      payment_pending: 3,
+      welcome_pending_intakes: 4,
+      intakes_completed_assessment_pending: 5,
+      assessment_in_progress: 6,
+      assessment_published_pending_review: 7,
+      review_scheduled: 8,
+      active_training: 9,
+      invited: 10
+    };
+    if (Object.prototype.hasOwnProperty.call(lookup, value)) {
+      return lookup[value];
+    }
+    return 99;
+  }
+
+  function getFoundingOnboardingStages() {
+    return [
+      "invited",
+      "first_login_pending_docs",
+      "docs_signed_pending_payment",
+      "payment_pending",
+      "welcome_pending_intakes",
+      "intakes_completed_assessment_pending",
+      "assessment_in_progress",
+      "assessment_published_pending_review",
+      "review_scheduled",
+      "active_training"
+    ];
+  }
+
+  function getNextFoundingOnboardingStage(stage) {
+    var orderedStages = getFoundingOnboardingStages();
+
+    var current = String(stage || "").trim();
+    var index = orderedStages.indexOf(current);
+    if (index < 0 || index >= orderedStages.length - 1) {
+      return "";
+    }
+
+    return orderedStages[index + 1];
+  }
+
+  function getPreviousFoundingOnboardingStage(stage) {
+    var orderedStages = getFoundingOnboardingStages();
+    var current = String(stage || "").trim();
+    var index = orderedStages.indexOf(current);
+    if (index <= 0) {
+      return "";
+    }
+
+    return orderedStages[index - 1];
+  }
+
+  function onFoundingOnboardingActionClick(event) {
+    if (!state.client) {
+      setStatus("Supabase client is unavailable.", "error");
+      return;
+    }
+
+    var target = event.target;
+    var advanceButton = target && target.closest("[data-founding-advance]");
+    var backButton = target && target.closest("[data-founding-back]");
+    var setStageButton = target && target.closest("[data-founding-set-stage]");
+
+    if (!advanceButton && !backButton && !setStageButton) {
+      return;
+    }
+
+    var actionButton = advanceButton || backButton || setStageButton;
+
+    var athleteId = String(actionButton.getAttribute("data-athlete-id") || "").trim();
+    var currentStage = String(actionButton.getAttribute("data-current-stage") || "").trim();
+    var nextStage = "";
+
+    if (advanceButton) {
+      nextStage = getNextFoundingOnboardingStage(currentStage);
+    } else if (backButton) {
+      nextStage = getPreviousFoundingOnboardingStage(currentStage);
+    } else if (setStageButton) {
+      var stageSelect = document.querySelector('[data-founding-stage-select][data-athlete-id="' + athleteId + '"]');
+      nextStage = String(stageSelect && stageSelect.value || "").trim();
+      if (nextStage && getFoundingOnboardingStages().indexOf(nextStage) < 0) {
+        nextStage = "";
+      }
+    }
+
+    if (!athleteId || !nextStage) {
+      setStatus("Could not determine next stage.", "error");
+      return;
+    }
+
+    if (nextStage === currentStage) {
+      setStatus("Stage is already set to that value.", "info");
+      return;
+    }
+
+    var confirmed = window.confirm(
+      "Update this athlete from " +
+      formatFoundingOnboardingStage(currentStage) +
+      " to " +
+      formatFoundingOnboardingStage(nextStage) +
+      "?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    actionButton.disabled = true;
+    setStatus("Updating founding onboarding stage...", "info");
+
+    state.client
+      .from("founding_member_onboarding")
+      .update({ stage: nextStage })
+      .eq("athlete_user_id", athleteId)
+      .then(function (result) {
+        if (result && result.error) {
+          throw result.error;
+        }
+
+        setStatus("Founding onboarding stage updated.", "success");
+        loadCoachOverviewData();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Could not update founding onboarding stage.", "error");
+      })
+      .finally(function () {
+        actionButton.disabled = false;
+      });
+  }
+
+  function formatFoundingOnboardingStage(stage) {
+    var value = String(stage || "").trim();
+    if (!value) {
+      return "Unknown";
+    }
+
+    return value
+      .split("_")
+      .map(function (part) {
+        return part ? part.charAt(0).toUpperCase() + part.slice(1) : "";
+      })
+      .join(" ");
   }
 
   function readInPersonClasses() {

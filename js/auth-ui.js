@@ -186,6 +186,8 @@
       }
     }
 
+    enforceFoundingOnboardingGate();
+
     syncModalMode();
   }
 
@@ -209,6 +211,13 @@
 
     if (!state.modal) {
       return;
+    }
+
+    var preferredMode = consumePreferredAuthMode();
+    if (preferredMode === "signup") {
+      state.mode = "signup";
+    } else if (preferredMode === "signin") {
+      state.mode = "signin";
     }
 
     state.modal.hidden = false;
@@ -376,6 +385,66 @@
     } catch (_error) {
       return "";
     }
+  }
+
+  function consumePreferredAuthMode() {
+    try {
+      var raw = sessionStorage.getItem("nomadic_auth_preferred_mode");
+      if (!raw) {
+        return "";
+      }
+
+      sessionStorage.removeItem("nomadic_auth_preferred_mode");
+      var mode = String(raw).trim().toLowerCase();
+      if (mode === "signup" || mode === "signin") {
+        return mode;
+      }
+
+      return "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function enforceFoundingOnboardingGate() {
+    if (!state.client || !state.user || !state.user.id) {
+      return;
+    }
+
+    var email = String(state.user.email || "").toLowerCase();
+    if (email === ADMIN_EMAIL) {
+      return;
+    }
+
+    var onOnboardingPage = window.location.pathname.indexOf("founding-onboarding.html") > -1;
+    var onUpdatePasswordPage = window.location.pathname.indexOf("update-password.html") > -1;
+    if (onOnboardingPage || onUpdatePasswordPage) {
+      return;
+    }
+
+    state.client
+      .from("founding_member_onboarding")
+      .select("stage,is_founding_member")
+      .eq("athlete_user_id", state.user.id)
+      .maybeSingle()
+      .then(function (result) {
+        if (result.error || !result.data) {
+          return;
+        }
+
+        var row = result.data;
+        if (row.is_founding_member !== true) {
+          return;
+        }
+
+        var stage = String(row.stage || "").trim();
+        if (stage === "first_login_pending_docs") {
+          window.location.href = "founding-onboarding.html";
+        }
+      })
+      .catch(function () {
+        // Skip gating if onboarding schema is not applied yet.
+      });
   }
 
   function onLogout() {

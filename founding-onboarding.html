@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Founding Member Onboarding - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/founding-onboarding.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="blog.html">Blog</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main style="max-width: 980px; margin: 2.2rem auto 3rem auto; padding: 0 1rem;">
+    <section class="service-card" style="border-top-color: #0f4749;">
+      <h1 style="margin-top: 0;">Founding Member Onboarding</h1>
+      <p>Welcome. Before we continue, please review and electronically sign your membership agreement and liability waiver.</p>
+      <p data-onboarding-stage style="font-size: 0.9rem; color: #345454; margin-top: 0.45rem;"></p>
+      <p data-onboarding-status role="status" aria-live="polite" style="font-size: 0.95rem; min-height: 1.2em;"></p>
+    </section>
+
+    <section data-onboarding-guard class="service-card" style="display: none;">
+      <h2 style="margin-top: 0;">Onboarding Not Assigned</h2>
+      <p>Your account does not have a founding-member onboarding workflow assigned yet. Please contact Joe to continue.</p>
+      <p><a href="mailto:joe@nomadicperformance.com?subject=Founding%20Onboarding%20Help">Contact joe@nomadicperformance.com</a></p>
+    </section>
+
+    <section data-onboarding-documents style="display: none;">
+      <form data-onboarding-form>
+        <div data-onboarding-doc-list style="display: grid; gap: 1rem;"></div>
+
+        <div class="service-card" style="margin-top: 1rem;">
+          <h3 style="margin-top: 0;">Electronic Signature</h3>
+          <p style="margin-top: 0.3rem;">Type your full legal name to sign both documents.</p>
+          <label for="onboarding-signature-name" style="display:block; font-weight:700; margin-bottom:0.3rem;">Full Legal Name</label>
+          <input id="onboarding-signature-name" name="signature_name" type="text" required style="width:100%; max-width:420px; border:1px solid #cfbfa9; border-radius:8px; padding:0.62rem 0.7rem;" />
+          <div style="margin-top: 0.75rem;">
+            <label style="display:flex; align-items:flex-start; gap:0.55rem;">
+              <input type="checkbox" data-onboarding-consent required style="margin-top:0.2rem;" />
+              <span>I agree to electronically sign these documents and understand this signature is legally binding.</span>
+            </label>
+          </div>
+          <div style="margin-top: 1rem; display:flex; gap:0.6rem; flex-wrap:wrap;">
+            <button type="submit" class="btn" data-onboarding-submit>Sign and Continue</button>
+            <a href="index.html" class="btn profile-btn-cancel">Cancel</a>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section data-onboarding-complete class="service-card" style="display: none; border-top-color:#1f6f2c;">
+      <h2 style="margin-top: 0;">Documents Signed</h2>
+      <p>Your required onboarding documents are complete.</p>
+      <p>Next step: continue to your athlete dashboard. Your payment task will be listed at the top.</p>
+      <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-top: 0.8rem;">
+        <a class="btn" href="profile.html?founding_payment=pending#profile-onboarding-section">Continue to Athlete Dashboard</a>
+      </div>
+    </section>
+  </main>
+
+  <footer style="background: #0e4749; color: #fff; padding: 24px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 10px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Instagram</a>
+      <a href="https://x.com/NomadPerformCo" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">X</a>
+      <a href="https://strava.app.link/XGMKMXacL1b" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Strava</a>
+    </div>
+    <p style="font-size: 1rem; opacity: 0.85;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
+  </footer>
+</body>
+</html>

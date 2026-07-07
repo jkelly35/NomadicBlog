@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Membership Inquiry - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/membership-inquiry.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="blog.html">Blog</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main style="max-width: 980px; margin: 2.3rem auto 3rem auto; padding: 0 1rem;">
+    <section class="service-card" style="border-top-color: #0f4749;">
+      <h1 style="margin-top: 0;">Inquire About Membership</h1>
+      <p>Tell us a little about your goals and we will follow up with fit, availability, and next steps.</p>
+      <p style="font-size: 0.92rem; color: #194848; margin-top: 0.35rem;">If approved, your coach can assign a membership payment task directly to your athlete dashboard.</p>
+    </section>
+
+    <section class="service-card">
+      <form data-membership-inquiry-form>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="inquiry-name">Full Name</label>
+            <input id="inquiry-name" name="name" type="text" required />
+          </div>
+          <div class="form-group">
+            <label for="inquiry-email">Email</label>
+            <input id="inquiry-email" name="email" type="email" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inquiry-sports">Primary Sport(s)</label>
+          <input id="inquiry-sports" name="sports" type="text" placeholder="Climbing, skiing, trail running, etc." required />
+        </div>
+
+        <div class="form-group">
+          <label for="inquiry-goal">Primary Goal</label>
+          <input id="inquiry-goal" name="goal" type="text" placeholder="What are you training for next?" required />
+        </div>
+
+        <div class="form-group">
+          <label for="inquiry-notes">Anything Else We Should Know?</label>
+          <textarea id="inquiry-notes" name="notes" rows="4" placeholder="Training schedule, injury history, questions, etc."></textarea>
+        </div>
+
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-top: 0.8rem;">
+          <button type="submit" class="btn" data-membership-inquiry-submit>Submit Inquiry</button>
+          <a class="btn profile-btn-cancel" href="founding-member.html">Back</a>
+        </div>
+      </form>
+
+      <p data-membership-inquiry-status class="status-info" role="status" aria-live="polite" style="margin-top:0.8rem; min-height:1.2em;"></p>
+
+      <div data-membership-create-account-prompt hidden style="margin-top: 0.9rem; padding: 0.85rem 0.9rem; border: 1px solid #d8c7b2; border-radius: 10px; background: #f9f4ee;">
+        <p style="margin: 0 0 0.55rem 0; color: #173f3f;">Inquiry received. Create your account now so we can assign next steps to your athlete dashboard.</p>
+        <button type="button" class="btn" data-membership-create-account-button>Create Account</button>
+      </div>
+    </section>
+  </main>
+
+  <footer style="background: #0e4749; color: #fff; padding: 24px 0 16px 0; text-align: center; margin-top: 48px;">
+    <div style="margin-bottom: 10px;">
+      <a href="https://instagram.com/nomadicperformanceco" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Instagram</a>
+      <a href="https://x.com/NomadPerformCo" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">X</a>
+      <a href="https://strava.app.link/XGMKMXacL1b" target="_blank" rel="noopener" style="margin: 0 10px; color: #fff; text-decoration: none;">Strava</a>
+    </div>
+    <p style="font-size: 1rem; opacity: 0.85;">&copy; 2026 Nomadic Performance. All rights reserved.</p>
+  </footer>
+</body>
+</html>
