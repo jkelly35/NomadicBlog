@@ -330,20 +330,7 @@
           return;
         }
 
-        var postLoginRedirect = consumePostLoginRedirect();
-        if (postLoginRedirect) {
-          window.location.href = postLoginRedirect;
-          return;
-        }
-
-        var onFoundingMemberPage = window.location.pathname.indexOf("founding-member.html") > -1;
-        if (onFoundingMemberPage) {
-          setStatus("Signed in successfully. Continue to checkout.", "success");
-          closeModal();
-          return;
-        }
-
-        // On successful sign in, redirect based on email
+        // On successful sign in, send coach to admin and athletes to dashboard.
         var userEmail = (result.data && result.data.user && result.data.user.email) || email;
         if (String(userEmail || "").toLowerCase() === ADMIN_EMAIL) {
           window.location.href = "admin.html";
