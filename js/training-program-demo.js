@@ -3453,6 +3453,12 @@
         var daySelect = document.querySelector("[data-workout-day]");
         if (daySelect) {
           refreshWorkoutDaySelect(daySelect);
+          var preferredDay = getPreferredDayFromQuery();
+          if (preferredDay && daySelect.querySelector('option[value="' + preferredDay + '"]')) {
+            daySelect.value = preferredDay;
+          } else if (state.day && daySelect.querySelector('option[value="' + state.day + '"]')) {
+            daySelect.value = state.day;
+          }
           state.day = daySelect.value || getAllSlotKeys()[0] || "w1d1";
         }
 

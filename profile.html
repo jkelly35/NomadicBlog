@@ -44,49 +44,53 @@
       <div class="profile-content" hidden data-profile-content>
         <div class="profile-dashboard-heading-row">
           <div>
+            <p class="profile-dashboard-kicker">Nomadic Performance Compass</p>
             <h1 class="section-heading">Athlete Dashboard</h1>
             <p class="profile-dashboard-subtitle" data-profile-welcome-message>Welcome Athlete</p>
-            <p class="profile-dashboard-subtitle" data-profile-dashboard-copy>Coach task queue: complete these steps to keep onboarding moving.</p>
+            <p class="profile-dashboard-subtitle" data-profile-dashboard-copy>Your current training context, coaching updates, and next steps at a glance.</p>
           </div>
           <aside class="profile-header-messages-widget" aria-label="Message Notifications">
             <p class="profile-header-messages-label">Messages</p>
             <strong class="profile-header-messages-value" data-profile-msg-summary-unread>0 unread</strong>
             <a href="athlete-messages.html" class="btn profile-btn-edit-profile" data-profile-messages-open>Open Messages</a>
+            <a href="athlete-editor.html?personal=true" class="btn profile-btn-cancel">Profile</a>
           </aside>
         </div>
         <nav class="profile-dashboard-nav" aria-label="Dashboard quick navigation">
           <a href="#profile-training-program-section" class="profile-dashboard-nav-link">Training</a>
-          <a href="#profile-onboarding-section" class="profile-dashboard-nav-link">Onboarding</a>
+          <a href="#profile-tasks-section" class="profile-dashboard-nav-link">Tasks</a>
           <a href="#profile-goals-section" class="profile-dashboard-nav-link">Goals</a>
           <a href="athlete-messages.html" class="profile-dashboard-nav-link" data-profile-messages-open>Messages</a>
-          <a href="#profile-overview-section" class="profile-dashboard-nav-link">Profile</a>
+          <a href="athlete-editor.html?personal=true" class="profile-dashboard-nav-link">Profile</a>
           <a href="#profile-metrics-section" class="profile-dashboard-nav-link">Metrics</a>
-          <a href="#profile-strava-section" class="profile-dashboard-nav-link">Wearables</a>
-          <a href="#profile-nutrition-section" class="profile-dashboard-nav-link">Nutrition</a>
         </nav>
 
-        <div class="profile-dashboard-glance profile-today-strip" data-dashboard-task-board>
-          <article class="profile-glance-card profile-today-card">
-            <p class="profile-glance-label">Coach Tasks</p>
-            <strong class="profile-glance-value">Loading...</strong>
-            <p class="profile-glance-meta">Checking assigned tasks from your coach.</p>
-            <a class="profile-glance-action" href="#profile-onboarding-section">Open Onboarding</a>
-          </article>
-        </div>
-
-        <!-- Current Training Program at Top -->
-        <div class="profile-section" id="profile-training-program-section">
-          <h2>Current Training Programs</h2>
-          <div id="profile-training-program-content">
-            <p class="profile-training-loading">Loading your training programs...</p>
+        <section class="profile-mountain-status-panel" aria-label="Nomadic Performance Compass" data-status-rings>
+          <div class="profile-mountain-status-header">
+            <div>
+              <p class="profile-mountain-status-kicker">The Nomadic Performance Compass</p>
+              <h2 data-mountain-status-headline>Ready to Train</h2>
+              <p class="profile-mountain-status-summary" data-mountain-status-summary>The Nomadic Performance Compass gives athletes a simple snapshot of readiness, training load, durability, and progress so they know when to push, when to maintain, and when to recover.</p>
+            </div>
           </div>
-        </div>
 
-        <div class="profile-section" id="profile-onboarding-section">
+          <div class="profile-compass-current-status" data-compass-current-status>
+            <h3>Your Current Status</h3>
+            <div class="profile-compass-status-grid">
+              <p><span>Training Status</span><strong data-compass-training-status>Ready to Train</strong></p>
+              <p><span>Current Phase</span><strong data-compass-phase>Strength + Durability</strong></p>
+              <p><span>Next Objective</span><strong data-compass-next-objective>Set your next race, trip, or milestone.</strong></p>
+              <p class="profile-compass-status-note"><span>Coach Note</span><strong data-compass-coach-note>You are trending well. Stay consistent and prioritize recovery after hard sessions.</strong></p>
+            </div>
+          </div>
+
+        </section>
+
+        <div class="profile-section" id="profile-tasks-section">
           <div class="profile-section-header">
             <div>
-              <h2>Onboarding Intake</h2>
-              <p class="profile-section-copy">Complete your assigned onboarding form so your coach can tailor your plan.</p>
+              <h2>Tasks</h2>
+              <p class="profile-section-copy">Your membership, onboarding forms, and coach-assigned tasks in one place.</p>
             </div>
             <div class="profile-section-actions" data-onboarding-coach-actions hidden>
               <button type="button" class="btn profile-btn-edit-profile" data-coach-intake-open>Assign Intake Form</button>
@@ -94,34 +98,28 @@
             </div>
           </div>
 
+          <div class="profile-dashboard-glance profile-today-strip" data-dashboard-task-board>
+            <article class="profile-glance-card profile-today-card">
+              <p class="profile-glance-label">Coach Tasks</p>
+              <strong class="profile-glance-value">Loading...</strong>
+              <p class="profile-glance-meta">Checking assigned tasks from your coach.</p>
+              <a class="profile-glance-action" href="#profile-tasks-section">Open Tasks</a>
+            </article>
+          </div>
+
           <div class="profile-onboarding-content" data-onboarding-content>
-            <p class="profile-loading">Loading onboarding intake forms...</p>
+            <p class="profile-loading">Loading assigned tasks...</p>
           </div>
 
           <p class="profile-status" role="status" aria-live="polite" data-onboarding-status></p>
         </div>
 
-        <div class="profile-section" id="profile-nutrition-section">
-          <div class="profile-section-header">
-            <div>
-              <h2>Nutrition Tracking</h2>
-              <p class="profile-section-copy">Quick glance at today's intake versus targets. Log full details from the nutrition page.</p>
-            </div>
-            <div class="profile-section-actions">
-              <a href="athlete-nutrition-goals.html" class="btn profile-btn-cancel" data-nutrition-goals-link>Nutrition Goals</a>
-              <a href="athlete-nutrition.html" class="btn profile-btn-edit-profile" data-nutrition-manage-link>Log Food</a>
-            </div>
+        <!-- Current Training Program at Top -->
+        <div class="profile-section" id="profile-training-program-section">
+          <h2>Active Programs</h2>
+          <div id="profile-training-program-content">
+            <p class="profile-training-loading">Loading your training programs...</p>
           </div>
-
-          <div class="profile-nutrition-today-grid" data-nutrition-today>
-            <p class="profile-loading">Loading daily nutrition progress...</p>
-          </div>
-
-          <div class="profile-nutrition-summary-grid" data-nutrition-summary>
-            <p class="profile-loading">Loading nutrition summary...</p>
-          </div>
-
-          <p class="profile-status" role="status" aria-live="polite" data-nutrition-status></p>
         </div>
 
         <div class="profile-section" id="profile-goals-section" data-goals-section>
@@ -241,183 +239,14 @@
           <div class="profile-section-header">
             <div>
               <h2>Athlete Metrics</h2>
-              <p class="profile-section-copy">Track your baseline and performance testing metrics. Coaches can tailor these to your sport.</p>
+              <p class="profile-section-copy">Keep the dashboard streamlined and open your full metrics workspace for viewing, editing, updates, and printable reports.</p>
             </div>
             <div class="metrics-actions">
-              <button
-                type="button"
-                class="btn profile-btn-cancel profile-btn-section-toggle"
-                data-metrics-compact-toggle
-                aria-pressed="false"
-              >
-                Show Details
-              </button>
-              <button
-                type="button"
-                class="btn profile-btn-cancel profile-btn-section-toggle profile-btn-metrics-collapse"
-                data-metrics-collapse-toggle
-                aria-expanded="true"
-                aria-controls="athlete-metrics-content"
-              >
-                Hide Metrics
-              </button>
-              <button type="button" class="btn profile-btn-edit-profile" data-metrics-summary-pdf>Metric Summary PDF</button>
-              <button type="button" class="btn profile-btn-edit-profile" data-metric-manage>Manage Metrics</button>
-            </div>
-          </div>
-
-          <div id="athlete-metrics-content" class="metrics-content" data-metrics-content>
-            <div class="metrics-list" data-metrics-list>
-              <p class="profile-loading">Loading metrics...</p>
-            </div>
-
-            <div class="metrics-editor-panel" id="metrics-editor-panel" hidden data-metrics-editor>
-              <p class="metrics-editor-copy">Add or remove metrics below, then save to refresh the cards above.</p>
-              <form class="metrics-form" data-metrics-form>
-                <div class="metrics-rows" data-metric-rows></div>
-                <div class="profile-form-actions metrics-editor-actions">
-                  <button type="button" class="btn profile-btn-cancel" data-metrics-cancel>Cancel</button>
-                  <button type="submit" class="btn profile-btn-save">Save Metrics</button>
-                </div>
-                <p class="profile-status" role="status" aria-live="polite" data-metrics-status></p>
-              </form>
+              <button type="button" class="btn profile-btn-edit-profile" data-metric-manage>View Metrics</button>
             </div>
           </div>
         </div>
 
-        <div class="profile-section" id="profile-strava-section">
-          <div class="profile-section-header">
-            <div>
-              <h2>Wearables Sync</h2>
-              <p class="profile-section-copy">Connect Strava and Whoop to pull training load and recovery metrics into your dashboard.</p>
-            </div>
-            <div class="profile-section-actions">
-              <button
-                type="button"
-                class="btn profile-btn-cancel profile-btn-section-toggle"
-                data-section-collapse-toggle="strava"
-                aria-expanded="false"
-                aria-controls="profile-strava-content"
-              >
-                Show Wearables
-              </button>
-            </div>
-          </div>
-
-          <div id="profile-strava-content" data-section-collapse-content="strava" hidden>
-            <div class="profile-wearables-grid">
-              <section class="profile-wearable-card" aria-label="Strava Sync">
-                <div class="profile-wearable-head">
-                  <h3>Strava</h3>
-                  <div class="profile-section-actions">
-                    <button type="button" class="btn profile-btn-edit-profile" data-strava-connect>Connect Strava</button>
-                    <button type="button" class="btn profile-btn-cancel" data-strava-sync hidden>Sync Strava</button>
-                    <button type="button" class="btn profile-btn-cancel" data-strava-disconnect hidden>Disconnect</button>
-                  </div>
-                </div>
-                <div class="strava-connection-meta" data-strava-connection-meta>
-                  <p class="profile-loading">Checking Strava connection...</p>
-                </div>
-                <div class="strava-metrics-grid" data-strava-metrics-grid>
-                  <p class="profile-loading">Loading Strava metrics...</p>
-                </div>
-                <p class="profile-status" role="status" aria-live="polite" data-strava-status></p>
-              </section>
-
-              <section class="profile-wearable-card" aria-label="Whoop Sync">
-                <div class="profile-wearable-head">
-                  <h3>Whoop</h3>
-                  <div class="profile-section-actions">
-                    <button type="button" class="btn profile-btn-edit-profile" data-whoop-connect>Connect Whoop</button>
-                    <button type="button" class="btn profile-btn-cancel" data-whoop-manual-toggle>Enter Whoop Info</button>
-                    <button type="button" class="btn profile-btn-cancel" data-whoop-sync hidden>Sync Whoop</button>
-                    <button type="button" class="btn profile-btn-cancel" data-whoop-disconnect hidden>Disconnect</button>
-                  </div>
-                </div>
-
-                <form class="profile-whoop-manual" data-whoop-manual-form hidden>
-                  <p class="profile-whoop-manual-copy">Paste Whoop token details to connect manually.</p>
-                  <div class="profile-whoop-manual-grid">
-                    <input type="text" placeholder="Whoop Access Token" data-whoop-manual-access-token required />
-                    <input type="text" placeholder="Whoop Refresh Token" data-whoop-manual-refresh-token required />
-                    <input type="number" min="1" step="1" placeholder="Token Expires In (seconds)" data-whoop-manual-expires-in />
-                    <input type="text" placeholder="Whoop User ID (optional)" data-whoop-manual-user-id />
-                  </div>
-                  <div class="profile-whoop-manual-actions">
-                    <button type="submit" class="btn profile-btn-save">Save Whoop Info</button>
-                    <button type="button" class="btn profile-btn-cancel" data-whoop-manual-cancel>Cancel</button>
-                  </div>
-                </form>
-
-                <div class="strava-connection-meta" data-whoop-connection-meta>
-                  <p class="profile-loading">Checking Whoop connection...</p>
-                </div>
-                <div class="strava-metrics-grid" data-whoop-metrics-grid>
-                  <p class="profile-loading">Loading Whoop metrics...</p>
-                </div>
-                <p class="profile-status" role="status" aria-live="polite" data-whoop-status></p>
-              </section>
-            </div>
-          </div>
-        </div>
-
-        <div class="profile-section" id="profile-overview-section">
-          <div class="profile-section-header">
-            <h2>Athlete Overview</h2>
-            <button type="button" class="btn profile-btn-edit-profile" data-profile-edit-toggle aria-expanded="false" aria-controls="profile-editor-section">Edit Athlete Profile</button>
-          </div>
-          <div class="profile-hero-stats">
-            <div class="profile-hero-chip">
-              <span class="profile-hero-label">Sports</span>
-              <strong data-hero-sport>—</strong>
-            </div>
-            <div class="profile-hero-chip">
-              <span class="profile-hero-label">Training Base</span>
-              <strong data-hero-location>—</strong>
-            </div>
-          </div>
-          <div class="profile-info-grid">
-            <div class="profile-info-item">
-              <label>Email</label>
-              <p class="profile-info-value" data-profile-email>—</p>
-            </div>
-            <div class="profile-info-item">
-              <label>DOB / Age</label>
-              <p class="profile-info-value" data-profile-dob-age>—</p>
-            </div>
-          </div>
-          <div class="profile-sport-overview" data-sport-overview-summary hidden></div>
-          <div class="profile-account-actions">
-            <div class="profile-account-actions-row">
-              <button type="button" class="btn profile-btn-reset-password" data-profile-reset-password>Reset My Password</button>
-              <button type="button" class="btn profile-btn-logout" data-profile-logout>Log Out</button>
-            </div>
-            <p class="profile-status" role="status" aria-live="polite" data-password-status></p>
-          </div>
-        </div>
-
-        <div class="profile-section profile-section-danger" id="profile-danger-section">
-          <div class="profile-section-header">
-            <div>
-              <h2>Danger Zone</h2>
-              <p class="profile-section-copy">Permanently delete your account and all associated data.</p>
-            </div>
-            <div class="profile-section-actions">
-              <button
-                type="button"
-                class="btn profile-btn-cancel profile-btn-section-toggle"
-                data-section-collapse-toggle="danger"
-                aria-expanded="false"
-                aria-controls="profile-danger-content"
-              >
-                Show Danger Zone
-              </button>
-            </div>
-          </div>
-          <div id="profile-danger-content" data-section-collapse-content="danger" hidden>
-            <button type="button" class="btn profile-btn-delete" data-profile-delete>Delete Account</button>
-          </div>
-        </div>
         </div>
       </div>
     </div>
@@ -459,7 +288,7 @@
     <div class="admin-modal-backdrop" data-coach-intake-close></div>
     <div class="admin-modal-panel admin-assign-modal-panel" role="dialog" aria-modal="true" aria-labelledby="coach-intake-title">
       <button type="button" class="admin-modal-close" data-coach-intake-close aria-label="Close">&times;</button>
-      <h2 id="coach-intake-title">Assign Onboarding Intake Form</h2>
+      <h2 id="coach-intake-title">Assign Task Form</h2>
 
       <div class="admin-modal-content">
         <div class="admin-modal-section">

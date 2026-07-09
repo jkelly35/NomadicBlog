@@ -636,6 +636,23 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     onboardingAssignments: [],
     foundingOnboardingRow: null,
     dashboardTaskBoard: null,
+    dashboardKickerEl: null,
+    dashboardCopyEl: null,
+    dashboardMessagesWidget: null,
+    dashboardMessagesLabelEl: null,
+    dashboardMessagesUnreadEl: null,
+    dashboardMessageLinks: [],
+    dashboardCompassSection: null,
+    dashboardAccessContext: {
+      mode: "limited",
+      fullFeatureAccess: false,
+      features: {
+        compass: false,
+        workoutCalendar: false,
+        messaging: false
+      },
+      reason: ""
+    },
     goalsManageLink: null,
     goalsToggleButton: null,
     goalsGlanceLink: null,
@@ -656,6 +673,21 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     readinessNutritionPct: null,
     readinessRecoveryScore: null,
     readinessStravaConnected: false,
+    statusReadinessPct: 0,
+    statusLoadPct: 0,
+    statusDurabilityPct: 0,
+    statusProgressPct: 0,
+    compassNextObjective: "Set your next race, trip, or milestone.",
+    compassNextObjectiveDate: null,
+    calendarDragPayload: null,
+    lastCalendarMove: null,
+    calendarSuppressClickUntil: 0,
+    trainingCalendarMonthIndex: null,
+    trainingProgramsLoaded: false,
+    trainingProgramsCache: [],
+    trainingScheduleByAssignment: {},
+    dashboardUpcomingTrainingItems: [],
+    trainingConsistencyMessage: "",
     goalItems: [],
     nutritionToday: null,
     nutritionManageLink: null,
@@ -965,30 +997,20 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.metricsCollapseToggle = document.querySelector("[data-metrics-collapse-toggle]");
     state.metricsCompactToggle = document.querySelector("[data-metrics-compact-toggle]");
     state.metricsSummaryBtn = document.querySelector("[data-metrics-summary-pdf]");
-    state.stravaConnectBtn = document.querySelector("[data-strava-connect]");
-    state.stravaSyncBtn = document.querySelector("[data-strava-sync]");
-    state.stravaDisconnectBtn = document.querySelector("[data-strava-disconnect]");
-    state.stravaConnectionMeta = document.querySelector("[data-strava-connection-meta]");
-    state.stravaMetricsGrid = document.querySelector("[data-strava-metrics-grid]");
-    state.stravaStatusElement = document.querySelector("[data-strava-status]");
-    state.whoopConnectBtn = document.querySelector("[data-whoop-connect]");
-    state.whoopManualToggleBtn = document.querySelector("[data-whoop-manual-toggle]");
-    state.whoopManualForm = document.querySelector("[data-whoop-manual-form]");
-    state.whoopManualAccessToken = document.querySelector("[data-whoop-manual-access-token]");
-    state.whoopManualRefreshToken = document.querySelector("[data-whoop-manual-refresh-token]");
-    state.whoopManualExpiresIn = document.querySelector("[data-whoop-manual-expires-in]");
-    state.whoopManualUserId = document.querySelector("[data-whoop-manual-user-id]");
-    state.whoopManualCancelBtn = document.querySelector("[data-whoop-manual-cancel]");
-    state.whoopSyncBtn = document.querySelector("[data-whoop-sync]");
-    state.whoopDisconnectBtn = document.querySelector("[data-whoop-disconnect]");
-    state.whoopConnectionMeta = document.querySelector("[data-whoop-connection-meta]");
-    state.whoopMetricsGrid = document.querySelector("[data-whoop-metrics-grid]");
-    state.whoopStatusElement = document.querySelector("[data-whoop-status]");
     state.onboardingContent = document.querySelector("[data-onboarding-content]");
     state.onboardingStatus = document.querySelector("[data-onboarding-status]");
     state.onboardingCoachActions = document.querySelector("[data-onboarding-coach-actions]");
     state.dashboardTaskBoard = document.querySelector("[data-dashboard-task-board]") || document.querySelector("[data-dashboard-glance]");
     state.welcomeMessageEl = document.querySelector("[data-profile-welcome-message]");
+    state.dashboardKickerEl = document.querySelector(".profile-dashboard-kicker");
+    state.dashboardCopyEl = document.querySelector("[data-profile-dashboard-copy]");
+    state.dashboardMessagesWidget = document.querySelector(".profile-header-messages-widget");
+    state.dashboardMessagesLabelEl = state.dashboardMessagesWidget
+      ? state.dashboardMessagesWidget.querySelector(".profile-header-messages-label")
+      : null;
+    state.dashboardMessagesUnreadEl = document.querySelector("[data-profile-msg-summary-unread]");
+    state.dashboardMessageLinks = Array.prototype.slice.call(document.querySelectorAll("[data-profile-messages-open]"));
+    state.dashboardCompassSection = document.querySelector("[data-status-rings]");
     state.coachIntakeSearch = document.querySelector("[data-coach-intake-search]");
     state.coachIntakeDueDate = document.querySelector("[data-coach-intake-due-date]");
     state.coachTaskTitle = document.querySelector("[data-coach-task-title]");
@@ -1133,27 +1155,310 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     hideGuard();
     showContent();
     renderWelcomeMessage();
+    hideLegacyDashboardSections();
     renderDashboardCoachTasks();
     renderDashboardQuickGlanceDefaults();
+    refreshAthleteDashboardAccess();
     applyCoachViewUi();
     configureGoalsLink();
-    configureNutritionLink();
     populateUserInfo();
     loadProfileData();
     loadMetricsData();
     loadCurrentTrainingProgram();
     loadOnboardingIntake();
     loadGoalItems();
-    loadNutritionData();
-    loadStravaOverview();
-    loadWhoopOverview();
-    maybeShowStravaRedirectStatus();
-    maybeShowWhoopRedirectStatus();
     maybeShowFoundingPaymentStatus();
+  }
+
+  function hideLegacyDashboardSections() {
+    [
+      "#profile-nutrition-section",
+      "#profile-strava-section",
+      "#profile-wearables-section",
+      ".profile-section-danger",
+      "#profile-danger-section",
+      "[data-section-collapse-content=\"danger\"]",
+      "[data-section-collapse-content=\"strava\"]",
+      "#profile-overview-section",
+      "#profile-athlete-overview-section",
+      "[data-profile-overview]",
+      "[data-metrics-content]",
+      "[data-metrics-editor]"
+    ].forEach(function (selector) {
+      var element = document.querySelector(selector);
+      if (!element) {
+        return;
+      }
+
+      element.hidden = true;
+      element.style.display = "none";
+      element.setAttribute("aria-hidden", "true");
+    });
+  }
+
+  function refreshAthleteDashboardAccess() {
+    var previous = state.dashboardAccessContext || null;
+    var next = computeAthleteDashboardAccessContext();
+    state.dashboardAccessContext = next;
+
+    applyAthleteDashboardAccessUi(next);
+
+    var previousCalendar = previous && previous.features ? !!previous.features.workoutCalendar : null;
+    var nextCalendar = next && next.features ? !!next.features.workoutCalendar : false;
+
+    if (previousCalendar !== null && previousCalendar !== nextCalendar) {
+      refreshTrainingProgramsCalendarFromState();
+    }
+  }
+
+  function computeAthleteDashboardAccessContext() {
+    if (state.isCoachView) {
+      return {
+        mode: "coach_view",
+        fullFeatureAccess: true,
+        features: {
+          compass: true,
+          workoutCalendar: true,
+          messaging: true
+        },
+        reason: ""
+      };
+    }
+
+    var activePrograms = (state.trainingProgramsCache || []).filter(function (program) {
+      return !!(program && program.is_active);
+    });
+
+    var assignments = (state.onboardingAssignments || []).filter(function (assignment) {
+      return !!assignment && String(assignment.status || "").toLowerCase() !== "archived";
+    });
+
+    var pendingLiability = assignments.filter(function (assignment) {
+      return isLiabilityTaskAssignment(assignment) && !isAssignmentCompleted(assignment);
+    });
+
+    var paymentAssignments = assignments.filter(function (assignment) {
+      return isPaymentTaskAssignment(assignment);
+    });
+
+    var onboardingFormAssignments = assignments.filter(function (assignment) {
+      return isOnboardingFormAssignment(assignment);
+    });
+
+    var hasPaymentTask = paymentAssignments.length > 0;
+    var hasPendingPaymentTask = paymentAssignments.some(function (assignment) {
+      return !isAssignmentCompleted(assignment);
+    });
+    var hasCompletedPaymentTask = paymentAssignments.some(function (assignment) {
+      return isAssignmentCompleted(assignment);
+    });
+
+    var founding = state.foundingOnboardingRow && state.foundingOnboardingRow.is_founding_member === true
+      ? state.foundingOnboardingRow
+      : null;
+
+    var foundingStage = String(founding && founding.stage || "").trim();
+    var foundingPaymentComplete = !!(founding && (
+      founding.payment_completed_at ||
+      foundingStage === "welcome_pending_intakes" ||
+      foundingStage === "intakes_completed_assessment_pending" ||
+      foundingStage === "assessment_in_progress" ||
+      foundingStage === "assessment_published_pending_review" ||
+      foundingStage === "review_scheduled" ||
+      foundingStage === "active_training"
+    ));
+
+    if (founding) {
+      if (!foundingPaymentComplete) {
+        return {
+          mode: "limited",
+          fullFeatureAccess: false,
+          features: {
+            compass: false,
+            workoutCalendar: false,
+            messaging: false
+          },
+          reason: "Complete assigned liability forms and membership payment to unlock coaching features."
+        };
+      }
+
+      return {
+        mode: "full",
+        fullFeatureAccess: true,
+        features: {
+          compass: true,
+          workoutCalendar: true,
+          messaging: true
+        },
+        reason: ""
+      };
+    }
+
+    if (pendingLiability.length) {
+      return {
+        mode: "limited",
+        fullFeatureAccess: false,
+        features: {
+          compass: false,
+          workoutCalendar: false,
+          messaging: false
+        },
+        reason: "Complete assigned liability forms to continue setup."
+      };
+    }
+
+    if (hasPaymentTask && hasPendingPaymentTask) {
+      return {
+        mode: "limited",
+        fullFeatureAccess: false,
+        features: {
+          compass: false,
+          workoutCalendar: false,
+          messaging: false
+        },
+        reason: "Complete your payment task to unlock coaching features."
+      };
+    }
+
+    if (hasPaymentTask && hasCompletedPaymentTask) {
+      return {
+        mode: "full",
+        fullFeatureAccess: true,
+        features: {
+          compass: true,
+          workoutCalendar: true,
+          messaging: true
+        },
+        reason: ""
+      };
+    }
+
+    if (activePrograms.length) {
+      return {
+        mode: "premade_program_only",
+        fullFeatureAccess: false,
+        features: {
+          compass: false,
+          workoutCalendar: false,
+          messaging: false
+        },
+        reason: "Program-only access: membership features unlock after coach-guided onboarding and payment."
+      };
+    }
+
+    return {
+      mode: "limited",
+      fullFeatureAccess: false,
+      features: {
+        compass: false,
+        workoutCalendar: false,
+        messaging: false
+      },
+      reason: "Welcome. Complete assigned tasks to unlock full dashboard features."
+    };
+  }
+
+  function applyAthleteDashboardAccessUi(context) {
+    if (!context || state.isCoachView) {
+      return;
+    }
+
+    if (state.dashboardCompassSection) {
+      state.dashboardCompassSection.hidden = !context.features.compass;
+    }
+
+    if (state.dashboardMessagesLabelEl) {
+      state.dashboardMessagesLabelEl.hidden = !context.features.messaging;
+    }
+
+    if (state.dashboardMessagesUnreadEl) {
+      state.dashboardMessagesUnreadEl.hidden = !context.features.messaging;
+    }
+
+    (state.dashboardMessageLinks || []).forEach(function (link) {
+      if (!link) {
+        return;
+      }
+
+      if (context.features.messaging) {
+        link.hidden = false;
+        link.removeAttribute("aria-hidden");
+        link.style.display = "";
+      } else {
+        link.hidden = true;
+        link.setAttribute("aria-hidden", "true");
+        link.style.display = "none";
+      }
+    });
+
+    if (state.dashboardKickerEl) {
+      state.dashboardKickerEl.textContent = context.features.compass
+        ? "Nomadic Performance Compass"
+        : "Athlete Dashboard";
+    }
+
+    if (state.dashboardCopyEl) {
+      if (context.mode === "full") {
+        state.dashboardCopyEl.textContent = "Your current training context, coaching updates, and next steps at a glance.";
+      } else if (context.mode === "premade_program_only") {
+        state.dashboardCopyEl.textContent = "You can access your purchased program here. Compass, calendar, and messaging unlock with membership onboarding.";
+      } else {
+        state.dashboardCopyEl.textContent = context.reason || "Complete assigned setup tasks to unlock full dashboard features.";
+      }
+    }
+  }
+
+  function isAssignmentCompleted(assignment) {
+    var status = String(assignment && assignment.status || "").toLowerCase();
+    return status === "submitted" || status === "archived";
+  }
+
+  function isLiabilityTaskAssignment(assignment) {
+    var formId = String(assignment && assignment.form_id || "").toLowerCase();
+    var name = String(assignment && assignment.form_name || "").toLowerCase();
+    var description = String(assignment && assignment.form_schema && assignment.form_schema.description || "").toLowerCase();
+    var combined = formId + " " + name + " " + description;
+
+    return (
+      combined.indexOf("liability") > -1 ||
+      combined.indexOf("waiver") > -1 ||
+      combined.indexOf("release") > -1 ||
+      combined.indexOf("consent") > -1
+    );
+  }
+
+  function isPaymentTaskAssignment(assignment) {
+    var formId = String(assignment && assignment.form_id || "").toLowerCase();
+    var name = String(assignment && assignment.form_name || "").toLowerCase();
+    var description = String(assignment && assignment.form_schema && assignment.form_schema.description || "").toLowerCase();
+    var combined = formId + " " + name + " " + description;
+
+    return (
+      combined.indexOf("payment") > -1 ||
+      combined.indexOf("checkout") > -1 ||
+      combined.indexOf("invoice") > -1 ||
+      combined.indexOf("membership payment") > -1
+    );
+  }
+
+  function isOnboardingFormAssignment(assignment) {
+    if (!assignment) {
+      return false;
+    }
+
+    if (isLiabilityTaskAssignment(assignment) || isPaymentTaskAssignment(assignment)) {
+      return false;
+    }
+
+    var category = getCoachAssignmentCategory(assignment);
+    return category === "onboarding" || category === "form";
   }
 
   function applyCoachViewUi() {
     if (!state.isCoachView) {
+      if (state.onboardingCoachActions) {
+        state.onboardingCoachActions.hidden = true;
+      }
       return;
     }
 
@@ -1366,10 +1671,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         if (result.data) {
           state.profile = mergeLocalSportProfile(result.data);
           populateForm(state.profile);
+          refreshTrainingProgramsCalendarFromState();
         } else {
           state.profile = mergeLocalSportProfile(null);
           if (state.profile) {
             populateForm(state.profile);
+            refreshTrainingProgramsCalendarFromState();
           } else {
             updateHero(null);
           }
@@ -1789,76 +2096,6 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       state.metricsSummaryBtn.addEventListener("click", onGenerateMetricSummaryPdf);
     }
 
-    if (state.stravaConnectBtn) {
-      state.stravaConnectBtn.addEventListener("click", onStravaConnect);
-    }
-
-    if (state.stravaSyncBtn) {
-      state.stravaSyncBtn.addEventListener("click", onStravaSync);
-    }
-
-    if (state.stravaDisconnectBtn) {
-      state.stravaDisconnectBtn.addEventListener("click", onStravaDisconnect);
-    }
-
-    if (state.stravaMetricsGrid) {
-      state.stravaMetricsGrid.addEventListener("click", function (event) {
-        var connectBtn = event.target && event.target.closest("[data-inline-strava-connect]");
-        if (connectBtn) {
-          onStravaConnect();
-          return;
-        }
-
-        var syncBtn = event.target && event.target.closest("[data-inline-strava-sync]");
-        if (syncBtn) {
-          onStravaSync();
-        }
-      });
-    }
-
-    if (state.whoopConnectBtn) {
-      state.whoopConnectBtn.addEventListener("click", onWhoopConnect);
-    }
-
-    if (state.whoopManualToggleBtn) {
-      state.whoopManualToggleBtn.addEventListener("click", function () {
-        setWhoopManualFormVisible(true);
-      });
-    }
-
-    if (state.whoopManualCancelBtn) {
-      state.whoopManualCancelBtn.addEventListener("click", function () {
-        setWhoopManualFormVisible(false);
-      });
-    }
-
-    if (state.whoopManualForm) {
-      state.whoopManualForm.addEventListener("submit", onWhoopManualSubmit);
-    }
-
-    if (state.whoopSyncBtn) {
-      state.whoopSyncBtn.addEventListener("click", onWhoopSync);
-    }
-
-    if (state.whoopDisconnectBtn) {
-      state.whoopDisconnectBtn.addEventListener("click", onWhoopDisconnect);
-    }
-
-    if (state.whoopMetricsGrid) {
-      state.whoopMetricsGrid.addEventListener("click", function (event) {
-        var connectBtn = event.target && event.target.closest("[data-inline-whoop-connect]");
-        if (connectBtn) {
-          onWhoopConnect();
-          return;
-        }
-
-        var syncBtn = event.target && event.target.closest("[data-inline-whoop-sync]");
-        if (syncBtn) {
-          onWhoopSync();
-        }
-      });
-    }
-
     if (state.nutritionTargetsForm) {
       state.nutritionTargetsForm.addEventListener("submit", onNutritionTargetsSubmit);
     }
@@ -1885,6 +2122,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           String(deleteBtn.getAttribute("data-nutrition-date") || "")
         );
       });
+    }
+
+    if (state.dashboardTaskBoard) {
+      state.dashboardTaskBoard.addEventListener("click", onDashboardTaskBoardClick);
     }
 
     var manageMetricsBtn = document.querySelector("[data-metric-manage]");
@@ -2044,11 +2285,6 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
     }
 
-    var deleteBtn = document.querySelector("[data-profile-delete]");
-    if (deleteBtn) {
-      deleteBtn.addEventListener("click", onDeleteAccount);
-    }
-
     applyMetricsSectionPreference();
     applyMetricsCompactPreference();
     applySectionCollapsePreferences();
@@ -2067,6 +2303,32 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var trainingProgramContent = document.getElementById("profile-training-program-content");
     if (trainingProgramContent) {
       trainingProgramContent.addEventListener("click", function (event) {
+        var calendarSessionLink = event.target && event.target.closest(".training-calendar-session");
+        if (calendarSessionLink && Date.now() < (Number(state.calendarSuppressClickUntil) || 0)) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
+        var calendarPrevBtn = event.target && event.target.closest("[data-calendar-prev]");
+        var calendarNextBtn = event.target && event.target.closest("[data-calendar-next]");
+        var calendarTodayBtn = event.target && event.target.closest("[data-calendar-today]");
+        if (calendarPrevBtn) {
+          event.preventDefault();
+          stepTrainingCalendarMonth(calendarPrevBtn, -1);
+          return;
+        }
+        if (calendarNextBtn) {
+          event.preventDefault();
+          stepTrainingCalendarMonth(calendarNextBtn, 1);
+          return;
+        }
+        if (calendarTodayBtn) {
+          event.preventDefault();
+          jumpTrainingCalendarToToday(calendarTodayBtn);
+          return;
+        }
+
         var completeBtn = event.target && event.target.closest("[data-complete-program]");
         var makeCurrentBtn = event.target && event.target.closest("[data-make-current-program]");
         var deletePastBtn = event.target && event.target.closest("[data-delete-past-program]");
@@ -2103,6 +2365,103 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           openCoachProgramModal();
           return;
         }
+      });
+
+      trainingProgramContent.addEventListener("dragstart", function (event) {
+        var sessionEl = event.target && event.target.closest("[data-calendar-session-id]");
+        if (!sessionEl || state.isCoachView) {
+          return;
+        }
+
+        var sessionStatus = String(sessionEl.getAttribute("data-calendar-session-status") || "").toLowerCase();
+        if (sessionStatus === "completed") {
+          event.preventDefault();
+          setTrainingProgramStatus("Completed workouts cannot be rescheduled by drag and drop.", "info");
+          return;
+        }
+
+        var payload = {
+          scheduleId: String(sessionEl.getAttribute("data-calendar-session-id") || ""),
+          sourceDate: String(sessionEl.getAttribute("data-calendar-session-date") || ""),
+          status: sessionStatus,
+          label: String(sessionEl.getAttribute("data-calendar-session-label") || "Workout")
+        };
+
+        if (!payload.scheduleId || !payload.sourceDate) {
+          event.preventDefault();
+          return;
+        }
+
+        state.calendarDragPayload = payload;
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+          try {
+            event.dataTransfer.setData("text/plain", JSON.stringify(payload));
+          } catch (e) {
+            // Some browsers can block custom drag payloads in strict contexts.
+          }
+        }
+      });
+
+      trainingProgramContent.addEventListener("dragover", function (event) {
+        if (state.isCoachView) {
+          return;
+        }
+
+        var dayEl = event.target && event.target.closest("[data-calendar-date]");
+        if (!dayEl || dayEl.classList.contains("training-calendar-day-empty")) {
+          return;
+        }
+
+        event.preventDefault();
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = "move";
+        }
+        dayEl.classList.add("is-drop-target");
+      });
+
+      trainingProgramContent.addEventListener("dragleave", function (event) {
+        var dayEl = event.target && event.target.closest("[data-calendar-date]");
+        if (!dayEl) {
+          return;
+        }
+
+        var related = event.relatedTarget;
+        if (related && dayEl.contains(related)) {
+          return;
+        }
+        dayEl.classList.remove("is-drop-target");
+      });
+
+      trainingProgramContent.addEventListener("drop", function (event) {
+        if (state.isCoachView) {
+          return;
+        }
+
+        var dayEl = event.target && event.target.closest("[data-calendar-date]");
+        if (!dayEl || dayEl.classList.contains("training-calendar-day-empty")) {
+          return;
+        }
+
+        event.preventDefault();
+        dayEl.classList.remove("is-drop-target");
+
+        var targetDate = String(dayEl.getAttribute("data-calendar-date") || "");
+        var payload = getCalendarDragPayloadFromEvent(event) || state.calendarDragPayload;
+        state.calendarDragPayload = null;
+        if (!payload || !payload.scheduleId || !targetDate) {
+          return;
+        }
+
+        state.calendarSuppressClickUntil = Date.now() + 1200;
+        onRescheduleCalendarSession(payload.scheduleId, targetDate, payload.sourceDate, payload.status, payload.label);
+      });
+
+      trainingProgramContent.addEventListener("dragend", function () {
+        state.calendarDragPayload = null;
+        trainingProgramContent.querySelectorAll(".training-calendar-day.is-drop-target").forEach(function (dayEl) {
+          dayEl.classList.remove("is-drop-target");
+        });
       });
     }
 
@@ -2194,6 +2553,63 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     });
   }
 
+  function onDashboardTaskBoardClick(event) {
+    var actionEl = event.target && event.target.closest("[data-dashboard-action]");
+    if (!actionEl) {
+      return;
+    }
+
+    var action = String(actionEl.getAttribute("data-dashboard-action") || "");
+    if (action !== "start-membership-checkout") {
+      return;
+    }
+
+    event.preventDefault();
+    startMembershipCheckoutFromDashboard(actionEl);
+  }
+
+  function startMembershipCheckoutFromDashboard(actionEl) {
+    var fallbackHref = String(actionEl && actionEl.getAttribute("href") || "founding-member.html?checkout=start");
+
+    if (state.isCoachView) {
+      window.location.href = fallbackHref;
+      return;
+    }
+
+    if (!state.client || !state.client.functions) {
+      window.location.href = fallbackHref;
+      return;
+    }
+
+    setOnboardingStatus("Redirecting to secure checkout...", "info");
+
+    state.client.functions
+      .invoke("stripe-create-checkout", {
+        body: {
+          plan: "founding_member",
+          source: "athlete_dashboard_task",
+          email: state.user && state.user.email ? state.user.email : null
+        }
+      })
+      .then(function (result) {
+        if (result.error) {
+          throw result.error;
+        }
+
+        var data = result.data || {};
+        var checkoutUrl = String(data.url || "").trim();
+        if (!checkoutUrl) {
+          throw new Error("Checkout URL was not returned.");
+        }
+
+        window.location.href = checkoutUrl;
+      })
+      .catch(function () {
+        setOnboardingStatus("Could not launch checkout directly. Redirecting to membership checkout page...", "info");
+        window.location.href = fallbackHref;
+      });
+  }
+
   function onEditProfileClick(event) {
     if (event) {
       event.preventDefault();
@@ -2273,6 +2689,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
         state.profile = Object.assign({}, state.profile || {}, result.data || profileData);
         updateHero(state.profile);
+        refreshTrainingProgramsCalendarFromState();
         persistLocalSportProfile(profileData);
 
         maybeUpdateEmail(desiredEmail)
@@ -2633,25 +3050,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   }
 
   function applySectionCollapsePreferences() {
-    ["strava", "danger"].forEach(function (sectionName) {
-      var storageKey = getCollapseStorageKey(sectionName);
-      var collapsed = true;
-
-      if (storageKey) {
-        try {
-          var value = window.localStorage.getItem(storageKey);
-          if (value === "0") {
-            collapsed = false;
-          } else if (value === "1") {
-            collapsed = true;
-          }
-        } catch (_error) {
-          collapsed = true;
-        }
-      }
-
-      setSectionCollapsed(sectionName, collapsed, false);
-    });
+    // Legacy dashboard section toggles (wearables/danger) were removed.
   }
 
   function getMetricKey(metric) {
@@ -2882,6 +3281,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
+    var existingHeight = content.offsetHeight;
+    if (existingHeight > 0) {
+      content.style.minHeight = String(existingHeight) + "px";
+    }
+
     content.innerHTML = '<p class="profile-training-loading">Loading your training programs...</p>';
 
     // Always use the non-join version to avoid ambiguous relationship embeds.
@@ -2893,7 +3297,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
-    state.onboardingContent.innerHTML = '<p class="profile-loading">Loading onboarding intake forms...</p>';
+    state.onboardingContent.innerHTML = '<p class="profile-loading">Loading task forms...</p>';
     setOnboardingStatus("", "info");
 
     state.client
@@ -2908,7 +3312,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
             state.onboardingAssignments = [];
             renderOnboardingAssignments();
             setOnboardingStatus(
-              "Onboarding intake tables are not installed yet. Run sql/create-athlete-onboarding-intake.sql in Supabase.",
+              "Task assignment tables are not installed yet. Run sql/create-athlete-onboarding-intake.sql in Supabase.",
               "error"
             );
             return;
@@ -2924,7 +3328,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         loadFoundingOnboardingTaskContext();
       })
       .catch(function (error) {
-        setOnboardingStatus(error && error.message ? error.message : "Failed to load onboarding intake.", "error");
+        setOnboardingStatus(error && error.message ? error.message : "Failed to load task forms.", "error");
         loadFoundingOnboardingTaskContext();
       });
   }
@@ -2933,6 +3337,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (!state.client || !getViewedUserId()) {
       state.foundingOnboardingRow = null;
       renderDashboardCoachTasks();
+      refreshAthleteDashboardAccess();
       return;
     }
 
@@ -2946,20 +3351,24 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           if (isMissingRelationError(result.error)) {
             state.foundingOnboardingRow = null;
             renderDashboardCoachTasks();
+            refreshAthleteDashboardAccess();
             return;
           }
 
           state.foundingOnboardingRow = null;
           renderDashboardCoachTasks();
+          refreshAthleteDashboardAccess();
           return;
         }
 
         state.foundingOnboardingRow = result.data || null;
         renderDashboardCoachTasks();
+        refreshAthleteDashboardAccess();
       })
       .catch(function () {
         state.foundingOnboardingRow = null;
         renderDashboardCoachTasks();
+        refreshAthleteDashboardAccess();
       });
   }
 
@@ -2970,7 +3379,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       id: String(row && row.id || ""),
       athlete_user_id: String(row && row.athlete_user_id || ""),
       form_id: String(row && row.form_id || ""),
-      form_name: String(row && row.form_name || "Onboarding Intake"),
+      form_name: String(row && row.form_name || "Task Form"),
       form_schema: schema,
       response_data: response,
       status: String(row && row.status || "assigned"),
@@ -3005,30 +3414,18 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var cards = [];
 
     pendingAssignments.forEach(function (assignment) {
-      var dueDays = assignment.due_date ? getDaysUntilDate(assignment.due_date) : null;
-      var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
-      var dueMeta = "Due " + dueLabel;
-
-      if (typeof dueDays === "number") {
-        if (dueDays > 0) {
-          dueMeta += " (" + dueDays + " day" + (dueDays === 1 ? "" : "s") + " left)";
-        } else if (dueDays === 0) {
-          dueMeta += " (due today)";
-        } else {
-          dueMeta += " (" + Math.abs(dueDays) + " day" + (Math.abs(dueDays) === 1 ? "" : "s") + " overdue)";
-        }
-      }
-
-      cards.push({
-        label: "Coach Task",
-        title: assignment.form_name || "Onboarding Intake",
-        meta: dueMeta,
-        href: "#profile-onboarding-section",
-        actionLabel: state.isCoachView ? "Review Intake" : "Complete Intake",
-        tone: typeof dueDays === "number" && dueDays < 0 ? "alert" : "",
-        priority: getAssignmentTaskPriority(assignment)
-      });
+      cards.push(buildCoachAssignmentTaskCard(assignment));
     });
+
+    var paymentTaskCard = getFoundingPaymentTaskCard(state.foundingOnboardingRow);
+    if (paymentTaskCard) {
+      cards.push(paymentTaskCard);
+    }
+
+    var workoutTaskCard = getTodayWorkoutTaskCard(state.dashboardUpcomingTrainingItems || []);
+    if (workoutTaskCard) {
+      cards.push(workoutTaskCard);
+    }
 
     var stageTaskCard = getFoundingStageTaskCard(state.foundingOnboardingRow, pendingAssignments.length);
     if (stageTaskCard) {
@@ -3039,13 +3436,13 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return (Number(a.priority) || 999) - (Number(b.priority) || 999);
     });
 
-    if (!visibleAssignments.length && !stageTaskCard) {
+    if (!visibleAssignments.length && !stageTaskCard && !paymentTaskCard && !workoutTaskCard) {
       state.dashboardTaskBoard.innerHTML =
         '<article class="profile-glance-card profile-today-card">' +
           '<p class="profile-glance-label">Coach Tasks</p>' +
           '<strong class="profile-glance-value">No Tasks Assigned</strong>' +
-          '<p class="profile-glance-meta">Your coach has not assigned intake forms yet.</p>' +
-          '<a class="profile-glance-action" href="#profile-onboarding-section">Open Onboarding</a>' +
+          '<p class="profile-glance-meta">No membership steps, forms, workouts, or check-in tasks are currently assigned.</p>' +
+          '<a class="profile-glance-action" href="#profile-tasks-section">Open Tasks</a>' +
         '</article>';
       return;
     }
@@ -3055,8 +3452,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         '<article class="profile-glance-card profile-today-card is-good">' +
           '<p class="profile-glance-label">Coach Tasks</p>' +
           '<strong class="profile-glance-value">All Tasks Complete</strong>' +
-          '<p class="profile-glance-meta">You have submitted all currently assigned onboarding forms.</p>' +
-          '<a class="profile-glance-action" href="#profile-onboarding-section">Review Submissions</a>' +
+          '<p class="profile-glance-meta">You are clear on assigned forms, check-ins, payment items, and today\'s required tasks.</p>' +
+          '<a class="profile-glance-action" href="#profile-training-program-section">Open Training</a>' +
         '</article>';
       return;
     }
@@ -3064,16 +3461,159 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.dashboardTaskBoard.innerHTML = cards.slice(0, 4)
       .map(function (card) {
         var toneClass = card.tone === "alert" ? " is-alert" : (card.tone === "good" ? " is-good" : "");
+        var actionAttr = card.dashboardAction
+          ? ' data-dashboard-action="' + escapeAttribute(String(card.dashboardAction || "")) + '"'
+          : "";
         return (
           '<article class="profile-glance-card profile-today-card' + toneClass + '">' +
             '<p class="profile-glance-label">' + escapeHtml(card.label || "Coach Task") + '</p>' +
             '<strong class="profile-glance-value">' + escapeHtml(card.title || "Task") + '</strong>' +
             '<p class="profile-glance-meta">' + escapeHtml(card.meta || "") + '</p>' +
-            '<a class="profile-glance-action" href="' + escapeAttribute(card.href || "#profile-onboarding-section") + '">' + escapeHtml(card.actionLabel || "Open Task") + '</a>' +
+            '<a class="profile-glance-action" href="' + escapeAttribute(card.href || "#profile-tasks-section") + '"' + actionAttr + '>' + escapeHtml(card.actionLabel || "Open Task") + '</a>' +
           '</article>'
         );
       })
       .join("");
+  }
+
+  function buildCoachAssignmentTaskCard(assignment) {
+    var dueDays = assignment && assignment.due_date ? getDaysUntilDate(assignment.due_date) : null;
+    var dueLabel = assignment && assignment.due_date ? formatDate(assignment.due_date) : "No due date";
+    var dueMeta = "Due " + dueLabel;
+
+    if (typeof dueDays === "number") {
+      if (dueDays > 0) {
+        dueMeta += " (" + dueDays + " day" + (dueDays === 1 ? "" : "s") + " left)";
+      } else if (dueDays === 0) {
+        dueMeta += " (due today)";
+      } else {
+        dueMeta += " (" + Math.abs(dueDays) + " day" + (Math.abs(dueDays) === 1 ? "" : "s") + " overdue)";
+      }
+    }
+
+    var category = getCoachAssignmentCategory(assignment);
+    var label = "Coach Task";
+    var actionLabel = state.isCoachView ? "Review Task" : "Open Task";
+
+    if (category === "onboarding") {
+      label = "Task Form";
+      actionLabel = state.isCoachView ? "Review Form" : "Complete Form";
+    } else if (category === "daily_readiness") {
+      label = "Daily Readiness";
+      actionLabel = state.isCoachView ? "Review Check-in" : "Complete Check-in";
+    } else if (category === "weekly_progress") {
+      label = "Weekly Progress";
+      actionLabel = state.isCoachView ? "Review Update" : "Submit Update";
+    } else if (category === "form") {
+      label = "Assigned Form";
+      actionLabel = state.isCoachView ? "Review Form" : "Complete Form";
+    } else if (category === "custom_task") {
+      label = "Coach Task";
+      actionLabel = state.isCoachView ? "Review Task" : "Complete Task";
+    }
+
+    return {
+      label: label,
+      title: assignment && assignment.form_name ? assignment.form_name : "Assigned Task",
+      meta: dueMeta,
+      href: "#profile-tasks-section",
+      actionLabel: actionLabel,
+      tone: typeof dueDays === "number" && dueDays < 0 ? "alert" : "",
+      priority: getAssignmentTaskPriority(assignment)
+    };
+  }
+
+  function getCoachAssignmentCategory(assignment) {
+    var name = String(assignment && assignment.form_name || "").toLowerCase();
+    var formId = String(assignment && assignment.form_id || "").toLowerCase();
+    var schema = assignment && assignment.form_schema && typeof assignment.form_schema === "object"
+      ? assignment.form_schema
+      : {};
+    var taskType = String(schema.task_type || "").toLowerCase();
+
+    if (taskType === "custom_task" || formId.indexOf("coach-task-") === 0) {
+      if (name.indexOf("daily readiness") > -1 || name.indexOf("readiness") > -1) {
+        return "daily_readiness";
+      }
+      if (name.indexOf("weekly progress") > -1 || name.indexOf("progress") > -1) {
+        return "weekly_progress";
+      }
+      return "custom_task";
+    }
+
+    if (name.indexOf("onboarding") > -1 || name.indexOf("intake") > -1) {
+      return "onboarding";
+    }
+    if (name.indexOf("daily readiness") > -1 || name.indexOf("readiness") > -1) {
+      return "daily_readiness";
+    }
+    if (name.indexOf("weekly progress") > -1 || name.indexOf("progress") > -1) {
+      return "weekly_progress";
+    }
+
+    return "form";
+  }
+
+  function getFoundingPaymentTaskCard(onboardingRow) {
+    if (!onboardingRow || onboardingRow.is_founding_member !== true) {
+      return null;
+    }
+
+    var stage = String(onboardingRow.stage || "").trim();
+    if (stage !== "docs_signed_pending_payment" && stage !== "payment_pending") {
+      return null;
+    }
+
+    if (onboardingRow.payment_completed_at) {
+      return null;
+    }
+
+    return {
+      label: "Membership",
+      title: "Complete Membership Payment",
+      meta: "Payment is required before full plan access and coach workflow unlock.",
+      href: "founding-member.html?checkout=start",
+      dashboardAction: "start-membership-checkout",
+      actionLabel: "Complete Payment",
+      tone: "alert",
+      priority: 140
+    };
+  }
+
+  function getTodayWorkoutTaskCard(upcomingItems) {
+    var todayKey = getTodayDateInputValue();
+    var todaySessions = (Array.isArray(upcomingItems) ? upcomingItems : []).filter(function (item) {
+      if (String(item && item.kind || "") !== "training") {
+        return false;
+      }
+
+      if (String(item && item.scheduled_for || "") !== todayKey) {
+        return false;
+      }
+
+      var status = String(item && item.status || "scheduled").toLowerCase();
+      return status !== "completed";
+    });
+
+    if (!todaySessions.length) {
+      return null;
+    }
+
+    var session = todaySessions[0];
+    var sessionStatus = String(session && session.status || "scheduled").toLowerCase();
+    var dueMeta = todaySessions.length === 1
+      ? "1 workout due today"
+      : String(todaySessions.length) + " workouts due today";
+
+    return {
+      label: "Today\'s Workout",
+      title: String(session && session.session_label || "Complete Today\'s Session"),
+      meta: dueMeta,
+      href: getTrainingSessionLaunchHref(session) || "#profile-training-program-section",
+      actionLabel: sessionStatus.indexOf("partial") > -1 ? "Finish Session" : "Open Workout",
+      tone: "",
+      priority: 120
+    };
   }
 
   function compareOnboardingTaskPriority(a, b) {
@@ -3111,10 +3651,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (stage === "welcome_pending_intakes" && pendingIntakeCount > 0) {
       return {
         label: "Coach Follow-up",
-        title: "Submit Assigned Intake Forms",
-        meta: String(pendingIntakeCount) + " intake task" + (pendingIntakeCount === 1 ? "" : "s") + " remaining.",
-        href: "#profile-onboarding-section",
-        actionLabel: state.isCoachView ? "Review Tasks" : "Open Intake",
+        title: "Submit Assigned Task Forms",
+        meta: String(pendingIntakeCount) + " task form" + (pendingIntakeCount === 1 ? "" : "s") + " remaining.",
+        href: "#profile-tasks-section",
+        actionLabel: state.isCoachView ? "Review Tasks" : "Open Tasks",
         tone: "",
         priority: 350
       };
@@ -3171,7 +3711,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (stage === "active_training" && pendingIntakeCount === 0) {
       return {
         label: "Coach Tasks",
-        title: "Onboarding Complete",
+        title: "Initial Tasks Complete",
         meta: "Stay consistent with your active training plan and weekly check-ins.",
         href: "#profile-training-program-section",
         actionLabel: "Open Training",
@@ -3193,15 +3733,16 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     });
 
     renderDashboardCoachTasks(assignments);
+    refreshAthleteDashboardAccess();
 
     if (!assignments.length) {
       state.onboardingContent.innerHTML =
         '<div class="profile-empty-state">' +
-          '<p class="profile-empty-state-title">No onboarding intake assigned</p>' +
+          '<p class="profile-empty-state-title">No tasks assigned</p>' +
           '<p class="profile-empty-state-copy">' +
             (state.isCoachView
-              ? "Assign an intake form so this athlete can complete onboarding."
-              : "Your coach has not assigned an onboarding intake form yet.") +
+              ? "Assign tasks so this athlete can complete required setup steps."
+              : "Your coach has not assigned any tasks yet.") +
           "</p>" +
         "</div>";
       return;
@@ -3216,8 +3757,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (!visibleAssignments.length) {
       state.onboardingContent.innerHTML =
         '<div class="profile-empty-state">' +
-          '<p class="profile-empty-state-title">No active onboarding forms</p>' +
-          '<p class="profile-empty-state-copy">All onboarding forms are archived.</p>' +
+          '<p class="profile-empty-state-title">No active task forms</p>' +
+          '<p class="profile-empty-state-copy">All task forms are archived.</p>' +
         "</div>";
       return;
     }
@@ -3296,7 +3837,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         }
 
         html += '<div class="profile-section-actions">';
-        html += '<button type="submit" class="btn profile-btn-save">Save Intake Responses</button>';
+        html += '<button type="submit" class="btn profile-btn-save">Save Task Responses</button>';
         html += '</div>';
         html += '</form>';
         html += '</article>';
@@ -3368,7 +3909,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
   function onSubmitOnboardingResponse(assignmentId, formEl) {
     if (!state.client || !getViewedUserId() || !assignmentId || !formEl || state.isCoachView) {
-      setOnboardingStatus("You cannot submit intake responses from this view.", "error");
+      setOnboardingStatus("You cannot submit task responses from this view.", "error");
       return;
     }
 
@@ -3377,7 +3918,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     });
 
     if (!assignment) {
-      setOnboardingStatus("Intake assignment not found.", "error");
+      setOnboardingStatus("Task assignment not found.", "error");
       return;
     }
 
@@ -3406,7 +3947,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
-    setOnboardingStatus("Saving intake responses...", "info");
+    setOnboardingStatus("Saving task responses...", "info");
 
     state.client
       .from("athlete_onboarding_intake_assignments")
@@ -3427,19 +3968,19 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         maybeAdvanceFoundingStageAfterIntakeSubmission()
           .then(function (advanced) {
             if (advanced) {
-              setOnboardingStatus("Intake responses saved. Onboarding advanced to assessment pending review.", "success");
+              setOnboardingStatus("Task responses saved. Membership workflow advanced to assessment pending review.", "success");
             } else {
-              setOnboardingStatus("Intake responses saved.", "success");
+              setOnboardingStatus("Task responses saved.", "success");
             }
             loadOnboardingIntake();
           })
           .catch(function () {
-            setOnboardingStatus("Intake responses saved.", "success");
+            setOnboardingStatus("Task responses saved.", "success");
             loadOnboardingIntake();
           });
       })
       .catch(function (error) {
-        setOnboardingStatus(error && error.message ? error.message : "Failed to save intake responses.", "error");
+        setOnboardingStatus(error && error.message ? error.message : "Failed to save task responses.", "error");
       });
   }
 
@@ -3486,7 +4027,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         maybeAdvanceFoundingStageAfterIntakeSubmission()
           .then(function (advanced) {
             if (advanced) {
-              setOnboardingStatus("Task completed. Onboarding advanced to assessment pending review.", "success");
+              setOnboardingStatus("Task completed. Membership workflow advanced to assessment pending review.", "success");
             } else if (isCustomTask) {
               setOnboardingStatus("Task completed and archived.", "success");
             } else {
@@ -3586,7 +4127,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
   function openCoachIntakeModal() {
     if (!state.isCoachView || !state.client || !getViewedUserId()) {
-      setOnboardingStatus("Unable to manage intake forms right now.", "error");
+      setOnboardingStatus("Unable to manage task forms right now.", "error");
       return;
     }
 
@@ -3655,7 +4196,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     });
 
     if (!filtered.length) {
-      list.innerHTML = '<p class="admin-loading">No intake forms match this search.</p>';
+      list.innerHTML = '<p class="admin-loading">No task forms match this search.</p>';
       return;
     }
 
@@ -3670,7 +4211,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           checked +
           ' />' +
           '<span class="admin-assign-item-main">' +
-          '<strong>' + escapeHtml(template.name || "Onboarding Intake") + '</strong>' +
+          '<strong>' + escapeHtml(template.name || "Task Form") + '</strong>' +
           '<small>' + escapeHtml(template.description || "") + '</small>' +
           '</span>' +
           '</label>'
@@ -3688,12 +4229,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   function onAssignIntakeToCurrentAthlete() {
     var viewedUserId = getViewedUserId();
     if (!state.isCoachView || !viewedUserId || !state.client) {
-      setCoachIntakeStatus("Unable to assign intake form right now.", "error");
+      setCoachIntakeStatus("Unable to assign task form right now.", "error");
       return;
     }
 
     if (!state.selectedOnboardingTemplateId) {
-      setCoachIntakeStatus("Select an intake form to assign.", "error");
+      setCoachIntakeStatus("Select a task form to assign.", "error");
       return;
     }
 
@@ -3701,13 +4242,13 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return item.id === state.selectedOnboardingTemplateId;
     });
     if (!template) {
-      setCoachIntakeStatus("Intake form not found.", "error");
+      setCoachIntakeStatus("Task form not found.", "error");
       return;
     }
 
     var dueDate = state.coachIntakeDueDate ? String(state.coachIntakeDueDate.value || "").trim() : "";
     var nowIso = new Date().toISOString();
-    setCoachIntakeStatus("Assigning intake form...", "info");
+    setCoachIntakeStatus("Assigning task form...", "info");
 
     state.client
       .from("athlete_onboarding_intake_assignments")
@@ -3732,15 +4273,15 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           return;
         }
 
-        setCoachIntakeStatus("Intake form assigned.", "success");
-        setOnboardingStatus("Intake form assigned to athlete.", "success");
+        setCoachIntakeStatus("Task form assigned.", "success");
+        setOnboardingStatus("Task form assigned to athlete.", "success");
         setTimeout(function () {
           closeCoachIntakeModal();
           loadOnboardingIntake();
         }, 400);
       })
       .catch(function (error) {
-        setCoachIntakeStatus(error && error.message ? error.message : "Failed to assign intake form.", "error");
+        setCoachIntakeStatus(error && error.message ? error.message : "Failed to assign task form.", "error");
       });
   }
 
@@ -3859,6 +4400,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           if (isMissingRelationError(result.error)) {
             state.goalItems = readGoalFallbackItems(getViewedUserId());
             renderGoalItems();
+            refreshTrainingProgramsCalendarFromState();
             setGoalsStatus(
               "Goals table not found yet. Run the goals SQL migration to sync goals with coach dashboard.",
               "error"
@@ -3873,6 +4415,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         state.goalItems = (result.data || []).map(normalizeGoalItem);
         writeGoalFallbackItems(getViewedUserId(), state.goalItems);
         renderGoalItems();
+        refreshTrainingProgramsCalendarFromState();
         setGoalsStatus("", "info");
       })
       .catch(function (error) {
@@ -5232,15 +5775,32 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     score = Math.max(1, Math.min(99, Math.round(score)));
 
-    var readinessLabel = "Moderate";
+    var readinessLabel = getReadinessStatusLabel(score);
     var variant = "";
-    if (score >= 75) {
-      readinessLabel = "Ready";
+    if (readinessLabel === "Ready to Push" || readinessLabel === "Ready to Train") {
       variant = "good";
-    } else if (score < 60) {
-      readinessLabel = "Caution";
+    } else if (readinessLabel === "Recovery Priority") {
       variant = "alert";
     }
+
+    state.statusReadinessPct = score;
+    updateStatusRing("readiness", state.statusReadinessPct, readinessLabel, notes.slice(0, 1).join(""), variant);
+
+    var durabilityBase = Number.isFinite(state.statusDurabilityPct) ? Number(state.statusDurabilityPct) : 50;
+    var recoveryPct = Number.isFinite(state.readinessRecoveryScore)
+      ? Math.max(0, Math.min(100, Number(state.readinessRecoveryScore)))
+      : 50;
+    var durabilityScore = Math.round((durabilityBase * 0.7) + (recoveryPct * 0.3));
+    state.statusDurabilityPct = Math.max(1, Math.min(99, durabilityScore));
+    updateStatusRing(
+      "durability",
+      state.statusDurabilityPct,
+      String(state.statusDurabilityPct) + "%",
+      Number.isFinite(state.readinessRecoveryScore)
+        ? "Recovery " + formatInteger(state.readinessRecoveryScore) + " + nutrition alignment"
+        : "Durability driven by nutrition baseline",
+      state.statusDurabilityPct >= 70 ? "good" : (state.statusDurabilityPct < 45 ? "alert" : "")
+    );
 
     updateQuickGlanceCard(
       "strava",
@@ -5248,6 +5808,369 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       notes.slice(0, 2).join(" | "),
       variant
     );
+
+    updateMountainHeadline();
+  }
+
+  function updateMountainHeadline() {
+    var heading = document.querySelector("[data-mountain-status-headline]");
+    var summary = document.querySelector("[data-mountain-status-summary]");
+    if (!heading || !summary) {
+      return;
+    }
+
+    var readiness = Number(state.statusReadinessPct) || 0;
+    var load = Number(state.statusLoadPct) || 0;
+    var durability = Number(state.statusDurabilityPct) || 0;
+    var progress = Number(state.statusProgressPct) || 0;
+    var composite = Math.round((readiness * 0.4) + (load * 0.2) + (durability * 0.2) + (progress * 0.2));
+
+    var statusText = "Maintain";
+    if (composite >= 80 && readiness >= 72 && durability >= 65) {
+      statusText = "Ready to Push";
+    } else if (composite >= 64 && readiness >= 58 && durability >= 50) {
+      statusText = "Ready to Train";
+    } else if (composite < 48 || readiness < 48 || durability < 42) {
+      statusText = "Recovery Priority";
+    }
+
+    heading.textContent = statusText;
+    summary.textContent = buildCompassInterpretation(statusText, readiness, load, durability, progress);
+    var phaseLabel = updateTrailStatus(statusText, readiness, load, durability, progress) || deriveRoadmapPhaseLabel(statusText, readiness, load, durability, progress);
+    updateCompassCurrentStatus(statusText, phaseLabel, readiness, load, durability, progress);
+  }
+
+  function buildCompassInterpretation(statusText, readiness, load, durability, progress) {
+    var guidance = "Keep intensity moderate and stay consistent this week.";
+
+    if (statusText === "Ready to Push") {
+      guidance = "You are trending well. Keep your hard work focused, then recover with intent after big sessions.";
+    } else if (statusText === "Recovery Priority") {
+      guidance = "Your system is asking for recovery. Reduce intensity today and prioritize sleep, fueling, and tissue care.";
+    } else if (load >= 82) {
+      guidance = "Your volume is elevated. Keep strength work moderate and avoid stacking extra conditioning.";
+    } else if (progress < 45) {
+      guidance = "Progress is lagging a bit. Keep sessions consistent and review your plan with your coach.";
+    }
+
+    return guidance;
+  }
+
+  function updateCompassCurrentStatus(statusText, phaseLabel, readiness, load, durability, progress) {
+    var trainingStatusEl = document.querySelector("[data-compass-training-status]");
+    var phaseEl = document.querySelector("[data-compass-phase]");
+    var objectiveEl = document.querySelector("[data-compass-next-objective]");
+    var coachNoteEl = document.querySelector("[data-compass-coach-note]");
+    if (!trainingStatusEl || !phaseEl || !objectiveEl || !coachNoteEl) {
+      return;
+    }
+
+    trainingStatusEl.textContent = statusText;
+    phaseEl.textContent = String(phaseLabel || "Strength + Durability");
+    objectiveEl.textContent = String(state.compassNextObjective || "Set your next race, trip, or milestone.");
+    coachNoteEl.textContent = buildCoachCompassNote(statusText, readiness, load, durability, progress);
+  }
+
+  function buildCoachCompassNote(statusText, readiness, load, durability, progress) {
+    var consistencyNote = String(state.trainingConsistencyMessage || "").trim();
+
+    if (statusText === "Recovery Priority") {
+      return "Today should be a recovery-first day. Keep intensity low, complete mobility/prehab, and rebuild for the next quality session." +
+        (consistencyNote ? " " + consistencyNote : "");
+    }
+
+    if (load >= 82) {
+      return "You are trending well, but your sport volume jumped this week. Keep strength work moderate and prioritize recovery after your next long session.";
+    }
+
+    if (progress < 45) {
+      return "You are training, but progress is flatter than expected. Keep consistency high and adjust session focus with your coach this week.";
+    }
+
+    if (readiness >= 72 && durability >= 65) {
+      return "You are on track this week. Push quality where planned and keep recovery habits tight between harder efforts." +
+        (consistencyNote ? " " + consistencyNote : "");
+    }
+
+    return "Maintain today. Keep intensity moderate, stay consistent with your plan, and protect recovery between sessions." +
+      (consistencyNote ? " " + consistencyNote : "");
+  }
+
+  function updateTrailStatus(statusText, readiness, load, durability, progress) {
+    var phaseEl = document.querySelector("[data-trail-status-phase]");
+    var fillEl = document.querySelector("[data-trail-status-fill]");
+    var noteEl = document.querySelector("[data-trail-status-note]");
+    var checkpointsWrap = document.querySelector("[data-trail-status-checkpoints]");
+    if (!phaseEl || !fillEl || !noteEl || !checkpointsWrap) {
+      return;
+    }
+
+    var roadmap = buildMemberRoadmap(statusText, readiness, load, durability, progress);
+    var steps = roadmap.steps || [];
+    var index = Math.max(0, Math.min(steps.length - 1, Number(roadmap.currentIndex) || 0));
+
+    checkpointsWrap.style.setProperty("--roadmap-step-count", String(Math.max(steps.length, 1)));
+    checkpointsWrap.innerHTML = steps
+      .map(function (step, stepIndex) {
+        return (
+          '<span class="profile-trail-checkpoint" role="listitem">' +
+            '<span class="profile-trail-checkpoint-index">' + String(stepIndex + 1) + '</span>' +
+            '<span class="profile-trail-checkpoint-title">' + escapeHtml(step.label || "Step") + '</span>' +
+            '<span class="profile-trail-checkpoint-meta">' + escapeHtml(step.meta || "") + '</span>' +
+          '</span>'
+        );
+      })
+      .join("");
+
+    var checkpoints = checkpointsWrap.querySelectorAll(".profile-trail-checkpoint");
+    checkpoints.forEach(function (checkpoint, checkpointIndex) {
+      checkpoint.classList.remove("is-active", "is-complete");
+      if (checkpointIndex < index) {
+        checkpoint.classList.add("is-complete");
+      }
+      if (checkpointIndex === index) {
+        checkpoint.classList.add("is-active");
+      }
+    });
+
+    phaseEl.textContent = String(roadmap.phaseLabel || "Training Roadmap");
+    noteEl.textContent = String(roadmap.note || "Your roadmap connects assessment, training phases, events, and reassessments.");
+
+    var fillPercent = steps.length > 1
+      ? (10 + ((90 * index) / (steps.length - 1)))
+      : 100;
+    fillEl.style.width = String(Math.round(fillPercent)) + "%";
+
+    return String(roadmap.currentPhase || "Strength + Durability");
+  }
+
+  function buildMemberRoadmap(statusText, readiness, load, durability, progress) {
+    var nextEventDays = Number.isFinite(state.readinessNextEventDays)
+      ? Number(state.readinessNextEventDays)
+      : null;
+    var activeTraining = Number(state.readinessTrainingActiveCount) || 0;
+    var objective = String(state.compassNextObjective || "").trim();
+    var hasObjective = !!objective && objective.toLowerCase() !== "set your next race, trip, or milestone.";
+
+    var latestMetricDate = getLatestMetricUpdatedDate();
+    var daysSinceAssessment = latestMetricDate ? getDaysSinceDate(latestMetricDate) : null;
+    var quarterlyDue = typeof daysSinceAssessment === "number" ? daysSinceAssessment >= 84 : false;
+    var reassessmentDate = latestMetricDate ? addDaysToDateValue(latestMetricDate, 84) : null;
+
+    var assessmentMeta = latestMetricDate ? ("Last: " + formatDate(latestMetricDate)) : "Baseline pending";
+    var baseMeta = activeTraining > 0
+      ? (String(activeTraining) + " active program" + (activeTraining === 1 ? "" : "s"))
+      : "Programming to be assigned";
+    var strengthMeta = load >= 58 ? "Current emphasis" : "Planned phase";
+    var powerMeta = load >= 72 ? "Current emphasis" : "Upcoming phase";
+    var eventMeta = "No event date set";
+    if (state.compassNextObjectiveDate) {
+      eventMeta = "Target: " + formatDate(state.compassNextObjectiveDate);
+    } else if (nextEventDays !== null) {
+      eventMeta = nextEventDays > 0 ? ("In " + nextEventDays + " days") : (nextEventDays === 0 ? "Today" : "Recently passed");
+    }
+    var quarterlyMeta = reassessmentDate
+      ? ("Due: " + formatDate(reassessmentDate.toISOString()))
+      : "Every 12 weeks";
+
+    var steps = [
+      { key: "assessment", label: "Performance Assessment", meta: assessmentMeta },
+      { key: "base", label: "Base Build", meta: baseMeta },
+      { key: "strength", label: "Strength Build", meta: strengthMeta },
+      { key: "power", label: "Power + Specific", meta: powerMeta },
+      { key: "event", label: hasObjective ? abbreviateRoadmapLabel(objective, 26) : "Event / Race Prep", meta: eventMeta },
+      { key: "quarterly", label: "Quarterly Reassessment", meta: quarterlyMeta }
+    ];
+
+    var currentKey = "assessment";
+    var note = "Start with baseline testing to anchor your training roadmap.";
+    var currentPhase = "Assessment + Plan Design";
+    var phaseLabel = "Assessment";
+
+    if (activeTraining > 0 || progress >= 36) {
+      currentKey = "base";
+      note = "Build consistency and aerobic work capacity while stacking quality reps.";
+      currentPhase = "Base Building";
+      phaseLabel = "Base Build";
+    }
+
+    if (load >= 58 || progress >= 50) {
+      currentKey = "strength";
+      note = "Shift emphasis toward force production, durability, and controlled loading.";
+      currentPhase = "Strength + Durability";
+      phaseLabel = "Strength Build";
+    }
+
+    if (load >= 72 && readiness >= 62 && durability >= 52) {
+      currentKey = "power";
+      note = "Convert strength into sport-specific power and high-quality performance outputs.";
+      currentPhase = "Power + Specific Preparation";
+      phaseLabel = "Power + Specific";
+    }
+
+    if (nextEventDays !== null && nextEventDays >= 0 && nextEventDays <= 45) {
+      currentKey = "event";
+      if (nextEventDays <= 10) {
+        note = "Event is near. Taper intelligently and prioritize freshness and confidence.";
+      } else {
+        note = "Event prep block is active. Focus on specificity, pacing, and readiness.";
+      }
+      currentPhase = "Event Preparation";
+      phaseLabel = "Event Prep";
+    }
+
+    if (quarterlyDue && statusText !== "Recovery Priority") {
+      currentKey = "quarterly";
+      note = "Quarterly reassessment due. Re-test key metrics and update your next training block.";
+      currentPhase = "Quarterly Reassessment";
+      phaseLabel = "Quarterly Review";
+    }
+
+    if (statusText === "Recovery Priority") {
+      note = "Recovery is the priority this week. Keep roadmap momentum by reducing load and restoring readiness.";
+    }
+
+    var keys = steps.map(function (step) { return step.key; });
+    var currentIndex = Math.max(0, keys.indexOf(currentKey));
+
+    return {
+      steps: steps,
+      currentIndex: currentIndex,
+      note: note,
+      currentPhase: currentPhase,
+      phaseLabel: phaseLabel
+    };
+  }
+
+  function deriveRoadmapPhaseLabel(statusText, readiness, load, durability, progress) {
+    return String(buildMemberRoadmap(statusText, readiness, load, durability, progress).phaseLabel || "Strength + Durability");
+  }
+
+  function getLatestMetricUpdatedDate() {
+    var list = Array.isArray(state.metricsLatest) ? state.metricsLatest : [];
+    if (!list.length) {
+      return null;
+    }
+
+    var latest = list[0];
+    var updated = latest && latest.updated_at ? String(latest.updated_at) : "";
+    if (!updated) {
+      return null;
+    }
+    return updated;
+  }
+
+  function getDaysSinceDate(dateInput) {
+    var raw = String(dateInput || "").trim();
+    if (!raw) {
+      return null;
+    }
+
+    var dateValue = new Date(raw);
+    if (isNaN(dateValue.getTime())) {
+      dateValue = parseDateInputValue(raw);
+    }
+    if (!dateValue || isNaN(dateValue.getTime())) {
+      return null;
+    }
+
+    var today = parseDateInputValue(getTodayDateInputValue());
+    if (!today) {
+      return null;
+    }
+
+    var diffMs = today.getTime() - dateValue.getTime();
+    return Math.floor(diffMs / 86400000);
+  }
+
+  function addDaysToDateValue(dateInput, daysToAdd) {
+    var raw = String(dateInput || "").trim();
+    if (!raw) {
+      return null;
+    }
+
+    var dateValue = new Date(raw);
+    if (isNaN(dateValue.getTime())) {
+      dateValue = parseDateInputValue(raw);
+    }
+    if (!dateValue || isNaN(dateValue.getTime())) {
+      return null;
+    }
+
+    var result = new Date(dateValue.getTime());
+    result.setDate(result.getDate() + (parseInt(daysToAdd, 10) || 0));
+    return result;
+  }
+
+  function abbreviateRoadmapLabel(text, maxLen) {
+    var value = String(text || "").trim();
+    var limit = Number(maxLen) || 24;
+    if (value.length <= limit) {
+      return value;
+    }
+    return value.slice(0, Math.max(0, limit - 1)).trim() + "...";
+  }
+
+  function getReadinessStatusLabel(score) {
+    var value = Number(score) || 0;
+    if (value >= 80) {
+      return "Ready";
+    }
+    if (value >= 66) {
+      return "Train";
+    }
+    if (value >= 50) {
+      return "Maintain";
+    }
+    return "Recover";
+  }
+
+  function getLoadStatusLabel(score) {
+    var value = Number(score) || 0;
+    if (value < 35) {
+      return "Under";
+    }
+    if (value < 65) {
+      return "Productive";
+    }
+    if (value < 80) {
+      return "Tolerable";
+    }
+    if (value < 92) {
+      return "Overreach";
+    }
+    return "Deload";
+  }
+
+  function getDurabilityStatusLabel(score) {
+    var value = Number(score) || 0;
+    if (value >= 78) {
+      return "Clear";
+    }
+    if (value >= 60) {
+      return "Monitor";
+    }
+    if (value >= 45) {
+      return "Modify";
+    }
+    return "Rehab";
+  }
+
+  function getProgressStatusLabel(score) {
+    var value = Number(score) || 0;
+    if (value >= 85) {
+      return "Ahead";
+    }
+    if (value >= 65) {
+      return "On Track";
+    }
+    if (value >= 45) {
+      return "Stable";
+    }
+    if (value >= 30) {
+      return "Behind";
+    }
+    return "Adjust";
   }
 
   function onStravaConnect() {
@@ -6057,7 +6980,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var message = String(params.get(FOUNDING_PAYMENT_MESSAGE_PARAM) || "").trim();
     if (!message) {
       if (status === "success") {
-        message = "Payment complete. Next step: complete your onboarding intake form below.";
+        message = "Payment complete. Next step: complete your assigned tasks below.";
       } else if (status === "cancelled") {
         message = "Payment was cancelled. You can return to the founding member page anytime to finish checkout.";
       } else {
@@ -6068,9 +6991,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     setOnboardingStatus(message, status === "success" ? "success" : "info");
 
     if (status === "success") {
-      var onboardingSection = document.getElementById("profile-onboarding-section");
-      if (onboardingSection && typeof onboardingSection.scrollIntoView === "function") {
-        onboardingSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      var tasksSection = document.getElementById("profile-tasks-section");
+      if (tasksSection && typeof tasksSection.scrollIntoView === "function") {
+        tasksSection.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }
 
@@ -6184,6 +7107,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       .then(function (result) {
         if (result.error) {
           contentElement.innerHTML = '<p class="profile-training-error">' + escapeHtml(result.error.message) + "</p>";
+          contentElement.style.minHeight = "";
           updateQuickGlanceCard("training", "Unavailable", "Could not load training programs", "alert");
           return;
         }
@@ -6242,6 +7166,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           '<p class="profile-training-error">' +
           escapeHtml(error && error.message ? error.message : "Failed to load training program.") +
           "</p>";
+        contentElement.style.minHeight = "";
         updateQuickGlanceCard("training", "Unavailable", "Could not load training programs", "alert");
       });
   }
@@ -6300,6 +7225,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   }
 
   function renderTrainingPrograms(contentElement, programs, scheduleByAssignment) {
+    state.trainingProgramsLoaded = true;
+    state.trainingProgramsCache = Array.isArray(programs) ? programs.slice() : [];
+    state.trainingScheduleByAssignment = scheduleByAssignment && typeof scheduleByAssignment === "object"
+      ? Object.assign({}, scheduleByAssignment)
+      : {};
+
     var activePrograms = (programs || []).filter(function (program) {
       return !!program.is_active;
     });
@@ -6311,8 +7242,21 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       ? scheduleByAssignment
       : {};
 
+    refreshAthleteDashboardAccess();
+    var accessContext = state.dashboardAccessContext || {};
+    var workoutCalendarEnabled = state.isCoachView || !!(accessContext.features && accessContext.features.workoutCalendar);
+
     var upcomingScheduledItems = collectUpcomingScheduledItems(activePrograms, safeScheduleMap, 14);
-    var calendarScheduledItems = collectTrainingCalendarItems(activePrograms, safeScheduleMap);
+    state.dashboardUpcomingTrainingItems = upcomingScheduledItems.slice();
+    var trainingCalendarItems = collectTrainingCalendarItems(activePrograms, safeScheduleMap);
+    var calendarSupplementalItems = collectTrainingCalendarSupplementalItems();
+    var calendarScheduledItems = trainingCalendarItems.concat(calendarSupplementalItems);
+    var adherence = calculateTrainingAdherenceStats(trainingCalendarItems);
+    state.trainingConsistencyMessage = trainingCalendarItems.length
+      ? String(adherence && adherence.consistencyMessage || "")
+      : "";
+
+    renderDashboardCoachTasks();
 
     updateQuickGlanceTraining(activePrograms.length, pastPrograms.length, upcomingScheduledItems);
 
@@ -6325,14 +7269,28 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       : '');
     html += '</div>';
 
-    html += '<div class="training-program-tabs" role="tablist" aria-label="Training program sections">';
-    html += '<button type="button" class="training-program-tab is-active" role="tab" aria-selected="true" data-training-program-tab="current">Current Training Programs</button>';
-    html += '<button type="button" class="training-program-tab" role="tab" aria-selected="false" data-training-program-tab="past">Past Training Programs</button>';
-    html += '</div>';
+    if (workoutCalendarEnabled && calendarScheduledItems.length) {
+      html += buildTrainingTodayStripHtml(trainingCalendarItems, calendarSupplementalItems);
+    }
 
-    html += '<div class="training-program-tab-panel" data-training-program-panel="current">';
-    if (activePrograms.length) {
+    if (workoutCalendarEnabled) {
+      html += buildTrainingUpcomingEventsCardHtml(calendarSupplementalItems);
+    }
+
+    if (workoutCalendarEnabled && calendarScheduledItems.length) {
       html += buildTrainingCalendarCardHtml(calendarScheduledItems);
+    } else if (workoutCalendarEnabled && activePrograms.length) {
+      html +=
+        '<article class="training-calendar-card training-calendar-card-compact">' +
+          '<h3>Workout Calendar</h3>' +
+          '<p>Your coach has not added dated sessions yet. Once your plan is scheduled, the calendar will appear here.</p>' +
+        '</article>';
+    } else if (!workoutCalendarEnabled && !state.isCoachView) {
+      html +=
+        '<article class="training-calendar-card training-calendar-card-compact">' +
+          '<h3>Workout Calendar Locked</h3>' +
+          '<p>' + escapeHtml((accessContext && accessContext.reason) || 'Complete your assigned setup tasks to unlock workout calendar access.') + '</p>' +
+        '</article>';
     }
 
     if (!activePrograms.length) {
@@ -6352,27 +7310,16 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
       html += '</div>';
     }
-    html += '</div>';
 
-    html += '<div class="training-program-tab-panel" data-training-program-panel="past" hidden>';
-    if (!pastPrograms.length) {
-      html +=
-        '<div class="profile-empty-state training-history-empty">' +
-          '<p class="profile-empty-state-title">No past programs yet</p>' +
-          '<p class="profile-empty-state-copy">Completed programs will appear here for review.</p>' +
-        '</div>';
-    } else {
-      html += '<div class="training-program-grid training-program-grid-past">';
-      pastPrograms.forEach(function (program) {
-        html += buildTrainingProgramCard(program, false, []);
-      });
-      html += '</div>';
+    if (workoutCalendarEnabled && trainingCalendarItems.length) {
+      html += buildTrainingAdherencePanelHtml(adherence);
     }
-    html += '</div>';
 
     html += '<p class="profile-status training-program-status" role="status" aria-live="polite" data-training-program-status></p>';
 
     contentElement.innerHTML = html;
+    initializeTrainingCalendarNavigators(contentElement);
+    contentElement.style.minHeight = "";
   }
 
   function renderDashboardQuickGlanceDefaults() {
@@ -6381,10 +7328,23 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.readinessNutritionPct = null;
     state.readinessRecoveryScore = null;
     state.readinessStravaConnected = false;
+    state.statusReadinessPct = 0;
+    state.statusLoadPct = 0;
+    state.statusDurabilityPct = 0;
+    state.statusProgressPct = 0;
+    state.dashboardUpcomingTrainingItems = [];
+    state.trainingConsistencyMessage = "";
+    state.compassNextObjective = "Set your next race, trip, or milestone.";
+    state.compassNextObjectiveDate = null;
     updateQuickGlanceCard("training", "Loading...", "Checking today's session", "");
     updateQuickGlanceCard("goals", "Loading...", "Finding your next event", "");
     updateQuickGlanceCard("nutrition", "Loading...", "Checking today's intake", "");
     updateQuickGlanceCard("strava", "Loading...", "Checking recovery signals", "");
+    updateStatusRing("readiness", 0, "Loading", "Checking readiness", "");
+    updateStatusRing("load", 0, "Loading", "Checking training load", "");
+    updateStatusRing("durability", 0, "Loading", "Checking durability", "");
+    updateStatusRing("progress", 0, "Loading", "Checking progress", "");
+    updateMountainHeadline();
   }
 
   function updateQuickGlanceTraining(activeCount, pastCount, upcomingScheduledItems) {
@@ -6403,6 +7363,14 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (active > 0) {
       if (todaysSessions.length) {
+        state.statusLoadPct = 100;
+        updateStatusRing(
+          "load",
+          state.statusLoadPct,
+          "Today",
+          String(todaysSessions.length) + " workout" + (todaysSessions.length === 1 ? "" : "s"),
+          "good"
+        );
         updateQuickGlanceCard(
           "training",
           "Today: " + todaysSessions.length + " Session" + (todaysSessions.length === 1 ? "" : "s"),
@@ -6415,6 +7383,28 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
       if (nextUpcoming && nextUpcoming.scheduled_for) {
         var daysUntil = getDaysUntilDate(nextUpcoming.scheduled_for);
+        if (typeof daysUntil === "number") {
+          if (daysUntil <= 0) {
+            state.statusLoadPct = 100;
+          } else if (daysUntil <= 3) {
+            state.statusLoadPct = 88;
+          } else if (daysUntil <= 7) {
+            state.statusLoadPct = 74;
+          } else {
+            state.statusLoadPct = 62;
+          }
+        } else {
+          state.statusLoadPct = 65;
+        }
+        updateStatusRing(
+          "load",
+          state.statusLoadPct,
+          typeof daysUntil === "number"
+            ? (daysUntil === 0 ? "Today" : (daysUntil > 0 ? "In " + daysUntil + "d" : "Due"))
+            : "Active",
+          String(nextUpcoming.session_label || "Next session"),
+          daysUntil === 0 ? "good" : ""
+        );
         var nextText = typeof daysUntil === "number"
           ? (daysUntil === 0 ? "Today" : (daysUntil > 0 ? "In " + daysUntil + " day" + (daysUntil === 1 ? "" : "s") : "Overdue"))
           : "Upcoming";
@@ -6434,6 +7424,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         String(active) + " active program" + (active === 1 ? "" : "s") + " | " + String(past) + " past",
         "good"
       );
+      state.statusLoadPct = 72;
+      updateStatusRing("load", state.statusLoadPct, "Active", String(active) + " program" + (active === 1 ? "" : "s"), "good");
       updateDailyReadinessCard();
       return;
     }
@@ -6444,6 +7436,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       state.isCoachView ? "Assign a program from coach actions" : "Activate a plan to get today's workout",
       "alert"
     );
+    state.statusLoadPct = 18;
+    updateStatusRing("load", state.statusLoadPct, "Needs Plan", "No active training program", "alert");
     updateDailyReadinessCard();
   }
 
@@ -6465,6 +7459,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (!activeEvents.length) {
       state.readinessNextEventDays = null;
+      state.compassNextObjective = "Set your next race, trip, or milestone.";
+      state.compassNextObjectiveDate = null;
+      state.statusProgressPct = 20;
+      updateStatusRing("progress", state.statusProgressPct, "No Event", "Set your next event", "alert");
       updateQuickGlanceCard("goals", "No Event Set", "Add a race, event, or trip to anchor your training", "alert");
       updateDailyReadinessCard();
       return;
@@ -6478,14 +7476,41 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (!withDate.length) {
       state.readinessNextEventDays = null;
+      state.compassNextObjective = String(activeEvents[0] && activeEvents[0].title || "Add a target date");
+      state.compassNextObjectiveDate = null;
+      state.statusProgressPct = 52;
+      updateStatusRing("progress", state.statusProgressPct, "Set Date", "Event exists, date missing", "");
       updateQuickGlanceCard("goals", String(activeEvents.length) + " Event" + (activeEvents.length === 1 ? "" : "s"), "Add target dates to start countdowns", "");
       updateDailyReadinessCard();
       return;
     }
 
     var nextItem = withDate[0];
+    state.compassNextObjective = String(nextItem && nextItem.title || "Upcoming milestone");
+    state.compassNextObjectiveDate = String(nextItem && nextItem.target_date || "");
     var daysUntil = getDaysUntilDate(nextItem.target_date);
     state.readinessNextEventDays = typeof daysUntil === "number" ? daysUntil : null;
+    if (typeof daysUntil === "number") {
+      if (daysUntil <= 2) {
+        state.statusProgressPct = 100;
+      } else if (daysUntil <= 7) {
+        state.statusProgressPct = 95;
+      } else if (daysUntil <= 14) {
+        state.statusProgressPct = 90;
+      } else if (daysUntil <= 30) {
+        state.statusProgressPct = 82;
+      } else if (daysUntil <= 60) {
+        state.statusProgressPct = 72;
+      } else {
+        state.statusProgressPct = 62;
+      }
+    } else {
+      state.statusProgressPct = 58;
+    }
+
+    if ((state.readinessTrainingActiveCount || 0) > 0) {
+      state.statusProgressPct = Math.min(100, state.statusProgressPct + 8);
+    }
     var meta = "Next: " + (nextItem.title || "Upcoming milestone");
     var value = "Upcoming";
     if (typeof daysUntil === "number") {
@@ -6498,6 +7523,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       }
     }
 
+    updateStatusRing("progress", state.statusProgressPct, value, nextItem.title || "Upcoming milestone", daysUntil === 0 ? "good" : "");
     updateQuickGlanceCard("goals", value, meta, daysUntil === 0 ? "good" : "");
     updateDailyReadinessCard();
   }
@@ -6511,6 +7537,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (!today) {
       state.readinessNutritionPct = null;
+      state.statusDurabilityPct = 16;
+      updateStatusRing("durability", state.statusDurabilityPct, "No Log", "Add nutrition for today", "alert");
       updateQuickGlanceCard("nutrition", "No Entry Today", "Add food to track daily intake", "alert");
       updateDailyReadinessCard();
       return;
@@ -6521,8 +7549,17 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (Number.isFinite(calories) && Number.isFinite(target) && target > 0) {
       var pct = Math.max(0, Math.min((calories / target) * 100, 999));
       state.readinessNutritionPct = pct;
+      var adherencePct = Math.max(0, Math.min(100, Math.round(100 - Math.abs(pct - 100))));
+      state.statusDurabilityPct = adherencePct;
       var value = formatInteger(calories) + " kcal";
       var meta = formatInteger(pct) + "% of target";
+      updateStatusRing(
+        "durability",
+        state.statusDurabilityPct,
+        String(adherencePct) + "%",
+        formatInteger(pct) + "% calories vs target",
+        adherencePct >= 70 ? "good" : ""
+      );
       updateQuickGlanceCard("nutrition", value, meta, pct >= 70 && pct <= 120 ? "good" : "");
       updateDailyReadinessCard();
       return;
@@ -6530,14 +7567,65 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     if (Number.isFinite(calories)) {
       state.readinessNutritionPct = null;
+      state.statusDurabilityPct = 56;
+      updateStatusRing("durability", state.statusDurabilityPct, "Logged", "Set calorie target", "");
       updateQuickGlanceCard("nutrition", formatInteger(calories) + " kcal", "Set calorie target for comparison", "");
       updateDailyReadinessCard();
       return;
     }
 
     state.readinessNutritionPct = null;
+    state.statusDurabilityPct = 46;
+    updateStatusRing("durability", state.statusDurabilityPct, "Logged", "Nutrition entry saved", "good");
     updateQuickGlanceCard("nutrition", "Logged Today", "Nutrition entry saved", "good");
     updateDailyReadinessCard();
+  }
+
+  function updateStatusRing(type, percent, valueLabel, metaLabel, variant) {
+    var card = document.querySelector('[data-status-ring="' + String(type || "") + '"]');
+    if (!card) {
+      return;
+    }
+
+    var visual = card.querySelector("[data-status-ring-visual]");
+    var valueEl = card.querySelector("[data-status-ring-value]");
+    var metaEl = card.querySelector("[data-status-ring-meta]");
+    var safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
+    var fallbackLabel = formatInteger(safePercent) + "%";
+    var interpretedLabel = valueLabel;
+
+    if (valueLabel !== "Loading") {
+      if (type === "readiness") {
+        interpretedLabel = getReadinessStatusLabel(safePercent);
+      } else if (type === "load") {
+        interpretedLabel = getLoadStatusLabel(safePercent);
+      } else if (type === "durability") {
+        interpretedLabel = getDurabilityStatusLabel(safePercent);
+      } else if (type === "progress") {
+        interpretedLabel = getProgressStatusLabel(safePercent);
+      }
+    }
+
+    if (visual) {
+      visual.style.setProperty("--peak-pct", String(safePercent));
+    }
+
+    if (valueEl) {
+      valueEl.textContent = String(interpretedLabel || fallbackLabel);
+    }
+
+    if (metaEl) {
+      metaEl.textContent = String(metaLabel || "");
+    }
+
+    card.classList.remove("is-good", "is-alert");
+    if (variant === "good") {
+      card.classList.add("is-good");
+    } else if (variant === "alert") {
+      card.classList.add("is-alert");
+    }
+
+    updateMountainHeadline();
   }
 
   function updateQuickGlanceCard(type, value, meta, variant) {
@@ -6626,6 +7714,21 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var scheduledProgramUrl = nextSession && nextSession.slot_key
       ? (programUrl + "&day=" + encodeURIComponent(nextSession.slot_key))
       : programUrl;
+    var overviewUrl = isActive ? viewUrl : viewUrl;
+    var isAthleteActiveCard = isActive && !state.isCoachView;
+
+    if (isAthleteActiveCard) {
+      return [
+        '<div class="profile-training-details training-program-card is-active is-compact-active" data-training-program-id="' + escapeAttribute(program.id || "") + '">',
+        '<a class="training-program-link training-program-link-title" href="' + programUrl + '">' + escapeHtml(programName) + '</a>',
+        '<div class="training-program-meta">',
+        '<span><strong>Start:</strong> ' + escapeHtml(startDate) + '</span>',
+        '<span><strong>Next:</strong> ' + escapeHtml(nextSessionLabel) + ' · ' + escapeHtml(nextSessionDate) + '</span>',
+        '</div>',
+        '<a class="btn training-open-btn training-open-btn-compact" href="' + overviewUrl + '">Program Overview</a>',
+        '</div>'
+      ].join("");
+    }
 
     return [
       '<div class="profile-training-details training-program-card' + (isActive ? ' is-active' : ' is-past') + '" data-training-program-id="' + escapeAttribute(program.id || "") + '">',
@@ -6635,7 +7738,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       isActive
         ? '<p class="training-note">This program is currently active. Use the button below when it is complete.</p>'
         : '<p class="training-note">This program has been moved to your past training history.</p>',
-      '<a class="btn training-open-btn" href="' + (isActive ? scheduledProgramUrl : viewUrl) + '">' + (isActive ? 'Open Program + Log Workout' : 'View Program') + '</a>',
+      '<a class="btn training-open-btn" href="' + (isActive ? overviewUrl : viewUrl) + '">' + (isActive ? 'Program Overview' : 'View Program') + '</a>',
       isActive
         ? '<div class="training-card-actions"><button type="button" class="btn profile-btn-edit-profile training-complete-btn" data-complete-program="' + escapeAttribute(program.id || "") + '">Completed Training Program</button></div>'
         : '<div class="training-card-actions training-card-actions-past"><button type="button" class="btn profile-btn-edit-profile training-make-current-btn" data-make-current-program="' + escapeAttribute(program.id || "") + '">Make Current</button><button type="button" class="btn profile-btn-delete training-delete-past-btn" data-delete-past-program="' + escapeAttribute(program.id || "") + '">Delete</button></div>',
@@ -6707,7 +7810,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         }
 
         allItems.push({
+          kind: "training",
           program: program,
+          schedule_id: String(row && row.id || ""),
           assignment_id: assignmentId,
           scheduled_for: dateValue,
           slot_key: String(row && row.slot_key || ""),
@@ -6730,6 +7835,80 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     return allItems;
   }
 
+  function collectTrainingCalendarSupplementalItems() {
+    var supplementalItems = [];
+
+    (Array.isArray(state.goalItems) ? state.goalItems : []).forEach(function (item) {
+      var targetDate = String(item && item.target_date || "").trim();
+      if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+        return;
+      }
+
+      var typeValue = String(item && item.goal_type || "goal").trim().toLowerCase();
+      var isEvent = /race|event|competition|meet|trip/.test(typeValue);
+      var title = String(item && item.title || "").trim() || (isEvent ? "Event" : "Goal");
+      var status = String(item && item.status || "active").trim().toLowerCase();
+
+      supplementalItems.push({
+        kind: "milestone",
+        milestone_type: isEvent ? "event" : "goal",
+        milestone_status: status,
+        scheduled_for: targetDate,
+        title: title,
+        subtitle: getGoalTypeLabel(typeValue) || (isEvent ? "Event" : "Goal")
+      });
+    });
+
+    var birthDate = getProfileDobValue(state.profile || null);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+      var birthdayItems = buildBirthdayCalendarItems(birthDate, 6, 12);
+      supplementalItems = supplementalItems.concat(birthdayItems);
+    }
+
+    supplementalItems.sort(function (a, b) {
+      if (a.scheduled_for !== b.scheduled_for) {
+        return String(a.scheduled_for || "").localeCompare(String(b.scheduled_for || ""));
+      }
+      return String(a.title || "").localeCompare(String(b.title || ""));
+    });
+
+    return supplementalItems;
+  }
+
+  function buildBirthdayCalendarItems(dobValue, backMonths, forwardMonths) {
+    var parsedDob = parseDateInputValue(dobValue);
+    if (!parsedDob) {
+      return [];
+    }
+
+    var today = new Date();
+    var start = new Date(today.getFullYear(), today.getMonth(), 1);
+    var end = new Date(today.getFullYear(), today.getMonth(), 1);
+    start.setMonth(start.getMonth() - (parseInt(backMonths, 10) || 0));
+    end.setMonth(end.getMonth() + (parseInt(forwardMonths, 10) || 0));
+
+    var birthdayMonth = parsedDob.getMonth();
+    var birthdayDay = parsedDob.getDate();
+    var items = [];
+    var cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+
+    while (cursor <= end) {
+      var year = cursor.getFullYear();
+      var daysInMonth = new Date(year, birthdayMonth + 1, 0).getDate();
+      if (birthdayDay <= daysInMonth && cursor.getMonth() === birthdayMonth) {
+        items.push({
+          kind: "birthday",
+          scheduled_for: formatDateInputValue(new Date(year, birthdayMonth, birthdayDay)),
+          title: "Birthday",
+          subtitle: "Celebrate"
+        });
+      }
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return items;
+  }
+
   function getNextScheduledSession(rows) {
     var todayKey = getTodayDateInputValue();
     var sorted = (Array.isArray(rows) ? rows : []).slice().sort(function (a, b) {
@@ -6746,6 +7925,270 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     return null;
   }
 
+  function getTrainingSessionLaunchHref(item) {
+    if (!item || String(item.kind || "") !== "training") {
+      return "";
+    }
+
+    var program = item.program || {};
+    var programName =
+      (program.training_program && program.training_program.name) ||
+      program.program_name ||
+      (program.program_id ? "Program " + String(program.program_id).slice(0, 8) : "Assigned Program");
+    var athleteName =
+      (state.profile && state.profile.name) ||
+      (state.viewUser && state.viewUser.email) ||
+      "Athlete";
+
+    return (
+      "training-program-example.html?program=" + encodeURIComponent(programName) +
+      (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "") +
+      (program.id ? "&assignmentId=" + encodeURIComponent(program.id) : "") +
+      "&athleteName=" + encodeURIComponent(athleteName) +
+      "&day=" + encodeURIComponent(String(item.slot_key || ""))
+    );
+  }
+
+  function getNextTrainingCalendarWorkout(trainingItems, fromDateKey) {
+    var todayKey = String(fromDateKey || getTodayDateInputValue() || "");
+    var list = (Array.isArray(trainingItems) ? trainingItems : []).slice().sort(function (a, b) {
+      var aKey = String(a && a.scheduled_for || "");
+      var bKey = String(b && b.scheduled_for || "");
+      if (aKey !== bKey) {
+        return aKey.localeCompare(bKey);
+      }
+
+      return String(a && a.slot_key || "").localeCompare(String(b && b.slot_key || ""));
+    });
+
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i] && list[i].scheduled_for || "") >= todayKey) {
+        return list[i];
+      }
+    }
+
+    return null;
+  }
+
+  function buildTrainingTodayStripHtml(trainingItems, supplementalItems) {
+    var todayKey = getTodayDateInputValue();
+    var workoutsToday = (Array.isArray(trainingItems) ? trainingItems : []).filter(function (item) {
+      return String(item && item.scheduled_for || "") === todayKey;
+    });
+    var milestonesToday = (Array.isArray(supplementalItems) ? supplementalItems : []).filter(function (item) {
+      return String(item && item.scheduled_for || "") === todayKey;
+    });
+
+    var value = workoutsToday.length
+      ? String(workoutsToday.length) + " workout" + (workoutsToday.length === 1 ? "" : "s") + " today"
+      : "No workout scheduled today";
+    var meta = milestonesToday.length
+      ? milestonesToday.map(function (item) { return String(item && item.title || "Milestone"); }).join(" | ")
+      : "Use Today to jump to the current day in your calendar.";
+
+    var actionItem = workoutsToday.length ? workoutsToday[0] : getNextTrainingCalendarWorkout(trainingItems, todayKey);
+    var actionHref = getTrainingSessionLaunchHref(actionItem);
+    var actionDate = String(actionItem && actionItem.scheduled_for || "");
+    var actionLabel = actionDate === todayKey ? "Open Today's Session" : "Open Next Session";
+    var actionHtml = actionHref
+      ? '<div class="training-today-strip-actions"><a class="btn profile-btn-edit-profile training-today-strip-action" href="' + escapeAttribute(actionHref) + '">' + escapeHtml(actionLabel) + '</a></div>'
+      : "";
+
+    return (
+      '<article class="training-today-strip">' +
+        '<p class="training-today-strip-label">Today</p>' +
+        '<strong class="training-today-strip-value">' + escapeHtml(value) + '</strong>' +
+        '<p class="training-today-strip-meta">' + escapeHtml(meta) + '</p>' +
+        actionHtml +
+      '</article>'
+    );
+  }
+
+  function buildTrainingUpcomingEventsCardHtml(supplementalItems) {
+    var todayKey = getTodayDateInputValue();
+    var upcomingItems = (Array.isArray(supplementalItems) ? supplementalItems : []).filter(function (item) {
+      if (String(item && item.kind || "") !== "milestone") {
+        return false;
+      }
+
+      var dateKey = String(item && item.scheduled_for || "");
+      if (!dateKey || dateKey < todayKey) {
+        return false;
+      }
+
+      return String(item && item.milestone_type || "").toLowerCase() !== "birthday";
+    }).sort(function (a, b) {
+      return String(a && a.scheduled_for || "").localeCompare(String(b && b.scheduled_for || ""));
+    }).slice(0, 4);
+
+    var rowsHtml = upcomingItems.map(function (item) {
+      var parsedDate = parseDateInputValue(item && item.scheduled_for);
+      var displayDate = parsedDate
+        ? parsedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        : String(item && item.scheduled_for || "");
+      var label = String(item && item.title || "Milestone");
+      var kindLabel = String(item && item.milestone_type || "event").replace(/_/g, " ");
+
+      return (
+        '<li>' +
+          '<span class="training-upcoming-item-date">' + escapeHtml(displayDate) + '</span>' +
+          '<span class="training-upcoming-item-title">' + escapeHtml(label) + '</span>' +
+          '<span class="training-upcoming-item-kind">' + escapeHtml(kindLabel) + '</span>' +
+        '</li>'
+      );
+    }).join("");
+
+    var emptyHtml =
+      '<p class="training-upcoming-empty">No upcoming events or goals yet. Add one to anchor your next block.</p>';
+
+    return (
+      '<article class="training-upcoming-card">' +
+        '<h3>Upcoming Events and Goals</h3>' +
+        (upcomingItems.length
+          ? '<ul class="training-upcoming-list">' + rowsHtml + '</ul>'
+          : emptyHtml) +
+        '<a class="btn profile-btn-cancel training-upcoming-manage" href="' + escapeAttribute(getGoalsPageHref()) + '">' +
+          escapeHtml(state.isCoachView ? 'Manage Athlete Goals' : 'Manage Goals') +
+        '</a>' +
+      '</article>'
+    );
+  }
+
+  function summarizeTrainingAdherenceWindow(items, startDateKey, endDateKey) {
+    var slice = (Array.isArray(items) ? items : []).filter(function (item) {
+      var dateKey = String(item && item.scheduled_for || "");
+      return dateKey >= String(startDateKey || "") && dateKey <= String(endDateKey || "");
+    });
+
+    var completed = 0;
+    var partial = 0;
+    var missed = 0;
+
+    slice.forEach(function (item) {
+      var status = String(item && item.status || "scheduled").toLowerCase();
+      if (status === "completed") {
+        completed += 1;
+      } else if (status.indexOf("partial") > -1) {
+        partial += 1;
+      } else if (status === "missed" || status === "skipped") {
+        missed += 1;
+      }
+    });
+
+    var denominator = Math.max(1, slice.length);
+    var adherencePct = slice.length
+      ? Math.round(((completed + (partial * 0.5)) / denominator) * 100)
+      : 0;
+
+    return {
+      adherencePct: adherencePct,
+      completed: completed,
+      partial: partial,
+      missed: missed,
+      total: slice.length
+    };
+  }
+
+  function calculateTrainingAdherenceStats(trainingItems) {
+    var list = Array.isArray(trainingItems) ? trainingItems : [];
+    var today = parseDateInputValue(getTodayDateInputValue()) || new Date();
+    var start7 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
+    var start30 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29);
+    var start7Key = formatDateInputValue(start7);
+    var startDateKey = formatDateInputValue(start30);
+    var todayKey = formatDateInputValue(today);
+
+    var last7 = summarizeTrainingAdherenceWindow(list, start7Key, todayKey);
+    var last30 = summarizeTrainingAdherenceWindow(list, startDateKey, todayKey);
+
+    if (!last30.total) {
+      return {
+        adherencePct: 0,
+        adherence7Pct: 0,
+        adherence30Pct: 0,
+        trendDelta: 0,
+        trendLabel: "No baseline",
+        completed: 0,
+        partial: 0,
+        missed: 0,
+        total: 0,
+        streak: 0,
+        consistencyMessage: "No recent workouts logged yet."
+      };
+    }
+
+    var adherencePct = last30.adherencePct;
+
+    var streak = 0;
+    for (var i = 0; i < 14; i++) {
+      var key = formatDateInputValue(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i));
+      var dayRows = list.filter(function (item) {
+        return String(item && item.scheduled_for || "") === key;
+      });
+
+      if (!dayRows.length) {
+        continue;
+      }
+
+      var allMet = dayRows.every(function (item) {
+        var status = String(item && item.status || "scheduled").toLowerCase();
+        return status === "completed" || status.indexOf("partial") > -1;
+      });
+
+      if (!allMet) {
+        break;
+      }
+
+      streak += 1;
+    }
+
+    var trendDelta = last7.adherencePct - last30.adherencePct;
+    var trendLabel = trendDelta >= 8
+      ? "Improving"
+      : (trendDelta <= -8 ? "Slipping" : "Steady");
+
+    var consistencyMessage = trendDelta >= 8
+      ? "Momentum is building. Keep your key sessions protected this week."
+      : (trendDelta <= -8
+        ? "Recent adherence dipped. Scale volume but complete priority sessions."
+        : (adherencePct >= 70
+          ? "Consistency is stable. Keep stacking quality sessions."
+          : "Consistency is mixed. Pick two non-negotiable sessions this week."));
+
+    return {
+      adherencePct: adherencePct,
+      adherence7Pct: last7.adherencePct,
+      adherence30Pct: last30.adherencePct,
+      trendDelta: trendDelta,
+      trendLabel: trendLabel,
+      completed: last30.completed,
+      partial: last30.partial,
+      missed: last30.missed,
+      total: last30.total,
+      streak: streak,
+      consistencyMessage: consistencyMessage
+    };
+  }
+
+  function buildTrainingAdherencePanelHtml(adherence) {
+    var stats = adherence && typeof adherence === "object" ? adherence : calculateTrainingAdherenceStats([]);
+    var trendValue = (stats.trendDelta > 0 ? "+" : "") + String(stats.trendDelta || 0) + " pts";
+    return (
+      '<article class="training-adherence-panel">' +
+        '<h3>Adherence Insights</h3>' +
+        '<div class="training-adherence-grid">' +
+          '<p><span>7-day adherence</span><strong>' + escapeHtml(String(stats.adherence7Pct || 0) + '%') + '</strong></p>' +
+          '<p><span>30-day adherence</span><strong>' + escapeHtml(String(stats.adherence30Pct || 0) + '%') + '</strong></p>' +
+          '<p><span>Trend</span><strong>' + escapeHtml(String(stats.trendLabel || 'Steady') + ' (' + trendValue + ')') + '</strong></p>' +
+          '<p><span>Current streak</span><strong>' + escapeHtml(String(stats.streak || 0) + ' day' + ((stats.streak || 0) === 1 ? '' : 's')) + '</strong></p>' +
+          '<p><span>Completed</span><strong>' + escapeHtml(String(stats.completed || 0)) + '</strong></p>' +
+          '<p><span>Partial / Missed</span><strong>' + escapeHtml(String(stats.partial || 0) + ' / ' + String(stats.missed || 0)) + '</strong></p>' +
+        '</div>' +
+        '<p class="training-adherence-note">' + escapeHtml(String(stats.consistencyMessage || 'Stay consistent this week.')) + '</p>' +
+      '</article>'
+    );
+  }
+
   function buildTrainingCalendarCardHtml(items) {
     var list = Array.isArray(items) ? items : [];
     if (!list.length) {
@@ -6758,9 +8201,15 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     return (
-      '<article class="training-calendar-card">' +
+      '<article class="training-calendar-card" data-training-calendar-card>' +
         '<h3>Workout Calendar</h3>' +
-        '<p>Completed, missed, today, and future sessions stay visible on the month view.</p>' +
+        '<p>Workouts, goals, events, and birthdays stay visible on the month view.</p>' +
+        '<div class="training-calendar-nav" data-calendar-nav hidden>' +
+          '<button type="button" class="training-calendar-nav-btn" data-calendar-prev aria-label="Previous month">Back</button>' +
+          '<strong class="training-calendar-nav-label" data-calendar-current-month>Month</strong>' +
+          '<button type="button" class="training-calendar-nav-btn" data-calendar-today aria-label="Jump to current month">Today</button>' +
+          '<button type="button" class="training-calendar-nav-btn" data-calendar-next aria-label="Next month">Next</button>' +
+        '</div>' +
         buildTrainingCalendarMonthsHtml(list) +
       '</article>'
     );
@@ -6797,9 +8246,63 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     monthKeys.sort();
 
+    var todayMonthKey = getTodayDateInputValue().slice(0, 7);
+    monthKeys = buildCalendarMonthKeyRange(monthKeys, todayMonthKey, 6, 12);
+
     return '<div class="training-calendar-months">' + monthKeys.map(function (monthKey) {
       return buildTrainingCalendarMonthHtml(monthKey, months[monthKey]);
     }).join("") + '</div>';
+  }
+
+  function buildCalendarMonthKeyRange(existingMonthKeys, anchorMonthKey, backPadding, forwardPadding, maxMonths) {
+    var anchor = parseMonthKey(anchorMonthKey) || new Date();
+    var back = Math.max(0, parseInt(backPadding, 10) || 0);
+    var forward = Math.max(0, parseInt(forwardPadding, 10) || 0);
+
+    var start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    var end = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    start.setMonth(start.getMonth() - back);
+    end.setMonth(end.getMonth() + forward);
+
+    var defaultWindow = back + forward + 1;
+    var allowedMonths = Math.max(1, parseInt(maxMonths, 10) || defaultWindow);
+    var result = [];
+    var cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+
+    while (cursor <= end && result.length < allowedMonths) {
+      result.push(formatMonthKey(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    if (!result.length) {
+      result.push(formatMonthKey(anchor));
+    }
+
+    return result;
+  }
+
+  function parseMonthKey(monthKey) {
+    var parts = String(monthKey || "").split("-");
+    if (parts.length !== 2) {
+      return null;
+    }
+
+    var year = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10);
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return null;
+    }
+
+    var value = new Date(year, month - 1, 1);
+    return isNaN(value.getTime()) ? null : value;
+  }
+
+  function formatMonthKey(dateValue) {
+    if (!(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
+      return "";
+    }
+
+    return dateValue.getFullYear() + "-" + String(dateValue.getMonth() + 1).padStart(2, "0");
   }
 
   function buildTrainingCalendarMonthHtml(monthKey, itemsByDate) {
@@ -6825,26 +8328,30 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       var dateValue = new Date(year, monthIndex, day);
       var dateKey = formatDateInputValue(dateValue);
       var entries = itemsByDate && itemsByDate[dateKey] ? itemsByDate[dateKey] : [];
+      entries = entries.slice().sort(function (a, b) {
+        return getTrainingCalendarItemSortOrder(a) - getTrainingCalendarItemSortOrder(b);
+      });
+
       var sessionsHtml = entries.map(function (item) {
+        if (String(item && item.kind || "") !== "training") {
+          return buildTrainingCalendarSupplementalItemHtml(item);
+        }
+
         var program = item && item.program ? item.program : {};
         var programName =
           (program.training_program && program.training_program.name) ||
           program.program_name ||
           (program.program_id ? "Program " + String(program.program_id).slice(0, 8) : "Assigned Program");
-        var athleteName =
-          (state.profile && state.profile.name) ||
-          (state.viewUser && state.viewUser.email) ||
-          "Athlete";
-        var url =
-          "training-program-example.html?program=" + encodeURIComponent(programName) +
-          (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "") +
-          (program.id ? "&assignmentId=" + encodeURIComponent(program.id) : "") +
-          "&athleteName=" + encodeURIComponent(athleteName) +
-          "&day=" + encodeURIComponent(String(item.slot_key || ""));
+        var url = getTrainingSessionLaunchHref(item);
         var sessionStatus = getTrainingCalendarStatusClass(item, dateKey, todayKey);
 
         return (
-          '<a class="training-calendar-session ' + sessionStatus + '" href="' + url + '">' +
+          '<a class="training-calendar-session ' + sessionStatus + '" href="' + url + '"' +
+            ' draggable="' + (state.isCoachView || String(item.status || "").toLowerCase() === "completed" ? "false" : "true") + '"' +
+            ' data-calendar-session-id="' + escapeAttribute(item.schedule_id || "") + '"' +
+            ' data-calendar-session-date="' + escapeAttribute(dateKey) + '"' +
+            ' data-calendar-session-status="' + escapeAttribute(String(item.status || "scheduled")) + '"' +
+            ' data-calendar-session-label="' + escapeAttribute(String(item.session_label || "Workout")) + '">' +
             '<span class="training-calendar-session-title">' + escapeHtml(String(item.session_label || "Workout")) + '</span>' +
             '<span class="training-calendar-session-program">' + escapeHtml(programName) + '</span>' +
           '</a>'
@@ -6852,7 +8359,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       }).join("");
 
       gridCells.push(
-        '<div class="training-calendar-day' + (entries.length ? ' has-session' : '') + (dateKey === todayKey ? ' is-today' : '') + '">' +
+        '<div class="training-calendar-day' + (entries.length ? ' has-session' : '') + (dateKey === todayKey ? ' is-today' : '') + '" data-calendar-date="' + escapeAttribute(dateKey) + '">' +
           '<div class="training-calendar-day-number">' + day + '</div>' +
           '<div class="training-calendar-day-sessions">' + sessionsHtml + '</div>' +
         '</div>'
@@ -6860,7 +8367,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     return (
-      '<section class="training-calendar-month">' +
+      '<section class="training-calendar-month" data-calendar-month data-calendar-month-key="' + escapeAttribute(monthKey) + '">' +
         '<div class="training-calendar-month-header">' + escapeHtml(monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })) + '</div>' +
         '<div class="training-calendar-weekdays">' + weekdayLabels.map(function (label) {
           return '<span>' + label + '</span>';
@@ -6872,11 +8379,17 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
   function getTrainingCalendarStatusClass(item, dateKey, todayKey) {
     var status = String(item && item.status || "scheduled");
+    var normalizedStatus = status.trim().toLowerCase();
+
+    if (normalizedStatus.indexOf("partial") > -1) {
+      return "is-partial";
+    }
+
     if (status === "completed") {
       return "is-completed";
     }
 
-    if (status === "missed" || status === "skipped") {
+    if (normalizedStatus === "missed" || normalizedStatus === "skipped") {
       return "is-missed";
     }
 
@@ -6889,6 +8402,209 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     return "is-future";
+  }
+
+  function getTrainingCalendarItemSortOrder(item) {
+    var kind = String(item && item.kind || "training");
+    if (kind === "training") {
+      return 1;
+    }
+    if (kind === "milestone") {
+      return 2;
+    }
+    if (kind === "birthday") {
+      return 3;
+    }
+    return 9;
+  }
+
+  function buildTrainingCalendarSupplementalItemHtml(item) {
+    var kind = String(item && item.kind || "milestone");
+    var typeClass = kind === "birthday"
+      ? "is-birthday"
+      : (String(item && item.milestone_type || "goal") === "event" ? "is-event" : "is-goal");
+    var title = String(item && item.title || (kind === "birthday" ? "Birthday" : "Milestone"));
+    var subtitle = String(item && item.subtitle || "");
+
+    return (
+      '<div class="training-calendar-supplement ' + typeClass + '">' +
+        '<span class="training-calendar-session-title">' + escapeHtml(title) + '</span>' +
+        (subtitle ? '<span class="training-calendar-session-program">' + escapeHtml(subtitle) + '</span>' : '') +
+      '</div>'
+    );
+  }
+
+  function refreshTrainingProgramsCalendarFromState() {
+    var content = document.getElementById("profile-training-program-content");
+    if (!content || !state.client || !getViewedUserId()) {
+      return;
+    }
+
+    if (!state.trainingProgramsLoaded || !Array.isArray(state.trainingProgramsCache)) {
+      return;
+    }
+
+    renderTrainingPrograms(
+      content,
+      state.trainingProgramsCache,
+      state.trainingScheduleByAssignment && typeof state.trainingScheduleByAssignment === "object"
+        ? state.trainingScheduleByAssignment
+        : {}
+    );
+  }
+
+  function getCalendarDragPayloadFromEvent(event) {
+    if (!event || !event.dataTransfer || typeof event.dataTransfer.getData !== "function") {
+      return null;
+    }
+
+    var raw = "";
+    try {
+      raw = String(event.dataTransfer.getData("text/plain") || "").trim();
+    } catch (e) {
+      return null;
+    }
+
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      var payload = JSON.parse(raw);
+      return payload && typeof payload === "object" ? payload : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function onRescheduleCalendarSession(scheduleId, targetDate, sourceDate, currentStatus, sessionLabel) {
+    var viewedUserId = getViewedUserId();
+    if (!state.client || !viewedUserId || !scheduleId || !targetDate) {
+      setTrainingProgramStatus("Unable to reschedule this workout right now.", "error");
+      return;
+    }
+
+    if (String(sourceDate || "") === String(targetDate || "")) {
+      setTrainingProgramStatus("Workout is already on that day.", "info");
+      return;
+    }
+
+    if (!parseDateInputValue(targetDate)) {
+      setTrainingProgramStatus("Select a valid target day in the calendar.", "error");
+      return;
+    }
+
+    var statusValue = String(currentStatus || "scheduled").toLowerCase();
+    if (statusValue === "completed") {
+      setTrainingProgramStatus("Completed workouts cannot be moved.", "info");
+      return;
+    }
+
+    var updatePayload = {
+      scheduled_for: targetDate,
+      status: "scheduled"
+    };
+
+    setTrainingProgramStatus("Rescheduling " + String(sessionLabel || "workout") + "...", "info");
+
+    state.client
+      .from("athlete_program_schedule")
+      .update(updatePayload)
+      .eq("id", scheduleId)
+      .eq("athlete_user_id", viewedUserId)
+      .then(function (result) {
+        if (result.error) {
+          setTrainingProgramStatus(result.error.message || "Could not move workout.", "error");
+          return;
+        }
+
+        var moveRecord = {
+          scheduleId: String(scheduleId || ""),
+          fromDate: String(sourceDate || ""),
+          toDate: String(targetDate || ""),
+          previousStatus: statusValue,
+          label: String(sessionLabel || "Workout")
+        };
+        state.lastCalendarMove = moveRecord;
+
+        moveCalendarSessionInDom(String(scheduleId || ""), String(sourceDate || ""), String(targetDate || ""));
+        setTrainingProgramStatus(
+          "Workout moved to " + formatDate(targetDate) + ".",
+          "success",
+          {
+            actionLabel: "Undo",
+            onAction: function () {
+              onUndoCalendarReschedule(moveRecord);
+            }
+          }
+        );
+      })
+      .catch(function (error) {
+        setTrainingProgramStatus(error && error.message ? error.message : "Could not move workout.", "error");
+      });
+  }
+
+  function onUndoCalendarReschedule(moveRecord) {
+    var viewedUserId = getViewedUserId();
+    var move = moveRecord && typeof moveRecord === "object" ? moveRecord : state.lastCalendarMove;
+    if (!state.client || !viewedUserId || !move || !move.scheduleId || !move.fromDate) {
+      setTrainingProgramStatus("Unable to undo this move right now.", "error");
+      return;
+    }
+
+    setTrainingProgramStatus("Undoing move for " + String(move.label || "workout") + "...", "info");
+
+    state.client
+      .from("athlete_program_schedule")
+      .update({
+        scheduled_for: String(move.fromDate || ""),
+        status: String(move.previousStatus || "scheduled")
+      })
+      .eq("id", String(move.scheduleId || ""))
+      .eq("athlete_user_id", viewedUserId)
+      .then(function (result) {
+        if (result.error) {
+          setTrainingProgramStatus(result.error.message || "Could not undo workout move.", "error");
+          return;
+        }
+
+        state.lastCalendarMove = null;
+        moveCalendarSessionInDom(String(move.scheduleId || ""), String(move.toDate || ""), String(move.fromDate || ""));
+        setTrainingProgramStatus("Move undone. Workout returned to " + formatDate(String(move.fromDate || "")) + ".", "success");
+      })
+      .catch(function (error) {
+        setTrainingProgramStatus(error && error.message ? error.message : "Could not undo workout move.", "error");
+      });
+  }
+
+  function moveCalendarSessionInDom(scheduleId, sourceDate, targetDate) {
+    var sessionEl = document.querySelector('[data-calendar-session-id="' + String(scheduleId || "") + '"]');
+    var fromDayEl = sourceDate
+      ? document.querySelector('[data-calendar-date="' + String(sourceDate || "") + '"]')
+      : null;
+    var toDayEl = targetDate
+      ? document.querySelector('[data-calendar-date="' + String(targetDate || "") + '"]')
+      : null;
+
+    if (!sessionEl || !toDayEl) {
+      return;
+    }
+
+    var targetSessionsWrap = toDayEl.querySelector(".training-calendar-day-sessions");
+    if (!targetSessionsWrap) {
+      return;
+    }
+
+    sessionEl.setAttribute("data-calendar-session-date", String(targetDate || ""));
+    targetSessionsWrap.appendChild(sessionEl);
+    toDayEl.classList.add("has-session");
+
+    if (fromDayEl) {
+      var fromSessionsWrap = fromDayEl.querySelector(".training-calendar-day-sessions");
+      if (fromSessionsWrap && !fromSessionsWrap.querySelector(".training-calendar-session")) {
+        fromDayEl.classList.remove("has-session");
+      }
+    }
   }
 
   function parseDateInputValue(dateString) {
@@ -6917,6 +8633,151 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var month = String(dateValue.getMonth() + 1).padStart(2, "0");
     var day = String(dateValue.getDate()).padStart(2, "0");
     return year + "-" + month + "-" + day;
+  }
+
+  function initializeTrainingCalendarNavigators(scopeElement) {
+    var root = scopeElement || document;
+    root.querySelectorAll("[data-training-calendar-card]").forEach(function (card) {
+      var months = Array.prototype.slice.call(card.querySelectorAll("[data-calendar-month]"));
+      var nav = card.querySelector("[data-calendar-nav]");
+      if (!months.length) {
+        if (nav) {
+          nav.hidden = true;
+        }
+        return;
+      }
+
+      if (!nav) {
+        return;
+      }
+
+      if (!card.getAttribute("data-calendar-nav-bound")) {
+        var prevBtn = card.querySelector("[data-calendar-prev]");
+        var nextBtn = card.querySelector("[data-calendar-next]");
+        var todayBtn = card.querySelector("[data-calendar-today]");
+
+        if (prevBtn) {
+          prevBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            stepTrainingCalendarMonth(prevBtn, -1);
+          });
+        }
+
+        if (nextBtn) {
+          nextBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            stepTrainingCalendarMonth(nextBtn, 1);
+          });
+        }
+
+        if (todayBtn) {
+          todayBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            jumpTrainingCalendarToToday(todayBtn);
+          });
+        }
+
+        card.setAttribute("data-calendar-nav-bound", "true");
+      }
+
+      var initialIndex = 0;
+      if (Number.isInteger(state.trainingCalendarMonthIndex)) {
+        initialIndex = Number(state.trainingCalendarMonthIndex);
+      } else {
+        var todayMonthKey = getTodayDateInputValue().slice(0, 7);
+        var foundIndex = months.findIndex(function (monthEl) {
+          return String(monthEl.getAttribute("data-calendar-month-key") || "") === todayMonthKey;
+        });
+        if (foundIndex > -1) {
+          initialIndex = foundIndex;
+        }
+      }
+
+      nav.hidden = months.length <= 1;
+      setTrainingCalendarMonthByIndex(card, initialIndex);
+    });
+  }
+
+  function stepTrainingCalendarMonth(buttonEl, delta) {
+    var card = buttonEl && buttonEl.closest("[data-training-calendar-card]");
+    if (!card) {
+      return;
+    }
+
+    var current = parseInt(card.getAttribute("data-calendar-month-index") || "0", 10);
+    var safeCurrent = isNaN(current) ? 0 : current;
+    setTrainingCalendarMonthByIndex(card, safeCurrent + (parseInt(delta, 10) || 0));
+  }
+
+  function setTrainingCalendarMonthByIndex(card, requestedIndex) {
+    if (!card) {
+      return;
+    }
+
+    var months = Array.prototype.slice.call(card.querySelectorAll("[data-calendar-month]"));
+    if (!months.length) {
+      return;
+    }
+
+    var maxIndex = months.length - 1;
+    var index = Math.max(0, Math.min(maxIndex, parseInt(requestedIndex, 10) || 0));
+    card.setAttribute("data-calendar-month-index", String(index));
+    state.trainingCalendarMonthIndex = index;
+
+    months.forEach(function (monthEl, monthIndex) {
+      monthEl.hidden = monthIndex !== index;
+    });
+
+    var labelEl = card.querySelector("[data-calendar-current-month]");
+    var prevBtn = card.querySelector("[data-calendar-prev]");
+    var nextBtn = card.querySelector("[data-calendar-next]");
+    var activeMonth = months[index];
+    var headerEl = activeMonth ? activeMonth.querySelector(".training-calendar-month-header") : null;
+
+    if (labelEl) {
+      labelEl.textContent = headerEl ? String(headerEl.textContent || "Month") : "Month";
+    }
+    if (prevBtn) {
+      prevBtn.disabled = index <= 0;
+    }
+    if (nextBtn) {
+      nextBtn.disabled = index >= maxIndex;
+    }
+  }
+
+  function jumpTrainingCalendarToToday(buttonEl) {
+    var card = buttonEl && buttonEl.closest("[data-training-calendar-card]");
+    if (!card) {
+      return;
+    }
+
+    var todayKey = getTodayDateInputValue();
+    var todayMonthKey = todayKey.slice(0, 7);
+    var months = Array.prototype.slice.call(card.querySelectorAll("[data-calendar-month]"));
+    var targetIndex = months.findIndex(function (monthEl) {
+      return String(monthEl.getAttribute("data-calendar-month-key") || "") === todayMonthKey;
+    });
+
+    if (targetIndex < 0) {
+      targetIndex = 0;
+    }
+
+    setTrainingCalendarMonthByIndex(card, targetIndex);
+
+    var todayDayEl = card.querySelector('[data-calendar-date="' + todayKey + '"]');
+    if (todayDayEl) {
+      todayDayEl.classList.remove("is-jump-target");
+      todayDayEl.offsetWidth;
+      todayDayEl.classList.add("is-jump-target");
+      try {
+        todayDayEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      } catch (error) {
+        todayDayEl.scrollIntoView();
+      }
+    }
   }
 
   function getDateOffsetInputValue(offsetDays) {
@@ -7431,7 +9292,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
   }
 
-  function setTrainingProgramStatus(message, variant) {
+  function setTrainingProgramStatus(message, variant, options) {
     var statusEl = document.querySelector("[data-training-program-status]");
     if (!statusEl) {
       return;
@@ -7450,6 +9311,18 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       statusEl.classList.add("is-success");
     } else {
       statusEl.classList.add("is-info");
+    }
+
+    if (options && options.actionLabel && typeof options.onAction === "function") {
+      var actionBtn = document.createElement("button");
+      actionBtn.type = "button";
+      actionBtn.className = "training-program-status-action";
+      actionBtn.textContent = String(options.actionLabel || "Action");
+      actionBtn.addEventListener("click", function () {
+        options.onAction();
+      });
+      statusEl.appendChild(document.createTextNode(" "));
+      statusEl.appendChild(actionBtn);
     }
   }
 
@@ -7474,18 +9347,27 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     setStatus("Deleting account...", "info");
 
-    state.client.auth
-      .admin.deleteUser(state.user.id)
+    state.client
+      .rpc("athlete_delete_own_account")
       .then(function (result) {
         if (result.error) {
-          setStatus(result.error.message, "error");
+          var message = result.error.message || "Failed to delete account.";
+          if (/athlete_delete_own_account/i.test(message) || /does not exist/i.test(message)) {
+            message = "Delete account is not configured yet. Run sql/create-athlete-self-delete-account-rpc.sql in Supabase.";
+          }
+          setStatus(message, "error");
           return;
         }
 
         setStatus("Account deleted. Redirecting...", "success");
-        setTimeout(function () {
-          redirectToHome();
-        }, 2000);
+
+        state.client.auth
+          .signOut()
+          .finally(function () {
+            setTimeout(function () {
+              redirectToHome();
+            }, 700);
+          });
       })
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Failed to delete account.", "error");

@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="css/style.css" />
   <script defer src="js/analytics.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script defer src="js/supabase-config.js"></script>
   <script defer src="js/auth-ui.js"></script>
   <script defer src="js/metrics-editor.js"></script>
@@ -44,10 +45,19 @@
           <p class="metrics-editor-subtitle" data-metrics-editor-athlete-name>Loading...</p>
         </div>
 
+        <div class="metrics-editor-section">
+          <div class="metrics-editor-section-header">
+            <h2>Metric Snapshot</h2>
+          </div>
+          <div class="metrics-list" data-metrics-editor-cards>
+            <p class="admin-loading">Loading metric cards...</p>
+          </div>
+        </div>
+
         <!-- Metrics List -->
         <div class="metrics-editor-section">
           <div class="metrics-editor-section-header">
-            <h2>Current Metrics</h2>
+            <h2>Edit Metrics</h2>
             <div class="metrics-editor-actions">
               <select class="metrics-editor-preset-select" data-metrics-editor-assessment>
                 <option value="">+ Add Assessment…</option>
@@ -84,6 +94,7 @@
 
         <!-- Action Buttons -->
         <div class="metrics-editor-footer">
+          <button type="button" class="btn admin-btn-secondary" data-metrics-editor-summary-pdf>Print Summary</button>
           <button type="button" class="btn admin-btn-primary" data-metrics-editor-save>Save Changes</button>
           <button type="button" class="btn admin-btn-reset-password" data-metrics-editor-back>Cancel</button>
         </div>
