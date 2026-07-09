@@ -128,19 +128,7 @@
     });
   }
 
-  function isEmailConfirmed(user) {
-    return !!(user && (user.email_confirmed_at || user.confirmed_at));
-  }
-
   function setUser(user) {
-    if (user && !isEmailConfirmed(user)) {
-      state.user = null;
-      if (state.client && state.client.auth && typeof state.client.auth.signOut === "function") {
-        state.client.auth.signOut();
-      }
-      user = null;
-    }
-
     state.user = user;
     var header = document.querySelector("header");
     var nav = document.querySelector("header nav");
@@ -354,7 +342,15 @@
 
     var authRequest;
     if (state.mode === "signup") {
-      authRequest = state.client.auth.signUp({ email: email, password: password });
+      authRequest = state.client.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            role: "athlete"
+          }
+        }
+      });
     } else {
       authRequest = state.client.auth.signInWithPassword({ email: email, password: password });
     }
@@ -368,21 +364,10 @@
         }
 
         if (state.mode === "signup") {
-          if (result.data && result.data.session && state.client && state.client.auth && typeof state.client.auth.signOut === "function") {
-            state.client.auth.signOut();
-          }
-          setStatus("Check your email for a confirmation link before signing in.", "success");
-          return;
+          setStatus("Account created. Redirecting...", "success");
         }
 
         var signedInUser = result && result.data && result.data.user ? result.data.user : null;
-        if (signedInUser && !isEmailConfirmed(signedInUser)) {
-          if (state.client && state.client.auth && typeof state.client.auth.signOut === "function") {
-            state.client.auth.signOut();
-          }
-          setStatus("Please confirm your email before signing in.", "error");
-          return;
-        }
 
         if (shouldForcePasswordUpdate(signedInUser)) {
           window.location.href = "update-password.html?firstLogin=1";

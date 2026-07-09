@@ -633,6 +633,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     coachIntakeDueDate: null,
     coachTaskTitle: null,
     coachTaskDescription: null,
+    athleteTaskModal: null,
+    athleteTaskModalTitle: null,
+    athleteTaskModalMeta: null,
+    athleteTaskModalContent: null,
+    athleteTaskModalStatus: null,
     onboardingAssignments: [],
     foundingOnboardingRow: null,
     dashboardTaskBoard: null,
@@ -1015,6 +1020,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.coachIntakeDueDate = document.querySelector("[data-coach-intake-due-date]");
     state.coachTaskTitle = document.querySelector("[data-coach-task-title]");
     state.coachTaskDescription = document.querySelector("[data-coach-task-description]");
+    state.athleteTaskModal = document.querySelector("[data-athlete-task-modal]");
+    state.athleteTaskModalTitle = document.querySelector("[data-athlete-task-title]");
+    state.athleteTaskModalMeta = document.querySelector("[data-athlete-task-meta]");
+    state.athleteTaskModalContent = document.querySelector("[data-athlete-task-content]");
+    state.athleteTaskModalStatus = document.querySelector("[data-athlete-task-status]");
     state.onboardingTemplates = getDefaultOnboardingTemplates();
     state.goalsManageLink = document.querySelector("[data-goals-manage-link]");
     state.goalsToggleButton = document.querySelector("[data-goals-toggle-list]");
@@ -1219,7 +1229,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         features: {
           compass: true,
           workoutCalendar: true,
-          messaging: true
+          messaging: true,
+          browsePrograms: true
         },
         reason: ""
       };
@@ -1276,7 +1287,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           features: {
             compass: false,
             workoutCalendar: false,
-            messaging: false
+            messaging: false,
+            browsePrograms: true
           },
           reason: "Complete assigned liability forms and membership payment to unlock coaching features."
         };
@@ -1288,7 +1300,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         features: {
           compass: true,
           workoutCalendar: true,
-          messaging: true
+          messaging: true,
+          browsePrograms: true
         },
         reason: ""
       };
@@ -1301,7 +1314,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         features: {
           compass: false,
           workoutCalendar: false,
-          messaging: false
+          messaging: false,
+          browsePrograms: false
         },
         reason: "Complete assigned liability forms to continue setup."
       };
@@ -1314,7 +1328,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         features: {
           compass: false,
           workoutCalendar: false,
-          messaging: false
+          messaging: false,
+          browsePrograms: true
         },
         reason: "Complete your payment task to unlock coaching features."
       };
@@ -1327,7 +1342,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         features: {
           compass: true,
           workoutCalendar: true,
-          messaging: true
+          messaging: true,
+          browsePrograms: true
         },
         reason: ""
       };
@@ -1340,7 +1356,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         features: {
           compass: false,
           workoutCalendar: false,
-          messaging: false
+          messaging: false,
+          browsePrograms: true
         },
         reason: "Program-only access: membership features unlock after coach-guided onboarding and payment."
       };
@@ -1352,7 +1369,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       features: {
         compass: false,
         workoutCalendar: false,
-        messaging: false
+        messaging: false,
+        browsePrograms: true
       },
       reason: "Welcome. Complete assigned tasks to unlock full dashboard features."
     };
@@ -2483,6 +2501,19 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
 
       state.onboardingContent.addEventListener("click", function (event) {
+        var openFormBtn = event.target && event.target.closest("[data-onboarding-open-form]");
+        if (openFormBtn) {
+          var openAssignmentId = String(openFormBtn.getAttribute("data-onboarding-open-form") || "").trim();
+          if (!openAssignmentId) {
+            setOnboardingStatus("Could not find task assignment.", "error");
+            return;
+          }
+
+          event.preventDefault();
+          openAthleteTaskModalByAssignmentId(openAssignmentId);
+          return;
+        }
+
         var completeTaskBtn = event.target && event.target.closest("[data-onboarding-complete-task]");
         if (!completeTaskBtn) {
           return;
@@ -2495,6 +2526,34 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         }
 
         onMarkOnboardingTaskComplete(assignmentId);
+      });
+    }
+
+    if (state.athleteTaskModal) {
+      state.athleteTaskModal.addEventListener("submit", function (event) {
+        var formEl = event && event.target;
+        if (!formEl || !formEl.matches("[data-onboarding-response-form]")) {
+          return;
+        }
+
+        event.preventDefault();
+        var assignmentId = String(formEl.getAttribute("data-assignment-id") || "").trim();
+        if (!assignmentId) {
+          setAthleteTaskModalStatus("Could not find task assignment.", "error");
+          return;
+        }
+
+        onSubmitOnboardingResponse(assignmentId, formEl);
+      });
+
+      state.athleteTaskModal.addEventListener("click", function (event) {
+        var closeBtn = event.target && event.target.closest("[data-athlete-task-close]");
+        if (!closeBtn) {
+          return;
+        }
+
+        event.preventDefault();
+        closeAthleteTaskModal();
       });
     }
 
@@ -2549,6 +2608,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       if (event && event.key === "Escape") {
         closeCoachProgramModal();
         closeCoachIntakeModal();
+        closeAthleteTaskModal();
       }
     });
   }
@@ -2560,12 +2620,21 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     var action = String(actionEl.getAttribute("data-dashboard-action") || "");
-    if (action !== "start-membership-checkout") {
+    if (action === "start-membership-checkout") {
+      event.preventDefault();
+      startMembershipCheckoutFromDashboard(actionEl);
       return;
     }
 
-    event.preventDefault();
-    startMembershipCheckoutFromDashboard(actionEl);
+    if (action === "open-onboarding-form") {
+      var assignmentId = String(actionEl.getAttribute("data-assignment-id") || "").trim();
+      if (!assignmentId) {
+        return;
+      }
+
+      event.preventDefault();
+      openAthleteTaskModalByAssignmentId(assignmentId);
+    }
   }
 
   function startMembershipCheckoutFromDashboard(actionEl) {
@@ -3300,12 +3369,15 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.onboardingContent.innerHTML = '<p class="profile-loading">Loading task forms...</p>';
     setOnboardingStatus("", "info");
 
-    state.client
+    ensureDefaultLiabilityWaiverTaskForCurrentAthlete()
+      .then(function () {
+        return state.client
       .from("athlete_onboarding_intake_assignments")
       .select("id,athlete_user_id,form_id,form_name,form_schema,response_data,status,assigned_at,assigned_by,due_date,submitted_at,updated_at")
       .eq("athlete_user_id", getViewedUserId())
       .order("assigned_at", { ascending: false })
-      .limit(20)
+      .limit(20);
+      })
       .then(function (result) {
         if (result.error) {
           if (isMissingRelationError(result.error)) {
@@ -3330,6 +3402,31 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       .catch(function (error) {
         setOnboardingStatus(error && error.message ? error.message : "Failed to load task forms.", "error");
         loadFoundingOnboardingTaskContext();
+      });
+  }
+
+  function ensureDefaultLiabilityWaiverTaskForCurrentAthlete() {
+    if (!state.client || !getViewedUserId() || state.isCoachView) {
+      return Promise.resolve();
+    }
+
+    return state.client
+      .rpc("ensure_default_liability_waiver_task", {
+        p_athlete_user_id: getViewedUserId()
+      })
+      .then(function (result) {
+        if (!result || !result.error) {
+          return null;
+        }
+
+        if (isMissingFunctionError(result.error) || isMissingRelationError(result.error)) {
+          return null;
+        }
+
+        return null;
+      })
+      .catch(function () {
+        return null;
       });
   }
 
@@ -3442,19 +3539,13 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           '<p class="profile-glance-label">Coach Tasks</p>' +
           '<strong class="profile-glance-value">No Tasks Assigned</strong>' +
           '<p class="profile-glance-meta">No membership steps, forms, workouts, or check-in tasks are currently assigned.</p>' +
-          '<a class="profile-glance-action" href="#profile-tasks-section">Open Tasks</a>' +
         '</article>';
       return;
     }
 
     if (!cards.length) {
       state.dashboardTaskBoard.innerHTML =
-        '<article class="profile-glance-card profile-today-card is-good">' +
-          '<p class="profile-glance-label">Coach Tasks</p>' +
-          '<strong class="profile-glance-value">All Tasks Complete</strong>' +
-          '<p class="profile-glance-meta">You are clear on assigned forms, check-ins, payment items, and today\'s required tasks.</p>' +
-          '<a class="profile-glance-action" href="#profile-training-program-section">Open Training</a>' +
-        '</article>';
+        '<p class="profile-task-inline-status">All tasks complete.</p>';
       return;
     }
 
@@ -3464,12 +3555,15 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         var actionAttr = card.dashboardAction
           ? ' data-dashboard-action="' + escapeAttribute(String(card.dashboardAction || "")) + '"'
           : "";
+        var assignmentAttr = card.assignmentId
+          ? ' data-assignment-id="' + escapeAttribute(String(card.assignmentId || "")) + '"'
+          : "";
         return (
           '<article class="profile-glance-card profile-today-card' + toneClass + '">' +
             '<p class="profile-glance-label">' + escapeHtml(card.label || "Coach Task") + '</p>' +
             '<strong class="profile-glance-value">' + escapeHtml(card.title || "Task") + '</strong>' +
             '<p class="profile-glance-meta">' + escapeHtml(card.meta || "") + '</p>' +
-            '<a class="profile-glance-action" href="' + escapeAttribute(card.href || "#profile-tasks-section") + '"' + actionAttr + '>' + escapeHtml(card.actionLabel || "Open Task") + '</a>' +
+            '<a class="profile-glance-action" href="' + escapeAttribute(card.href || "#profile-tasks-section") + '"' + actionAttr + assignmentAttr + '>' + escapeHtml(card.actionLabel || "Open Task") + '</a>' +
           '</article>'
         );
       })
@@ -3512,12 +3606,21 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       actionLabel = state.isCoachView ? "Review Task" : "Complete Task";
     }
 
+    var dashboardAction = "";
+    var assignmentId = "";
+    if (!state.isCoachView && !isCustomCoachTaskAssignment(assignment) && (category === "onboarding" || category === "form")) {
+      dashboardAction = "open-onboarding-form";
+      assignmentId = String(assignment && assignment.id || "");
+    }
+
     return {
       label: label,
       title: assignment && assignment.form_name ? assignment.form_name : "Assigned Task",
       meta: dueMeta,
       href: "#profile-tasks-section",
       actionLabel: actionLabel,
+      dashboardAction: dashboardAction,
+      assignmentId: assignmentId,
       tone: typeof dueDays === "number" && dueDays < 0 ? "alert" : "",
       priority: getAssignmentTaskPriority(assignment)
     };
@@ -3751,10 +3854,39 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var visibleAssignments = state.isCoachView
       ? assignments
       : assignments.filter(function (assignment) {
-          return assignment.status !== "archived";
+          var status = String(assignment && assignment.status || "").toLowerCase();
+          if (status === "archived" || status === "submitted") {
+            return false;
+          }
+
+          // Liability waiver stays in the top dashboard task strip to avoid duplicate cards.
+          return !isLiabilityTaskAssignment(assignment);
         });
 
     if (!visibleAssignments.length) {
+      var hasPendingLiabilityTask = !state.isCoachView && assignments.some(function (assignment) {
+        if (!assignment) {
+          return false;
+        }
+
+        var assignmentStatus = String(assignment.status || "").toLowerCase();
+        if (assignmentStatus === "archived" || assignmentStatus === "submitted") {
+          return false;
+        }
+
+        return isLiabilityTaskAssignment(assignment);
+      });
+
+      if (hasPendingLiabilityTask) {
+        state.onboardingContent.innerHTML = "";
+        return;
+      }
+
+      if (!state.isCoachView) {
+        state.onboardingContent.innerHTML = "";
+        return;
+      }
+
       state.onboardingContent.innerHTML =
         '<div class="profile-empty-state">' +
           '<p class="profile-empty-state-title">No active task forms</p>' +
@@ -3766,9 +3898,6 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.onboardingContent.innerHTML = visibleAssignments
       .map(function (assignment) {
         var isCustomTask = isCustomCoachTaskAssignment(assignment);
-        var schemaQuestions = Array.isArray(assignment.form_schema && assignment.form_schema.questions)
-          ? assignment.form_schema.questions
-          : [];
         var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
         var submittedLabel = assignment.submitted_at ? formatDate(assignment.submitted_at) : "Not submitted";
         var statusLabel = assignment.status === "submitted" ? "Submitted" : (assignment.status === "archived" ? "Archived" : "Assigned");
@@ -3825,25 +3954,47 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           return html;
         }
 
-        html += '<form data-onboarding-response-form data-assignment-id="' + escapeAttribute(assignment.id) + '">';
-        if (!schemaQuestions.length) {
-          html += '<p class="profile-empty-state-copy">This intake form has no questions configured.</p>';
-        } else {
-          html += schemaQuestions
-            .map(function (question) {
-              return buildOnboardingQuestionField(question, assignment.response_data || {});
-            })
-            .join('');
+        var description = String(assignment.form_schema && assignment.form_schema.description || "").trim();
+        if (description) {
+          html += '<p class="profile-section-copy">' + escapeHtml(description) + '</p>';
         }
 
         html += '<div class="profile-section-actions">';
-        html += '<button type="submit" class="btn profile-btn-save">Save Task Responses</button>';
+        html += '<button type="button" class="btn profile-btn-save" data-onboarding-open-form="' + escapeAttribute(assignment.id) + '">Complete Form</button>';
         html += '</div>';
-        html += '</form>';
         html += '</article>';
         return html;
       })
       .join("");
+  }
+
+  function buildOnboardingResponseFormHtml(assignment) {
+    if (!assignment) {
+      return '';
+    }
+
+    var schemaQuestions = Array.isArray(assignment.form_schema && assignment.form_schema.questions)
+      ? assignment.form_schema.questions
+      : [];
+
+    var html = '';
+    html += '<form data-onboarding-response-form data-assignment-id="' + escapeAttribute(assignment.id) + '">';
+    if (!schemaQuestions.length) {
+      html += '<p class="profile-empty-state-copy">This intake form has no questions configured.</p>';
+    } else {
+      html += schemaQuestions
+        .map(function (question) {
+          return buildOnboardingQuestionField(question, assignment.response_data || {});
+        })
+        .join('');
+    }
+
+    html += '<div class="profile-section-actions">';
+    html += '<button type="submit" class="btn profile-btn-save">Save Task Responses</button>';
+    html += '<button type="button" class="btn profile-btn-cancel" data-athlete-task-close>Cancel</button>';
+    html += '</div>';
+    html += '</form>';
+    return html;
   }
 
   function isCustomCoachTaskAssignment(assignment) {
@@ -3944,10 +4095,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     });
     if (missingQuestion) {
       setOnboardingStatus("Please complete required field: " + String(missingQuestion.label || missingQuestion.key), "error");
+      setAthleteTaskModalStatus("Please complete required field: " + String(missingQuestion.label || missingQuestion.key), "error");
       return;
     }
 
     setOnboardingStatus("Saving task responses...", "info");
+    setAthleteTaskModalStatus("Saving task responses...", "info");
 
     state.client
       .from("athlete_onboarding_intake_assignments")
@@ -3969,19 +4122,103 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           .then(function (advanced) {
             if (advanced) {
               setOnboardingStatus("Task responses saved. Membership workflow advanced to assessment pending review.", "success");
+              setAthleteTaskModalStatus("Task responses saved.", "success");
             } else {
               setOnboardingStatus("Task responses saved.", "success");
+              setAthleteTaskModalStatus("Task responses saved.", "success");
             }
+            closeAthleteTaskModal();
             loadOnboardingIntake();
           })
           .catch(function () {
             setOnboardingStatus("Task responses saved.", "success");
+            setAthleteTaskModalStatus("Task responses saved.", "success");
+            closeAthleteTaskModal();
             loadOnboardingIntake();
           });
       })
       .catch(function (error) {
         setOnboardingStatus(error && error.message ? error.message : "Failed to save task responses.", "error");
+        setAthleteTaskModalStatus(error && error.message ? error.message : "Failed to save task responses.", "error");
       });
+  }
+
+  function openAthleteTaskModalByAssignmentId(assignmentId) {
+    if (state.isCoachView) {
+      return;
+    }
+
+    var assignment = (state.onboardingAssignments || []).find(function (item) {
+      return String(item && item.id || "") === String(assignmentId || "");
+    });
+
+    if (!assignment || isCustomCoachTaskAssignment(assignment)) {
+      setOnboardingStatus("Task assignment not found.", "error");
+      return;
+    }
+
+    var modal = state.athleteTaskModal;
+    if (!modal || !state.athleteTaskModalContent) {
+      window.location.hash = "#profile-tasks-section";
+      return;
+    }
+
+    var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
+
+    if (state.athleteTaskModalTitle) {
+      state.athleteTaskModalTitle.textContent = String(assignment.form_name || "Complete Task Form");
+    }
+    if (state.athleteTaskModalMeta) {
+      state.athleteTaskModalMeta.textContent = "Assigned " + formatDate(assignment.assigned_at) + " • Due " + dueLabel;
+    }
+    state.athleteTaskModalContent.innerHTML = buildOnboardingResponseFormHtml(assignment);
+    setAthleteTaskModalStatus("", "info");
+
+    modal.hidden = false;
+    document.body.classList.add("admin-modal-open");
+  }
+
+  function closeAthleteTaskModal() {
+    var modal = state.athleteTaskModal;
+    if (!modal || modal.hidden) {
+      return;
+    }
+
+    modal.hidden = true;
+    document.body.classList.remove("admin-modal-open");
+
+    if (state.athleteTaskModalContent) {
+      state.athleteTaskModalContent.innerHTML = '<p class="admin-loading">Select a task to continue.</p>';
+    }
+
+    if (state.athleteTaskModalTitle) {
+      state.athleteTaskModalTitle.textContent = "Complete Task Form";
+    }
+    if (state.athleteTaskModalMeta) {
+      state.athleteTaskModalMeta.textContent = "";
+    }
+
+    setAthleteTaskModalStatus("", "info");
+  }
+
+  function setAthleteTaskModalStatus(message, variant) {
+    if (!state.athleteTaskModalStatus) {
+      return;
+    }
+
+    state.athleteTaskModalStatus.textContent = message || "";
+    state.athleteTaskModalStatus.classList.remove("is-error", "is-success", "is-info");
+    if (!message) {
+      return;
+    }
+
+    if (variant === "error") {
+      state.athleteTaskModalStatus.classList.add("is-error");
+    } else if (variant === "success") {
+      state.athleteTaskModalStatus.classList.add("is-success");
+    } else {
+      state.athleteTaskModalStatus.classList.add("is-info");
+    }
   }
 
   function onMarkOnboardingTaskComplete(assignmentId) {
@@ -4442,6 +4679,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
+    var goalsSectionEl = document.getElementById("profile-goals-section");
+
     var items = (state.goalItems || [])
       .slice()
       .sort(function (a, b) {
@@ -4464,16 +4703,21 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     renderGoalCountdown(items);
 
     if (!items.length) {
+      if (goalsSectionEl) {
+        goalsSectionEl.classList.add("is-goals-empty");
+      }
+
       updateGoalsToggleButton(0, 0);
       state.goalsList.innerHTML =
         '<div class="profile-empty-state">' +
           '<p class="profile-empty-state-title">No goals or events yet</p>' +
-          '<p class="profile-empty-state-copy">Add your next race, event, or milestone to keep training focused.</p>' +
-          (!state.isCoachView
-            ? '<a href="' + escapeAttribute(getGoalsPageHref()) + '" class="btn profile-btn-edit-profile">Add Goal</a>'
-            : '') +
+          '<p class="profile-empty-state-copy">Add your next race, event, or milestone to keep training focused and measurable.</p>' +
         '</div>';
       return;
+    }
+
+    if (goalsSectionEl) {
+      goalsSectionEl.classList.remove("is-goals-empty");
     }
 
     var defaultGoalCount = 2;
@@ -7263,7 +7507,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var html = '';
 
     html += '<div class="training-program-section-header">';
-    html += '<p class="training-note">Multiple programs can be active at once. Mark a program completed when it moves into your past history.</p>';
+    html += '<p class="training-note">Browse the program library to find a plan that fits your goals. Your plan will appear here once your coach assigns it to you.</p>';
     html += (state.isCoachView
       ? '<div class="training-coach-actions"><button type="button" class="btn profile-btn-edit-profile training-change-btn" data-assign-active-program>Assign Program to Athlete</button><button type="button" class="btn profile-btn-edit-profile training-change-btn" data-change-active-program>Edit Program for Athlete</button></div>'
       : '');
@@ -7289,8 +7533,22 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       html +=
         '<article class="training-calendar-card training-calendar-card-compact">' +
           '<h3>Workout Calendar Locked</h3>' +
-          '<p>' + escapeHtml((accessContext && accessContext.reason) || 'Complete your assigned setup tasks to unlock workout calendar access.') + '</p>' +
+          '<p>Calendar view unlocks after your liability waiver is completed and a training plan has been assigned by your coach.</p>' +
         '</article>';
+    }
+
+    var browseProgramsEnabled = state.isCoachView || !!(accessContext && accessContext.features && accessContext.features.browsePrograms);
+    var trainingEmptyStateActionsHtml = "";
+
+    if (!state.isCoachView) {
+      if (browseProgramsEnabled) {
+        trainingEmptyStateActionsHtml += '<a class="btn profile-btn-cancel" href="training-programs.html">Browse Program Library</a>';
+      } else {
+        trainingEmptyStateActionsHtml += '<a class="btn profile-btn-cancel" href="#profile-tasks-section">Complete Liability Waiver First</a>';
+      }
+
+      trainingEmptyStateActionsHtml += '<a class="btn profile-btn-cancel" href="custom-plan-inquiry.html">Inquire About Individualized Programming</a>';
+      trainingEmptyStateActionsHtml += '<a class="btn profile-btn-cancel" href="membership-inquiry.html">Inquire About Membership</a>';
     }
 
     if (!activePrograms.length) {
@@ -7300,7 +7558,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           '<p class="profile-empty-state-copy">Activate a plan so your current workout appears here.</p>' +
           (state.isCoachView
             ? '<p class="profile-empty-state-copy">Use coach actions above to assign a program.</p>'
-            : '<a class="btn profile-btn-cancel" href="training-programs.html">Browse Program Library</a>') +
+            : '<div class="profile-empty-state-actions">' + trainingEmptyStateActionsHtml + '</div>') +
         '</div>';
     } else {
       html += '<div class="training-program-grid training-program-grid-active">';
@@ -14902,6 +15160,12 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   function isMissingRelationError(error) {
     var msg = error && error.message ? error.message.toLowerCase() : "";
     return error && error.code === "42P01" || msg.indexOf("does not exist") > -1;
+  }
+
+  function isMissingFunctionError(error) {
+    var msg = error && error.message ? error.message.toLowerCase() : "";
+    var code = error && error.code ? String(error.code) : "";
+    return code === "42883" || (msg.indexOf("function") > -1 && msg.indexOf("does not exist") > -1);
   }
 
   function isMissingRelationshipError(error) {

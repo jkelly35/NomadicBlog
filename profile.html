@@ -43,17 +43,20 @@
       <!-- Profile Content (shown when logged in) -->
       <div class="profile-content" hidden data-profile-content>
         <div class="profile-dashboard-heading-row">
-          <div>
+          <div class="profile-dashboard-heading-main">
             <p class="profile-dashboard-kicker">Nomadic Performance Compass</p>
             <h1 class="section-heading">Athlete Dashboard</h1>
             <p class="profile-dashboard-subtitle" data-profile-welcome-message>Welcome Athlete</p>
             <p class="profile-dashboard-subtitle" data-profile-dashboard-copy>Your current training context, coaching updates, and next steps at a glance.</p>
           </div>
           <aside class="profile-header-messages-widget" aria-label="Message Notifications">
-            <p class="profile-header-messages-label">Messages</p>
-            <strong class="profile-header-messages-value" data-profile-msg-summary-unread>0 unread</strong>
-            <a href="athlete-messages.html" class="btn profile-btn-edit-profile" data-profile-messages-open>Open Messages</a>
-            <a href="athlete-editor.html?personal=true" class="btn profile-btn-cancel">Profile</a>
+            <p class="profile-header-messages-label">Quick Actions</p>
+            <strong class="profile-header-messages-value" data-profile-msg-summary-unread>0 unread messages</strong>
+            <p class="profile-header-messages-copy">Stay on top of coach updates and keep your athlete profile current.</p>
+            <div class="profile-header-messages-actions">
+              <a href="athlete-messages.html" class="btn profile-btn-edit-profile" data-profile-messages-open>Messages</a>
+              <a href="athlete-editor.html?personal=true" class="btn profile-btn-cancel">Edit Profile</a>
+            </div>
           </aside>
         </div>
         <nav class="profile-dashboard-nav" aria-label="Dashboard quick navigation">
@@ -326,6 +329,21 @@
 
         <p class="admin-modal-status" role="status" aria-live="polite" data-coach-intake-status></p>
       </div>
+    </div>
+  </div>
+
+  <div class="admin-modal" data-athlete-task-modal hidden>
+    <div class="admin-modal-backdrop" data-athlete-task-close></div>
+    <div class="admin-modal-panel admin-assign-modal-panel" role="dialog" aria-modal="true" aria-labelledby="athlete-task-title">
+      <button type="button" class="admin-modal-close" data-athlete-task-close aria-label="Close">&times;</button>
+      <h2 id="athlete-task-title" data-athlete-task-title>Complete Task Form</h2>
+      <p class="profile-section-copy" data-athlete-task-meta></p>
+
+      <div class="admin-modal-content" data-athlete-task-content>
+        <p class="admin-loading">Select a task to continue.</p>
+      </div>
+
+      <p class="admin-modal-status" role="status" aria-live="polite" data-athlete-task-status></p>
     </div>
   </div>
 
