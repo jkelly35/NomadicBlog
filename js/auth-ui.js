@@ -13,6 +13,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     state.authButton = mountLoginButton();
     mountAuthModal();
+    bindPreferredAuthModeTriggers();
     initializeAuth();
   });
   function mountLoginButton() {
@@ -30,7 +31,7 @@
     button.type = "button";
     button.className = "auth-nav-button is-corner";
     button.dataset.authTrigger = "true";
-    button.textContent = "Log In";
+    button.textContent = "Sign Up / Log In";
     button.setAttribute("aria-haspopup", "dialog");
     button.addEventListener("click", onAuthButtonClick);
 
@@ -127,7 +128,19 @@
     });
   }
 
+  function isEmailConfirmed(user) {
+    return !!(user && (user.email_confirmed_at || user.confirmed_at));
+  }
+
   function setUser(user) {
+    if (user && !isEmailConfirmed(user)) {
+      state.user = null;
+      if (state.client && state.client.auth && typeof state.client.auth.signOut === "function") {
+        state.client.auth.signOut();
+      }
+      user = null;
+    }
+
     state.user = user;
     var header = document.querySelector("header");
     var nav = document.querySelector("header nav");
@@ -141,7 +154,7 @@
       }
 
       if (btn) {
-        btn.textContent = user && user.email ? "Log Out" : "Log In";
+        btn.textContent = user && user.email ? "Log Out" : "Sign Up / Log In";
         btn.setAttribute("aria-haspopup", user && user.email ? "false" : "dialog");
       }
 
@@ -228,6 +241,41 @@
     if (emailInput && !state.user) {
       emailInput.focus();
     }
+  }
+
+  function openAuthModalWithMode(mode) {
+    try {
+      if (mode === "signup" || mode === "signin") {
+        sessionStorage.setItem("nomadic_auth_preferred_mode", mode);
+      }
+    } catch (_error) {
+      // Best effort only.
+    }
+
+    onAuthButtonClick();
+  }
+
+  function bindPreferredAuthModeTriggers() {
+    var triggers = document.querySelectorAll("[data-auth-preferred-mode]");
+    if (!triggers.length) {
+      return;
+    }
+
+    Array.prototype.forEach.call(triggers, function (trigger) {
+      trigger.addEventListener("click", function (event) {
+        var mode = String(trigger.getAttribute("data-auth-preferred-mode") || "").trim().toLowerCase();
+        if (mode !== "signup" && mode !== "signin") {
+          return;
+        }
+
+        if (state.user) {
+          return;
+        }
+
+        event.preventDefault();
+        openAuthModalWithMode(mode);
+      });
+    });
   }
 
   function closeModal() {
@@ -320,11 +368,22 @@
         }
 
         if (state.mode === "signup") {
-          setStatus("Check your email for a confirmation link.", "success");
+          if (result.data && result.data.session && state.client && state.client.auth && typeof state.client.auth.signOut === "function") {
+            state.client.auth.signOut();
+          }
+          setStatus("Check your email for a confirmation link before signing in.", "success");
           return;
         }
 
         var signedInUser = result && result.data && result.data.user ? result.data.user : null;
+        if (signedInUser && !isEmailConfirmed(signedInUser)) {
+          if (state.client && state.client.auth && typeof state.client.auth.signOut === "function") {
+            state.client.auth.signOut();
+          }
+          setStatus("Please confirm your email before signing in.", "error");
+          return;
+        }
+
         if (shouldForcePasswordUpdate(signedInUser)) {
           window.location.href = "update-password.html?firstLogin=1";
           return;

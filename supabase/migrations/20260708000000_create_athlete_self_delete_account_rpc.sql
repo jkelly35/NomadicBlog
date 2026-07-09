@@ -1,5 +1,5 @@
 -- Nomadic Performance - athlete self-delete account RPC
--- Run this in Supabase SQL Editor.
+-- Run this in Supabase SQL Editor or apply via Supabase migrations.
 
 begin;
 
@@ -159,6 +159,3 @@ revoke all on function public.athlete_delete_own_account() from public;
 grant execute on function public.athlete_delete_own_account() to authenticated;
 
 commit;
-
--- Verify:
--- select proname from pg_proc where proname = 'athlete_delete_own_account';

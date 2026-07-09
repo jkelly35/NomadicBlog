@@ -1674,7 +1674,7 @@
       .then(function (result) {
         if (result.error) {
           var message = result.error.message || "Failed to delete account.";
-          if (/athlete_delete_own_account/i.test(message) || /does not exist/i.test(message)) {
+          if (result.error.code === "42883" || /athlete_delete_own_account\(\)/i.test(message)) {
             message = "Delete account is not configured yet. Run sql/create-athlete-self-delete-account-rpc.sql in Supabase.";
           }
           setAccountStatus(message, "error");
