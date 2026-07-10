@@ -1793,6 +1793,48 @@ footer a:hover {
   max-width: none;
 }
 
+.profile-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  margin: 0;
+  padding: 0.34rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid #d7c7af;
+  background: rgba(255, 249, 238, 0.92);
+  color: #3d4545;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.profile-tier-badge.is-tier-member {
+  border-color: #77a283;
+  background: rgba(236, 249, 240, 0.95);
+  color: #295f39;
+}
+
+.profile-tier-badge.is-tier-individualized {
+  border-color: #5b8fc2;
+  background: rgba(231, 242, 252, 0.95);
+  color: #1f4f77;
+}
+
+.profile-tier-badge.is-tier-program {
+  border-color: #b89456;
+  background: rgba(255, 247, 230, 0.95);
+  color: #6b4b1f;
+}
+
+.profile-tier-badge.is-tier-athlete {
+  border-color: #c4c8cc;
+  background: rgba(245, 247, 250, 0.95);
+  color: #4d5964;
+}
+
 .profile-content .section-heading {
   margin: 0;
   color: #0d3131;

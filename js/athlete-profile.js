@@ -566,6 +566,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
 (function () {
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
+  var MEMBERSHIP_PAYMENT_TASK_FORM_ID = "membership-payment-task-v1";
+  var MEMBERSHIP_PAYMENT_TASK_NAME = "Complete Membership Payment";
+  var MEMBERSHIP_PAYMENT_TASK_URL = "founding-member.html?checkout=start";
   var METRICS_COLLAPSE_KEY = "nomadic.metricsSectionCollapsed";
   var METRICS_COMPACT_KEY = "nomadic.metricsCompactMode";
   var STRAVA_COLLAPSE_KEY = "nomadic.stravaSectionCollapsed";
@@ -640,7 +643,13 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     athleteTaskModalStatus: null,
     onboardingAssignments: [],
     foundingOnboardingRow: null,
+    accountTier: {
+      key: "athlete",
+      label: "Athlete Account",
+      toneClass: "is-tier-athlete"
+    },
     dashboardTaskBoard: null,
+    profileTierBadgeEl: null,
     dashboardKickerEl: null,
     dashboardCopyEl: null,
     dashboardMessagesWidget: null,
@@ -914,11 +923,24 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     trainingTemplates: [],
     selectedTrainingTemplateId: "",
     onboardingTemplates: [],
-    selectedOnboardingTemplateId: ""
+    selectedOnboardingTemplateId: "",
+    isAssigningCoachTask: false,
+    isAssigningQuickTask: false,
+    onboardingCoachTaskFilter: "active"
   };
 
   function getDefaultOnboardingTemplates() {
     return [
+      {
+        id: MEMBERSHIP_PAYMENT_TASK_FORM_ID,
+        name: MEMBERSHIP_PAYMENT_TASK_NAME,
+        description: "Assign this when an athlete is approved for membership. Includes a direct checkout link.",
+        task_type: "custom_task",
+        action_label: "Open Payment",
+        action_url: MEMBERSHIP_PAYMENT_TASK_URL,
+        action_target: "_self",
+        questions: []
+      },
       {
         id: "founding-member-intake-v1",
         name: "Founding Member Intake",
@@ -1006,6 +1028,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.onboardingStatus = document.querySelector("[data-onboarding-status]");
     state.onboardingCoachActions = document.querySelector("[data-onboarding-coach-actions]");
     state.dashboardTaskBoard = document.querySelector("[data-dashboard-task-board]") || document.querySelector("[data-dashboard-glance]");
+    state.profileTierBadgeEl = document.querySelector("[data-profile-tier-badge]");
     state.welcomeMessageEl = document.querySelector("[data-profile-welcome-message]");
     state.dashboardKickerEl = document.querySelector(".profile-dashboard-kicker");
     state.dashboardCopyEl = document.querySelector("[data-profile-dashboard-copy]");
@@ -1212,12 +1235,118 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.dashboardAccessContext = next;
 
     applyAthleteDashboardAccessUi(next);
+    renderProfileTierBadge();
 
     var previousCalendar = previous && previous.features ? !!previous.features.workoutCalendar : null;
     var nextCalendar = next && next.features ? !!next.features.workoutCalendar : false;
 
     if (previousCalendar !== null && previousCalendar !== nextCalendar) {
       refreshTrainingProgramsCalendarFromState();
+    }
+  }
+
+  function hasCompletedMembershipPayment(onboardingRow) {
+    var row = onboardingRow && onboardingRow.is_founding_member === true ? onboardingRow : null;
+    if (!row) {
+      return false;
+    }
+
+    var stage = String(row.stage || "").trim();
+    return !!(
+      row.payment_completed_at ||
+      stage === "welcome_pending_intakes" ||
+      stage === "intakes_completed_assessment_pending" ||
+      stage === "assessment_in_progress" ||
+      stage === "assessment_published_pending_review" ||
+      stage === "review_scheduled" ||
+      stage === "active_training"
+    );
+  }
+
+  function isLikelyIndividualizedProgram(program) {
+    if (!program || !program.is_active) {
+      return false;
+    }
+
+    var name = String(
+      (program.training_program && program.training_program.name) ||
+      program.program_name ||
+      ""
+    ).toLowerCase();
+
+    if (
+      name.indexOf("custom") > -1 ||
+      name.indexOf("individualized") > -1 ||
+      name.indexOf("1:1") > -1 ||
+      name.indexOf("1-1") > -1
+    ) {
+      return true;
+    }
+
+    var assignedBy = String(program.assigned_by || "").trim();
+    var viewedUserId = String(getViewedUserId() || "").trim();
+    return !!assignedBy && !!viewedUserId && assignedBy !== viewedUserId;
+  }
+
+  function resolveAthleteAccountTier() {
+    var activePrograms = (state.trainingProgramsCache || []).filter(function (program) {
+      return !!(program && program.is_active);
+    });
+
+    var hasActiveProgram = activePrograms.length > 0;
+    var hasIndividualizedProgramming = activePrograms.some(isLikelyIndividualizedProgram);
+    var hasMembership = hasCompletedMembershipPayment(state.foundingOnboardingRow);
+
+    if (hasIndividualizedProgramming) {
+      return {
+        key: "individualized",
+        label: "Individualized Programming",
+        toneClass: "is-tier-individualized"
+      };
+    }
+
+    if (hasActiveProgram) {
+      return {
+        key: "active_program",
+        label: "Active Program",
+        toneClass: "is-tier-program"
+      };
+    }
+
+    if (hasMembership) {
+      return {
+        key: "active_member",
+        label: "Active Member",
+        toneClass: "is-tier-member"
+      };
+    }
+
+    return {
+      key: "athlete",
+      label: "Athlete Account",
+      toneClass: "is-tier-athlete"
+    };
+  }
+
+  function renderProfileTierBadge() {
+    if (!state.profileTierBadgeEl) {
+      return;
+    }
+
+    var tier = resolveAthleteAccountTier();
+    state.accountTier = tier;
+
+    var badge = state.profileTierBadgeEl;
+    badge.hidden = false;
+    badge.textContent = tier.label;
+    badge.classList.remove("is-tier-member", "is-tier-individualized", "is-tier-program", "is-tier-athlete");
+    if (tier.toneClass) {
+      badge.classList.add(tier.toneClass);
+    }
+    badge.setAttribute("data-tier", String(tier.key || "athlete"));
+
+    if (state.contentElement) {
+      state.contentElement.setAttribute("data-account-tier", String(tier.key || "athlete"));
     }
   }
 
@@ -1534,6 +1663,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (state.onboardingCoachActions) {
       state.onboardingCoachActions.hidden = false;
     }
+
+    renderCoachTaskFilterControls();
 
     if (state.nutritionGoalsLink) {
       state.nutritionGoalsLink.style.display = "";
@@ -2501,6 +2632,18 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
 
       state.onboardingContent.addEventListener("click", function (event) {
+        var deleteTaskBtn = event.target && event.target.closest("[data-onboarding-delete-assignment]");
+        if (deleteTaskBtn) {
+          var deleteAssignmentId = String(deleteTaskBtn.getAttribute("data-onboarding-delete-assignment") || "").trim();
+          if (!deleteAssignmentId) {
+            setOnboardingStatus("Could not find task assignment.", "error");
+            return;
+          }
+
+          onDeleteOnboardingAssignment(deleteAssignmentId);
+          return;
+        }
+
         var openFormBtn = event.target && event.target.closest("[data-onboarding-open-form]");
         if (openFormBtn) {
           var openAssignmentId = String(openFormBtn.getAttribute("data-onboarding-open-form") || "").trim();
@@ -2587,6 +2730,25 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       coachTaskAssignBtn.addEventListener("click", onAssignQuickTaskToCurrentAthlete);
     }
 
+    var coachTaskFilterEl = document.querySelector("[data-onboarding-coach-filter]");
+    if (coachTaskFilterEl) {
+      coachTaskFilterEl.addEventListener("click", function (event) {
+        var filterBtn = event.target && event.target.closest("[data-onboarding-coach-filter-btn]");
+        if (!filterBtn) {
+          return;
+        }
+
+        var nextFilter = String(filterBtn.getAttribute("data-onboarding-coach-filter-btn") || "").trim().toLowerCase();
+        if (nextFilter !== "active" && nextFilter !== "completed" && nextFilter !== "all") {
+          return;
+        }
+
+        state.onboardingCoachTaskFilter = nextFilter;
+        renderCoachTaskFilterControls();
+        renderOnboardingAssignments();
+      });
+    }
+
     var coachProgramCloseButtons = document.querySelectorAll("[data-coach-program-close]");
     coachProgramCloseButtons.forEach(function (btn) {
       btn.addEventListener("click", closeCoachProgramModal);
@@ -2620,6 +2782,17 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     var action = String(actionEl.getAttribute("data-dashboard-action") || "");
+    if (action === "remove-onboarding-assignment") {
+      var deleteAssignmentId = String(actionEl.getAttribute("data-assignment-id") || "").trim();
+      if (!deleteAssignmentId) {
+        return;
+      }
+
+      event.preventDefault();
+      onDeleteOnboardingAssignment(deleteAssignmentId);
+      return;
+    }
+
     if (action === "start-membership-checkout") {
       event.preventDefault();
       startMembershipCheckoutFromDashboard(actionEl);
@@ -2652,12 +2825,19 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     setOnboardingStatus("Redirecting to secure checkout...", "info");
 
+    var expectedUserId = String(getViewedUserId() || state.user && state.user.id || "").trim();
+    var successUrl = window.location.origin + "/founding-payment-success.html" +
+      (expectedUserId ? "?expected_user_id=" + encodeURIComponent(expectedUserId) : "");
+    var cancelUrl = window.location.origin + "/founding-member.html?checkout=cancelled";
+
     state.client.functions
       .invoke("stripe-create-checkout", {
         body: {
           plan: "founding_member",
           source: "athlete_dashboard_task",
-          email: state.user && state.user.email ? state.user.email : null
+          email: state.user && state.user.email ? state.user.email : null,
+          success_url: successUrl,
+          cancel_url: cancelUrl
         }
       })
       .then(function (result) {
@@ -3502,8 +3682,28 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return assignment && assignment.status !== "archived";
     });
 
+    var hasCompletedFoundingPayment = !!(state.foundingOnboardingRow && (
+      state.foundingOnboardingRow.payment_completed_at ||
+      String(state.foundingOnboardingRow.stage || "") === "welcome_pending_intakes" ||
+      String(state.foundingOnboardingRow.stage || "") === "intakes_completed_assessment_pending" ||
+      String(state.foundingOnboardingRow.stage || "") === "assessment_in_progress" ||
+      String(state.foundingOnboardingRow.stage || "") === "assessment_published_pending_review" ||
+      String(state.foundingOnboardingRow.stage || "") === "review_scheduled" ||
+      String(state.foundingOnboardingRow.stage || "") === "active_training"
+    ));
+
     var pendingAssignments = visibleAssignments.filter(function (assignment) {
-      return String(assignment.status || "") !== "submitted";
+      var status = String(assignment && assignment.status || "").toLowerCase();
+      if (status === "submitted") {
+        return false;
+      }
+
+      // Athlete view fallback: hide stale payment assignment cards once payment is completed.
+      if (!state.isCoachView && hasCompletedFoundingPayment && isPaymentTaskAssignment(assignment)) {
+        return false;
+      }
+
+      return true;
     });
 
     pendingAssignments.sort(compareOnboardingTaskPriority);
@@ -3558,12 +3758,23 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         var assignmentAttr = card.assignmentId
           ? ' data-assignment-id="' + escapeAttribute(String(card.assignmentId || "")) + '"'
           : "";
+        var secondaryActionHtml = "";
+        if (card.secondaryActionLabel) {
+          var secondaryActionAttr = card.secondaryDashboardAction
+            ? ' data-dashboard-action="' + escapeAttribute(String(card.secondaryDashboardAction || "")) + '"'
+            : "";
+          secondaryActionHtml =
+            '<a class="profile-glance-action profile-glance-action-secondary" href="#profile-tasks-section"' + secondaryActionAttr + assignmentAttr + '>' +
+              escapeHtml(card.secondaryActionLabel) +
+            '</a>';
+        }
         return (
           '<article class="profile-glance-card profile-today-card' + toneClass + '">' +
             '<p class="profile-glance-label">' + escapeHtml(card.label || "Coach Task") + '</p>' +
             '<strong class="profile-glance-value">' + escapeHtml(card.title || "Task") + '</strong>' +
             '<p class="profile-glance-meta">' + escapeHtml(card.meta || "") + '</p>' +
             '<a class="profile-glance-action" href="' + escapeAttribute(card.href || "#profile-tasks-section") + '"' + actionAttr + assignmentAttr + '>' + escapeHtml(card.actionLabel || "Open Task") + '</a>' +
+            secondaryActionHtml +
           '</article>'
         );
       })
@@ -3586,6 +3797,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     var category = getCoachAssignmentCategory(assignment);
+    var isPaymentTask = isPaymentTaskAssignment(assignment);
     var label = "Coach Task";
     var actionLabel = state.isCoachView ? "Review Task" : "Open Task";
 
@@ -3604,23 +3816,47 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     } else if (category === "custom_task") {
       label = "Coach Task";
       actionLabel = state.isCoachView ? "Review Task" : "Complete Task";
+
+      if (!state.isCoachView) {
+        var taskAction = getCustomTaskActionConfig(assignment);
+        if (taskAction) {
+          actionLabel = taskAction.label;
+        }
+      }
     }
 
     var dashboardAction = "";
     var assignmentId = "";
+    var href = "#profile-tasks-section";
+
+    if (isPaymentTask) {
+      label = "Membership";
+      actionLabel = "Complete Payment";
+      href = MEMBERSHIP_PAYMENT_TASK_URL;
+      dashboardAction = "start-membership-checkout";
+      assignmentId = String(assignment && assignment.id || "");
+    }
+
     if (!state.isCoachView && !isCustomCoachTaskAssignment(assignment) && (category === "onboarding" || category === "form")) {
       dashboardAction = "open-onboarding-form";
       assignmentId = String(assignment && assignment.id || "");
+    } else if (!state.isCoachView && category === "custom_task" && !isPaymentTask) {
+      var customTaskAction = getCustomTaskActionConfig(assignment);
+      if (customTaskAction) {
+        href = customTaskAction.url;
+      }
     }
 
     return {
       label: label,
       title: assignment && assignment.form_name ? assignment.form_name : "Assigned Task",
       meta: dueMeta,
-      href: "#profile-tasks-section",
+      href: href,
       actionLabel: actionLabel,
       dashboardAction: dashboardAction,
       assignmentId: assignmentId,
+      secondaryActionLabel: state.isCoachView && isPaymentTask ? "Remove Task" : "",
+      secondaryDashboardAction: state.isCoachView && isPaymentTask ? "remove-onboarding-assignment" : "",
       tone: typeof dueDays === "number" && dueDays < 0 ? "alert" : "",
       priority: getAssignmentTaskPriority(assignment)
     };
@@ -3852,7 +4088,17 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     var visibleAssignments = state.isCoachView
-      ? assignments
+      ? assignments.filter(function (assignment) {
+          var filter = String(state.onboardingCoachTaskFilter || "active").toLowerCase();
+          var status = String(assignment && assignment.status || "").toLowerCase();
+          if (filter === "completed") {
+            return status === "submitted" || status === "archived";
+          }
+          if (filter === "all") {
+            return true;
+          }
+          return status !== "submitted" && status !== "archived";
+        })
       : assignments.filter(function (assignment) {
           var status = String(assignment && assignment.status || "").toLowerCase();
           if (status === "archived" || status === "submitted") {
@@ -3862,6 +4108,24 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           // Liability waiver stays in the top dashboard task strip to avoid duplicate cards.
           return !isLiabilityTaskAssignment(assignment);
         });
+
+    // Keep athlete view uncluttered: membership payment tasks live in the top strip only.
+    // In coach view, hide only ACTIVE payment tasks from the lower list to avoid duplicate cards.
+    // Completed payment tasks remain visible for review when using Completed/All filters.
+    if (!state.isCoachView) {
+      visibleAssignments = visibleAssignments.filter(function (assignment) {
+        return !isPaymentTaskAssignment(assignment);
+      });
+    } else {
+      visibleAssignments = visibleAssignments.filter(function (assignment) {
+        var status = String(assignment && assignment.status || "").toLowerCase();
+        if (!isPaymentTaskAssignment(assignment)) {
+          return true;
+        }
+
+        return status === "submitted" || status === "archived";
+      });
+    }
 
     if (!visibleAssignments.length) {
       var hasPendingLiabilityTask = !state.isCoachView && assignments.some(function (assignment) {
@@ -3887,10 +4151,21 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         return;
       }
 
+      var coachFilter = String(state.onboardingCoachTaskFilter || "active").toLowerCase();
+      var emptyTitle = "No active task forms";
+      var emptyCopy = "All task forms are archived.";
+      if (coachFilter === "completed") {
+        emptyTitle = "No completed tasks";
+        emptyCopy = "Completed tasks will appear here after athletes submit or complete them.";
+      } else if (coachFilter === "all") {
+        emptyTitle = "No task forms";
+        emptyCopy = "No task forms have been assigned yet.";
+      }
+
       state.onboardingContent.innerHTML =
         '<div class="profile-empty-state">' +
-          '<p class="profile-empty-state-title">No active task forms</p>' +
-          '<p class="profile-empty-state-copy">All task forms are archived.</p>' +
+          '<p class="profile-empty-state-title">' + escapeHtml(emptyTitle) + '</p>' +
+          '<p class="profile-empty-state-copy">' + escapeHtml(emptyCopy) + '</p>' +
         "</div>";
       return;
     }
@@ -3898,9 +4173,14 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.onboardingContent.innerHTML = visibleAssignments
       .map(function (assignment) {
         var isCustomTask = isCustomCoachTaskAssignment(assignment);
+        var isPaymentTask = isPaymentTaskAssignment(assignment);
         var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
         var submittedLabel = assignment.submitted_at ? formatDate(assignment.submitted_at) : "Not submitted";
         var statusLabel = assignment.status === "submitted" ? "Submitted" : (assignment.status === "archived" ? "Archived" : "Assigned");
+        var showCompletedPaymentBadge =
+          state.isCoachView &&
+          isPaymentTask &&
+          (assignment.status === "submitted" || assignment.status === "archived");
 
         var html = '';
         html += '<article class="profile-nutrition-card profile-onboarding-card">';
@@ -3908,10 +4188,14 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         html += '<div><h3>' + escapeHtml(assignment.form_name) + '</h3>';
         html += '<p class="profile-section-copy">Assigned ' + escapeHtml(formatDate(assignment.assigned_at)) + ' • Due ' + escapeHtml(dueLabel) + '</p></div>';
         html += '<span class="admin-risk-chip ' + (assignment.status === "submitted" ? "is-stable" : "") + '">' + escapeHtml(statusLabel) + '</span>';
+        if (showCompletedPaymentBadge) {
+          html += '<span class="admin-risk-chip is-watch">Payment Task</span>';
+        }
         html += '</div>';
 
         if (isCustomTask) {
           var taskDescription = String(assignment.form_schema && assignment.form_schema.description || "").trim();
+          var customTaskAction = getCustomTaskActionConfig(assignment);
           if (taskDescription) {
             html += '<p class="profile-section-copy">' + escapeHtml(taskDescription) + '</p>';
           }
@@ -3921,6 +4205,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
             if (assignment.response_data && assignment.response_data.task_completed_at) {
               html += '<p class="profile-section-copy"><strong>Completed:</strong> ' + escapeHtml(formatDate(String(assignment.response_data.task_completed_at || ""))) + '</p>';
             }
+            html += '<div class="profile-section-actions">';
+            html += '<button type="button" class="btn profile-btn-cancel" data-onboarding-delete-assignment="' + escapeAttribute(assignment.id) + '">Delete Task</button>';
+            html += '</div>';
             html += '</article>';
             return html;
           }
@@ -3929,6 +4216,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
             html += '<p class="profile-section-copy"><strong>Status:</strong> Completed ' + escapeHtml(submittedLabel) + '</p>';
           } else {
             html += '<div class="profile-section-actions">';
+            if (customTaskAction) {
+              var targetAttr = customTaskAction.target === "_blank" ? ' target="_blank" rel="noopener noreferrer"' : "";
+              html += '<a class="btn profile-btn-cancel" href="' + escapeAttribute(customTaskAction.url) + '"' + targetAttr + '>' + escapeHtml(customTaskAction.label) + '</a>';
+            }
             html += '<button type="button" class="btn profile-btn-save" data-onboarding-complete-task="' + escapeAttribute(assignment.id) + '">Mark Task Complete</button>';
             html += '</div>';
           }
@@ -3950,6 +4241,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           } else {
             html += '<p class="profile-empty-state-copy">No athlete responses submitted yet.</p>';
           }
+          html += '<div class="profile-section-actions">';
+          html += '<button type="button" class="btn profile-btn-cancel" data-onboarding-delete-assignment="' + escapeAttribute(assignment.id) + '">Delete Task</button>';
+          html += '</div>';
           html += '</article>';
           return html;
         }
@@ -3966,6 +4260,27 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         return html;
       })
       .join("");
+
+    renderCoachTaskFilterControls();
+  }
+
+  function renderCoachTaskFilterControls() {
+    var filterEl = document.querySelector("[data-onboarding-coach-filter]");
+    if (!filterEl) {
+      return;
+    }
+
+    var isCoach = !!state.isCoachView;
+    filterEl.hidden = !isCoach;
+    if (!isCoach) {
+      return;
+    }
+
+    var activeFilter = String(state.onboardingCoachTaskFilter || "active").toLowerCase();
+    filterEl.querySelectorAll("[data-onboarding-coach-filter-btn]").forEach(function (btn) {
+      var value = String(btn.getAttribute("data-onboarding-coach-filter-btn") || "").trim().toLowerCase();
+      btn.classList.toggle("is-active", value === activeFilter);
+    });
   }
 
   function buildOnboardingResponseFormHtml(assignment) {
@@ -4006,6 +4321,22 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var taskType = String(assignment.form_schema && assignment.form_schema.task_type || "").trim().toLowerCase();
 
     return taskType === "custom_task" || formId.indexOf("coach-task-") === 0;
+  }
+
+  function getCustomTaskActionConfig(assignment) {
+    var schema = assignment && assignment.form_schema && typeof assignment.form_schema === "object"
+      ? assignment.form_schema
+      : {};
+    var url = String(schema.action_url || "").trim();
+    if (!url) {
+      return null;
+    }
+
+    return {
+      url: url,
+      label: String(schema.action_label || "Open Task").trim() || "Open Task",
+      target: String(schema.action_target || "_self") === "_blank" ? "_blank" : "_self"
+    };
   }
 
   function formatQuestionKeyLabel(key) {
@@ -4394,6 +4725,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     state.selectedOnboardingTemplateId = "";
+    state.isAssigningCoachTask = false;
+    state.isAssigningQuickTask = false;
+    setCoachIntakeAssignButtonsDisabled(false);
     setCoachIntakeStatus("", "info");
     modal.hidden = false;
     document.body.classList.add("admin-modal-open");
@@ -4409,6 +4743,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     modal.hidden = true;
     document.body.classList.remove("admin-modal-open");
     state.selectedOnboardingTemplateId = "";
+    state.isAssigningCoachTask = false;
+    state.isAssigningQuickTask = false;
+    setCoachIntakeAssignButtonsDisabled(false);
     if (state.coachTaskTitle) {
       state.coachTaskTitle.value = "";
     }
@@ -4475,6 +4812,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
+    if (state.isAssigningCoachTask) {
+      return;
+    }
+
     var template = (state.onboardingTemplates || []).find(function (item) {
       return item.id === state.selectedOnboardingTemplateId;
     });
@@ -4485,29 +4826,65 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     var dueDate = state.coachIntakeDueDate ? String(state.coachIntakeDueDate.value || "").trim() : "";
     var nowIso = new Date().toISOString();
+    state.isAssigningCoachTask = true;
+    setCoachIntakeAssignButtonsDisabled(true);
     setCoachIntakeStatus("Assigning task form...", "info");
 
+    if (String(template.id || "") === MEMBERSHIP_PAYMENT_TASK_FORM_ID) {
+      assignMembershipPaymentTaskFromCoachIntake(viewedUserId, dueDate)
+        .finally(function () {
+          state.isAssigningCoachTask = false;
+          setCoachIntakeAssignButtonsDisabled(false);
+        });
+      return;
+    }
+
     state.client
+      .from("athlete_onboarding_intake_assignments")
+      .select("id")
+      .eq("athlete_user_id", viewedUserId)
+      .eq("form_id", template.id)
+      .eq("status", "assigned")
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .then(function (existingResult) {
+        if (existingResult.error) {
+          throw existingResult.error;
+        }
+
+        var alreadyAssigned = Array.isArray(existingResult.data) && existingResult.data.length > 0;
+        if (alreadyAssigned) {
+          setCoachIntakeStatus("This task is already assigned to the athlete.", "info");
+          setOnboardingStatus("Task already assigned to athlete.", "info");
+          setTimeout(function () {
+            closeCoachIntakeModal();
+            loadOnboardingIntake();
+          }, 350);
+          return null;
+        }
+
+        return state.client
       .from("athlete_onboarding_intake_assignments")
       .insert({
         athlete_user_id: viewedUserId,
         form_id: template.id,
         form_name: template.name,
-        form_schema: {
-          description: template.description || "",
-          questions: template.questions || []
-        },
+        form_schema: buildCoachTemplateAssignmentSchema(template),
         response_data: {},
         status: "assigned",
         assigned_at: nowIso,
         assigned_by: state.user ? state.user.id : null,
         due_date: dueDate || null,
         updated_at: nowIso
+      });
       })
       .then(function (result) {
-        if (result.error) {
-          setCoachIntakeStatus(result.error.message, "error");
+        if (!result) {
           return;
+        }
+
+        if (result.error) {
+          throw result.error;
         }
 
         setCoachIntakeStatus("Task form assigned.", "success");
@@ -4519,6 +4896,112 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       })
       .catch(function (error) {
         setCoachIntakeStatus(error && error.message ? error.message : "Failed to assign task form.", "error");
+      })
+      .finally(function () {
+        state.isAssigningCoachTask = false;
+        setCoachIntakeAssignButtonsDisabled(false);
+      });
+  }
+
+  function buildCoachTemplateAssignmentSchema(template) {
+    var source = template && typeof template === "object" ? template : {};
+    var schema = {
+      description: String(source.description || ""),
+      questions: Array.isArray(source.questions) ? source.questions : []
+    };
+
+    if (source.task_type) {
+      schema.task_type = String(source.task_type);
+    }
+    if (source.action_label) {
+      schema.action_label = String(source.action_label);
+    }
+    if (source.action_url) {
+      schema.action_url = String(source.action_url);
+    }
+    if (source.action_target) {
+      schema.action_target = String(source.action_target);
+    }
+
+    return schema;
+  }
+
+  function assignMembershipPaymentTaskFromCoachIntake(athleteUserId, dueDate) {
+    if (!state.client || !athleteUserId) {
+      setCoachIntakeStatus("Unable to assign payment task right now.", "error");
+      return Promise.resolve(false);
+    }
+
+    var dueDateValue = String(dueDate || "").trim() || null;
+
+    return state.client
+      .from("athlete_onboarding_intake_assignments")
+      .select("id,status")
+      .eq("athlete_user_id", athleteUserId)
+      .eq("form_id", MEMBERSHIP_PAYMENT_TASK_FORM_ID)
+      .neq("status", "archived")
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .then(function (lookupResult) {
+        if (lookupResult.error) {
+          setCoachIntakeStatus(lookupResult.error.message, "error");
+          return false;
+        }
+
+        var existing = Array.isArray(lookupResult.data) && lookupResult.data.length
+          ? lookupResult.data[0]
+          : null;
+
+        if (existing) {
+          setCoachIntakeStatus("Membership payment task is already assigned.", "info");
+          setOnboardingStatus("Membership payment task is already assigned to athlete.", "info");
+          setTimeout(function () {
+            closeCoachIntakeModal();
+            loadOnboardingIntake();
+          }, 400);
+          return true;
+        }
+
+        var nowIso = new Date().toISOString();
+        return state.client
+          .from("athlete_onboarding_intake_assignments")
+          .insert({
+            athlete_user_id: athleteUserId,
+            form_id: MEMBERSHIP_PAYMENT_TASK_FORM_ID,
+            form_name: MEMBERSHIP_PAYMENT_TASK_NAME,
+            form_schema: buildCoachTemplateAssignmentSchema({
+              description: "You are approved for membership. Complete payment to activate coaching access.",
+              task_type: "custom_task",
+              action_label: "Open Payment",
+              action_url: MEMBERSHIP_PAYMENT_TASK_URL,
+              action_target: "_self",
+              questions: []
+            }),
+            response_data: {},
+            status: "assigned",
+            assigned_at: nowIso,
+            assigned_by: state.user ? state.user.id : null,
+            due_date: dueDateValue,
+            updated_at: nowIso
+          })
+          .then(function (insertResult) {
+            if (insertResult.error) {
+              setCoachIntakeStatus(insertResult.error.message, "error");
+              return false;
+            }
+
+            setCoachIntakeStatus("Membership payment task assigned.", "success");
+            setOnboardingStatus("Membership payment task assigned to athlete.", "success");
+            setTimeout(function () {
+              closeCoachIntakeModal();
+              loadOnboardingIntake();
+            }, 400);
+            return true;
+          });
+      })
+      .catch(function (error) {
+        setCoachIntakeStatus(error && error.message ? error.message : "Failed to assign payment task.", "error");
+        return false;
       });
   }
 
@@ -4536,9 +5019,16 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
+    if (state.isAssigningQuickTask) {
+      return;
+    }
+
     var dueDate = state.coachIntakeDueDate ? String(state.coachIntakeDueDate.value || "").trim() : "";
     var nowIso = new Date().toISOString();
     var taskFormId = "coach-task-" + Date.now();
+
+    state.isAssigningQuickTask = true;
+    setCoachIntakeAssignButtonsDisabled(true);
 
     setCoachIntakeStatus("Assigning quick task...", "info");
 
@@ -4575,7 +5065,56 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       })
       .catch(function (error) {
         setCoachIntakeStatus(error && error.message ? error.message : "Failed to assign quick task.", "error");
+      })
+      .finally(function () {
+        state.isAssigningQuickTask = false;
+        setCoachIntakeAssignButtonsDisabled(false);
       });
+  }
+
+  function onDeleteOnboardingAssignment(assignmentId) {
+    if (!state.client || !state.isCoachView || !getViewedUserId() || !assignmentId) {
+      setOnboardingStatus("Unable to delete this task from current view.", "error");
+      return;
+    }
+
+    var confirmed = window.confirm("Delete this task assignment for the athlete? This cannot be undone.");
+    if (!confirmed) {
+      return;
+    }
+
+    setOnboardingStatus("Deleting task...", "info");
+
+    state.client
+      .from("athlete_onboarding_intake_assignments")
+      .delete()
+      .eq("id", assignmentId)
+      .eq("athlete_user_id", getViewedUserId())
+      .then(function (result) {
+        if (result.error) {
+          setOnboardingStatus(result.error.message, "error");
+          return;
+        }
+
+        setOnboardingStatus("Task deleted.", "success");
+        loadOnboardingIntake();
+      })
+      .catch(function (error) {
+        setOnboardingStatus(error && error.message ? error.message : "Failed to delete task.", "error");
+      });
+  }
+
+  function setCoachIntakeAssignButtonsDisabled(disabled) {
+    var isDisabled = !!disabled;
+    var assignBtn = document.querySelector("[data-coach-intake-assign]");
+    var quickBtn = document.querySelector("[data-coach-intake-assign-quick]");
+
+    if (assignBtn) {
+      assignBtn.disabled = isDisabled;
+    }
+    if (quickBtn) {
+      quickBtn.disabled = isDisabled;
+    }
   }
 
   function setOnboardingStatus(message, variant) {
@@ -7224,7 +7763,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var message = String(params.get(FOUNDING_PAYMENT_MESSAGE_PARAM) || "").trim();
     if (!message) {
       if (status === "success") {
-        message = "Payment complete. Next step: complete your assigned tasks below.";
+        message = "Payment complete. Your membership payment task is now marked complete and your coach can review it.";
       } else if (status === "cancelled") {
         message = "Payment was cancelled. You can return to the founding member page anytime to finish checkout.";
       } else {

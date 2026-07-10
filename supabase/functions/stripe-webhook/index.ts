@@ -339,6 +339,29 @@ function getOnboardingStageRank(stage: string | null): number {
   return lookup[value] || 0;
 }
 
+async function completeMembershipPaymentTasks(
+  admin: ReturnType<typeof createServiceClient>,
+  userId: string,
+  completedAtIso: string
+): Promise<void> {
+  const completionPayload = {
+    status: "submitted",
+    submitted_at: completedAtIso,
+    updated_at: completedAtIso
+  };
+
+  const { error } = await admin
+    .from("athlete_onboarding_intake_assignments")
+    .update(completionPayload)
+    .eq("athlete_user_id", userId)
+    .eq("status", "assigned")
+    .or("form_id.eq.membership-payment-task-v1,form_name.ilike.%membership%payment%");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 async function advanceFoundingOnboardingAfterPayment(
   admin: ReturnType<typeof createServiceClient>,
   userId: string
@@ -470,6 +493,8 @@ Deno.serve(async (req) => {
     }
 
     if (normalized.shouldActivateMember && userId) {
+      const completionIso = new Date().toISOString();
+
       const { error: activationError } = await admin
         .from("athlete_profiles")
         .update({ is_active: true })
@@ -480,6 +505,7 @@ Deno.serve(async (req) => {
       }
 
       await advanceFoundingOnboardingAfterPayment(admin, userId);
+      await completeMembershipPaymentTasks(admin, userId, completionIso);
     }
 
     return jsonResponse({

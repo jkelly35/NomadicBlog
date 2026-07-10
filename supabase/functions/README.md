@@ -41,6 +41,11 @@ It also contains nutrition catalog enrichment used by `athlete-nutrition.html` /
   - Auth required
   - Creates Stripe Checkout Session for Founding Member subscription
   - Returns redirect URL to hosted Stripe checkout
+  - Accepts optional `success_url` and `cancel_url` in request body.
+  - If request `Origin` is present, both URLs must match that origin.
+  - If request `Origin` is missing, both URLs are used only when they share the same origin.
+
+
 - `stripe-webhook`
   - Public (no auth required)
   - Verifies Stripe webhook signatures
@@ -85,7 +90,7 @@ Set these in Supabase project secrets:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_FOUNDING_MEMBER_PRICE_ID` (Stripe recurring price id for founding cohort)
 - `STRIPE_WEBHOOK_SECRET` (Stripe signing secret for webhook endpoint)
-- `STRIPE_SUCCESS_URL` (optional, default: `https://nomadicperformance.com/founding-member.html?checkout=success`)
+- `STRIPE_SUCCESS_URL` (optional, default: request origin + `/founding-payment-success.html`, fallback: `https://nomadicperformance.com/founding-payment-success.html`)
 - `STRIPE_CANCEL_URL` (optional, default: `https://nomadicperformance.com/founding-member.html?checkout=cancelled`)
 - `USDA_FOODDATA_API_KEY` (required for USDA import; function still works without it)
 - `OPENFOODFACTS_USER_AGENT` (optional but recommended, e.g. `NomadicPerformance/1.0 (support@nomadicperformance.com)`)

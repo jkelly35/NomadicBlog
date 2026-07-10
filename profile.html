@@ -46,6 +46,7 @@
           <div class="profile-dashboard-heading-main">
             <p class="profile-dashboard-kicker">Nomadic Performance Compass</p>
             <h1 class="section-heading">Athlete Dashboard</h1>
+            <p class="profile-tier-badge is-tier-athlete" data-profile-tier-badge hidden>Athlete Account</p>
             <p class="profile-dashboard-subtitle" data-profile-welcome-message>Welcome Athlete</p>
             <p class="profile-dashboard-subtitle" data-profile-dashboard-copy>Your current training context, coaching updates, and next steps at a glance.</p>
           </div>
@@ -96,8 +97,13 @@
               <p class="profile-section-copy">Your membership, onboarding forms, and coach-assigned tasks in one place.</p>
             </div>
             <div class="profile-section-actions" data-onboarding-coach-actions hidden>
-              <button type="button" class="btn profile-btn-edit-profile" data-coach-intake-open>Assign Intake Form</button>
+              <button type="button" class="btn profile-btn-edit-profile" data-coach-intake-open>Assign Task Form</button>
               <button type="button" class="btn profile-btn-cancel" data-coach-task-open>Assign Quick Task</button>
+              <div class="admin-risk-filter" data-onboarding-coach-filter style="margin-top:0.35rem; width:100%; justify-content:flex-end;">
+                <button type="button" class="btn admin-btn-refresh is-active" data-onboarding-coach-filter-btn="active">Active</button>
+                <button type="button" class="btn admin-btn-refresh" data-onboarding-coach-filter-btn="completed">Completed</button>
+                <button type="button" class="btn admin-btn-refresh" data-onboarding-coach-filter-btn="all">All</button>
+              </div>
             </div>
           </div>
 
@@ -321,7 +327,7 @@
 
         <div class="admin-modal-section">
           <div class="admin-modal-actions">
-            <button type="button" class="btn admin-btn-primary" data-coach-intake-assign>Assign Intake Form</button>
+            <button type="button" class="btn admin-btn-primary" data-coach-intake-assign>Assign Selected Task</button>
             <button type="button" class="btn profile-btn-cancel" data-coach-intake-assign-quick>Assign Quick Task</button>
             <button type="button" class="btn admin-btn-reset-password" data-coach-intake-close>Cancel</button>
           </div>

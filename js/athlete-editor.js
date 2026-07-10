@@ -272,11 +272,7 @@
       state.form.addEventListener("change", function (event) {
         var target = event && event.target;
         if (target && target.name === "dob") {
-          updateCalculatedAgeDisplay(String(target.value || ""), getAgeInputValue());
-          return;
-        }
-        if (target && target.name === "age") {
-          updateCalculatedAgeDisplay(getDobInputValue(), String(target.value || ""));
+          updateCalculatedAgeDisplay(String(target.value || ""), null);
           return;
         }
         if (!target || target.name !== "sports[]") {
@@ -360,7 +356,6 @@
 
     setInputValue("name", athlete.name);
     setInputValue("dob", getDobFromProfile(athlete));
-    setInputValue("age", athlete.age);
     setInputValue("bio", athlete.bio);
     setInputValue("location", athlete.location);
     setInputValue("height_cm", athlete.height_cm);
@@ -383,16 +378,6 @@
     if (input) {
       input.value = value == null ? "" : String(value);
     }
-  }
-
-  function getDobInputValue() {
-    var input = document.querySelector("[data-athlete-editor-input='dob']");
-    return input ? String(input.value || "") : "";
-  }
-
-  function getAgeInputValue() {
-    var input = document.querySelector("[data-athlete-editor-input='age']");
-    return input ? String(input.value || "") : "";
   }
 
   function parseAgeValue(value) {
@@ -419,7 +404,7 @@
     }
 
     var dobValue = normalizeDob(String(formData.get("dob") || "").trim());
-    var ageValue = parseAgeValue(formData.get("age"));
+    var ageValue = calculateAgeFromDob(dobValue);
     var sportOverview = collectSportOverviewFromForm();
     var generalProfile = collectGeneralProfileFromForm();
     if (dobValue) {
@@ -437,7 +422,7 @@
       sports: selectedSports,
       sport_overview: sportOverview,
       bio: String(formData.get("bio") || "").trim(),
-      age: ageValue != null ? ageValue : calculateAgeFromDob(dobValue),
+      age: ageValue,
       location: String(formData.get("location") || "").trim(),
       height_cm: parseFloat(formData.get("height_cm") || "") || null,
       weight_kg: parseFloat(formData.get("weight_kg") || "") || null,

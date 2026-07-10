@@ -4,6 +4,9 @@
   var HIDDEN_ATHLETES_KEY = "nomadic_hidden_athletes_v1";
   var COACH_TODO_KEY = "nomadic_coach_todo_v1";
   var COACH_FLAGS_KEY = "nomadic_coach_flags_v1";
+  var MEMBERSHIP_PAYMENT_TASK_FORM_ID = "membership-payment-task-v1";
+  var MEMBERSHIP_PAYMENT_TASK_NAME = "Complete Membership Payment";
+  var MEMBERSHIP_PAYMENT_TASK_URL = "founding-member.html?checkout=start";
   var CLASSES_STORAGE_KEY = "nomadic_in_person_classes_v1";
   var EXERCISE_LIBRARY_KEY = "nomadic_exercise_library_v1";
   var EXERCISE_LIBRARY_TABLE = "exercise_library";
@@ -327,6 +330,11 @@
     var membershipInquiryList = document.querySelector("[data-admin-membership-inquiries]");
     if (membershipInquiryList) {
       membershipInquiryList.addEventListener("click", onMembershipInquiryActionClick);
+    }
+
+    var membershipBulkPushBtn = document.querySelector("[data-admin-membership-push-approved]");
+    if (membershipBulkPushBtn) {
+      membershipBulkPushBtn.addEventListener("click", assignMembershipPaymentTasksForApprovedInquiries);
     }
 
     var addAthleteBtn = document.querySelector("[data-admin-add-athlete]");
@@ -1494,7 +1502,7 @@
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
           "<td><div class='admin-table-actions'><a class='btn admin-btn-small' href='" +
           insightsHref +
-          "' target='_blank'>Insights</a><button type='button' class='btn admin-btn-small' data-admin-toggle-active='1' data-athlete-active='" +
+          "'>Insights</a><button type='button' class='btn admin-btn-small' data-admin-toggle-active='1' data-athlete-active='" +
           (isActive ? "true" : "false") +
           "' data-athlete-id='" +
           escapeAttribute(athleteId) +
@@ -3379,14 +3387,19 @@
     }
   }
 
-  function updateMembershipInquiryStatus(inquiryId, status) {
+  function updateMembershipInquiryStatus(inquiryId, status, options) {
+    var config = options && typeof options === "object" ? options : {};
+    var silent = !!config.silent;
+
     if (!state.client || !inquiryId || !status) {
-      return;
+      return Promise.resolve(false);
     }
 
-    setStatus("Updating membership inquiry status...", "info");
+    if (!silent) {
+      setStatus("Updating membership inquiry status...", "info");
+    }
 
-    state.client
+    return state.client
       .from("membership_inquiries")
       .update({
         status: status,
@@ -3395,8 +3408,10 @@
       .eq("id", inquiryId)
       .then(function (result) {
         if (result.error) {
-          setStatus(result.error.message, "error");
-          return;
+          if (!silent) {
+            setStatus(result.error.message, "error");
+          }
+          return false;
         }
 
         state.membershipInquiries = (state.membershipInquiries || []).map(function (inquiry) {
@@ -3407,54 +3422,230 @@
         });
 
         renderMembershipInquiries();
-        setStatus("Membership inquiry updated.", "success");
+        if (!silent) {
+          setStatus("Membership inquiry updated.", "success");
+        }
+        return true;
       })
       .catch(function (error) {
-        setStatus(error && error.message ? error.message : "Failed to update inquiry.", "error");
+        if (!silent) {
+          setStatus(error && error.message ? error.message : "Failed to update inquiry.", "error");
+        }
+        return false;
       });
   }
 
+  function buildMembershipPaymentTaskPayload(athleteUserId) {
+    return {
+      athlete_user_id: athleteUserId,
+      form_id: MEMBERSHIP_PAYMENT_TASK_FORM_ID,
+      form_name: MEMBERSHIP_PAYMENT_TASK_NAME,
+      form_schema: {
+        task_type: "custom_task",
+        description: "You are approved for membership. Complete payment to activate coaching access.",
+        action_label: "Open Payment",
+        action_url: MEMBERSHIP_PAYMENT_TASK_URL,
+        action_target: "_self",
+        questions: []
+      },
+      response_data: {},
+      status: "assigned",
+      assigned_at: new Date().toISOString(),
+      assigned_by: state.user ? state.user.id : null,
+      due_date: null,
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  function ensureMembershipPaymentTaskAssignment(athleteUserId) {
+    if (!state.client || !athleteUserId) {
+      return Promise.resolve({ created: false, existing: false, error: new Error("Missing athlete user id.") });
+    }
+
+    return state.client
+      .from("athlete_onboarding_intake_assignments")
+      .select("id,status,assigned_at")
+      .eq("athlete_user_id", athleteUserId)
+      .eq("form_id", MEMBERSHIP_PAYMENT_TASK_FORM_ID)
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .then(function (lookupResult) {
+        if (lookupResult.error) {
+          return { created: false, existing: false, error: lookupResult.error };
+        }
+
+        var existingRow = Array.isArray(lookupResult.data) && lookupResult.data.length
+          ? lookupResult.data[0]
+          : null;
+
+        if (existingRow) {
+          return {
+            created: false,
+            existing: true,
+            assignmentId: String(existingRow.id || ""),
+            status: String(existingRow.status || "")
+          };
+        }
+
+        return state.client
+          .from("athlete_onboarding_intake_assignments")
+          .insert(buildMembershipPaymentTaskPayload(athleteUserId))
+          .select("id,status")
+          .single()
+          .then(function (insertResult) {
+            if (insertResult.error) {
+              return { created: false, existing: false, error: insertResult.error };
+            }
+            return {
+              created: true,
+              existing: false,
+              assignmentId: String(insertResult.data && insertResult.data.id || ""),
+              status: String(insertResult.data && insertResult.data.status || "assigned")
+            };
+          });
+      })
+      .catch(function (error) {
+        return { created: false, existing: false, error: error };
+      });
+  }
+
+  function getAthleteLookupByEmail() {
+    var lookup = {};
+    (state.athletes || []).forEach(function (athlete) {
+      var email = String(athlete && athlete.email || "").trim().toLowerCase();
+      if (!email) {
+        return;
+      }
+      lookup[email] = athlete;
+    });
+    return lookup;
+  }
+
+  function getMembershipInquiryAthleteId(inquiry, athleteByEmail) {
+    var directUserId = String(inquiry && inquiry.user_id || "").trim();
+    if (directUserId) {
+      return directUserId;
+    }
+
+    var email = String(inquiry && inquiry.email || "").trim().toLowerCase();
+    var matched = email && athleteByEmail ? athleteByEmail[email] : null;
+    return String(matched && matched.user_id || "").trim();
+  }
+
   function assignMembershipPaymentTask(inquiryId, athleteUserId) {
-    if (!state.client || !inquiryId || !athleteUserId) {
+    if (!state.client || !athleteUserId) {
       setStatus("Cannot assign payment task: no athlete account found.", "error");
       return;
     }
 
-    var nowIso = new Date().toISOString();
-    var taskId = "membership-payment-" + Date.now();
-
     setStatus("Assigning membership payment task...", "info");
 
-    state.client
-      .from("athlete_onboarding_intake_assignments")
-      .insert({
-        athlete_user_id: athleteUserId,
-        form_id: taskId,
-        form_name: "Complete Membership Payment",
-        form_schema: {
-          task_type: "custom_task",
-          description: "You are approved for membership. Complete payment to activate coaching access.",
-          questions: []
-        },
-        response_data: {},
-        status: "assigned",
-        assigned_at: nowIso,
-        assigned_by: state.user ? state.user.id : null,
-        due_date: null,
-        updated_at: nowIso
-      })
-      .then(function (insertResult) {
-        if (insertResult.error) {
-          setStatus(insertResult.error.message, "error");
+    ensureMembershipPaymentTaskAssignment(athleteUserId)
+      .then(function (assignmentResult) {
+        if (!assignmentResult || assignmentResult.error) {
+          var assignmentError = assignmentResult && assignmentResult.error;
+          setStatus(
+            assignmentError && assignmentError.message ? assignmentError.message : "Failed to assign payment task.",
+            "error"
+          );
           return;
         }
 
-        updateMembershipInquiryStatus(inquiryId, "approved");
-        setStatus("Payment task assigned to athlete dashboard.", "success");
-        loadCoachOverviewData();
+        var updatePromise = inquiryId
+          ? updateMembershipInquiryStatus(inquiryId, "approved", { silent: true })
+          : Promise.resolve(true);
+
+        updatePromise.finally(function () {
+          if (assignmentResult.created) {
+            setStatus("Payment task assigned to athlete dashboard.", "success");
+          } else {
+            setStatus("Athlete already has a membership payment task.", "info");
+          }
+          loadCoachOverviewData();
+        });
       })
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Failed to assign payment task.", "error");
+      });
+  }
+
+  function assignMembershipPaymentTasksForApprovedInquiries() {
+    if (!state.client) {
+      setStatus("Supabase client is unavailable.", "error");
+      return;
+    }
+
+    var inquiries = Array.isArray(state.membershipInquiries) ? state.membershipInquiries : [];
+    var approvedInquiries = inquiries.filter(function (inquiry) {
+      return String(inquiry && inquiry.status || "").toLowerCase() === "approved";
+    });
+
+    if (!approvedInquiries.length) {
+      setStatus("No approved membership inquiries found.", "info");
+      return;
+    }
+
+    var athleteByEmail = getAthleteLookupByEmail();
+    var assignmentTargets = approvedInquiries.map(function (inquiry) {
+      return {
+        inquiryId: String(inquiry && inquiry.id || "").trim(),
+        athleteUserId: getMembershipInquiryAthleteId(inquiry, athleteByEmail)
+      };
+    }).filter(function (target) {
+      return !!target.athleteUserId;
+    });
+
+    if (!assignmentTargets.length) {
+      setStatus("No approved inquiries are linked to athlete accounts yet.", "error");
+      return;
+    }
+
+    setStatus("Pushing membership payment tasks to approved athletes...", "info");
+
+    Promise.all(
+      assignmentTargets.map(function (target) {
+        return ensureMembershipPaymentTaskAssignment(target.athleteUserId)
+          .then(function (result) {
+            return {
+              inquiryId: target.inquiryId,
+              athleteUserId: target.athleteUserId,
+              result: result
+            };
+          });
+      })
+    )
+      .then(function (results) {
+        var createdCount = 0;
+        var existingCount = 0;
+        var errorCount = 0;
+
+        results.forEach(function (item) {
+          var assignmentResult = item && item.result ? item.result : null;
+          if (!assignmentResult || assignmentResult.error) {
+            errorCount += 1;
+            return;
+          }
+
+          if (assignmentResult.created) {
+            createdCount += 1;
+          } else {
+            existingCount += 1;
+          }
+        });
+
+        if (errorCount > 0) {
+          setStatus("Payment task push finished with " + errorCount + " error(s).", "error");
+        } else {
+          setStatus(
+            "Payment task push complete: " + createdCount + " new, " + existingCount + " already assigned.",
+            "success"
+          );
+        }
+
+        loadCoachOverviewData();
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to push payment tasks.", "error");
       });
   }
 
@@ -3683,6 +3874,12 @@
       var insightHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
       var actionHtml = "";
       var backHtml = "";
+      var paymentTaskHtml = "";
+
+      if (currentStage === "docs_signed_pending_payment" || currentStage === "payment_pending") {
+        paymentTaskHtml =
+          '<button type="button" class="btn admin-btn-refresh" data-founding-push-payment="1" data-athlete-id="' + escapeAttribute(athleteId) + '">Push Payment Task</button>';
+      }
 
       if (nextStage) {
         actionHtml =
@@ -3709,6 +3906,7 @@
           '</div>' +
           '<div style="display:flex; gap:0.45rem; flex-wrap:wrap; justify-content:flex-end;">' +
             '<a class="btn admin-btn-small" href="' + escapeAttribute(insightHref) + '">Insights</a>' +
+            paymentTaskHtml +
             backHtml +
             actionHtml +
           '</div>' +
@@ -3824,8 +4022,15 @@
     var advanceButton = target && target.closest("[data-founding-advance]");
     var backButton = target && target.closest("[data-founding-back]");
     var setStageButton = target && target.closest("[data-founding-set-stage]");
+    var pushPaymentButton = target && target.closest("[data-founding-push-payment]");
 
-    if (!advanceButton && !backButton && !setStageButton) {
+    if (!advanceButton && !backButton && !setStageButton && !pushPaymentButton) {
+      return;
+    }
+
+    if (pushPaymentButton) {
+      var paymentAthleteId = String(pushPaymentButton.getAttribute("data-athlete-id") || "").trim();
+      assignMembershipPaymentTask("", paymentAthleteId);
       return;
     }
 

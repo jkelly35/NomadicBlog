@@ -27,6 +27,16 @@
     buttons: []
   };
 
+  function buildPaymentSuccessUrl(userId) {
+    var base = window.location.origin + "/founding-payment-success.html";
+    var expectedUserId = String(userId || "").trim();
+    if (!expectedUserId) {
+      return base;
+    }
+
+    return base + "?expected_user_id=" + encodeURIComponent(expectedUserId);
+  }
+
   function setStatus(message, tone) {
     if (!state.statusEl) {
       return;
@@ -333,12 +343,17 @@
     setBusy(true);
     setStatus("Redirecting to secure checkout...", "info");
 
+    var successUrl = buildPaymentSuccessUrl(state.sessionUser && state.sessionUser.id);
+    var cancelUrl = window.location.origin + "/founding-member.html?checkout=cancelled";
+
     state.client.functions
       .invoke("stripe-create-checkout", {
         body: {
           plan: "founding_member",
           source: source || "founding_member_page",
-          email: state.sessionUser && state.sessionUser.email ? state.sessionUser.email : null
+          email: state.sessionUser && state.sessionUser.email ? state.sessionUser.email : null,
+          success_url: successUrl,
+          cancel_url: cancelUrl
         }
       })
       .then(function (result) {

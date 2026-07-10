@@ -10,6 +10,8 @@ type CheckoutBody = {
   plan?: string;
   source?: string;
   email?: string;
+  success_url?: string;
+  cancel_url?: string;
 };
 
 function jsonResponse(data: unknown, status = 200) {
@@ -85,6 +87,35 @@ function sanitizeEmail(value: unknown): string | null {
   return text;
 }
 
+function buildOriginUrl(origin: string | null, path: string): string | null {
+  if (!origin) {
+    return null;
+  }
+
+  const safeOrigin = sanitizeUrl(origin);
+  if (!safeOrigin) {
+    return null;
+  }
+
+  try {
+    return new URL(path, safeOrigin).toString();
+  } catch (_error) {
+    return null;
+  }
+}
+
+function isSameOrigin(urlA: string | null, urlB: string | null): boolean {
+  if (!urlA || !urlB) {
+    return false;
+  }
+
+  try {
+    return new URL(urlA).origin === new URL(urlB).origin;
+  } catch (_error) {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -99,13 +130,9 @@ Deno.serve(async (req) => {
     const stripeSecretKey = getRequiredEnv("STRIPE_SECRET_KEY");
     const foundingMemberPriceId = getRequiredEnv("STRIPE_FOUNDING_MEMBER_PRICE_ID");
 
-    const defaultSuccessUrl =
-      sanitizeUrl(Deno.env.get("STRIPE_SUCCESS_URL")) ||
-      "https://nomadicperformance.com/founding-payment-success.html";
-
-    const defaultCancelUrl =
-      sanitizeUrl(Deno.env.get("STRIPE_CANCEL_URL")) ||
-      "https://nomadicperformance.com/founding-member.html?checkout=cancelled";
+    const requestOrigin = sanitizeUrl(req.headers.get("origin"));
+    const originSuccessUrl = buildOriginUrl(requestOrigin, "/founding-payment-success.html");
+    const originCancelUrl = buildOriginUrl(requestOrigin, "/founding-member.html?checkout=cancelled");
 
     let body: CheckoutBody = {};
     try {
@@ -121,6 +148,41 @@ Deno.serve(async (req) => {
 
     const source = String(body.source || "founding_member_page").trim().slice(0, 80);
     const customerEmail = sanitizeEmail(authedUser.email || body.email);
+
+    const requestedSuccessUrl = sanitizeUrl(body.success_url);
+    const requestedCancelUrl = sanitizeUrl(body.cancel_url);
+
+    let trustedSuccessUrl: string | null = null;
+    let trustedCancelUrl: string | null = null;
+
+    if (requestedSuccessUrl && requestedCancelUrl) {
+      if (requestOrigin) {
+        if (
+          isSameOrigin(requestedSuccessUrl, requestOrigin) &&
+          isSameOrigin(requestedCancelUrl, requestOrigin)
+        ) {
+          trustedSuccessUrl = requestedSuccessUrl;
+          trustedCancelUrl = requestedCancelUrl;
+        }
+      } else if (isSameOrigin(requestedSuccessUrl, requestedCancelUrl)) {
+        // Some invoke clients may omit Origin headers. In that case, trust only a matching
+        // success/cancel pair that clearly stays on one origin.
+        trustedSuccessUrl = requestedSuccessUrl;
+        trustedCancelUrl = requestedCancelUrl;
+      }
+    }
+
+    const defaultSuccessUrl =
+      trustedSuccessUrl ||
+      originSuccessUrl ||
+      sanitizeUrl(Deno.env.get("STRIPE_SUCCESS_URL")) ||
+      "https://nomadicperformance.com/founding-payment-success.html";
+
+    const defaultCancelUrl =
+      trustedCancelUrl ||
+      originCancelUrl ||
+      sanitizeUrl(Deno.env.get("STRIPE_CANCEL_URL")) ||
+      "https://nomadicperformance.com/founding-member.html?checkout=cancelled";
 
     const payload = new URLSearchParams();
     payload.set("mode", "subscription");
