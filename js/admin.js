@@ -3714,6 +3714,34 @@
       });
     }).length;
 
+    var recentPaymentNotifications = foundedIdList
+      .map(function (id) {
+        var rows = subscriptionsByUser[id] || [];
+        var latest = rows
+          .filter(function (row) {
+            var status = String(row && row.status || "").toLowerCase();
+            return !!paidLikeStatuses[status] || String(row && row.last_event_type || "") === "invoice.payment_succeeded";
+          })
+          .sort(function (a, b) {
+            return String(b && (b.last_event_created_at || b.updated_at || "")).localeCompare(String(a && (a.last_event_created_at || a.updated_at || "")));
+          })[0] || null;
+
+        if (!latest) {
+          return null;
+        }
+
+        return {
+          user_id: id,
+          row: latest
+        };
+      })
+      .filter(function (item) {
+        return !!item;
+      })
+      .sort(function (a, b) {
+        return String(b && b.row && (b.row.last_event_created_at || b.row.updated_at || "")).localeCompare(String(a && a.row && (a.row.last_event_created_at || a.row.updated_at || "")));
+      });
+
     var stageProgressRank = {
       invited: 1,
       first_login_pending_docs: 2,
@@ -3782,6 +3810,31 @@
         '<p class="admin-overview-item-title">Founding Verification Snapshot</p>' +
         '<p class="admin-overview-item-meta">Founding members tracked: ' + escapeHtml(String(totalFounding)) + '</p>' +
       '</div>';
+
+    if (recentPaymentNotifications.length) {
+      var latestPayment = recentPaymentNotifications[0];
+      var latestSubscription = latestPayment.row || {};
+      var latestAthlete = state.athletes.find(function (athlete) {
+        return String(athlete && athlete.user_id || "") === String(latestPayment.user_id || "");
+      }) || null;
+      var latestLabel = latestAthlete && (latestAthlete.name || latestAthlete.email)
+        ? String(latestAthlete.name || latestAthlete.email)
+        : String(latestPayment.user_id || "Athlete").slice(0, 8);
+
+      html +=
+        '<div class="admin-overview-item admin-widget-row">' +
+          '<div>' +
+            '<p class="admin-overview-item-title">Payment Received</p>' +
+            '<p class="admin-overview-item-meta">' +
+              escapeHtml(latestLabel) +
+              ' • ' +
+              escapeHtml(String(latestSubscription.last_event_type || latestSubscription.status || "active")) +
+              (latestSubscription.last_event_created_at || latestSubscription.updated_at ? ' • ' + escapeHtml(formatDate(latestSubscription.last_event_created_at || latestSubscription.updated_at)) : '') +
+            '</p>' +
+          '</div>' +
+          '<span class="admin-risk-chip is-stable">Notify Coach</span>' +
+        '</div>';
+    }
 
     checks.forEach(function (check) {
       var isPass = check.total > 0 && check.value >= check.target;

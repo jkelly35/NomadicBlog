@@ -354,7 +354,7 @@ async function completeMembershipPaymentTasks(
     .from("athlete_onboarding_intake_assignments")
     .update(completionPayload)
     .eq("athlete_user_id", userId)
-    .eq("status", "assigned")
+    .neq("status", "archived")
     .or("form_id.eq.membership-payment-task-v1,form_name.ilike.%membership%payment%");
 
   if (error) {

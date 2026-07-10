@@ -18,10 +18,6 @@
     return "profile.html?founding_payment=success#profile-tasks-section";
   }
 
-  function getLoginRedirectUrl() {
-    return "index.html";
-  }
-
   function getExpectedUserIdFromQuery() {
     try {
       var params = new URLSearchParams(window.location.search || "");
@@ -44,8 +40,22 @@
     window.location.href = getDashboardRedirectUrl();
   }
 
-  function redirectToLogin() {
-    window.location.href = getLoginRedirectUrl();
+  function finalizePaymentForSession(client, expectedUserId) {
+    if (!client || !client.rpc) {
+      return Promise.resolve(false);
+    }
+
+    return client
+      .rpc("complete_founding_member_payment", {
+        p_athlete_user_id: expectedUserId || null
+      })
+      .then(function (result) {
+        if (result.error) {
+          throw result.error;
+        }
+
+        return true;
+      });
   }
 
   function init() {
@@ -67,17 +77,18 @@
 
         var currentUserId = String(session.user.id || "").trim();
         if (expectedUserId && currentUserId && expectedUserId !== currentUserId) {
-          setAutoRedirectMessage("Payment is complete, but this browser is signed in as a different account. Redirecting to login...");
-          client.auth
-            .signOut()
-            .finally(function () {
-              window.setTimeout(redirectToLogin, 550);
-            });
+          setAutoRedirectMessage("Payment is complete for your athlete account, but this browser is currently signed in as a different user. Sign out and then sign in with the athlete account to continue.");
           return;
         }
 
-        setAutoRedirectMessage("Payment complete. Redirecting to your athlete dashboard...");
-        window.setTimeout(redirectToDashboard, 450);
+        setAutoRedirectMessage("Payment complete. Updating your athlete account and redirecting to your dashboard...");
+        finalizePaymentForSession(client, expectedUserId || currentUserId)
+          .catch(function () {
+            // Best-effort: redirect even if the reconciliation RPC is temporarily unavailable.
+          })
+          .finally(function () {
+            window.setTimeout(redirectToDashboard, 450);
+          });
       })
       .catch(function () {
         // Do not block manual navigation on transient auth check failures.
