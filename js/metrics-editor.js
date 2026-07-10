@@ -245,6 +245,8 @@
     var cardsList = document.querySelector("[data-metrics-editor-cards]");
     if (cardsList) {
       cardsList.addEventListener("click", function (event) {
+        var clickedCard = event.target && event.target.closest(".metric-card");
+
         var deleteFlipBtn = event.target && event.target.closest("[data-metric-flip-delete]");
         if (deleteFlipBtn) {
           var deleteCard = deleteFlipBtn.closest(".metric-card");
@@ -281,33 +283,60 @@
           return;
         }
 
+        // Toggle a flipped card closed when clicking the back face (except form controls/buttons).
+        var clickedBackFace = event.target && event.target.closest(".metric-card-back");
+        var interactiveTarget = event.target && event.target.closest("input, select, textarea, button, a, label");
+        if (clickedCard && clickedBackFace && clickedCard.classList.contains("is-flipped") && !interactiveTarget) {
+          closeMetricCardEditor(clickedCard);
+          return;
+        }
+
         var actionBtn = event.target && event.target.closest("[data-metric-action]");
-        if (!actionBtn) {
+        if (actionBtn) {
+          var action = String(actionBtn.getAttribute("data-metric-action") || "");
+          var metricName = String(actionBtn.getAttribute("data-metric-name") || "");
+          var metricUnit = String(actionBtn.getAttribute("data-metric-unit") || "");
+          var metric = findLatestMetricByNameUnit(metricName, metricUnit);
+          if (!metric) {
+            setStatus("Metric not found. Refresh and try again.", "error");
+            return;
+          }
+
+          if (action === "edit") {
+            openMetricCardEditor(actionBtn.closest(".metric-card"), metric, "edit");
+            return;
+          }
+
+          if (action === "test") {
+            openMetricCardEditor(actionBtn.closest(".metric-card"), metric, "test");
+            return;
+          }
+
+          if (action === "benchmark") {
+            openMetricCardBenchmark(actionBtn.closest(".metric-card"), metric);
+            return;
+          }
+        }
+
+        var frontFace = event.target && event.target.closest(".metric-card-front");
+        if (!frontFace) {
           return;
         }
 
-        var action = String(actionBtn.getAttribute("data-metric-action") || "");
-        var metricName = String(actionBtn.getAttribute("data-metric-name") || "");
-        var metricUnit = String(actionBtn.getAttribute("data-metric-unit") || "");
-        var metric = findLatestMetricByNameUnit(metricName, metricUnit);
-        if (!metric) {
-          setStatus("Metric not found. Refresh and try again.", "error");
+        var frontCard = frontFace.closest(".metric-card");
+        if (!frontCard || frontCard.classList.contains("is-flipped")) {
           return;
         }
 
-        if (action === "edit") {
-          openMetricCardEditor(actionBtn.closest(".metric-card"), metric, "edit");
+        var frontMetricName = String(frontCard.getAttribute("data-metric-name") || "");
+        var frontMetricUnit = String(frontCard.getAttribute("data-metric-unit") || "");
+        var frontMetric = findLatestMetricByNameUnit(frontMetricName, frontMetricUnit);
+        if (!frontMetric) {
+          setStatus("Metric details unavailable right now.", "error");
           return;
         }
 
-        if (action === "test") {
-          openMetricCardEditor(actionBtn.closest(".metric-card"), metric, "test");
-          return;
-        }
-
-        if (action === "benchmark") {
-          openMetricCardBenchmark(actionBtn.closest(".metric-card"), metric);
-        }
+        openMetricCardBenchmark(frontCard, frontMetric);
       });
     }
   }
@@ -402,66 +431,40 @@
         var metricKey = getMetricKey(metric);
         var name = escapeHtml(metric.metric_name || "Metric");
         var frontValueHtml = buildMetricFrontValueHtml(metric);
-        var category = escapeHtml(metric.metric_category || "Performance");
-        var updated = metric.updated_at ? formatDate(metric.updated_at) : "-";
         var trend = getMetricTrend(metric);
         var trendClass = trend && trend.delta > 0 ? "is-up" : trend && trend.delta < 0 ? "is-down" : "is-neutral";
         var trendText = trend
-          ? (trend.delta > 0 ? "Up " : trend.delta < 0 ? "Down " : "No change ") +
+          ? (trend.delta > 0 ? "Improving" : trend.delta < 0 ? "Declining" : "Maintaining") +
+            " (" +
+            (trend.delta > 0 ? "+" : "") +
             trend.deltaLabel +
-            " vs last test"
-          : "Baseline recorded";
-        var historyPoints = (metric._history || [])
-          .slice(0, 4)
-          .reverse()
-          .map(function (entry) {
-            var entryValue = escapeHtml(entry.metric_value || "-");
-            var entryDate = escapeAttribute(formatDate(entry.updated_at || ""));
-            return '<span class="metric-history-point" title="' + entryDate + '">' + entryValue + "</span>";
-          })
-          .join("");
+            " vs last)"
+          : "Maintaining (baseline)";
 
         return (
-          '<article class="metric-card" data-metric-key="' + escapeAttribute(metricKey) + '" data-metric-id="' + escapeAttribute(metric.id || "") + '">' +
+          '<article class="metric-card" data-metric-key="' + escapeAttribute(metricKey) + '" data-metric-id="' + escapeAttribute(metric.id || "") + '" data-metric-name="' + escapeAttribute(metric.metric_name || "") + '" data-metric-unit="' + escapeAttribute(metric.metric_unit || "") + '">' +
           '<div class="metric-card-inner">' +
           '<div class="metric-card-face metric-card-front">' +
           '<div class="metric-card-body">' +
-          '<span class="metric-category">' + category + "</span>" +
           '<h3 class="metric-name">' + name + "</h3>" +
           '<p class="metric-value">' + frontValueHtml + "</p>" +
           '<p class="metric-trend ' + trendClass + '">' + trendText + "</p>" +
-          (historyPoints ? '<div class="metric-history-row">' + historyPoints + "</div>" : "") +
           "</div>" +
           '<div class="metric-card-footer">' +
-          '<p class="metric-updated">Updated ' + updated + "</p>" +
           '<div class="metric-card-actions">' +
-          '<button type="button" class="metric-card-btn" data-metric-action="benchmark" data-metric-name="' +
-          escapeAttribute(metric.metric_name || "") +
-          '" data-metric-unit="' +
-          escapeAttribute(metric.metric_unit || "") +
-          '">Benchmarks</button>' +
-          '<button type="button" class="metric-card-btn" data-metric-action="edit" data-metric-name="' +
+          '<button type="button" class="metric-card-btn metric-card-btn-compact" data-metric-action="edit" data-metric-name="' +
           escapeAttribute(metric.metric_name || "") +
           '" data-metric-unit="' +
           escapeAttribute(metric.metric_unit || "") +
           '">Edit</button>' +
-          '<button type="button" class="metric-card-btn" data-metric-action="test" data-metric-name="' +
-          escapeAttribute(metric.metric_name || "") +
-          '" data-metric-unit="' +
-          escapeAttribute(metric.metric_unit || "") +
-          '">+ Test</button>' +
           "</div>" +
           "</div>" +
           "</div>" +
           '<div class="metric-card-face metric-card-back">' +
           '<div class="metric-flip-label" data-metric-flip-label>Edit Metric</div>' +
           '<div class="metric-benchmark" data-metric-benchmark>' +
-          '<p class="metric-benchmark-value" data-benchmark-value></p>' +
-          '<p class="metric-benchmark-rating" data-benchmark-rating></p>' +
-          '<p class="metric-benchmark-range" data-benchmark-range></p>' +
-          '<p class="metric-benchmark-meaning" data-benchmark-meaning></p>' +
-          '<p class="metric-benchmark-note">Benchmarks are guideposts. Use your trend and coach context for interpretation.</p>' +
-          "</div>" +
+          '<p class="metric-benchmark-note">Description and Normative Values Coming Soon.</p>' +
+          '</div>' +
           '<div class="metric-flip-grid">' +
           '<input type="text" data-metric-edit="name" placeholder="Metric name" value="' + escapeAttribute(metric.metric_name || "") + '" />' +
           '<input type="text" data-metric-edit="value" placeholder="Test value" value="' + escapeAttribute(metric.metric_value || "") + '" />' +
@@ -470,9 +473,9 @@
           "</div>" +
           '<div class="metric-card-actions metric-card-actions-back metric-card-actions-benchmark">' +
           '<button type="button" class="metric-card-btn" data-metric-flip-close>Close</button>' +
-          "</div>" +
+          '</div>' +
           '<div class="metric-card-actions metric-card-actions-back">' +
-          '<button type="button" class="metric-card-btn metric-card-btn-danger" data-metric-flip-delete>Delete Metric</button>' +
+          '<button type="button" class="metric-card-btn metric-card-btn-danger metric-card-btn-mini" data-metric-flip-delete>Delete</button>' +
           '<button type="button" class="metric-card-btn" data-metric-flip-cancel>Cancel</button>' +
           '<button type="button" class="metric-card-btn metric-card-btn-primary" data-metric-flip-save>Save</button>' +
           "</div>" +
@@ -490,8 +493,6 @@
     if (!card || !metric) {
       return;
     }
-
-    closeAllMetricCardEditors();
 
     var modeValue = mode === "test" ? "test" : "edit";
     card.classList.add("is-flipped");
@@ -531,28 +532,12 @@
       return;
     }
 
-    closeAllMetricCardEditors();
-
     card.classList.add("is-flipped");
     card.setAttribute("data-metric-mode", "benchmark");
 
-    var benchmarkValueEl = card.querySelector("[data-benchmark-value]");
-    var benchmarkRatingEl = card.querySelector("[data-benchmark-rating]");
-    var benchmarkRangeEl = card.querySelector("[data-benchmark-range]");
-    var benchmarkMeaningEl = card.querySelector("[data-benchmark-meaning]");
-    var hint = getMetricBenchmarkHint(metric);
-
-    if (benchmarkValueEl) {
-      benchmarkValueEl.textContent = String(metric.metric_name || "Metric") + ": " + String(metric.metric_value || "-");
-    }
-    if (benchmarkRatingEl) {
-      benchmarkRatingEl.textContent = "Benchmark Guidance";
-    }
-    if (benchmarkRangeEl) {
-      benchmarkRangeEl.textContent = hint;
-    }
-    if (benchmarkMeaningEl) {
-      benchmarkMeaningEl.textContent = "Track trend direction over multiple tests, not just one score.";
+    var label = card.querySelector("[data-metric-flip-label]");
+    if (label) {
+      label.textContent = "Metric Details";
     }
   }
 
@@ -585,17 +570,12 @@
     var categoryInput = card.querySelector('[data-metric-edit="category"]');
 
     var nextName = String((nameInput && nameInput.value) || "").trim();
-    var nextValue = String((valueInput && valueInput.value) || "").trim();
+    var nextValue = String((valueInput && valueInput.value) || "").trim() || "-";
     var nextUnit = String((unitInput && unitInput.value) || "").trim();
     var nextCategory = String((categoryInput && categoryInput.value) || "Performance").trim() || "Performance";
 
     if (!nextName) {
       setStatus("Metric name is required.", "error");
-      return;
-    }
-
-    if (!nextValue) {
-      setStatus("Metric value is required.", "error");
       return;
     }
 
@@ -611,7 +591,8 @@
       state.metricsLatest = getLatestMetrics(state.currentMetrics);
       renderMetricsCards();
       renderMetricsEditor();
-      setStatus("New test entry added. Click Save Changes to persist.", "success");
+      setStatus("New test entry saved.", "success");
+      onSaveMetrics();
       return;
     }
 
@@ -633,7 +614,8 @@
     state.metricsLatest = getLatestMetrics(state.currentMetrics);
     renderMetricsCards();
     renderMetricsEditor();
-    setStatus("Metric updated. Click Save Changes to persist.", "success");
+    setStatus("Metric updated.", "success");
+    onSaveMetrics();
   }
 
   function deleteMetricFromFlippedCard(card) {
@@ -752,20 +734,62 @@
     }) || null;
   }
 
-  function getMetricBenchmarkHint(metric) {
+  function getMetricBenchmarkReference(metric) {
     var metricName = String(metric && metric.metric_name || "Metric");
-    var metricValue = String(metric && metric.metric_value || "-").trim() || "-";
-    var metricUnit = String(metric && metric.metric_unit || "").trim();
+    var references = [
+      {
+        match: /single\s*leg\s*squat/i,
+        description: "Assesses unilateral lower-body control, knee tracking, and movement quality under repeated reps.",
+        normative: "General adult quality range is about 12-20 controlled reps per side; asymmetry over 3 reps may indicate imbalance."
+      },
+      {
+        match: /heel\s*raise/i,
+        description: "Measures calf endurance and ankle-foot strength with controlled full-range heel raises.",
+        normative: "Typical recreational range is 20-30 reps per side; below ~15 may indicate reduced calf endurance."
+      },
+      {
+        match: /side\s*plank/i,
+        description: "Evaluates lateral core endurance and frontal-plane trunk/hip control.",
+        normative: "Many active adults hold 45-90 seconds; large side-to-side differences can flag stability deficits."
+      },
+      {
+        match: /vertical\s*jump/i,
+        description: "Captures lower-body explosive power from a rapid stretch-shortening action.",
+        normative: "Broad adult ranges are roughly 30-45 cm (women) and 40-60 cm (men), varying by sport and training age."
+      },
+      {
+        match: /y\s*balance|anterior\s*reach/i,
+        description: "Screens dynamic balance and single-leg control during reach tasks.",
+        normative: "Aim for strong left-right symmetry; anterior reach asymmetry around 4 cm or more can indicate elevated risk."
+      },
+      {
+        match: /vo2/i,
+        description: "Estimates aerobic capacity and endurance performance potential.",
+        normative: "General guide (ml/kg/min): recreational 35-45, trained 45-55, elite 55+."
+      }
+    ];
+
+    var matched = references.find(function (entry) {
+      return entry.match.test(metricName);
+    });
+
+    if (matched) {
+      return {
+        description: matched.description,
+        normative: matched.normative
+      };
+    }
 
     var hint = BENCHMARK_HINTS.find(function (entry) {
       return entry.match.test(metricName);
     });
 
-    var base = hint
-      ? hint.text
-      : "Benchmarks are sport- and athlete-specific. Compare this score to your own trend and your coach's target ranges.";
-
-    return metricName + ": " + metricValue + (metricUnit ? " " + metricUnit : "") + ". " + base;
+    return {
+      description: "Use consistent test setup and movement standards so trend data stays reliable across sessions.",
+      normative: hint
+        ? hint.text
+        : "Normative values are test-, sport-, and athlete-specific; compare against your own trend and coach targets."
+    };
   }
 
   function renderMetricsEditor() {
@@ -779,28 +803,84 @@
       return;
     }
 
+    var groupedMetrics = {};
     state.currentMetrics.forEach(function (metric, index) {
-      var row = document.createElement("div");
-      row.className = "metrics-editor-row";
-      row.innerHTML = `
-        <div class="metrics-editor-row-content">
-          <div class="metrics-editor-row-name">${escapeHtml(metric.metric_name || "")}</div>
-          <div class="metrics-editor-row-details">
-            <input type="text" class="metrics-editor-metric-value" data-metric-index="${index}" placeholder="Value" value="${escapeAttribute(metric.metric_value || "")}" />
-            <input type="text" class="metrics-editor-metric-unit" data-metric-index="${index}" placeholder="Unit" value="${escapeAttribute(metric.metric_unit || "")}" />
-            <select class="metrics-editor-metric-category" data-metric-index="${index}">${buildCategoryOptions(metric.metric_category)}</select>
+      var category = String(metric && metric.metric_category || "Performance").trim() || "Performance";
+      if (!groupedMetrics[category]) {
+        groupedMetrics[category] = [];
+      }
+
+      groupedMetrics[category].push({ metric: metric, index: index });
+    });
+
+    var categoryOrder = METRIC_CATEGORIES.filter(function (category) {
+      return Array.isArray(groupedMetrics[category]) && groupedMetrics[category].length;
+    });
+
+    Object.keys(groupedMetrics)
+      .filter(function (category) {
+        return categoryOrder.indexOf(category) === -1;
+      })
+      .sort(function (a, b) {
+        return a.localeCompare(b);
+      })
+      .forEach(function (category) {
+        categoryOrder.push(category);
+      });
+
+    categoryOrder.forEach(function (category) {
+      var section = document.createElement("section");
+      section.className = "metrics-editor-category-group";
+      section.innerHTML =
+        '<div class="metrics-editor-category-header">' +
+          '<h3 class="metrics-editor-category-title">' + escapeHtml(category) + '</h3>' +
+          '<span class="metrics-editor-category-count">' + String(groupedMetrics[category].length) + '</span>' +
+        '</div>';
+
+      var categoryList = document.createElement("div");
+      categoryList.className = "metrics-editor-category-list";
+
+      groupedMetrics[category].forEach(function (entry) {
+        var metric = entry.metric;
+        var index = entry.index;
+        var row = document.createElement("div");
+        row.className = "metrics-editor-row";
+        row.innerHTML = `
+          <div class="metrics-editor-card-top">
+            <div class="metrics-editor-row-name">${escapeHtml(metric.metric_name || "Untitled Metric")}</div>
+            <button type="button" class="btn metrics-editor-delete-btn" data-metric-delete data-metric-id="${escapeAttribute(metric.id || "")}" data-metric-index="${index}">Delete</button>
           </div>
-        </div>
-        <button type="button" class="btn metrics-editor-delete-btn" data-metric-delete data-metric-id="${escapeAttribute(metric.id || "")}">Delete</button>
-      `;
-      metricsListEl.appendChild(row);
+          <div class="metrics-editor-row-details metrics-editor-card-fields">
+            <label class="metrics-editor-field">
+              <span class="metrics-editor-field-label">Value</span>
+              <input type="text" class="metrics-editor-metric-value" data-metric-index="${index}" placeholder="Value" value="${escapeAttribute(metric.metric_value || "")}" />
+            </label>
+            <label class="metrics-editor-field">
+              <span class="metrics-editor-field-label">Unit</span>
+              <input type="text" class="metrics-editor-metric-unit" data-metric-index="${index}" placeholder="Unit" value="${escapeAttribute(metric.metric_unit || "")}" />
+            </label>
+            <label class="metrics-editor-field">
+              <span class="metrics-editor-field-label">Category</span>
+              <select class="metrics-editor-metric-category" data-metric-index="${index}">${buildCategoryOptions(metric.metric_category)}</select>
+            </label>
+          </div>
+        `;
+
+        categoryList.appendChild(row);
+      });
+
+      section.appendChild(categoryList);
+      metricsListEl.appendChild(section);
     });
 
     // Attach change listeners to input fields
-    var valueInputs = document.querySelectorAll("[data-metric-index]");
+    var valueInputs = metricsListEl.querySelectorAll("[data-metric-index]");
     valueInputs.forEach(function (input) {
       input.addEventListener("change", function () {
         var index = parseInt(this.getAttribute("data-metric-index"), 10);
+        if (Number.isNaN(index) || !state.currentMetrics[index]) {
+          return;
+        }
         if (this.classList.contains("metrics-editor-metric-value")) {
           state.currentMetrics[index].metric_value = this.value;
         } else if (this.classList.contains("metrics-editor-metric-unit")) {
@@ -860,24 +940,39 @@
 
   function onAddCustomMetric() {
     state.currentMetrics.push({
-      metric_name: "",
+      metric_name: "New Metric",
       metric_value: "",
       metric_unit: "",
-      metric_category: "Performance"
+      metric_category: "Performance",
+      updated_at: new Date().toISOString()
     });
+
     state.hasChanges = true;
+    state.metricsLatest = getLatestMetrics(state.currentMetrics);
+    renderMetricsCards();
     renderMetricsEditor();
+    setStatus("Metric card added. Click Edit on the card, then Save Changes.", "info");
   }
 
   function onDeleteMetric(btn) {
     var metricId = btn.getAttribute("data-metric-id");
-    if (!metricId) return;
+    var metricIndex = parseInt(btn.getAttribute("data-metric-index"), 10);
 
-    var idx = state.currentMetrics.findIndex(function (m) {
-      return m.id === metricId;
-    });
-    if (idx !== -1) {
-      state.currentMetrics.splice(idx, 1);
+    if (metricId) {
+      var idxById = state.currentMetrics.findIndex(function (m) {
+        return String(m && m.id || "") === String(metricId);
+      });
+      if (idxById !== -1) {
+        state.currentMetrics.splice(idxById, 1);
+        state.hasChanges = true;
+        renderMetricsEditor();
+        setStatus("Metric removed. Save to apply.", "info");
+      }
+      return;
+    }
+
+    if (!Number.isNaN(metricIndex) && state.currentMetrics[metricIndex]) {
+      state.currentMetrics.splice(metricIndex, 1);
       state.hasChanges = true;
       renderMetricsEditor();
       setStatus("Metric removed. Save to apply.", "info");

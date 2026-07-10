@@ -30,7 +30,7 @@
   </header>
 
   <!-- ===== Main Content ===== -->
-  <main class="metrics-editor-main">
+  <main class="metrics-editor-main metrics-page-main">
     <div class="metrics-editor-container">
       <!-- Auth Guard -->
       <div data-metrics-editor-guard>
@@ -48,47 +48,12 @@
         <div class="metrics-editor-section">
           <div class="metrics-editor-section-header">
             <h2>Metric Snapshot</h2>
+            <div class="metrics-editor-actions metrics-editor-actions-compact">
+              <button type="button" class="btn admin-btn-metric-add metrics-add-inline-btn" data-metrics-editor-add-custom>+ Add Metric</button>
+            </div>
           </div>
           <div class="metrics-list" data-metrics-editor-cards>
             <p class="admin-loading">Loading metric cards...</p>
-          </div>
-        </div>
-
-        <!-- Metrics List -->
-        <div class="metrics-editor-section">
-          <div class="metrics-editor-section-header">
-            <h2>Edit Metrics</h2>
-            <div class="metrics-editor-actions">
-              <select class="metrics-editor-preset-select" data-metrics-editor-assessment>
-                <option value="">+ Add Assessment…</option>
-                <option value="climbing">Climbing Performance Assessment</option>
-                <option value="running">Running Performance Assessment</option>
-              </select>
-              <select class="metrics-editor-preset-select" data-metrics-editor-preset>
-                <option value="">+ Add Preset Metric…</option>
-                <option value="Countermovement Push-Up (CMPU)">Countermovement Push-Up (CMPU)</option>
-                <option value="Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)">Closed Kinetic Chain Upper Extremity Stability Test (CKCUEST)</option>
-                <option value="20mm Edge Pull Strength">20mm Edge Pull Strength</option>
-                <option value="Max Pull Ups">Max Pull Ups</option>
-                <option value="Max Hang Time">Max Hang Time</option>
-                <option value="90 Degree Bent Leg Hang">90 Degree Bent Leg Hang</option>
-                <option value="Adapted Grant Foot Raise">Adapted Grant Foot Raise</option>
-                <option value="Ape Index">Ape Index</option>
-                <option value="Vertical Jump Height">Vertical Jump Height</option>
-                <option value="Single Leg Squat Test">Single Leg Squat Test</option>
-                <option value="Single Leg Heel Raise">Single Leg Heel Raise</option>
-                <option value="Side Plank with Hip Abduction Hold (Max Time)">Side Plank with Hip Abduction Hold (Max Time)</option>
-                <option value="Knee to Wall (Ankle DF Test)">Knee to Wall (Ankle DF Test)</option>
-                <option value="Y Balance (Anterior Reach)">Y Balance (Anterior Reach)</option>
-                <option value="Broad Jump">Broad Jump</option>
-                <option value="Tripple Hop">Tripple Hop</option>
-              </select>
-              <button type="button" class="btn admin-btn-metric-add" data-metrics-editor-add-custom>+ Add Custom Metric</button>
-            </div>
-          </div>
-
-          <div class="metrics-editor-list" data-metrics-editor-list>
-            <p class="admin-loading">Loading metrics...</p>
           </div>
         </div>
 

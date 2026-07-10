@@ -1092,6 +1092,10 @@
       return;
     }
 
+    if (!state.stravaMetaEl && !state.whoopMetaEl) {
+      return;
+    }
+
     loadStravaConnection();
     loadWhoopConnection();
   }

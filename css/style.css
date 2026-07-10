@@ -960,6 +960,192 @@ main {
   opacity: 0.5;
 }
 
+/* ---------- Blog List Page Refresh ---------- */
+.blog-page-main {
+  max-width: 1240px;
+  margin: 2.35rem auto 3rem;
+  padding: 0 1rem;
+}
+
+.blog-hero {
+  border: 1px solid #d8c9b5;
+  border-radius: 28px;
+  padding: 2rem 1.9rem 2.1rem;
+  background:
+    radial-gradient(980px 340px at 96% -10%, rgba(15, 71, 73, 0.26) 0%, rgba(15, 71, 73, 0) 62%),
+    radial-gradient(900px 300px at 0% 120%, rgba(197, 106, 44, 0.24) 0%, rgba(197, 106, 44, 0) 62%),
+    linear-gradient(145deg, #fff8ef 0%, #f5efe6 44%, #f2ebe1 100%);
+  box-shadow: 0 20px 42px rgba(22, 58, 58, 0.12);
+}
+
+.blog-hero-kicker {
+  margin: 0;
+  color: #c56a2c;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 800;
+  font-size: 0.76rem;
+}
+
+.blog-hero h2 {
+  margin: 0.6rem 0 0;
+  max-width: 23ch;
+  font-size: clamp(2rem, 1.3rem + 2.35vw, 3.35rem);
+  line-height: 1.05;
+  color: #0f3131;
+  letter-spacing: -0.02em;
+}
+
+.blog-hero-copy {
+  margin: 1rem 0 0;
+  max-width: 72ch;
+  color: #355252;
+  font-size: 1.03rem;
+  line-height: 1.62;
+}
+
+.blog-hero-chips {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.blog-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #d8c9b4;
+  background: rgba(255, 255, 255, 0.84);
+  color: #163f3f;
+  font-size: 0.83rem;
+  font-weight: 700;
+  padding: 0.34rem 0.7rem;
+}
+
+.blog-feed-shell {
+  margin-top: 1.35rem;
+  border: 1px solid #ddd0be;
+  border-radius: 24px;
+  padding: 1.2rem 1.2rem 1.35rem;
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.95) 0%, rgba(249, 243, 233, 0.92) 100%);
+  box-shadow: 0 12px 26px rgba(18, 56, 56, 0.08);
+}
+
+.blog-feed-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border-bottom: 1px solid #e4d9cb;
+  padding-bottom: 0.78rem;
+}
+
+.blog-feed-header h3 {
+  margin: 0;
+  color: #123838;
+  font-size: 1.3rem;
+}
+
+.blog-feed-header p {
+  margin: 0;
+  color: #5a6a6a;
+  font-size: 0.92rem;
+}
+
+.blog-page-main .posts-grid {
+  margin-top: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 1.15rem;
+}
+
+.blog-page-main .card {
+  border-top-width: 4px;
+  border-left-width: 1px;
+  border-left-color: #e6d8c5;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(19, 58, 58, 0.1);
+}
+
+.blog-page-main .card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 14px 28px rgba(15, 60, 60, 0.18);
+}
+
+.blog-page-main .card-cover {
+  height: 208px;
+}
+
+.blog-page-main .card-body {
+  padding: 1.15rem;
+}
+
+.blog-page-main .card-meta {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.blog-page-main .card-body h3 {
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+
+.blog-page-main .card-body p {
+  font-size: 0.92rem;
+  margin-bottom: 0.95rem;
+}
+
+.blog-page-main .card-body .btn {
+  padding: 0.62rem 1.05rem;
+  border-radius: 10px;
+  font-size: 0.77rem;
+}
+
+.blog-page-footer-action {
+  margin-top: 1.2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.blog-page-footer-action .btn {
+  font-size: 0.94rem;
+  padding: 0.72rem 1.15rem;
+  border-radius: 12px;
+}
+
+@media (max-width: 900px) {
+  .blog-page-main {
+    margin: 1.4rem auto 2.1rem;
+    padding: 0 0.85rem;
+  }
+
+  .blog-hero {
+    border-radius: 20px;
+    padding: 1.35rem 1.15rem 1.45rem;
+  }
+
+  .blog-feed-shell {
+    border-radius: 18px;
+    padding: 0.95rem;
+  }
+
+  .blog-feed-header {
+    display: grid;
+    gap: 0.32rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .blog-page-main .posts-grid {
+    grid-template-columns: 1fr;
+    gap: 0.95rem;
+  }
+
+  .blog-page-main .card-cover {
+    height: 188px;
+  }
+}
+
 /* ---------- Blog Post Page ---------- */
 .post-header {
   margin-bottom: 2rem;
@@ -1390,6 +1576,38 @@ footer a:hover {
   color: #e8d5c4;
   max-width: 760px;
   margin: 0.5rem auto 0 auto;
+}
+
+.founding-membership-hero-note {
+  margin: 0.95rem auto 0;
+  max-width: 760px;
+  border: 1px solid rgba(245, 240, 232, 0.22);
+  border-radius: 12px;
+  padding: 0.72rem 0.9rem;
+  background: linear-gradient(145deg, rgba(15, 45, 45, 0.46) 0%, rgba(20, 62, 62, 0.3) 100%);
+  backdrop-filter: blur(1px);
+}
+
+.founding-membership-hero-note-copy {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #f5ede2;
+}
+
+.founding-membership-hero-note-copy + .founding-membership-hero-note-copy {
+  margin-top: 0.35rem;
+}
+
+.founding-membership-hero-note-link {
+  color: #ffd3ad;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.founding-membership-hero-note-link:hover {
+  color: #fff0de;
 }
 
 .services-grid {
@@ -4726,6 +4944,695 @@ footer a:hover {
   border-color: #c56a2c;
 }
 
+/* ---------- Metrics Editor Refresh ---------- */
+.metrics-page-main {
+  max-width: 1240px;
+  margin: 2.35rem auto;
+  padding: 0 1.2rem 2rem;
+}
+
+.metrics-page-main .metrics-editor-container {
+  border: 1px solid #dfd2c1;
+  border-radius: 24px;
+  box-shadow: 0 20px 46px rgba(18, 63, 63, 0.12);
+  padding: 1.9rem 1.95rem 2.1rem;
+  background:
+    radial-gradient(900px 300px at 108% -16%, rgba(197, 106, 44, 0.14) 0%, rgba(197, 106, 44, 0) 60%),
+    radial-gradient(760px 320px at -10% -20%, rgba(18, 93, 96, 0.1) 0%, rgba(18, 93, 96, 0) 62%),
+    linear-gradient(180deg, #fffcf8 0%, #f8f4ed 100%);
+}
+
+.metrics-page-main [data-metrics-editor-content] {
+  gap: 1.25rem;
+}
+
+.metrics-page-main .metrics-editor-header {
+  border: 1px solid #e2d4c2;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94) 0%, rgba(245, 239, 230, 0.92) 100%);
+  padding: 1rem 1.08rem 0.95rem;
+  margin: 0;
+}
+
+.metrics-page-main .metrics-editor-back-btn {
+  margin-bottom: 0.95rem;
+  border-radius: 12px;
+  border: 1px solid #c7b9a7;
+  background: #f7f2ea;
+  color: #123e3e;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 0.62rem 1.08rem;
+}
+
+.metrics-page-main .metrics-editor-back-btn:hover {
+  background: #eee5d9;
+  border-color: #b8aa96;
+}
+
+.metrics-page-main .metrics-editor-header h1 {
+  margin: 0;
+  font-size: clamp(2.05rem, 1.6rem + 1.8vw, 2.8rem);
+  letter-spacing: 0.01em;
+  line-height: 1.08;
+  color: #123b3b;
+}
+
+.metrics-page-main .metrics-editor-subtitle {
+  margin-top: 0.58rem;
+  font-size: 1rem;
+  color: #4e6060;
+}
+
+.metrics-page-main .metrics-editor-section {
+  border: 1px solid #e3d7c7;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 7px 16px rgba(19, 58, 58, 0.06);
+  padding: 0.95rem;
+  gap: 0.92rem;
+}
+
+.metrics-page-main .metrics-editor-section-header h2 {
+  font-size: 1.45rem;
+  color: #153c3c;
+}
+
+.metrics-page-main .metrics-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.72rem;
+}
+
+.metrics-page-main .metric-card,
+.metrics-page-main .metric-card-inner {
+  min-width: 0;
+  min-height: 300px;
+}
+
+.metrics-page-main .metric-card-face {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.8rem;
+  gap: 0.42rem;
+}
+
+.metrics-page-main .metric-card-body {
+  overflow-x: hidden;
+  padding-bottom: 0.8rem;
+  align-content: start;
+}
+
+.metrics-page-main .metric-name {
+  margin: 0;
+  align-items: stretch;
+  line-height: 1.15;
+  font-size: 1.12rem;
+}
+
+.metrics-page-main .metric-value {
+  margin: 0.06rem 0 0;
+  font-size: 1.34rem;
+  line-height: 1.12;
+  color: #143b3b;
+  font-weight: 800;
+}
+
+.metrics-page-main .metric-card-front {
+  cursor: pointer;
+}
+
+.metrics-page-main .metric-trend {
+  margin: 0.2rem 0 0;
+  font-size: 0.79rem;
+}
+
+.metrics-page-main .metric-card-footer {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.metrics-page-main .metric-card-actions {
+  justify-content: flex-start;
+}
+
+.metrics-page-main .metric-card-btn-compact {
+  min-width: 0;
+  padding: 0.36rem 0.62rem;
+  font-size: 0.74rem;
+  border-radius: 8px;
+}
+
+.metrics-page-main .metric-card-actions-back {
+  justify-content: flex-end;
+  gap: 0.42rem;
+}
+
+.metrics-page-main .metric-card-btn-mini {
+  min-width: 0;
+  padding: 0.3rem 0.52rem;
+  font-size: 0.71rem;
+  border-radius: 7px;
+}
+
+.metrics-page-main .metric-flip-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.38rem;
+  width: 100%;
+}
+
+.metrics-page-main .metric-flip-grid input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 0.42rem 0.55rem;
+}
+
+.metrics-page-main .metric-benchmark {
+  gap: 0.38rem;
+}
+
+.metrics-page-main .metric-benchmark-range,
+.metrics-page-main .metric-benchmark-meaning,
+.metrics-page-main .metric-benchmark-note {
+  font-size: 0.78rem;
+  line-height: 1.38;
+}
+
+.metrics-page-main .profile-empty-state {
+  border-style: solid;
+  border-color: #dbcab4;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fffdf8 0%, #f8f2e7 100%);
+}
+
+.metrics-page-main .metrics-editor-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.metrics-page-main .metrics-editor-preset-select {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 10px;
+  border: 1px solid #d4c5b1;
+  background: #fff;
+  font-size: 0.94rem;
+}
+
+.metrics-page-main .admin-btn-metric-add {
+  min-height: 48px;
+  border-radius: 12px;
+  padding: 0.6rem 0.95rem;
+  white-space: nowrap;
+}
+
+.metrics-page-main .metrics-editor-actions-compact {
+  width: auto;
+  grid-template-columns: auto;
+}
+
+.metrics-page-main .metrics-add-inline-btn {
+  min-height: 36px;
+  border-radius: 9px;
+  padding: 0.34rem 0.68rem;
+  font-size: 0.8rem;
+  line-height: 1.1;
+}
+  padding: 0.8rem;
+  gap: 0.42rem;
+  gap: 0.72rem;
+}
+
+  overflow-x: hidden;
+.metrics-page-main .metrics-editor-category-group {
+  border: 1px solid #e5d9ca;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  padding-bottom: 0.8rem;
+}
+
+.metrics-page-main .metrics-editor-category-header {
+  gap: 0.34rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: 36px;
+  border-bottom: 1px solid #ebdfd0;
+  margin-bottom: 0.72rem;
+}
+
+    min-height: 292px;
+  margin: 0;
+  color: #153e3e;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.metrics-page-main .metrics-editor-category-count {
+  min-width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #153e3e;
+  border: 1px solid #d6c7b4;
+  background: linear-gradient(165deg, #fffdfa 0%, #f5eee2 100%);
+}
+
+.metrics-page-main .metrics-editor-category-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.72rem;
+}
+
+.metrics-page-main .metrics-editor-row {
+  display: grid;
+  gap: 0.72rem;
+  border: 1px solid #dfd2c2;
+  border-radius: 14px;
+  background: linear-gradient(165deg, #ffffff 0%, #f8f4ec 100%);
+  box-shadow: 0 5px 14px rgba(20, 58, 58, 0.07);
+  padding: 0.82rem;
+}
+
+.metrics-page-main .metrics-editor-row.is-focused {
+  border-color: #c56a2c;
+  box-shadow: 0 0 0 3px rgba(197, 106, 44, 0.19);
+}
+
+.metrics-page-main .metrics-editor-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.metrics-page-main .metrics-editor-row-name {
+  margin: 0;
+  font-size: 1.06rem;
+  line-height: 1.2;
+}
+
+.metrics-page-main .metrics-editor-card-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.metrics-page-main .metrics-editor-field {
+  display: grid;
+  gap: 0.32rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.metrics-page-main .metrics-editor-field-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #486060;
+}
+
+.metrics-page-main .metrics-editor-metric-value,
+.metrics-page-main .metrics-editor-metric-unit,
+.metrics-page-main .metrics-editor-metric-category {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 42px;
+  border-radius: 10px;
+  border: 1px solid #d8c9b6;
+  padding: 0.46rem 0.62rem;
+  font-size: 0.93rem;
+}
+
+.metrics-page-main .metrics-editor-delete-btn {
+  border-radius: 11px;
+  padding: 0.46rem 0.82rem;
+  border: 1px solid #e7beb6;
+  background: #fae4e0;
+  min-height: 0;
+  font-weight: 700;
+}
+
+.metrics-page-main .metrics-editor-footer {
+  border: 1px solid #e1d4c3;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffdf9 0%, #f7f1e7 100%);
+  padding: 0.95rem;
+  margin-top: 0.15rem;
+}
+
+.metrics-page-main .metrics-editor-footer .btn {
+  border-radius: 12px;
+  min-height: 46px;
+  min-width: 155px;
+}
+
+.metrics-page-main [data-metrics-editor-save] {
+  box-shadow: 0 10px 22px rgba(19, 74, 74, 0.18);
+}
+
+.metrics-page-main [data-metrics-editor-status] {
+  margin-top: 0.1rem;
+}
+
+@media (max-width: 980px) {
+  .metrics-page-main {
+    margin: 1.2rem auto;
+    padding: 0 0.85rem 1.2rem;
+  }
+
+  .metrics-page-main .metrics-editor-container {
+    padding: 1.25rem 1.1rem 1.3rem;
+    border-radius: 18px;
+  }
+
+  .metrics-page-main .metrics-editor-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-page-main .metrics-editor-category-group {
+    padding: 0.6rem;
+  }
+
+  .metrics-page-main .metrics-editor-category-header {
+    margin-bottom: 0.62rem;
+    padding-bottom: 0.55rem;
+  }
+
+  .metrics-page-main .metrics-editor-row-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .metrics-page-main .metrics-editor-header,
+  .metrics-page-main .metrics-editor-section,
+  .metrics-page-main .metrics-editor-footer {
+    border-radius: 14px;
+  }
+
+  .metrics-page-main .metrics-editor-header h1 {
+    font-size: 1.9rem;
+  }
+
+  .metrics-page-main .metrics-editor-category-list {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-page-main .metric-card,
+  .metrics-page-main .metric-card-inner {
+    min-width: 0;
+    min-height: 340px;
+  }
+
+  .metrics-page-main .metrics-editor-card-top {
+    align-items: flex-start;
+  }
+
+  .metrics-page-main .metrics-editor-row-details {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Athlete Editor Refresh ---------- */
+.athlete-editor-main {
+  max-width: 1260px;
+  margin: 2.4rem auto;
+  padding: 0 1.2rem 2.2rem;
+}
+
+.athlete-editor-main .metrics-editor-container {
+  border: 1px solid #e3d8c8;
+  border-radius: 24px;
+  box-shadow: 0 22px 48px rgba(19, 63, 63, 0.12);
+  padding: 2rem 2rem 2.2rem;
+  background:
+    radial-gradient(880px 340px at 105% -15%, rgba(197, 106, 44, 0.13) 0%, rgba(197, 106, 44, 0) 58%),
+    radial-gradient(760px 320px at -8% -20%, rgba(18, 92, 96, 0.11) 0%, rgba(18, 92, 96, 0) 62%),
+    linear-gradient(180deg, #fffcf8 0%, #fbf7f1 100%);
+}
+
+.athlete-editor-main [data-athlete-editor-content] {
+  gap: 1.4rem;
+}
+
+.athlete-editor-main .metrics-editor-header {
+  padding: 0.15rem 0 1.3rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid #e8ddd0;
+}
+
+.athlete-editor-main .metrics-editor-back-btn {
+  margin-bottom: 1.05rem;
+  border-radius: 12px;
+  border: 1px solid #c8baa8;
+  background: #f7f2ea;
+  color: #123d3d;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 0.62rem 1.12rem;
+}
+
+.athlete-editor-main .metrics-editor-back-btn:hover {
+  background: #efe6da;
+  border-color: #b9aa96;
+}
+
+.athlete-editor-main .metrics-editor-header h1 {
+  margin: 0;
+  font-size: clamp(2.05rem, 1.55rem + 2vw, 3rem);
+  letter-spacing: 0.01em;
+  line-height: 1.08;
+  color: #123939;
+}
+
+.athlete-editor-main .metrics-editor-subtitle {
+  margin-top: 0.7rem;
+  font-size: 1.06rem;
+  color: #4e5f5f;
+}
+
+.athlete-editor-main .athlete-editor-form {
+  gap: 1.15rem;
+}
+
+.athlete-editor-main .metrics-editor-section {
+  border: 1px solid #e5d8c8;
+  border-radius: 18px;
+  padding: 1.2rem 1.2rem 1.05rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 7px 18px rgba(20, 62, 62, 0.06);
+  gap: 0.95rem;
+}
+
+.athlete-editor-main .metrics-editor-section-header h2 {
+  font-size: 1.5rem;
+  color: #123939;
+}
+
+.athlete-editor-main .athlete-editor-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.92rem 0.95rem;
+}
+
+.athlete-editor-main .athlete-editor-info-row {
+  gap: 0.42rem;
+  margin-bottom: 0;
+}
+
+.athlete-editor-main .athlete-editor-info-row label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: #355252;
+}
+
+.athlete-editor-main .athlete-editor-info-row input,
+.athlete-editor-main .athlete-editor-info-row select,
+.athlete-editor-main .athlete-editor-info-row textarea {
+  min-height: 54px;
+  border: 1px solid #d8c9b6;
+  border-radius: 12px;
+  padding: 0.78rem 0.9rem;
+  font-size: 1.03rem;
+  color: #113838;
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.athlete-editor-main .athlete-editor-info-row textarea {
+  min-height: 112px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.athlete-editor-main .athlete-editor-info-row input:focus,
+.athlete-editor-main .athlete-editor-info-row select:focus,
+.athlete-editor-main .athlete-editor-info-row textarea:focus {
+  border-color: #c56a2c;
+  box-shadow: 0 0 0 3px rgba(197, 106, 44, 0.2);
+  outline: none;
+}
+
+.athlete-editor-main .athlete-editor-info-row p {
+  min-height: 54px;
+  margin: 0;
+  border: 1px dashed #d9c8b3;
+  border-radius: 12px;
+  padding: 0.78rem 0.9rem;
+  background: #fcf8f1;
+  color: #1f4343;
+  display: flex;
+  align-items: center;
+  font-size: 1.02rem;
+}
+
+.athlete-editor-main .athlete-editor-help {
+  font-size: 0.96rem;
+  color: #4f6262;
+}
+
+.athlete-editor-main .sport-checkbox-grid {
+  border: 1px solid #e6d8c8;
+  border-radius: 14px;
+  padding: 0.8rem;
+  background: #fffdfa;
+}
+
+.athlete-editor-main .sport-checkbox-item {
+  border-radius: 10px;
+  border: 1px solid #e7dccf;
+  background: #fff;
+  padding: 0.55rem 0.6rem;
+}
+
+.athlete-editor-main .sport-checkbox-item:hover {
+  border-color: #d7c4ac;
+  background: #fcf8f2;
+}
+
+.athlete-editor-main .sport-overview-editor {
+  border-radius: 14px;
+  border: 1px solid #e4d7c6;
+  background: #fff;
+}
+
+.athlete-editor-main .profile-wearables-grid {
+  gap: 0.8rem;
+}
+
+.athlete-editor-main .profile-wearable-card {
+  border-radius: 14px;
+  border: 1px solid #dfd2c0;
+  box-shadow: 0 4px 10px rgba(19, 60, 60, 0.06);
+  background: #fff;
+}
+
+.athlete-editor-main .profile-section-actions {
+  gap: 0.5rem;
+}
+
+.athlete-editor-main .profile-section-actions .btn,
+.athlete-editor-main .profile-account-actions-row .btn,
+.athlete-editor-main .metrics-editor-footer .btn {
+  border-radius: 12px;
+  min-height: 44px;
+  font-weight: 700;
+}
+
+.athlete-editor-main .metrics-editor-footer {
+  margin-top: 0.4rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid #e6dccf;
+}
+
+.athlete-editor-main .metrics-editor-footer .btn {
+  min-width: 180px;
+}
+
+.athlete-editor-main [data-athlete-editor-save] {
+  box-shadow: 0 10px 24px rgba(18, 73, 73, 0.18);
+}
+
+.athlete-editor-main .admin-modal-status {
+  font-size: 0.9rem;
+}
+
+.athlete-editor-main .athlete-editor-coming-soon {
+  border: 1px solid #dfd0bc;
+  border-radius: 14px;
+  padding: 1rem 1.05rem;
+  background:
+    radial-gradient(440px 150px at 8% 0%, rgba(197, 106, 44, 0.1) 0%, rgba(197, 106, 44, 0) 64%),
+    linear-gradient(145deg, #fffdf8 0%, #f6f1e8 100%);
+}
+
+.athlete-editor-main .athlete-editor-coming-soon-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6a5845;
+}
+
+.athlete-editor-main .athlete-editor-coming-soon p {
+  margin: 0.35rem 0 0;
+  color: #224848;
+  font-size: 1rem;
+}
+
+@media (max-width: 980px) {
+  .athlete-editor-main .metrics-editor-container {
+    padding: 1.5rem 1.3rem 1.6rem;
+    border-radius: 18px;
+  }
+
+  .athlete-editor-main .athlete-editor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .athlete-editor-main {
+    margin: 1.1rem auto;
+    padding: 0 0.7rem 1.2rem;
+  }
+
+  .athlete-editor-main .metrics-editor-header h1 {
+    font-size: 2rem;
+  }
+
+  .athlete-editor-main .athlete-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .athlete-editor-main .metrics-editor-section {
+    padding: 0.92rem 0.88rem 0.85rem;
+  }
+
+  .athlete-editor-main .metrics-editor-footer .btn {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
 /* Progress Card */
 .program-demo-progress-card {
   display: flex;
@@ -6251,8 +7158,8 @@ footer a:hover {
   margin-top: 0.2rem;
 }
 
-.profile-btn-save,
-.profile-btn-delete {
+.profile-form-actions .profile-btn-save,
+.profile-form-actions .profile-btn-delete {
   flex: 1;
 }
 
@@ -7359,6 +8266,26 @@ footer a:hover {
 .admin-assign-schedule-field {
   display: grid;
   gap: 0.32rem;
+}
+.athlete-editor-main [data-athlete-editor-account-actions] .profile-account-actions-row {
+  align-items: center;
+  gap: 0.65rem;
+}
+.athlete-editor-main [data-athlete-editor-account-actions] .profile-account-actions-row .btn {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 0.55rem 0.95rem;
+}
+.athlete-editor-main [data-athlete-editor-account-actions] .profile-btn-delete {
+  background: #fff4f2;
+  color: #8f2a1f;
+  border: 1px solid #d9b7b2;
+  box-shadow: none;
+}
+.athlete-editor-main [data-athlete-editor-account-actions] .profile-btn-delete:hover {
+  background: #fbe8e4;
+  border-color: #b94e41;
+  color: #7f2415;
 }
 
 .admin-assign-schedule-field span {
@@ -11676,6 +12603,197 @@ body.template-builder-mode .program-demo-actions-section .btn {
   margin-bottom: 0.95rem;
 }
 
+[data-goals-content].goals-page-content {
+  gap: 1rem;
+}
+
+[data-goals-content] .goals-page-hero {
+  border: 1px solid #dfd3c3;
+  border-radius: 18px;
+  padding: 1.2rem 1.25rem;
+  background:
+    radial-gradient(880px 260px at 110% -20%, rgba(197, 106, 44, 0.09) 0%, rgba(197, 106, 44, 0) 58%),
+    radial-gradient(720px 300px at -10% -25%, rgba(15, 91, 95, 0.08) 0%, rgba(15, 91, 95, 0) 60%),
+    linear-gradient(145deg, #fffdfa 0%, #f6f2ea 100%);
+}
+
+[data-goals-content] .goals-page-section {
+  padding: 1rem;
+}
+
+[data-goals-content] .goals-page-body {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+[data-goals-content] .goals-page-form-card {
+  border: 1px solid #dfd2c2;
+  border-radius: 16px;
+  padding: 0.95rem;
+  background: linear-gradient(180deg, #fffdf8 0%, #f8f3ea 100%);
+  box-shadow: 0 8px 20px rgba(19, 58, 58, 0.06);
+  position: sticky;
+  top: 1rem;
+}
+
+[data-goals-content] .goals-page-panel-title {
+  margin: 0;
+  color: #173b3b;
+  font-size: 1.12rem;
+}
+
+[data-goals-content] .goals-page-panel-copy {
+  margin: 0.42rem 0 0.82rem;
+  color: #4f6161;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+[data-goals-content] .profile-goals-form {
+  margin-bottom: 0;
+}
+
+[data-goals-content] .profile-goals-form-row {
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+}
+
+[data-goals-content] .profile-goals-form .form-group {
+  margin-bottom: 0.55rem;
+}
+
+[data-goals-content] .profile-goals-form label {
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #355252;
+  font-weight: 700;
+}
+
+[data-goals-content] .profile-goals-form input,
+[data-goals-content] .profile-goals-form select,
+[data-goals-content] .profile-goals-form textarea {
+  border-radius: 10px;
+  border: 1px solid #d8c9b6;
+  min-height: 46px;
+  font-size: 0.95rem;
+}
+
+[data-goals-content] .profile-goals-form textarea {
+  min-height: 96px;
+}
+
+[data-goals-content] .profile-goals-form .profile-form-actions {
+  width: 100%;
+  margin-top: 0.15rem;
+}
+
+[data-goals-content] .profile-goals-form .profile-form-actions .btn {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+}
+
+[data-goals-content] .goals-page-results {
+  border: 1px solid #e2d7c8;
+  border-radius: 16px;
+  background: #fff;
+  padding: 0.95rem;
+}
+
+[data-goals-content] .goals-page-results .profile-goals-countdown {
+  margin-bottom: 0.8rem;
+}
+
+[data-goals-content] .goals-page-results .profile-goals-list {
+  margin-top: 0;
+}
+
+[data-goals-content] .goals-page-results .profile-status {
+  margin-top: 0.55rem;
+}
+
+[data-goals-content] .profile-goal-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: auto;
+}
+
+[data-goals-content] .profile-goal-actions .btn {
+  min-width: 0;
+  width: 100%;
+  justify-content: center;
+}
+
+[data-goals-content] .profile-goal-check {
+  grid-column: 1 / -1;
+  margin-right: 0;
+}
+
+@media (max-width: 980px) {
+  [data-goals-content] .goals-page-body {
+    grid-template-columns: 1fr;
+  }
+
+  [data-goals-content] .goals-page-form-card {
+    position: static;
+    top: auto;
+  }
+
+  [data-goals-content] .profile-goals-form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  [data-goals-content] .goals-page-hero,
+  [data-goals-content] .goals-page-section,
+  [data-goals-content] .goals-page-form-card,
+  [data-goals-content] .goals-page-results {
+    border-radius: 14px;
+  }
+
+  [data-goals-content] .profile-goals-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  [data-goals-content] .profile-goal-actions {
+    grid-template-columns: 1fr;
+  }
+
+  [data-goals-content] .profile-goal-actions .btn {
+    width: 100%;
+  }
+}
+
+[data-goals-content] .profile-dashboard-heading-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+[data-goals-content] .profile-dashboard-heading-row > a.btn {
+  width: auto;
+  min-width: 0;
+  justify-self: end;
+  align-self: center;
+  padding: 0.64rem 1rem;
+}
+
+@media (max-width: 900px) {
+  [data-goals-content] .profile-dashboard-heading-row {
+    grid-template-columns: 1fr;
+  }
+
+  [data-goals-content] .profile-dashboard-heading-row > a.btn {
+    justify-self: start;
+  }
+}
+
 #profile-goals-section .profile-section-header {
   align-items: flex-start;
   gap: 0.9rem;
@@ -11740,27 +12858,38 @@ body.template-builder-mode .program-demo-actions-section .btn {
 
 .profile-goals-list {
   display: grid;
-  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.85rem;
 }
 
 .profile-goal-item {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.8rem;
-  background: #fff;
-  border: 1px solid #e6ddcf;
-  border-radius: 11px;
-  padding: 0.9rem 0.95rem;
+  flex-direction: column;
+  gap: 0.72rem;
+  background: linear-gradient(165deg, #ffffff 0%, #f9f5ee 100%);
+  border: 1px solid #e3d7c6;
+  border-radius: 14px;
+  padding: 0.95rem 1rem;
+  box-shadow: 0 6px 16px rgba(19, 58, 58, 0.07);
+  min-height: 170px;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.profile-goal-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(19, 58, 58, 0.1);
+  border-color: #d4c3ad;
 }
 
 .profile-goal-item.is-completed {
-  opacity: 0.75;
-  background: #fbfaf8;
+  opacity: 0.82;
+  background: linear-gradient(165deg, #fbfaf8 0%, #f4efe7 100%);
 }
 
 .profile-goal-main {
   flex: 1;
+  display: grid;
+  align-content: start;
 }
 
 .profile-goal-top {
@@ -11811,22 +12940,33 @@ body.template-builder-mode .program-demo-actions-section .btn {
 }
 
 .profile-goal-item h3 {
-  margin: 0.35rem 0 0.35rem;
+  margin: 0.42rem 0 0.24rem;
   color: #173636;
-  font-size: 1rem;
+  font-size: 1.14rem;
+  line-height: 1.25;
 }
 
 .profile-goal-details {
-  margin: 0;
+  margin: 0.05rem 0 0;
   color: #4f5e5e;
   font-size: 0.9rem;
 }
 
 .profile-goal-countdown-inline {
-  margin: 0.45rem 0 0;
+  margin: 0.62rem 0 0;
   color: #a3531f;
-  font-size: 0.85rem;
+  font-size: 0.98rem;
   font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .profile-goals-list {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-goal-item {
+    min-height: 0;
+  }
 }
 
 .profile-goal-actions {

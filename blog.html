@@ -25,9 +25,25 @@
       <a href="about.html">About Me</a>
     </nav>
   </header>
-  <main>
-    <h2 class="section-heading">All Blog Posts</h2>
-    <div class="posts-section-accent">
+  <main class="blog-page-main">
+    <section class="blog-hero" aria-labelledby="blog-hero-title">
+      <p class="blog-hero-kicker">Nomadic Journal</p>
+      <h2 id="blog-hero-title">Training Stories, Rehab Insights, and Mountain-Ready Performance Education</h2>
+      <p class="blog-hero-copy">Explore practical coaching insights, outcome case studies, and field-tested strategies you can apply across climbing, skiing, riding, and trail sports.</p>
+      <div class="blog-hero-chips" aria-label="Blog Topics">
+        <span class="blog-chip">Performance</span>
+        <span class="blog-chip">Injury Prevention</span>
+        <span class="blog-chip">Case Studies</span>
+        <span class="blog-chip">Mountain Sports</span>
+      </div>
+    </section>
+
+    <section class="blog-feed-shell" aria-labelledby="blog-feed-title">
+      <div class="blog-feed-header">
+        <h3 id="blog-feed-title">Latest Articles</h3>
+        <p>Fresh posts are loaded first, with legacy archives below.</p>
+      </div>
+
       <div class="posts-grid">
         <div data-blog-list-dynamic style="display: contents;"></div>
         <!-- Card 0 -->
@@ -154,8 +170,11 @@
           </div>
         </article>
       </div>
+    </section>
+
+    <div class="blog-page-footer-action">
+      <a class="btn" href="index.html">Back to Home</a>
     </div>
-    <a class="btn" href="index.html" style="display:inline-block;margin:2.5rem auto 0 auto;font-size:1.1rem;">Back to Home</a>
   </main>
   <footer style="background: #0e4749; color: #fff; padding: 24px 0 16px 0; text-align: center; margin-top: 48px;">
     <div style="margin-bottom: 10px;">

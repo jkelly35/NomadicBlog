@@ -24,7 +24,7 @@
   </header>
 
   <!-- ===== Main Content ===== -->
-  <main class="metrics-editor-main">
+  <main class="metrics-editor-main athlete-editor-main">
     <div class="metrics-editor-container">
       <!-- Guard for auth -->
       <div data-athlete-editor-guard>
@@ -142,54 +142,10 @@
             <div class="metrics-editor-section-header">
               <h2>Wearables Sync</h2>
             </div>
-            <p class="athlete-editor-help">Connect Strava and Whoop to sync training load and recovery data.</p>
-
-            <div class="profile-wearables-grid">
-              <section class="profile-wearable-card" aria-label="Strava Sync">
-                <div class="profile-wearable-head">
-                  <h3>Strava</h3>
-                  <div class="profile-section-actions">
-                    <button type="button" class="btn profile-btn-edit-profile" data-athlete-editor-strava-connect>Connect Strava</button>
-                    <button type="button" class="btn profile-btn-cancel" data-athlete-editor-strava-sync hidden>Sync Strava</button>
-                    <button type="button" class="btn profile-btn-cancel" data-athlete-editor-strava-disconnect hidden>Disconnect</button>
-                  </div>
-                </div>
-                <div class="strava-connection-meta" data-athlete-editor-strava-meta>
-                  <p class="profile-loading">Checking Strava connection...</p>
-                </div>
-                <p class="admin-modal-status" role="status" aria-live="polite" data-athlete-editor-strava-status></p>
-              </section>
-
-              <section class="profile-wearable-card" aria-label="Whoop Sync">
-                <div class="profile-wearable-head">
-                  <h3>Whoop</h3>
-                  <div class="profile-section-actions">
-                    <button type="button" class="btn profile-btn-edit-profile" data-athlete-editor-whoop-connect>Connect Whoop</button>
-                    <button type="button" class="btn profile-btn-cancel" data-athlete-editor-whoop-manual-toggle>Enter Whoop Info</button>
-                    <button type="button" class="btn profile-btn-cancel" data-athlete-editor-whoop-sync hidden>Sync Whoop</button>
-                    <button type="button" class="btn profile-btn-cancel" data-athlete-editor-whoop-disconnect hidden>Disconnect</button>
-                  </div>
-                </div>
-
-                <form class="profile-whoop-manual" data-athlete-editor-whoop-manual-form hidden>
-                  <p class="profile-whoop-manual-copy">Paste Whoop token details to connect manually.</p>
-                  <div class="profile-whoop-manual-grid">
-                    <input type="text" placeholder="Whoop Access Token" data-athlete-editor-whoop-access-token required />
-                    <input type="text" placeholder="Whoop Refresh Token" data-athlete-editor-whoop-refresh-token required />
-                    <input type="number" min="1" step="1" placeholder="Token Expires In (seconds)" data-athlete-editor-whoop-expires-in />
-                    <input type="text" placeholder="Whoop User ID (optional)" data-athlete-editor-whoop-user-id />
-                  </div>
-                  <div class="profile-whoop-manual-actions">
-                    <button type="submit" class="btn profile-btn-save">Save Whoop Info</button>
-                    <button type="button" class="btn profile-btn-cancel" data-athlete-editor-whoop-manual-cancel>Cancel</button>
-                  </div>
-                </form>
-
-                <div class="strava-connection-meta" data-athlete-editor-whoop-meta>
-                  <p class="profile-loading">Checking Whoop connection...</p>
-                </div>
-                <p class="admin-modal-status" role="status" aria-live="polite" data-athlete-editor-whoop-status></p>
-              </section>
+            <p class="athlete-editor-help">Wearables integration is temporarily unavailable while we finalize setup.</p>
+            <div class="athlete-editor-coming-soon" role="status" aria-live="polite">
+              <p class="athlete-editor-coming-soon-label">Coming Soon</p>
+              <p>Strava and Whoop sync will be available in a future update.</p>
             </div>
           </div>
 

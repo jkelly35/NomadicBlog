@@ -10,7 +10,10 @@
     goalsList: null,
     goalsCountdown: null,
     goalsStatus: null,
-    goalItems: []
+    goalItems: [],
+    editingGoalId: null,
+    submitButton: null,
+    cancelEditButton: null
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -24,6 +27,8 @@
     state.goalsList = document.querySelector("[data-goals-list]");
     state.goalsCountdown = document.querySelector("[data-goals-countdown]");
     state.goalsStatus = document.querySelector("[data-goals-status]");
+    state.submitButton = document.querySelector("[data-goal-submit-button]");
+    state.cancelEditButton = document.querySelector("[data-goal-cancel-edit]");
 
     if (!window.supabase || !window.supabase.createClient) {
       showError("Supabase client library failed to load.");
@@ -63,6 +68,16 @@
   function bindEvents() {
     if (state.goalsForm) {
       state.goalsForm.addEventListener("submit", onGoalSubmit);
+    }
+
+    if (state.cancelEditButton) {
+      state.cancelEditButton.addEventListener("click", function () {
+        if (state.goalsForm) {
+          state.goalsForm.reset();
+        }
+        resetGoalFormMode();
+        setGoalsStatus("Edit canceled.", "info");
+      });
     }
 
     if (state.goalsList) {
@@ -143,6 +158,11 @@
       status: "active"
     };
 
+    if (state.editingGoalId) {
+      updateGoalItem(state.editingGoalId, payload);
+      return;
+    }
+
     setGoalsStatus("Saving goal...", "info");
 
     state.client
@@ -177,6 +197,7 @@
         writeGoalFallbackItems(getUserId(), state.goalItems);
         renderGoalItems();
         state.goalsForm.reset();
+        resetGoalFormMode();
         setGoalsStatus("Goal added.", "success");
       })
       .catch(function (error) {
@@ -185,6 +206,15 @@
   }
 
   function onGoalListClick(event) {
+    var editBtn = event.target && event.target.closest("[data-goal-edit]");
+    if (editBtn) {
+      var editGoalId = String(editBtn.getAttribute("data-goal-edit") || "").trim();
+      if (editGoalId) {
+        beginGoalEdit(editGoalId);
+      }
+      return;
+    }
+
     var deleteBtn = event.target && event.target.closest("[data-goal-delete]");
     if (!deleteBtn) {
       return;
@@ -196,6 +226,138 @@
     }
 
     deleteGoalItem(goalId);
+  }
+
+  function beginGoalEdit(goalId) {
+    if (!state.goalsForm) {
+      return;
+    }
+
+    var goal = (state.goalItems || []).find(function (item) {
+      return String(item && item.id || "") === String(goalId || "");
+    });
+
+    if (!goal) {
+      setGoalsStatus("Goal not found.", "error");
+      return;
+    }
+
+    state.editingGoalId = String(goal.id || "");
+    setGoalFormValues(goal);
+
+    if (state.submitButton) {
+      state.submitButton.textContent = "Update Goal";
+    }
+
+    if (state.cancelEditButton) {
+      state.cancelEditButton.hidden = false;
+    }
+
+    setGoalsStatus("Editing goal. Update fields and save.", "info");
+    state.goalsForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function setGoalFormValues(goal) {
+    if (!state.goalsForm || !goal) {
+      return;
+    }
+
+    var goalTypeEl = state.goalsForm.querySelector("[data-goal-type]");
+    var goalDateEl = state.goalsForm.querySelector("[data-goal-target-date]");
+    var goalTitleEl = state.goalsForm.querySelector("[data-goal-title]");
+    var goalDetailsEl = state.goalsForm.querySelector("[data-goal-details]");
+
+    if (goalTypeEl) {
+      goalTypeEl.value = String(goal.goal_type || "goal") || "goal";
+    }
+    if (goalDateEl) {
+      goalDateEl.value = String(goal.target_date || "");
+    }
+    if (goalTitleEl) {
+      goalTitleEl.value = String(goal.title || "");
+    }
+    if (goalDetailsEl) {
+      goalDetailsEl.value = String(goal.details || "");
+    }
+  }
+
+  function resetGoalFormMode() {
+    state.editingGoalId = null;
+
+    if (state.submitButton) {
+      state.submitButton.textContent = "Add Goal";
+    }
+
+    if (state.cancelEditButton) {
+      state.cancelEditButton.hidden = true;
+    }
+  }
+
+  function updateGoalItem(goalId, payload) {
+    if (!state.client) {
+      return;
+    }
+
+    setGoalsStatus("Updating goal...", "info");
+
+    state.client
+      .from("athlete_goals_events")
+      .update({
+        title: payload.title,
+        goal_type: payload.goal_type,
+        target_date: payload.target_date,
+        details: payload.details,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", goalId)
+      .eq("user_id", getUserId())
+      .select("id,user_id,title,goal_type,target_date,details,status,created_at,updated_at")
+      .single()
+      .then(function (result) {
+        if (result.error) {
+          if (isMissingGoalTableError(result.error)) {
+            state.goalItems = state.goalItems.map(function (item) {
+              if (item.id !== goalId) {
+                return item;
+              }
+
+              return normalizeGoalItem(Object.assign({}, item, {
+                title: payload.title,
+                goal_type: payload.goal_type,
+                target_date: payload.target_date || "",
+                details: payload.details || "",
+                updated_at: new Date().toISOString()
+              }));
+            });
+
+            writeGoalFallbackItems(getUserId(), state.goalItems);
+            renderGoalItems();
+            state.goalsForm.reset();
+            resetGoalFormMode();
+            setGoalsStatus("Updated in this browser only.", "error");
+            return;
+          }
+
+          setGoalsStatus(result.error.message, "error");
+          return;
+        }
+
+        state.goalItems = state.goalItems.map(function (item) {
+          if (item.id !== goalId) {
+            return item;
+          }
+          return normalizeGoalItem(result.data);
+        });
+
+        writeGoalFallbackItems(getUserId(), state.goalItems);
+        renderGoalItems();
+        state.goalsForm.reset();
+        resetGoalFormMode();
+        setGoalsStatus("Goal updated.", "success");
+      })
+      .catch(function (error) {
+        setGoalsStatus(error && error.message ? error.message : "Failed to update goal.", "error");
+      });
   }
 
   function onGoalListChange(event) {
@@ -282,6 +444,12 @@
             state.goalItems = state.goalItems.filter(function (item) {
               return item.id !== goalId;
             });
+
+            if (state.editingGoalId && state.editingGoalId === goalId) {
+              state.goalsForm.reset();
+              resetGoalFormMode();
+            }
+
             writeGoalFallbackItems(getUserId(), state.goalItems);
             renderGoalItems();
             setGoalsStatus("Deleted in this browser only.", "error");
@@ -295,6 +463,12 @@
         state.goalItems = state.goalItems.filter(function (item) {
           return item.id !== goalId;
         });
+
+        if (state.editingGoalId && state.editingGoalId === goalId) {
+          state.goalsForm.reset();
+          resetGoalFormMode();
+        }
+
         writeGoalFallbackItems(getUserId(), state.goalItems);
         renderGoalItems();
         setGoalsStatus("Goal removed.", "success");
@@ -363,6 +537,7 @@
             '</div>' +
             '<div class="profile-goal-actions">' +
               '<label class="profile-goal-check"><input type="checkbox" data-goal-complete="' + escapeAttribute(item.id) + '" ' + (isCompleted ? 'checked' : '') + ' /><span>Completed</span></label>' +
+              '<button type="button" class="btn profile-btn-cancel" data-goal-edit="' + escapeAttribute(item.id) + '">Edit</button>' +
               '<button type="button" class="btn profile-btn-delete" data-goal-delete="' + escapeAttribute(item.id) + '">Delete</button>' +
             '</div>' +
           '</article>'
