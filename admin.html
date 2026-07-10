@@ -49,7 +49,6 @@
             <a class="btn admin-btn-refresh" href="nutrition-foodbank-settings.html">Foodbank</a>
             <a class="btn admin-btn-refresh" href="coach-training-programs.html">Programs</a>
             <a class="btn admin-btn-refresh" href="coach-workout-blocks.html">Workout Blocks</a>
-            <a class="btn admin-btn-refresh" href="in-person-classes.html">Classes</a>
             <a class="btn admin-btn-refresh" href="coach-blog-manager.html">Blog</a>
           </div>
         </div>
@@ -57,24 +56,24 @@
         <!-- Dashboard Stats -->
         <div class="admin-stats">
           <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-athlete-account>0</div>
+            <div class="admin-stat-label">Active Athlete</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-active-membership>0</div>
+            <div class="admin-stat-label">Active Membership</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-individualized-programming>0</div>
+            <div class="admin-stat-label">Individualized Programming</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" data-stat-active-program-tier>0</div>
+            <div class="admin-stat-label">Active Program</div>
+          </div>
+          <div class="admin-stat-card">
             <div class="admin-stat-value" data-stat-total-athletes>0</div>
-            <div class="admin-stat-label">Active Athletes</div>
-          </div>
-          <div class="admin-stat-card">
-            <div class="admin-stat-value" data-stat-profiles>0</div>
-            <div class="admin-stat-label">Profiles Created</div>
-          </div>
-          <div class="admin-stat-card">
-            <div class="admin-stat-value" data-stat-today-classes>0</div>
-            <div class="admin-stat-label">Classes Today</div>
-          </div>
-          <div class="admin-stat-card">
-            <div class="admin-stat-value" data-stat-upcoming-classes>0</div>
-            <div class="admin-stat-label">Classes Next 7 Days</div>
-          </div>
-          <div class="admin-stat-card">
-            <div class="admin-stat-value" data-stat-active-programs>0</div>
-            <div class="admin-stat-label">Active Programs</div>
+            <div class="admin-stat-label">Total Athletes</div>
           </div>
           <div class="admin-stat-card">
             <div class="admin-stat-value" data-stat-open-flags>0</div>
@@ -83,23 +82,10 @@
         </div>
 
         <section class="admin-overview-grid" id="coach-overview" aria-label="Coach Overview">
-          <article class="admin-overview-card admin-overview-calendar-card">
-            <div class="admin-overview-card-head">
-              <h2>Schedule Calendar</h2>
-              <p>Today and upcoming sessions at a glance.</p>
-            </div>
-            <div class="admin-calendar-strip" data-admin-calendar-strip>
-              <p class="admin-loading">Loading calendar...</p>
-            </div>
-            <div class="admin-calendar-day-list" data-admin-calendar-day-list>
-              <p class="admin-loading">Loading day schedule...</p>
-            </div>
-          </article>
-
           <article class="admin-overview-card">
             <div class="admin-overview-card-head">
               <h2>Upcoming Timeline</h2>
-              <p>Classes, athlete events, and program activity.</p>
+              <p>Birthdays, upcoming events, and membership or plan expiry alerts.</p>
             </div>
             <div class="admin-overview-list" data-admin-upcoming-list>
               <p class="admin-loading">Loading upcoming items...</p>
@@ -109,7 +95,7 @@
           <article class="admin-overview-card">
             <div class="admin-overview-card-head">
               <h2>Coach To-Do</h2>
-              <p>Track priorities that need attention.</p>
+              <p>Track priorities that need attention, including automated coaching follow-ups.</p>
             </div>
             <form class="admin-inline-form" data-admin-todo-form>
               <input type="text" class="admin-search" placeholder="Add a task..." data-admin-todo-input />
@@ -118,116 +104,11 @@
             <div class="admin-overview-list" data-admin-todo-list>
               <p class="admin-loading">No tasks yet.</p>
             </div>
-          </article>
-
-          <article class="admin-overview-card">
-            <div class="admin-overview-card-head">
-              <h2>Founding Onboarding</h2>
-              <p>Track legal signing status for founding members.</p>
-            </div>
-            <div class="admin-overview-list" data-admin-founding-onboarding>
-              <p class="admin-loading">Loading onboarding queue...</p>
+            <div class="admin-overview-list" data-admin-todo-automated-list>
+              <p class="admin-loading">Loading automated coaching tasks...</p>
             </div>
           </article>
 
-          <article class="admin-overview-card">
-            <div class="admin-overview-card-head">
-              <h2>Membership Inquiries</h2>
-              <p>Review interest requests, approve candidates, and assign payment tasks.</p>
-              <button class="btn admin-btn-refresh" type="button" data-admin-membership-push-approved>Push Payment Tasks To Approved</button>
-            </div>
-            <div class="admin-overview-list" data-admin-membership-inquiries>
-              <p class="admin-loading">Loading membership inquiries...</p>
-            </div>
-          </article>
-
-          <article class="admin-overview-card">
-            <div class="admin-overview-card-head">
-              <h2>Phase 2 Verification</h2>
-              <p>Live launch checks for onboarding, payment, and intake progression.</p>
-            </div>
-            <div class="admin-overview-list" data-admin-founding-verification>
-              <p class="admin-loading">Loading verification checks...</p>
-            </div>
-          </article>
-
-          <article class="admin-overview-card">
-            <div class="admin-overview-card-head">
-              <h2>Athlete Flags</h2>
-              <p>Surface issues and coaching risks fast.</p>
-            </div>
-            <form class="admin-inline-form" data-admin-flag-form>
-              <select data-admin-flag-severity>
-                <option value="high">High</option>
-                <option value="medium" selected>Medium</option>
-                <option value="low">Low</option>
-              </select>
-              <select data-admin-flag-athlete>
-                <option value="">General Flag (not athlete-specific)</option>
-              </select>
-              <input type="text" class="admin-search" placeholder="Add a flag..." data-admin-flag-input />
-              <button class="btn admin-btn-refresh" type="submit">Add</button>
-            </form>
-            <div class="admin-overview-list" data-admin-flags-list>
-              <p class="admin-loading">No flags yet.</p>
-            </div>
-          </article>
-
-          <article class="admin-overview-card">
-            <div class="admin-overview-card-head">
-              <h2>Coach Risk Board</h2>
-              <p>Prioritize interventions by urgency and signal reasons.</p>
-            </div>
-            <div class="admin-risk-filter" data-admin-risk-filter>
-              <button class="btn admin-btn-refresh is-active" type="button" data-risk-filter="all">All</button>
-              <button class="btn admin-btn-refresh" type="button" data-risk-filter="urgent">Urgent</button>
-              <button class="btn admin-btn-refresh" type="button" data-risk-filter="watch">Watch</button>
-              <button class="btn admin-btn-refresh" type="button" data-risk-filter="stable">Stable</button>
-            </div>
-            <div class="admin-overview-list" data-admin-risk-board>
-              <p class="admin-loading">Loading athlete risk signals...</p>
-            </div>
-          </article>
-
-          <article class="admin-overview-card">
-            <div class="admin-overview-card-head">
-              <h2>Readiness Trend</h2>
-              <p>Team readiness and recovery trend over the last two weeks.</p>
-            </div>
-            <div class="admin-overview-list" data-admin-readiness-trend>
-              <p class="admin-loading">Loading readiness trend...</p>
-            </div>
-          </article>
-
-          <article class="admin-overview-card">
-            <div class="admin-overview-card-head">
-              <h2>ACWR Risk Bands</h2>
-              <p>Acute:chronic workload ratio watchlist across tracked athletes.</p>
-            </div>
-            <div class="admin-overview-list" data-admin-acwr-risk>
-              <p class="admin-loading">Loading ACWR risk...</p>
-            </div>
-          </article>
-
-          <article class="admin-overview-card">
-            <div class="admin-overview-card-head">
-              <h2>Injury Flag Alerts</h2>
-              <p>Combined manual/auto flags plus athlete-reported pain and injury markers.</p>
-            </div>
-            <div class="admin-overview-list" data-admin-injury-alerts>
-              <p class="admin-loading">Loading injury alerts...</p>
-            </div>
-          </article>
-
-          <article class="admin-overview-card">
-            <div class="admin-overview-card-head">
-              <h2>Climbing Level Comparison</h2>
-              <p>Compare self-reported climbing level vs testing-based assessment signal.</p>
-            </div>
-            <div class="admin-overview-list" data-admin-climbing-comparison>
-              <p class="admin-loading">Loading climbing comparison...</p>
-            </div>
-          </article>
         </section>
 
         <section class="admin-athletes-panel" id="coach-messages" aria-label="Coach Message Alerts">
@@ -307,7 +188,6 @@
                   <a class="admin-tools-menu-link" href="exercise-library.html">Exercise Library</a>
                   <a class="admin-tools-menu-link" href="nutrition-foodbank-settings.html">Nutrition Foodbank</a>
                   <a class="admin-tools-menu-link" href="coach-training-programs.html">Training Programs</a>
-                  <a class="admin-tools-menu-link" href="in-person-classes.html">In-Person Classes</a>
                   <a class="admin-tools-menu-link" href="coach-blog-manager.html">Blog Manager</a>
                 </div>
               </details>
