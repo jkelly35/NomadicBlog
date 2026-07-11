@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Programming Block Library - Nomadic Performance</title>
-  <link rel="stylesheet" href="css/style.css?v=20260711f" />
-  <script defer src="js/analytics.js?v=20260711f"></script>
+  <link rel="stylesheet" href="css/style.css?v=20260711j" />
+  <script defer src="js/analytics.js?v=20260711j"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script defer src="js/supabase-config.js?v=20260711f"></script>
-  <script defer src="js/auth-ui.js?v=20260711f"></script>
-  <script defer src="js/coach-workout-blocks.js?v=20260711f"></script>
+  <script defer src="js/supabase-config.js?v=20260711j"></script>
+  <script defer src="js/auth-ui.js?v=20260711j"></script>
+  <script defer src="js/coach-workout-blocks.js?v=20260711j"></script>
 </head>
 <body>
   <header>
@@ -54,7 +54,7 @@
             <label for="block-tags">Tags</label>
             <input type="text" class="program-builder-block-tags" placeholder="Tags (comma separated)" data-block-tags />
 
-            <div class="block-manager-import-panel">
+            <div class="block-manager-import-panel" data-block-import-panel>
               <div>
                 <label for="block-source-day">Import From Draft Day</label>
                 <select id="block-source-day" class="program-builder-block-section" data-block-source-day>
@@ -75,7 +75,43 @@
               <button type="button" class="btn btn-secondary" data-block-import>Import Exercises</button>
             </div>
 
-            <div class="block-manager-composer-header">
+            <div class="block-manager-single-fields" data-block-single-fields>
+              <label for="block-single-section">Section</label>
+              <select id="block-single-section" class="program-builder-block-section" data-block-single-section>
+                <option value="Warm Up">Warm Up</option>
+                <option value="A Block">A Block</option>
+                <option value="B Block">B Block</option>
+                <option value="C Block">C Block</option>
+                <option value="Cool Down">Cool Down</option>
+              </select>
+
+              <label for="block-single-mode">Mode</label>
+              <select id="block-single-mode" class="program-builder-block-section" data-block-single-mode>
+                <option value="reps">Reps</option>
+                <option value="time">Time</option>
+                <option value="endurance">Endurance</option>
+              </select>
+
+              <label for="block-single-reps">Target Reps / Duration</label>
+              <input id="block-single-reps" type="text" class="program-builder-block-section" placeholder="e.g., 5 or 45s or 20:00" data-block-single-reps />
+
+              <label for="block-single-weight">Weight / Metric</label>
+              <input id="block-single-weight" type="text" class="program-builder-block-section" placeholder="e.g., BW, 20kg, Zone 2" data-block-single-weight />
+
+              <label for="block-single-rpe">Intensity / RPE</label>
+              <input id="block-single-rpe" type="text" class="program-builder-block-section" placeholder="e.g., RPE 7, Fast, Z2" data-block-single-rpe />
+
+              <label for="block-single-rest">Rest</label>
+              <input id="block-single-rest" type="text" class="program-builder-block-section" placeholder="e.g., 90s" data-block-single-rest />
+
+              <label for="block-single-description">How To Perform</label>
+              <textarea id="block-single-description" class="program-builder-block-section block-manager-exercise-notes" placeholder="Coaching cues and execution notes" data-block-single-description></textarea>
+
+              <label for="block-single-video">Video Demonstration URL</label>
+              <input id="block-single-video" type="url" class="program-builder-block-section" placeholder="https://..." data-block-single-video />
+            </div>
+
+            <div class="block-manager-composer-header" data-block-composer-header>
               <div>
                 <h3>Exercises In This Item</h3>
                 <p>Add one exercise for a single-exercise item, or stack several for a reusable block.</p>
@@ -99,7 +135,7 @@
               <p>Filter by item type or tag, then edit, reorder, or delete.</p>
             </div>
             <div class="block-manager-list-filters">
-              <div>
+              <div class="block-manager-filter-field">
                 <label for="block-type-filter">Type</label>
                 <select id="block-type-filter" class="program-builder-block-filter" data-block-type-filter>
                   <option value="all">All items</option>
@@ -107,10 +143,12 @@
                   <option value="block">Blocks</option>
                 </select>
               </div>
-              <label for="block-tag-filter">Tag filter</label>
-              <select id="block-tag-filter" class="program-builder-block-filter" data-block-filter>
-                <option value="all">All tags</option>
-              </select>
+              <div class="block-manager-filter-field">
+                <label for="block-tag-filter">Tag filter</label>
+                <select id="block-tag-filter" class="program-builder-block-filter" data-block-filter>
+                  <option value="all">All tags</option>
+                </select>
+              </div>
             </div>
           </div>
           <div class="block-manager-list" data-block-list>

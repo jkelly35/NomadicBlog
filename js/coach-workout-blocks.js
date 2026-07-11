@@ -94,20 +94,20 @@
 
     state.client = createSupabaseClient();
     if (!state.client) {
-      showGuardMessage("Supabase is not configured. Cannot load the exercise library.");
+      enterLocalFallback("Supabase is not configured. Using local-only exercise library.");
       return;
     }
 
     resolveCoachAccess()
       .then(function (access) {
         if (!access || !access.allowed || !access.user) {
-          showGuardMessage("Coach access is required to manage the exercise library.");
+          enterLocalFallback("Coach access is not available. Using local-only exercise library.");
           return;
         }
 
         state.coachUserId = String(access.user.id || "").trim() || null;
         if (!state.coachUserId) {
-          showGuardMessage("Could not verify coach account.");
+          enterLocalFallback("Could not verify coach account. Using local-only exercise library.");
           return;
         }
 
@@ -116,9 +116,23 @@
         clearEditState();
         loadLibraryItems();
       })
-      .catch(function () {
-        showGuardMessage("Could not verify coach access.");
+      .catch(function (error) {
+        enterLocalFallback(
+          "Could not verify coach access. Using local-only mode." +
+            (error && error.message ? " " + String(error.message) : "")
+        );
       });
+  }
+
+  function enterLocalFallback(message) {
+    state.client = null;
+    state.coachUserId = null;
+    showManager();
+    loadDraftDayOptions();
+    clearEditState();
+    state.items = readItemsFromStorage();
+    renderItems();
+    setStatus(String(message || "Using local-only mode."), "info");
   }
 
   function resolveCoachAccess() {
@@ -243,7 +257,11 @@
         if (getSelectedEntryType() === "exercise" && state.draftExercises.length > 1) {
           state.draftExercises = [cloneExercise(state.draftExercises[0])];
         }
+        if (getSelectedEntryType() === "exercise") {
+          syncSingleExerciseFromInputs();
+        }
         renderDraftExercises();
+        toggleComposerForEntryType();
       });
     }
 
@@ -286,6 +304,11 @@
     });
 
     document.addEventListener("input", function (event) {
+      if (event && event.target && event.target.closest && event.target.closest("[data-block-single-fields]")) {
+        syncSingleExerciseFromInputs();
+        return;
+      }
+
       var exerciseItem = event.target && event.target.closest && event.target.closest("[data-block-exercise-item]");
       if (!exerciseItem) {
         return;
@@ -298,6 +321,100 @@
 
       updateDraftExerciseFromRow(index, exerciseItem);
     });
+  }
+
+  function toggleComposerForEntryType() {
+    var entryType = getSelectedEntryType();
+    var isExercise = entryType === "exercise";
+    var importPanel = document.querySelector("[data-block-import-panel]");
+    var singlePanel = document.querySelector("[data-block-single-fields]");
+    var composerHeader = document.querySelector("[data-block-composer-header]");
+    var exerciseList = document.querySelector("[data-block-exercise-list]");
+    var addExerciseBtn = document.querySelector("[data-block-add-exercise]");
+
+    if (importPanel) {
+      importPanel.hidden = isExercise;
+    }
+    if (singlePanel) {
+      singlePanel.hidden = !isExercise;
+    }
+    if (composerHeader) {
+      composerHeader.hidden = isExercise;
+    }
+    if (exerciseList) {
+      exerciseList.hidden = isExercise;
+    }
+    if (addExerciseBtn) {
+      addExerciseBtn.hidden = isExercise;
+    }
+
+    if (isExercise) {
+      populateSingleExerciseInputs();
+    }
+  }
+
+  function populateSingleExerciseInputs() {
+    var exercise = normalizeExercises(state.draftExercises || [])[0] || createDefaultExercise();
+    var set = exercise && Array.isArray(exercise.sets) && exercise.sets[0] ? exercise.sets[0] : {};
+
+    setInputValue("[data-block-single-section]", String(exercise.section || DEFAULT_SECTION));
+    setInputValue("[data-block-single-mode]", String(exercise.mode || DEFAULT_MODE));
+    setInputValue("[data-block-single-reps]", set.reps != null ? String(set.reps) : "");
+    setInputValue("[data-block-single-weight]", set.weight != null ? String(set.weight) : "");
+    setInputValue("[data-block-single-rpe]", set.rpe != null ? String(set.rpe) : "");
+    setInputValue("[data-block-single-rest]", set.rest != null ? String(set.rest) : "");
+    setInputValue("[data-block-single-description]", String(exercise.description || set.notes || ""));
+    setInputValue("[data-block-single-video]", String(exercise.video_demo_url || ""));
+  }
+
+  function syncSingleExerciseFromInputs() {
+    if (getSelectedEntryType() !== "exercise") {
+      return;
+    }
+
+    var nameInput = document.querySelector("[data-block-title]");
+    var title = String(nameInput && nameInput.value || "").trim();
+    var description = readValue("[data-block-single-description]");
+    var video = readValue("[data-block-single-video]");
+    var reps = readValue("[data-block-single-reps]");
+    var weight = readValue("[data-block-single-weight]");
+    var rpe = readValue("[data-block-single-rpe]");
+    var rest = readValue("[data-block-single-rest]");
+
+    state.draftExercises = [normalizeExercises([{
+      name: title || "Exercise",
+      section: readValue("[data-block-single-section]") || DEFAULT_SECTION,
+      mode: readValue("[data-block-single-mode]") || DEFAULT_MODE,
+      description: description,
+      video_demo_url: video,
+      superset_group: null,
+      field_toggles: null,
+      sets: [{
+        reps: reps,
+        weight: weight,
+        rpe: rpe,
+        rest: rest,
+        notes: description,
+        done: false,
+        target_reps: reps,
+        target_weight: weight,
+        target_rpe: rpe,
+        target_rest: rest,
+        target_notes: description
+      }]
+    }])[0]];
+  }
+
+  function readValue(selector) {
+    var el = document.querySelector(selector);
+    return String(el && el.value || "").trim();
+  }
+
+  function setInputValue(selector, value) {
+    var el = document.querySelector(selector);
+    if (el) {
+      el.value = String(value || "");
+    }
   }
 
   function showGuardMessage(message) {
@@ -363,6 +480,22 @@
   }
 
   function loadLibraryItems() {
+    if (!state.client || !state.coachUserId) {
+      state.items = readItemsFromStorage();
+      if (!state.items.length) {
+        seedStarterLibraryItems().then(function (seeded) {
+          state.items = sortItems(seeded);
+          writeItemsToStorage(state.items);
+          renderItems();
+          setStatus("Added starter preset exercises (local mode).", "success");
+        });
+        return;
+      }
+
+      renderItems();
+      return;
+    }
+
     state.items = readItemsFromStorage();
     renderItems();
 
@@ -543,6 +676,11 @@
       updated_at: new Date().toISOString()
     };
 
+    if (!state.client || !state.coachUserId) {
+      saveLocalOnly(localItem, "Saved locally.");
+      return;
+    }
+
     state.client
       .from("coach_workout_blocks")
       .insert(buildCloudPayload(localItem))
@@ -597,7 +735,7 @@
       persistOrderToCloud();
     };
 
-    if (!isUuid(existing.id)) {
+    if (!state.client || !state.coachUserId || !isUuid(existing.id)) {
       applyLocal();
       return;
     }
@@ -736,7 +874,7 @@
       persistOrderToCloud();
     };
 
-    if (!isUuid(itemId)) {
+    if (!state.client || !state.coachUserId || !isUuid(itemId)) {
       removeLocal();
       return;
     }
@@ -788,6 +926,10 @@
   }
 
   function persistOrderToCloud() {
+    if (!state.client || !state.coachUserId) {
+      return;
+    }
+
     var cloudItems = (Array.isArray(state.items) ? state.items : []).filter(function (item) {
       return item && isUuid(item.id);
     });
@@ -862,6 +1004,8 @@
     if (addExerciseBtn) {
       addExerciseBtn.hidden = getSelectedEntryType() === "exercise";
     }
+
+    toggleComposerForEntryType();
   }
 
   function buildDraftExerciseMarkup(exercise, index) {
@@ -882,7 +1026,8 @@
           '<input type="text" class="program-builder-block-section" placeholder="RPE" data-field="rpe" value="' + escapeAttribute(firstSetValue(exercise, "rpe")) + '" />' +
           '<input type="text" class="program-builder-block-section" placeholder="Rest" data-field="rest" value="' + escapeAttribute(firstSetValue(exercise, "rest")) + '" />' +
         '</div>' +
-        '<textarea class="program-builder-block-section block-manager-exercise-notes" placeholder="Notes or coaching cues" data-field="notes">' + escapeHtml(firstSetValue(exercise, "notes")) + '</textarea>' +
+        '<textarea class="program-builder-block-section block-manager-exercise-notes" placeholder="How to perform (coaching cues)" data-field="description">' + escapeHtml(String(exercise.description || firstSetValue(exercise, "notes"))) + '</textarea>' +
+        '<input type="url" class="program-builder-block-section" placeholder="Video demonstration URL (https://...)" data-field="video_demo_url" value="' + escapeAttribute(String(exercise.video_demo_url || "")) + '" />' +
         '<div class="block-manager-exercise-actions">' +
           '<button type="button" class="btn admin-btn-delete-mini" data-block-exercise-remove="' + index + '">Remove</button>' +
         '</div>' +
@@ -891,10 +1036,13 @@
   }
 
   function updateDraftExerciseFromRow(index, exerciseItem) {
+    var description = readFieldValue(exerciseItem, '[data-field="description"]');
     state.draftExercises[index] = {
       name: readFieldValue(exerciseItem, '[data-field="name"]') || "Exercise",
       section: readFieldValue(exerciseItem, '[data-field="section"]') || DEFAULT_SECTION,
       mode: readFieldValue(exerciseItem, '[data-field="mode"]') || DEFAULT_MODE,
+      description: description,
+      video_demo_url: readFieldValue(exerciseItem, '[data-field="video_demo_url"]'),
       superset_group: null,
       field_toggles: null,
       sets: [{
@@ -902,13 +1050,13 @@
         weight: readFieldValue(exerciseItem, '[data-field="weight"]'),
         rpe: readFieldValue(exerciseItem, '[data-field="rpe"]'),
         rest: readFieldValue(exerciseItem, '[data-field="rest"]'),
-        notes: readFieldValue(exerciseItem, '[data-field="notes"]'),
+        notes: description,
         done: false,
         target_reps: readFieldValue(exerciseItem, '[data-field="reps"]'),
         target_weight: readFieldValue(exerciseItem, '[data-field="weight"]'),
         target_rpe: readFieldValue(exerciseItem, '[data-field="rpe"]'),
         target_rest: readFieldValue(exerciseItem, '[data-field="rest"]'),
-        target_notes: readFieldValue(exerciseItem, '[data-field="notes"]')
+        target_notes: description
       }]
     };
   }
@@ -1401,7 +1549,9 @@
   function escapeAttribute(value) {
     return escapeHtml(value).replace(/`/g, "&#96;");
   }
-})();(function () {
+})();
+/*
+(function () {
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
   var TEMPLATE_DRAFT_PREFIX = "nomadic_training_program_template_builder_draft_";
   var WORKOUT_BLOCK_LIBRARY_KEY = "nomadic_template_workout_blocks_v1";
@@ -1766,6 +1916,10 @@
     var title = String((titleInput && titleInput.value) || "").trim();
     var tags = parseTags((tagsInput && tagsInput.value) || "");
     var entryType = getSelectedEntryType();
+    if (entryType === "exercise") {
+      syncSingleExerciseFromInputs();
+    }
+
     var exercises = normalizeExercises(state.draftExercises);
 
     if (!title) {
@@ -1944,6 +2098,7 @@
     }
 
     renderDraftExercises();
+    toggleComposerForEntryType();
     renderItems();
     setStatus("Editing item: " + String(item.title || "Library Item") + ".", "info");
   }
@@ -1983,6 +2138,8 @@
     }
 
     renderDraftExercises();
+    populateSingleExerciseInputs();
+    toggleComposerForEntryType();
     renderItems();
   }
 
@@ -2438,13 +2595,26 @@
   function normalizeExercises(exercises) {
     return (Array.isArray(exercises) ? exercises : []).map(function (exercise) {
       var safe = exercise && typeof exercise === "object" ? exercise : {};
+      var sets = normalizeSets(safe.sets);
+      var description = String(safe.description || (sets[0] && sets[0].notes) || "");
       return {
         name: String(safe.name || "Exercise").trim() || "Exercise",
         section: String(safe.section || DEFAULT_SECTION).trim() || DEFAULT_SECTION,
         mode: String(safe.mode || DEFAULT_MODE).trim() || DEFAULT_MODE,
+        description: description,
+        video_demo_url: String(safe.video_demo_url || "").trim(),
         superset_group: safe.superset_group || null,
         field_toggles: safe.field_toggles && typeof safe.field_toggles === "object" ? safe.field_toggles : null,
-        sets: normalizeSets(safe.sets)
+        sets: sets.map(function (set) {
+          var next = Object.assign({}, set);
+          if (!String(next.notes || "").trim() && description) {
+            next.notes = description;
+          }
+          if (!String(next.target_notes || "").trim() && description) {
+            next.target_notes = description;
+          }
+          return next;
+        })
       };
     }).filter(function (exercise) {
       return Array.isArray(exercise.sets) && exercise.sets.length > 0 && String(exercise.name || "").trim();
@@ -2476,6 +2646,8 @@
       name: "",
       section: DEFAULT_SECTION,
       mode: DEFAULT_MODE,
+      description: "",
+      video_demo_url: "",
       superset_group: null,
       field_toggles: null,
       sets: [{
@@ -2666,3 +2838,4 @@
     return escapeHtml(value).replace(/`/g, "&#96;");
   }
 })();
+*/
