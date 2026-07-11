@@ -6,11 +6,13 @@
   var MEMBERSHIP_PAYMENT_TASK_NAME = "Complete Membership Payment";
   var MEMBERSHIP_PAYMENT_TASK_URL = "founding-member.html?checkout=start";
   var COACH_TASK_TEMPLATE_KEY = "nomadic_coach_task_templates_v1";
+  var COACH_FORMS_TEMPLATE_KEY = "nomadic_coach_forms_templates_v1";
 
   var state = {
     client: null,
     coachUser: null,
     templates: [],
+    forms: [],
     editingTemplateId: "",
     templateSearchTerm: "",
     questionDrafts: []
@@ -54,8 +56,9 @@
       showContent();
       bindEvents();
       state.templates = readTemplates();
+      state.forms = readFormsIndex();
       renderTemplateList();
-      renderQuestionList();
+      renderAttachedFormOptions("");
       updateCreateActionButtons();
     });
 
@@ -156,8 +159,32 @@
       action_label: String(entry && entry.action_label || "").trim(),
       action_url: String(entry && entry.action_url || "").trim(),
       action_target: "_self",
+      attached_form_id: String(entry && entry.attached_form_id || "").trim(),
       questions: sanitizeQuestions(entry && entry.questions)
     };
+  }
+
+  function readFormsIndex() {
+    try {
+      var raw = window.localStorage.getItem(COACH_FORMS_TEMPLATE_KEY);
+      if (!raw) {
+        return [];
+      }
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed.map(function (entry) {
+        return {
+          id: String(entry && entry.id || "").trim(),
+          name: String(entry && entry.name || "").trim()
+        };
+      }).filter(function (entry) {
+        return !!entry.id && !!entry.name;
+      });
+    } catch (_error) {
+      return [];
+    }
   }
 
   function sanitizeQuestions(rawQuestions) {
@@ -219,14 +246,6 @@
       });
     }
 
-    var addQuestionBtn = document.querySelector("[data-coach-task-add-question]");
-    if (addQuestionBtn) {
-      addQuestionBtn.addEventListener("click", function () {
-        state.questionDrafts.push(createEmptyQuestionDraft());
-        renderQuestionList();
-      });
-    }
-
     var templateList = document.querySelector("[data-coach-task-template-list]");
     if (templateList) {
       templateList.addEventListener("click", function (event) {
@@ -245,25 +264,12 @@
       });
     }
 
-    var questionList = document.querySelector("[data-coach-task-question-list]");
-    if (questionList) {
-      questionList.addEventListener("click", function (event) {
-        var removeBtn = event.target && event.target.closest("[data-coach-task-question-remove]");
-        if (!removeBtn) {
-          return;
-        }
-
-        var index = parseInt(removeBtn.getAttribute("data-coach-task-question-remove") || "-1", 10);
-        if (!Number.isFinite(index) || index < 0 || index >= state.questionDrafts.length) {
-          return;
-        }
-
-        state.questionDrafts.splice(index, 1);
-        renderQuestionList();
+    var attachedFormSelect = document.querySelector("[data-coach-task-create-attached-form]");
+    if (attachedFormSelect) {
+      attachedFormSelect.addEventListener("focus", function () {
+        state.forms = readFormsIndex();
+        renderAttachedFormOptions(attachedFormSelect.value || "");
       });
-
-      questionList.addEventListener("input", onQuestionDraftInput);
-      questionList.addEventListener("change", onQuestionDraftInput);
     }
   }
 
@@ -322,7 +328,7 @@
           '<div>' +
             '<p class="admin-overview-item-title">' + escapeHtml(template.name || "Task") + '</p>' +
             '<p class="admin-overview-item-meta">' + escapeHtml(template.description || "No description") + '</p>' +
-            '<p class="admin-overview-item-meta">Form fields: ' + escapeHtml(String(Array.isArray(template.questions) ? template.questions.length : 0)) + '</p>' +
+            '<p class="admin-overview-item-meta">Attached form: ' + escapeHtml(resolveFormName(template.attached_form_id)) + '</p>' +
           '</div>' +
           '<div class="admin-request-side">' +
             '<div class="admin-request-actions">' +
@@ -335,6 +341,35 @@
         '</div>'
       );
     }).join("");
+  }
+
+  function resolveFormName(formId) {
+    var id = String(formId || "").trim();
+    if (!id) {
+      return "None";
+    }
+    var match = (state.forms || []).find(function (entry) {
+      return String(entry && entry.id || "") === id;
+    });
+    return match && match.name ? match.name : "Unknown form";
+  }
+
+  function renderAttachedFormOptions(selectedId) {
+    var select = document.querySelector("[data-coach-task-create-attached-form]");
+    if (!select) {
+      return;
+    }
+    var selected = String(selectedId || "").trim();
+    var options = ['<option value="">No attached form</option>'];
+    (state.forms || []).forEach(function (form) {
+      var id = String(form && form.id || "").trim();
+      var name = String(form && form.name || "").trim();
+      if (!id || !name) {
+        return;
+      }
+      options.push('<option value="' + escapeAttribute(id) + '"' + (selected === id ? ' selected' : '') + '>' + escapeHtml(name) + '</option>');
+    });
+    select.innerHTML = options.join("");
   }
 
   function renderQuestionList() {
@@ -454,24 +489,15 @@
     var descriptionInput = document.querySelector("[data-coach-task-create-description]");
     var actionLabelInput = document.querySelector("[data-coach-task-create-action-label]");
     var actionUrlInput = document.querySelector("[data-coach-task-create-action-url]");
+    var attachedFormInput = document.querySelector("[data-coach-task-create-attached-form]");
 
     if (titleInput) titleInput.value = String(template.name || "");
     if (descriptionInput) descriptionInput.value = String(template.description || "");
     if (actionLabelInput) actionLabelInput.value = String(template.action_label || "");
     if (actionUrlInput) actionUrlInput.value = String(template.action_url || "");
-
-    state.questionDrafts = sanitizeQuestions(template.questions).map(function (question) {
-      return {
-        label: String(question.label || ""),
-        key: String(question.key || ""),
-        type: String(question.type || "text"),
-        placeholder: String(question.placeholder || ""),
-        options: Array.isArray(question.options) ? question.options.slice() : [],
-        required: question.required === true
-      };
-    });
-
-    renderQuestionList();
+    if (attachedFormInput) {
+      renderAttachedFormOptions(String(template.attached_form_id || ""));
+    }
     updateCreateActionButtons();
     setStatus("Editing task template.", "info");
   }
@@ -496,18 +522,19 @@
     var descriptionInput = document.querySelector("[data-coach-task-create-description]");
     var actionLabelInput = document.querySelector("[data-coach-task-create-action-label]");
     var actionUrlInput = document.querySelector("[data-coach-task-create-action-url]");
+    var attachedFormInput = document.querySelector("[data-coach-task-create-attached-form]");
 
     var name = String(titleInput && titleInput.value || "").trim();
     var description = String(descriptionInput && descriptionInput.value || "").trim();
     var actionLabel = String(actionLabelInput && actionLabelInput.value || "").trim();
     var actionUrl = String(actionUrlInput && actionUrlInput.value || "").trim();
+    var attachedFormId = String(attachedFormInput && attachedFormInput.value || "").trim();
 
     if (!name) {
       setStatus("Enter a task title.", "error");
       return;
     }
 
-    var questions = collectQuestionsFromDrafts();
     var isEditing = !!state.editingTemplateId;
 
     var id = isEditing ? state.editingTemplateId : ("coach-task-template-" + Date.now());
@@ -519,7 +546,8 @@
       action_label: actionLabel,
       action_url: actionUrl,
       action_target: "_self",
-      questions: questions
+      attached_form_id: attachedFormId,
+      questions: []
     };
 
     if (isEditing) {
@@ -541,15 +569,17 @@
     var descriptionInput = document.querySelector("[data-coach-task-create-description]");
     var actionLabelInput = document.querySelector("[data-coach-task-create-action-label]");
     var actionUrlInput = document.querySelector("[data-coach-task-create-action-url]");
+    var attachedFormInput = document.querySelector("[data-coach-task-create-attached-form]");
 
     if (titleInput) titleInput.value = "";
     if (descriptionInput) descriptionInput.value = "";
     if (actionLabelInput) actionLabelInput.value = "";
     if (actionUrlInput) actionUrlInput.value = "";
+    if (attachedFormInput) {
+      renderAttachedFormOptions("");
+    }
 
     resetEditingState();
-    state.questionDrafts = [];
-    renderQuestionList();
     updateCreateActionButtons();
   }
 

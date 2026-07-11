@@ -46,11 +46,16 @@
     athleteMobileOpenByDay: {},
     lastViewportWidth: null,
     lastIsAthleteMobileUi: false,
+    workoutEntryMode: "log",
     workoutWalkthroughActive: false,
     workoutWalkthroughStepIndex: 0,
     workoutWalkthroughSteps: [],
     workoutWalkthroughStartedAt: null,
-    workoutCompletionSummary: null
+    workoutCompletionSummary: null,
+    workoutSessionStartedAt: null,
+    currentUserId: null,
+    assignmentAthleteUserId: null,
+    assignmentCoachUserId: null
   };
 
   var TEMPLATE_DRAFT_PREFIX = "nomadic_training_program_template_builder_draft_";
@@ -418,6 +423,13 @@
     configureAssignedTemplateMode();
     setProgramTitleFromQuery();
 
+    // Aggregate overview links from the athlete dashboard should bypass
+    // workout-log rendering and open the full compiled viewer immediately.
+    if (shouldOpenProgramOverviewFromQuery() && shouldUseAggregateOverviewFromQuery()) {
+      openFullPlanOverviewInCurrentPage(getProgramOverviewReturnUrlFromQuery());
+      return;
+    }
+
     var daySelect = document.querySelector("[data-workout-day]");
     var addExerciseBtn = document.querySelector("[data-add-exercise]");
     var printBtn = document.querySelector("[data-print-workout]");
@@ -425,11 +437,17 @@
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var startWorkoutBtn = document.querySelector("[data-start-workout]");
+    var footerSaveBtn = document.querySelector("[data-workout-footer-save]");
+    var footerCompleteBtn = document.querySelector("[data-workout-footer-complete]");
+    var completionSubmitBtn = document.querySelector("[data-workout-complete-submit]");
     var dayNameInput = document.querySelector("[data-template-day-name]");
     var dayRenameBtn = document.querySelector("[data-template-day-rename]");
     var dayCopyForwardBtn = document.querySelector("[data-template-day-copy-forward]");
 
     if (!daySelect) {
+      if (shouldOpenProgramOverviewFromQuery()) {
+        openFullPlanOverviewInCurrentPage(getProgramOverviewReturnUrlFromQuery());
+      }
       return;
     }
 
@@ -503,6 +521,11 @@
 
     if (printBtn) {
       printBtn.addEventListener("click", function () {
+        if (state.isAthleteLockedView && !state.isProgramReadOnly) {
+          saveExercisesForDay(true);
+          openCurrentWorkoutOverviewInCurrentPage(getWorkoutOverviewReturnUrlFromCurrentQuery());
+          return;
+        }
         if (!state.isTemplateBuilder) {
           saveExercisesForDay(true);
         }
@@ -517,12 +540,22 @@
           openTemplateProgramOverviewPage();
           return;
         }
-        openFullPlanPrintPreview();
+        if (state.isAthleteLockedView && !state.isProgramReadOnly) {
+          // Athlete "View Workout" should always stay in workout overview mode.
+          activateAthleteWorkoutOverviewMode();
+          return;
+        }
+        openFullPlanOverviewPage();
       });
     }
 
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
+        if (isAthleteWorkoutOverviewMode()) {
+          activateAthleteWorkoutLogMode();
+          return;
+        }
+
         if (state.isTemplateBuilder) {
           saveTemplateProgram();
           return;
@@ -543,6 +576,50 @@
     if (startWorkoutBtn) {
       wireStartWorkoutButton(startWorkoutBtn);
     }
+
+    if (footerSaveBtn) {
+      footerSaveBtn.addEventListener("click", function () {
+        saveCurrentAthleteWorkoutLog();
+      });
+    }
+
+    if (footerCompleteBtn) {
+      footerCompleteBtn.addEventListener("click", function () {
+        openWorkoutCompletionModal();
+      });
+    }
+
+    if (completionSubmitBtn) {
+      completionSubmitBtn.addEventListener("click", function () {
+        completeWorkoutFromLogPage();
+      });
+    }
+
+    var completionIntensity = document.querySelector("[data-workout-complete-modal] [data-workout-intensity]");
+    var completionComments = document.querySelector("[data-workout-complete-modal] [data-workout-feedback]");
+    if (completionIntensity) {
+      completionIntensity.addEventListener("change", function () {
+        renderWorkoutCompletionModalPreview();
+      });
+    }
+    if (completionComments) {
+      completionComments.addEventListener("input", function () {
+        renderWorkoutCompletionModalPreview();
+      });
+    }
+
+    document.querySelectorAll("[data-workout-intensity-option]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var value = String(button.getAttribute("data-workout-intensity-option") || "").trim();
+        setWorkoutIntensityValue(value);
+      });
+    });
+
+    document.querySelectorAll("[data-workout-complete-close]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        closeWorkoutCompletionModal();
+      });
+    });
 
     if (clearBtn) {
       clearBtn.addEventListener("click", function () {
@@ -569,6 +646,15 @@
     updateDayInfo();
     refreshTemplateDayTools();
     updateStats();
+
+    if (shouldOpenProgramOverviewFromQuery()) {
+      // For assigned-template views, wait until template hydration completes
+      // so the overview can include every programmed day.
+      if (!state.assignedTemplateId) {
+        openFullPlanOverviewInCurrentPage(getProgramOverviewReturnUrlFromQuery());
+        return;
+      }
+    }
   }
 
   function bindDailyProgrammingDesignerEvents() {
@@ -3065,6 +3151,10 @@
       }
       state.isCoachAssignedProgramEdit = params.get("coachEdit") === "1";
       state.isProgramReadOnly = params.get("view") === "1";
+      state.workoutEntryMode = getWorkoutEntryModeFromQuery();
+      if (state.isProgramReadOnly) {
+        state.workoutEntryMode = "log";
+      }
       var assignmentId = String(params.get("assignmentId") || "").trim();
       var templateId = params.get("templateId");
       if (!templateId && !assignmentId) {
@@ -3117,6 +3207,8 @@
       applyAthleteLockedUi();
     }
 
+    ensureAssignmentMessagingContext();
+
     hydrateAssignedTemplate(normalizedTemplateId);
   }
 
@@ -3128,7 +3220,7 @@
 
     return state.client
       .from("user_training_programs")
-      .select("program_id")
+      .select("program_id,user_id,assigned_by")
       .eq("id", normalizedAssignmentId)
       .single()
       .then(function (result) {
@@ -3136,10 +3228,39 @@
           return "";
         }
 
+        state.assignmentAthleteUserId = String(result.data && result.data.user_id || "").trim() || null;
+        state.assignmentCoachUserId = String(result.data && result.data.assigned_by || "").trim() || null;
+
         return String(result.data && result.data.program_id || "").trim();
       })
       .catch(function () {
         return "";
+      });
+  }
+
+  function ensureAssignmentMessagingContext() {
+    var assignmentId = String(state.assignedProgramInstanceId || "").trim();
+    if (!state.client || !assignmentId) {
+      return Promise.resolve();
+    }
+
+    if (isUuid(String(state.assignmentAthleteUserId || "")) && isUuid(String(state.assignmentCoachUserId || ""))) {
+      return Promise.resolve();
+    }
+
+    return state.client
+      .from("user_training_programs")
+      .select("user_id,assigned_by")
+      .eq("id", assignmentId)
+      .single()
+      .then(function (result) {
+        if (result && !result.error) {
+          state.assignmentAthleteUserId = String(result.data && result.data.user_id || "").trim() || null;
+          state.assignmentCoachUserId = String(result.data && result.data.assigned_by || "").trim() || null;
+        }
+      })
+      .catch(function () {
+        // Messaging context is optional; keep workout flow functional.
       });
   }
 
@@ -3153,10 +3274,12 @@
     var saveBtn = document.querySelector("[data-save-workout]");
     var startWorkoutBtn = document.querySelector("[data-start-workout]");
     var backLink = document.querySelector("[data-program-back-link]");
+    var backLink = document.querySelector("[data-program-back-link]");
     var subtitle = document.querySelector(".program-demo-subtitle");
     var prevDailyBtn = document.querySelector("[data-template-prev-step-daily]");
     var dailyNavGrid = document.querySelector(".program-builder-daily-nav-grid");
     var daySelectorTitle = document.querySelector(".day-selector-title");
+    var daySelectorPanel = document.querySelector(".program-demo-day-selector");
 
     state.builderStep = 3;
     state.isProgramReadOnly = false;
@@ -3202,6 +3325,10 @@
     if (daySelectorTitle) {
       daySelectorTitle.textContent = "Edit Scheduled Workout";
     }
+    if (daySelectorPanel) {
+      daySelectorPanel.hidden = false;
+      daySelectorPanel.style.display = "block";
+    }
 
     state.dailyProgrammingViewMode = "day";
     ensureDailyNavigatorState();
@@ -3228,6 +3355,267 @@
     }
   }
 
+  function shouldOpenProgramOverviewFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return String(params.get("overview") || "") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function getProgramOverviewReturnUrlFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      var next = String(params.get("returnTo") || "").trim();
+      return next || "profile.html#profile-training-programs-section";
+    } catch (e) {
+      return "profile.html#profile-training-programs-section";
+    }
+  }
+
+  function getWorkoutOverviewReturnUrlFromCurrentQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      if (params.get("view") === "1") {
+        params.set("entry", "overview");
+      }
+      params.delete("overview");
+      params.delete("aggregate");
+      params.delete("templateIds");
+
+      var nextSearch = params.toString();
+      return window.location.pathname + (nextSearch ? "?" + nextSearch : "");
+    } catch (e) {
+      return "training-program-example.html?view=1&entry=overview";
+    }
+  }
+
+  function shouldUseAggregateOverviewFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return String(params.get("aggregate") || "") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function getAggregateTemplateIdsFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      var raw = String(params.get("templateIds") || "").trim();
+      if (!raw) {
+        return [];
+      }
+      return raw
+        .split(",")
+        .map(function (value) { return String(value || "").trim(); })
+        .filter(function (value) { return !!value && isUuid(value); })
+        .filter(function (value, index, arr) { return arr.indexOf(value) === index; });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function getWorkoutEntryModeFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return String(params.get("entry") || "").trim().toLowerCase() === "overview"
+        ? "overview"
+        : "log";
+    } catch (e) {
+      return "log";
+    }
+  }
+
+  function isAthleteWorkoutOverviewMode() {
+    return !!(state.isAthleteLockedView && !state.isProgramReadOnly && state.workoutEntryMode === "overview");
+  }
+
+  function setWorkoutEntryModeInUrl(mode) {
+    if (typeof window === "undefined" || typeof window.history === "undefined") {
+      return;
+    }
+
+    try {
+      var safeMode = String(mode || "log").trim().toLowerCase() === "overview" ? "overview" : "log";
+      var params = new URLSearchParams(window.location.search || "");
+      if (safeMode === "overview") {
+        params.set("entry", "overview");
+      } else {
+        params.set("entry", "log");
+      }
+
+      var nextSearch = params.toString();
+      var nextUrl = window.location.pathname + (nextSearch ? "?" + nextSearch : "") + (window.location.hash || "");
+      window.history.replaceState({}, "", nextUrl);
+    } catch (_error) {
+      // Ignore URL update failures.
+    }
+  }
+
+  function activateAthleteWorkoutLogMode() {
+    if (!state.isAthleteLockedView || state.isProgramReadOnly) {
+      return;
+    }
+
+    state.workoutEntryMode = "log";
+    if (!state.workoutSessionStartedAt) {
+      state.workoutSessionStartedAt = Date.now();
+    }
+    setWorkoutEntryModeInUrl("log");
+    applyAthleteLockedUi();
+    renderRows();
+    updateDayInfo();
+    setStatus("Workout log ready. Track your sets below.", "info");
+  }
+
+  function activateAthleteWorkoutOverviewMode() {
+    if (!state.isAthleteLockedView || state.isProgramReadOnly) {
+      return;
+    }
+
+    state.workoutEntryMode = "overview";
+    setWorkoutEntryModeInUrl("overview");
+    applyAthleteLockedUi();
+    renderRows();
+    updateDayInfo();
+    setStatus("Back to workout overview.", "info");
+  }
+
+  function syncWorkoutLogFooterState() {
+    var footer = document.querySelector("[data-workout-log-actions]");
+    if (!footer) {
+      return;
+    }
+
+    var shouldShow =
+      state.isAthleteLockedView &&
+      !state.isProgramReadOnly &&
+      !isAthleteWorkoutOverviewMode() &&
+      !state.workoutWalkthroughActive;
+
+    footer.hidden = !shouldShow;
+    footer.style.display = shouldShow ? "grid" : "none";
+  }
+
+  function getWorkoutFeedbackValues() {
+    var modal = document.querySelector("[data-workout-complete-modal]");
+    var root = modal && !modal.hidden ? modal : document;
+    var intensitySelect = root.querySelector("[data-workout-intensity]");
+    var commentsInput = root.querySelector("[data-workout-feedback]");
+    var intensityRaw = intensitySelect ? String(intensitySelect.value || "").trim() : "";
+    var intensity = parseInt(intensityRaw, 10);
+
+    return {
+      intensityRating: Number.isFinite(intensity) ? Math.min(10, Math.max(1, intensity)) : null,
+      comments: commentsInput ? String(commentsInput.value || "").trim() : ""
+    };
+  }
+
+  function setWorkoutIntensityValue(value) {
+    var next = parseInt(String(value || "").trim(), 10);
+    var select = document.querySelector("[data-workout-complete-modal] [data-workout-intensity]");
+
+    if (select) {
+      select.value = Number.isFinite(next) ? String(Math.min(10, Math.max(1, next))) : "";
+    }
+
+    document.querySelectorAll("[data-workout-intensity-option]").forEach(function (button) {
+      var buttonValue = String(button.getAttribute("data-workout-intensity-option") || "").trim();
+      var isActive = !!(select && select.value && buttonValue === select.value);
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+
+    renderWorkoutCompletionModalPreview();
+  }
+
+  function saveCurrentAthleteWorkoutLog() {
+    saveExercisesForDay();
+    syncScheduledSessionStatusForCurrentDay();
+    updateStats();
+    setStatus("Workout log saved.", "success");
+  }
+
+  function openWorkoutCompletionModal() {
+    if (!state.isAthleteLockedView || state.isProgramReadOnly || isAthleteWorkoutOverviewMode()) {
+      return;
+    }
+
+    var modal = document.querySelector("[data-workout-complete-modal]");
+    if (!modal) {
+      completeWorkoutFromLogPage();
+      return;
+    }
+
+    modal.hidden = false;
+    renderWorkoutCompletionModalPreview();
+    var intensitySelect = modal.querySelector("[data-workout-intensity]");
+    setWorkoutIntensityValue(intensitySelect ? intensitySelect.value : "");
+    if (intensitySelect && !intensitySelect.value) {
+      intensitySelect.focus();
+    }
+  }
+
+  function closeWorkoutCompletionModal() {
+    var modal = document.querySelector("[data-workout-complete-modal]");
+    if (!modal) {
+      return;
+    }
+    modal.hidden = true;
+  }
+
+  function completeWorkoutFromLogPage() {
+    if (!state.isAthleteLockedView || state.isProgramReadOnly || isAthleteWorkoutOverviewMode()) {
+      return;
+    }
+
+    var feedback = getWorkoutFeedbackValues();
+    if (!feedback.intensityRating) {
+      setStatus("Please rate workout intensity (1-10) before marking this session complete.", "info");
+      return;
+    }
+
+    finalizeWorkoutCompletion(state.workoutSessionStartedAt || Date.now(), Date.now(), feedback, true);
+    closeWorkoutCompletionModal();
+  }
+
+  function renderWorkoutCompletionModalPreview() {
+    var container = document.querySelector("[data-workout-complete-preview]");
+    var modal = document.querySelector("[data-workout-complete-modal]");
+    if (!container || !modal || modal.hidden) {
+      return;
+    }
+
+    var feedback = getWorkoutFeedbackValues();
+    var preview = buildWorkoutCompletionSummary(state.workoutSessionStartedAt || Date.now(), Date.now(), feedback);
+    var prItems = Array.isArray(preview.prItems) ? preview.prItems : [];
+    var badges = Array.isArray(preview.badges) ? preview.badges : [];
+
+    container.innerHTML =
+      '<article class="workout-summary-card">' +
+        '<h3 class="workout-summary-title">Workout Snapshot</h3>' +
+        '<ul class="workout-summary-stats">' +
+          '<li class="workout-summary-stat"><span class="workout-summary-stat-label">Sets Completed</span><span class="workout-summary-stat-value">' + escapeHtml(String(preview.doneSets) + ' / ' + String(preview.totalSets)) + '</span></li>' +
+          '<li class="workout-summary-stat"><span class="workout-summary-stat-label">Completion</span><span class="workout-summary-stat-value">' + escapeHtml(String(preview.completionPercent) + '%') + '</span></li>' +
+          '<li class="workout-summary-stat"><span class="workout-summary-stat-label">Intensity</span><span class="workout-summary-stat-value">' + escapeHtml(preview.intensityRating ? String(preview.intensityRating) + '/10' : '--') + '</span></li>' +
+        '</ul>' +
+        '<p class="workout-summary-comments">' + escapeHtml(preview.comments || 'Great job showing up and putting in quality work today.') + '</p>' +
+        (badges.length
+          ? '<div class="workout-summary-badges">' + badges.map(function (badge) { return '<span class="workout-summary-badge">' + escapeHtml(badge) + '</span>'; }).join('') + '</div>'
+          : '') +
+        (prItems.length
+          ? '<ul class="workout-summary-pr-list">' + prItems.map(function (item) {
+              var text = item.previousWeight == null
+                ? item.exerciseName + ': first logged top weight at ' + item.currentWeight
+                : item.exerciseName + ': ' + item.previousWeight + ' -> ' + item.currentWeight;
+              return '<li>' + escapeHtml(text) + '</li>';
+            }).join('') + '</ul>'
+          : '<p class="workout-summary-pr-empty">No new PRs yet this session. Keep pushing with great form.</p>') +
+      '</article>';
+  }
+
   function applyAthleteLockedUi() {
     stopWorkoutWalkthrough(true);
 
@@ -3237,7 +3625,10 @@
     var clearBtn = document.querySelector("[data-clear-workout]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var startWorkoutBtn = document.querySelector("[data-start-workout]");
+    var backLink = document.querySelector("[data-program-back-link]");
     var subtitle = document.querySelector(".program-demo-subtitle");
+    var daySelectorTitle = document.querySelector(".day-selector-title");
+    var daySelectorPanel = document.querySelector(".program-demo-day-selector");
     var dayTools = document.querySelector("[data-template-day-tools]");
     var dayTypeControls = document.querySelector("[data-template-day-type-controls]");
     var templateWorkspace = document.querySelector("[data-template-workspace]");
@@ -3256,10 +3647,20 @@
 
     if (printBtn) {
       printBtn.style.display = "inline-flex";
+      if (state.isAthleteLockedView && !state.isProgramReadOnly) {
+        printBtn.innerHTML = "Workout PDF";
+      }
     }
 
     if (fullPlanPrintBtn) {
       fullPlanPrintBtn.style.display = "inline-flex";
+      if (state.isAthleteLockedView && !state.isProgramReadOnly && !isAthleteWorkoutOverviewMode()) {
+        fullPlanPrintBtn.innerHTML = "Workout Overview";
+      } else {
+        fullPlanPrintBtn.innerHTML = isAthleteWorkoutOverviewMode()
+          ? "View Workout"
+          : "<span>👁️</span> View Full Program";
+      }
     }
 
     if (clearBtn) {
@@ -3271,18 +3672,45 @@
         saveBtn.style.display = "none";
       } else {
         saveBtn.style.display = "inline-flex";
-        saveBtn.innerHTML = "<span>💾</span> Save Workout Log";
+        if (isAthleteWorkoutOverviewMode()) {
+          saveBtn.innerHTML = "Log Workout";
+        } else {
+          saveBtn.innerHTML = "<span>💾</span> Save Workout Log";
+        }
       }
     }
 
     if (startWorkoutBtn) {
       startWorkoutBtn.style.display = state.isProgramReadOnly ? "none" : "inline-flex";
+      startWorkoutBtn.innerHTML = isAthleteWorkoutOverviewMode()
+        ? "Start Workout"
+        : "<span>▶</span> Start Guided Workout";
     }
 
     if (subtitle) {
       subtitle.textContent = state.isProgramReadOnly
         ? "View this past program and your logged workout history (read-only)."
-        : "Log reps performed, weights used, notes, and completed sets.";
+        : (isAthleteWorkoutOverviewMode()
+            ? "Review your day plan first, then choose Log Workout or Start Workout when you're ready."
+            : "Log reps performed, weights used, notes, and completed sets.");
+    }
+
+    if (backLink) {
+      if (!state.isProgramReadOnly && !isAthleteWorkoutOverviewMode()) {
+        backLink.href = getWorkoutOverviewReturnUrlFromCurrentQuery();
+        backLink.textContent = "← Back to Workout Overview";
+      } else {
+        backLink.href = getProgramOverviewReturnUrlFromQuery();
+        backLink.textContent = "← Back to Dashboard";
+      }
+    }
+
+    if (daySelectorTitle && isAthleteWorkoutOverviewMode()) {
+      daySelectorTitle.textContent = "Workout Overview";
+    }
+    if (daySelectorPanel) {
+      daySelectorPanel.hidden = true;
+      daySelectorPanel.style.display = "none";
     }
 
     if (dayTools) {
@@ -3297,6 +3725,11 @@
 
     if (templateWorkspace) {
       templateWorkspace.hidden = true;
+    }
+
+    syncWorkoutLogFooterState();
+    if (isAthleteWorkoutOverviewMode() || state.isProgramReadOnly) {
+      closeWorkoutCompletionModal();
     }
 
     setTemplateBuilderChromeVisible(false);
@@ -3326,6 +3759,7 @@
     var backLink = document.querySelector("[data-program-back-link]");
     var subtitle = document.querySelector(".program-demo-subtitle");
     var kicker = document.querySelector(".program-demo-kicker");
+    var daySelectorPanel = document.querySelector(".program-demo-day-selector");
     var templateWorkspace = document.querySelector("[data-template-workspace]");
     var athleteScheduleRow = document.querySelector("[data-template-athlete-schedule]");
     var athleteScheduleName = document.querySelector("[data-template-athlete-name]");
@@ -3393,6 +3827,10 @@
 
     if (kicker) {
       kicker.textContent = "Coaching Template";
+    }
+    if (daySelectorPanel) {
+      daySelectorPanel.hidden = false;
+      daySelectorPanel.style.display = "block";
     }
 
     renderSavedWorkoutBlocks();
@@ -4087,7 +4525,167 @@
     var label = labelForSlot(state.day);
     var dayType = getDayTypeForSlot(state.day);
     var dayTypeLabel = dayType ? " • " + capitalize(dayType) + " Day" : "";
-    dayInfo.textContent = "📅 " + label + dayTypeLabel;
+    if (isAthleteWorkoutOverviewMode()) {
+      dayInfo.textContent = "📅 " + label + dayTypeLabel + " • Review this plan before starting your log.";
+    } else {
+      dayInfo.textContent = "📅 " + label + dayTypeLabel;
+    }
+  }
+
+  function formatWorkoutOverviewSetHint(exercise) {
+    var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
+    if (!sets.length) {
+      return "No sets configured";
+    }
+
+    var firstSet = sets[0] || {};
+    var targetHint = String(firstSet.target_reps || firstSet.reps || modePrimaryPlaceholder(exercise && exercise.mode) || "").trim();
+    var setCountLabel = String(sets.length) + " set" + (sets.length === 1 ? "" : "s");
+    if (!targetHint) {
+      return setCountLabel;
+    }
+
+    return setCountLabel + " • " + targetHint;
+  }
+
+  function formatWorkoutOverviewSetDetail(setValue, fallbackValue) {
+    var primary = String(setValue || "").trim();
+    if (primary) {
+      return primary;
+    }
+
+    return String(fallbackValue || "").trim() || "-";
+  }
+
+  function buildWorkoutOverviewSetRowsHtml(exercise) {
+    var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
+    if (!sets.length) {
+      return '<p class="athlete-workout-overview-set-empty">No sets configured.</p>';
+    }
+
+    var fieldToggles = normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode);
+
+    return (
+      '<div class="athlete-workout-overview-sets">' +
+        '<div class="athlete-workout-overview-sets-head">' +
+          '<span>Set</span>' +
+          '<span>' + escapeHtml(exercise.mode === "endurance" ? "Duration" : "Reps") + '</span>' +
+          '<span>' + escapeHtml(exercise.mode === "endurance" ? "Load / Distance" : "Weight / Time") + '</span>' +
+          '<span>RPE / Zone</span>' +
+          '<span>Rest</span>' +
+        '</div>' +
+        sets.map(function (set, index) {
+          var reps = formatWorkoutOverviewSetDetail(set && set.target_reps, set && set.reps);
+          var weight = fieldToggles.showWeight
+            ? formatWorkoutOverviewSetDetail(set && set.target_weight, set && set.weight)
+            : "Off";
+          var rpe = fieldToggles.showRpe
+            ? formatWorkoutOverviewSetDetail(set && set.target_rpe, set && set.rpe)
+            : "Off";
+          var rest = fieldToggles.showRest
+            ? formatWorkoutOverviewSetDetail(set && set.target_rest, set && set.rest)
+            : "Off";
+
+          return (
+            '<div class="athlete-workout-overview-set-row">' +
+              '<span>' + String(index + 1) + '</span>' +
+              '<span>' + escapeHtml(reps) + '</span>' +
+              '<span>' + escapeHtml(weight) + '</span>' +
+              '<span>' + escapeHtml(rpe) + '</span>' +
+              '<span>' + escapeHtml(rest) + '</span>' +
+            '</div>'
+          );
+        }).join("") +
+      '</div>'
+    );
+  }
+
+  function renderAthleteWorkoutOverview() {
+    var container = document.querySelector("[data-athlete-workout-overview]");
+    if (!container) {
+      return;
+    }
+
+    if (!isAthleteWorkoutOverviewMode()) {
+      container.hidden = true;
+      container.innerHTML = "";
+      return;
+    }
+
+    var exercises = Array.isArray(state.exercises) ? state.exercises : [];
+    var sectionMap = {};
+    defaultSections.forEach(function (section) {
+      sectionMap[section] = [];
+    });
+
+    exercises.forEach(function (exercise) {
+      var section = String(exercise && exercise.section || "A Block");
+      if (!sectionMap[section]) {
+        sectionMap[section] = [];
+      }
+      sectionMap[section].push(exercise);
+    });
+
+    if (!exercises.length) {
+      container.hidden = false;
+      container.innerHTML =
+        '<p class="athlete-workout-overview-empty">No exercises were found for this day yet. Try another workout day from the selector.</p>';
+      return;
+    }
+
+    var totalSets = exercises.reduce(function (sum, exercise) {
+      var setCount = Array.isArray(exercise && exercise.sets) ? exercise.sets.length : 0;
+      return sum + setCount;
+    }, 0);
+
+    var sectionCards = defaultSections
+      .filter(function (section) {
+        return (sectionMap[section] || []).length > 0;
+      })
+      .map(function (section) {
+        var items = sectionMap[section] || [];
+        var exerciseRows = items.map(function (exercise) {
+          var notes = String(exercise && exercise.notes || "").trim();
+          var demoUrl = resolveWorkoutWalkthroughDemoUrl(exercise);
+          return (
+            '<article class="athlete-workout-overview-exercise">' +
+              '<div class="athlete-workout-overview-row">' +
+                '<strong>' + escapeHtml(String(exercise && exercise.name || "Exercise")) + '</strong>' +
+                '<span>' + escapeHtml(modeLabel(exercise && exercise.mode)) + '</span>' +
+              '</div>' +
+              '<p class="athlete-workout-overview-recipe">' + escapeHtml(formatWorkoutOverviewSetHint(exercise)) + '</p>' +
+              buildWorkoutOverviewSetRowsHtml(exercise) +
+              (notes
+                ? '<p class="athlete-workout-overview-notes">Coach Notes: ' + escapeHtml(notes) + '</p>'
+                : '') +
+              (demoUrl
+                ? '<a class="athlete-workout-overview-demo" href="' + escapeAttribute(demoUrl) + '" target="_blank" rel="noopener">View Demo</a>'
+                : '') +
+            '</article>'
+          );
+        }).join("");
+
+        return (
+          '<article class="athlete-workout-overview-section">' +
+            '<h3>' + escapeHtml(section) + '</h3>' +
+            '<div class="athlete-workout-overview-list">' + exerciseRows + '</div>' +
+          '</article>'
+        );
+      })
+      .join("");
+
+    var dayLabel = String(labelForSlot(state.day) || state.day || "Today");
+
+    container.hidden = false;
+    container.innerHTML =
+      '<div class="athlete-workout-overview-head">' +
+        '<div>' +
+          '<p class="athlete-workout-overview-kicker">Today\'s Plan</p>' +
+          '<p class="athlete-workout-overview-title">' + escapeHtml(dayLabel) + '</p>' +
+        '</div>' +
+        '<p class="athlete-workout-overview-meta">' + escapeHtml(String(exercises.length) + ' exercises • ' + String(totalSets) + ' total sets') + '</p>' +
+      '</div>' +
+      '<div class="athlete-workout-overview-grid">' + sectionCards + '</div>';
   }
 
   function refreshTemplateDayTools() {
@@ -7255,6 +7853,10 @@
         updateDayInfo();
         refreshTemplateDayTools();
         updateStats();
+
+        if (shouldOpenProgramOverviewFromQuery() && !shouldUseAggregateOverviewFromQuery()) {
+          openFullPlanOverviewInCurrentPage(getProgramOverviewReturnUrlFromQuery());
+        }
       })
       .catch(function () {
         // Leave default fallback behavior intact.
@@ -7479,6 +8081,442 @@
     previewWindow.document.write(buildFullPlanPrintDocument());
     previewWindow.document.close();
     previewWindow.focus();
+  }
+
+  function openFullPlanOverviewPage() {
+    var overviewWindow = window.open("", "nomadic-full-plan-overview", "width=1400,height=960");
+    if (!overviewWindow) {
+      setStatus("Please allow pop-ups to open the full program overview.", "error");
+      return;
+    }
+
+    overviewWindow.document.open();
+    overviewWindow.document.write(buildFullPlanOverviewDocument("", false));
+    overviewWindow.document.close();
+    overviewWindow.focus();
+  }
+
+  function openFullPlanOverviewInCurrentPage(returnUrl) {
+    var nextReturnUrl = String(returnUrl || "profile.html#profile-training-programs-section").trim();
+
+    if (shouldUseAggregateOverviewFromQuery()) {
+      openAggregateProgramOverviewInCurrentPage(nextReturnUrl);
+      return;
+    }
+
+    document.open();
+    document.write(buildFullPlanOverviewDocument(nextReturnUrl, true));
+    document.close();
+  }
+
+  function openCurrentWorkoutOverviewInCurrentPage(returnUrl) {
+    var nextReturnUrl = String(returnUrl || "profile.html#profile-training-programs-section").trim();
+    var slotKey = String(state.day || "").trim() || "w1d1";
+    var exercises = getExercisesForPrintForDay(slotKey);
+
+    document.open();
+    document.write(buildCurrentWorkoutOverviewDocument(slotKey, exercises, nextReturnUrl));
+    document.close();
+  }
+
+  function openAggregateProgramOverviewInCurrentPage(returnUrl) {
+    var templateIds = getAggregateTemplateIdsFromQuery();
+    if (!templateIds.length) {
+      document.open();
+      document.write(buildAggregateOverviewDocument([], returnUrl, resolvePrintProgramTitle("Training Plan")));
+      document.close();
+      return;
+    }
+
+    if (!state.client) {
+      state.client = createSupabaseClient();
+    }
+
+    if (!state.client) {
+      document.open();
+      document.write(buildAggregateOverviewDocument([], returnUrl, resolvePrintProgramTitle("Training Plan")));
+      document.close();
+      return;
+    }
+
+    state.client
+      .from("training_programs")
+      .select("id,name,description")
+      .in("id", templateIds)
+      .then(function (result) {
+        var rows = result && !result.error && Array.isArray(result.data) ? result.data : [];
+        var rowsById = {};
+        rows.forEach(function (row) {
+          rowsById[String(row && row.id || "")] = row;
+        });
+
+        var orderedRows = templateIds
+          .map(function (id) { return rowsById[id] || null; })
+          .filter(function (row) { return !!row; });
+
+        var cards = [];
+        orderedRows.forEach(function (row) {
+          var payload = parseTemplatePayload(row && row.description);
+          if (!payload || !payload.days) {
+            return;
+          }
+
+          var programName = String(row && row.name || "Program").trim() || "Program";
+          var normalizedDays = normalizeTemplateDays(payload.days);
+          var customNames = normalizeCustomDayNames(payload.custom_day_names);
+          var structure = normalizeStructure(payload.structure || deriveStructureFromDays(payload.days));
+
+          Object.keys(normalizedDays).sort(function (a, b) {
+            var parsedA = parseSlotKey(a);
+            var parsedB = parseSlotKey(b);
+            if (!parsedA || !parsedB) {
+              return String(a).localeCompare(String(b));
+            }
+            if (parsedA.week !== parsedB.week) {
+              return parsedA.week - parsedB.week;
+            }
+            return parsedA.workout - parsedB.workout;
+          }).forEach(function (slotKey) {
+            var exercises = normalizeExercisesArray(normalizedDays[slotKey]);
+            if (!Array.isArray(exercises) || !exercises.length) {
+              return;
+            }
+
+            var parsed = parseSlotKey(slotKey);
+            var baseLabel = parsed
+              ? ("Week " + parsed.week + " Day " + parsed.workout)
+              : slotKey;
+            var customLabel = String(customNames && customNames[slotKey] || "").trim();
+            var dayLabel = customLabel || baseLabel;
+            var fullLabel = programName + " • " + dayLabel;
+            cards.push(buildFullPlanOverviewCardForLabel(fullLabel, exercises));
+          });
+        });
+
+        document.open();
+        document.write(buildAggregateOverviewDocument(cards, returnUrl, resolvePrintProgramTitle("Training Plan")));
+        document.close();
+      })
+      .catch(function () {
+        document.open();
+        document.write(buildAggregateOverviewDocument([], returnUrl, resolvePrintProgramTitle("Training Plan")));
+        document.close();
+      });
+  }
+
+  function buildFullPlanOverviewCardForLabel(label, exercises) {
+    var grouped = groupExercisesForFullPlanPrint(exercises);
+    var sectionsHtml = grouped
+      .map(function (group) {
+        var itemsHtml = group.exercises
+          .map(function (exercise) {
+            return '<li><strong>' + escapeHtml(exercise.name || 'Exercise') + '</strong> <span>' + escapeHtml(summarizeExerciseTargetsForPrint(exercise, exercise && exercise.sets)) + '</span></li>';
+          })
+          .join('');
+
+        return [
+          '<section class="plan-overview-section">',
+          '<div class="plan-overview-section-label">' + escapeHtml(group.section) + '</div>',
+          '<ul class="plan-overview-list">' + itemsHtml + '</ul>',
+          '</section>'
+        ].join('');
+      })
+      .join('');
+
+    return [
+      '<article class="plan-overview-card">',
+      '<div class="plan-overview-head">',
+      '<div class="plan-overview-title">' + escapeHtml(label) + '</div>',
+      '<div class="plan-overview-meta">' + exercises.length + ' exercise' + (exercises.length === 1 ? '' : 's') + '</div>',
+      '</div>',
+      sectionsHtml,
+      '</article>'
+    ].join('');
+  }
+
+  function buildAggregateOverviewDocument(cards, returnUrl, title) {
+    var cardsHtml = Array.isArray(cards) ? cards.join('') : '';
+    var athleteLabel = resolvePrintAthleteLabel();
+    var generatedAt = new Date().toLocaleString();
+    var programTitle = String(title || resolvePrintProgramTitle("Training Plan")).trim() || "Training Plan";
+
+    return [
+      '<!DOCTYPE html>',
+      '<html lang="en">',
+      '<head>',
+      '<meta charset="UTF-8" />',
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+      '<title>' + escapeHtml(programTitle + ' - Program Overview') + '</title>',
+      '<style>',
+      'html, body { margin: 0; padding: 0; }',
+      'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif; color: #143636; background: linear-gradient(180deg, #f5f1ea 0%, #efe9de 100%); }',
+      '.program-overview-shell { max-width: 1320px; margin: 0 auto; padding: 1.15rem 1rem 1.4rem; }',
+      '.program-overview-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.9rem; margin-bottom: 0.85rem; border-bottom: 1px solid #dbcdb9; padding-bottom: 0.65rem; }',
+      '.program-overview-kicker { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: #c56a2c; font-weight: 800; }',
+      '.program-overview-title { margin: 0.16rem 0 0; font-size: 1.62rem; line-height: 1.15; color: #123434; }',
+      '.program-overview-sub { margin: 0.28rem 0 0; color: #567070; font-size: 0.88rem; }',
+      '.program-overview-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }',
+      '.program-overview-link, .program-overview-btn { border: 1px solid #cfbea8; border-radius: 9px; background: #fff; color: #214848; font-size: 0.82rem; font-weight: 700; padding: 0.48rem 0.74rem; text-decoration: none; display: inline-flex; align-items: center; cursor: pointer; }',
+      '.program-overview-link:hover, .program-overview-btn:hover { background: #f6efe5; }',
+      '.program-overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.62rem; }',
+      '.plan-overview-card { border: 1px solid #e0d4c3; border-radius: 10px; background: #fffdfa; padding: 0.44rem; }',
+      '.plan-overview-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.36rem; margin-bottom: 0.36rem; border-left: 3px solid #c56a2c; padding: 0.22rem 0.35rem; background: #f9f2e9; border-radius: 0 5px 5px 0; }',
+      '.plan-overview-title { font-size: 0.78rem; font-weight: 800; color: #133636; line-height: 1.2; }',
+      '.plan-overview-meta { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7f705f; white-space: nowrap; }',
+      '.plan-overview-section { margin-top: 0.34rem; }',
+      '.plan-overview-section:first-child { margin-top: 0; }',
+      '.plan-overview-section-label { font-size: 0.64rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #5a4331; margin-bottom: 0.18rem; }',
+      '.plan-overview-list { margin: 0; padding: 0 0 0 0.78rem; }',
+      '.plan-overview-list li { margin: 0 0 0.14rem; font-size: 0.69rem; line-height: 1.25; color: #2f2f2b; }',
+      '.plan-overview-list li span { color: #556c6c; }',
+      '.program-overview-empty { border: 1px solid #dccfbc; border-radius: 10px; background: #fff; padding: 1rem; color: #546b6b; }',
+      '@media print { .program-overview-actions { display: none !important; } }',
+      '@media (max-width: 1160px) { .program-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }',
+      '@media (max-width: 720px) { .program-overview-grid { grid-template-columns: 1fr; } .program-overview-header { flex-direction: column; } }',
+      '</style>',
+      '</head>',
+      '<body>',
+      '<main class="program-overview-shell">',
+      '<header class="program-overview-header">',
+      '<div>',
+      '<p class="program-overview-kicker">Nomadic Performance</p>',
+      '<h1 class="program-overview-title">' + escapeHtml(programTitle) + '</h1>',
+      '<p class="program-overview-sub">Athlete: ' + escapeHtml(athleteLabel) + ' • Updated ' + escapeHtml(generatedAt) + '</p>',
+      '</div>',
+      '<div class="program-overview-actions">',
+      '<a class="program-overview-link" href="' + escapeAttribute(String(returnUrl || "profile.html#profile-training-programs-section")) + '">Back to Dashboard</a>',
+      '<button class="program-overview-btn" type="button" onclick="window.print()">Print Entire Program</button>',
+      '<button class="program-overview-btn" type="button" onclick="window.location.reload()">Refresh</button>',
+      '</div>',
+      '</header>',
+      (cardsHtml
+        ? '<section class="program-overview-grid">' + cardsHtml + '</section>'
+        : '<section class="program-overview-empty">No workouts were found across active program templates.</section>'),
+      '</main>',
+      '</body>',
+      '</html>'
+    ].join('');
+  }
+
+  function buildCurrentWorkoutOverviewDocument(slotKey, exercises, returnUrl) {
+    var programTitle = resolvePrintProgramTitle("Training Plan");
+    var athleteLabel = resolvePrintAthleteLabel();
+    var generatedAt = new Date().toLocaleString();
+    var workoutTitle = labelForSlot(slotKey);
+    var safeExercises = normalizeExercisesArray(Array.isArray(exercises) ? exercises : []);
+
+    var groups = groupExercisesForFullPlanPrint(safeExercises);
+    var groupsHtml = groups.map(function (group) {
+      var exerciseCardsHtml = group.exercises.map(function (exercise) {
+        var safeSets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
+        var rowsHtml = safeSets.map(function (set, setIndex) {
+          var targetReps = resolveTemplateTarget(set && set.target_reps, set && set.reps) || modePrimaryPlaceholder(exercise && exercise.mode);
+          var targetWeight = resolveTemplateTarget(set && set.target_weight, set && set.weight) || modeSecondaryPlaceholder(exercise && exercise.mode, exercise && exercise.field_toggles && exercise.field_toggles.secondaryMetric);
+          var targetRpe = resolveTemplateTarget(set && set.target_rpe, set && set.rpe) || modeTertiaryPlaceholder(exercise && exercise.mode);
+          var targetRest = resolveTemplateTarget(set && set.target_rest, set && set.rest) || "Off";
+          var targetNotes = resolveTemplateTarget(set && set.target_notes, set && set.notes) || "-";
+
+          return [
+            '<tr>',
+            '<td>' + String(setIndex + 1) + '</td>',
+            '<td>' + escapeHtml(targetReps) + '</td>',
+            '<td>' + escapeHtml(targetWeight) + '</td>',
+            '<td>' + escapeHtml(targetRpe) + '</td>',
+            '<td>' + escapeHtml(targetRest) + '</td>',
+            '<td>' + escapeHtml(targetNotes) + '</td>',
+            '</tr>'
+          ].join("");
+        }).join("");
+
+        if (!rowsHtml) {
+          rowsHtml = '<tr><td colspan="6">No sets assigned</td></tr>';
+        }
+
+        return [
+          '<article class="workout-outline-card">',
+          '<div class="workout-outline-head">',
+          '<h3>' + escapeHtml(exercise && exercise.name ? exercise.name : "Exercise") + '</h3>',
+          '<p>' + escapeHtml(String(safeSets.length) + ' set' + (safeSets.length === 1 ? '' : 's')) + '</p>',
+          '</div>',
+          '<div class="workout-outline-table-wrap">',
+          '<table class="workout-outline-table">',
+          '<thead><tr><th>Set</th><th>Reps</th><th>Weight / Time</th><th>RPE / Zone</th><th>Rest</th><th>Notes</th></tr></thead>',
+          '<tbody>' + rowsHtml + '</tbody>',
+          '</table>',
+          '</div>',
+          '</article>'
+        ].join("");
+      }).join("");
+
+      return [
+        '<section class="workout-outline-group">',
+        '<div class="workout-outline-group-title">' + escapeHtml(group.section) + '</div>',
+        '<div class="workout-outline-grid">' + exerciseCardsHtml + '</div>',
+        '</section>'
+      ].join("");
+    }).join("");
+
+    return [
+      '<!DOCTYPE html>',
+      '<html lang="en">',
+      '<head>',
+      '<meta charset="UTF-8" />',
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+      '<title>' + escapeHtml(programTitle + ' - View Workout') + '</title>',
+      '<style>',
+      'html, body { margin: 0; padding: 0; }',
+      'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif; color: #143636; background: linear-gradient(180deg, #f5f1ea 0%, #efe9de 100%); }',
+      '.workout-overview-shell { max-width: 1320px; margin: 0 auto; padding: 1.1rem 1rem 1.4rem; }',
+      '.workout-overview-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.9rem; margin-bottom: 0.85rem; border-bottom: 1px solid #dbcdb9; padding-bottom: 0.65rem; }',
+      '.workout-overview-kicker { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: #c56a2c; font-weight: 800; }',
+      '.workout-overview-title { margin: 0.16rem 0 0; font-size: 1.62rem; line-height: 1.15; color: #123434; }',
+      '.workout-overview-sub { margin: 0.28rem 0 0; color: #567070; font-size: 0.88rem; }',
+      '.workout-overview-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }',
+      '.workout-overview-link, .workout-overview-btn { border: 1px solid #cfbea8; border-radius: 9px; background: #fff; color: #214848; font-size: 0.82rem; font-weight: 700; padding: 0.48rem 0.74rem; text-decoration: none; display: inline-flex; align-items: center; cursor: pointer; }',
+      '.workout-overview-link:hover, .workout-overview-btn:hover { background: #f6efe5; }',
+      '.workout-overview-day-title { margin: 0 0 0.64rem; font-size: 1.08rem; font-weight: 800; color: #173d3d; }',
+      '.workout-overview-group + .workout-overview-group { margin-top: 0.62rem; }',
+      '.workout-outline-group { border: 1px solid #e0d4c3; border-radius: 10px; background: #fffdfa; padding: 0.52rem; margin-bottom: 0.62rem; }',
+      '.workout-outline-group-title { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #5a4331; margin-bottom: 0.35rem; }',
+      '.workout-outline-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }',
+      '.workout-outline-card { border: 1px solid #e5dccf; border-radius: 9px; background: #fff; padding: 0.4rem; }',
+      '.workout-outline-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.3rem; margin-bottom: 0.32rem; }',
+      '.workout-outline-head h3 { margin: 0; font-size: 0.86rem; line-height: 1.2; color: #123636; }',
+      '.workout-outline-head p { margin: 0; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7f705f; }',
+      '.workout-outline-table-wrap { overflow-x: auto; }',
+      '.workout-outline-table { width: 100%; border-collapse: collapse; min-width: 520px; }',
+      '.workout-outline-table th, .workout-outline-table td { border: 1px solid #eadfce; padding: 0.24rem 0.3rem; font-size: 0.68rem; line-height: 1.2; text-align: left; }',
+      '.workout-outline-table th { background: #f7f1e8; color: #1b4343; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.62rem; }',
+      '.workout-overview-empty { border: 1px solid #dccfbc; border-radius: 10px; background: #fff; padding: 1rem; color: #546b6b; }',
+      '@media print { .workout-overview-actions { display: none !important; } }',
+      '@media (max-width: 980px) { .workout-outline-grid { grid-template-columns: 1fr; } }',
+      '@media (max-width: 720px) { .workout-overview-header { flex-direction: column; } }',
+      '</style>',
+      '</head>',
+      '<body>',
+      '<main class="workout-overview-shell">',
+      '<header class="workout-overview-header">',
+      '<div>',
+      '<p class="workout-overview-kicker">Nomadic Performance</p>',
+      '<h1 class="workout-overview-title">' + escapeHtml(programTitle) + '</h1>',
+      '<p class="workout-overview-sub">Athlete: ' + escapeHtml(athleteLabel) + ' • Updated ' + escapeHtml(generatedAt) + '</p>',
+      '</div>',
+      '<div class="workout-overview-actions">',
+      '<a class="workout-overview-link" href="' + escapeAttribute(returnUrl || getWorkoutOverviewReturnUrlFromCurrentQuery()) + '">Back to Workout Overview</a>',
+      '<button class="workout-overview-btn" type="button" onclick="window.print()">Print Workout</button>',
+      '<button class="workout-overview-btn" type="button" onclick="window.location.reload()">Refresh</button>',
+      '</div>',
+      '</header>',
+      '<h2 class="workout-overview-day-title">' + escapeHtml(workoutTitle) + '</h2>',
+      (groupsHtml
+        ? '<section class="workout-overview-group">' + groupsHtml + '</section>'
+        : '<section class="workout-overview-empty">No exercises are configured for this workout day yet.</section>'),
+      '</main>',
+      '</body>',
+      '</html>'
+    ].join('');
+  }
+
+  function buildFullPlanOverviewDocument(returnUrl, inlineMode) {
+    var slotKeys = getAllSlotKeys();
+    var programTitle = resolvePrintProgramTitle("Training Plan");
+    var athleteLabel = resolvePrintAthleteLabel();
+    var generatedAt = new Date().toLocaleString();
+    var hasReturn = !!String(returnUrl || "").trim();
+
+    var dayEntries = slotKeys
+      .map(function (slotKey) {
+        var exercises = getExercisesForPrintForDay(slotKey);
+        if (!exercises.length) {
+          return null;
+        }
+
+        return {
+          rows: Math.max(1, countFullPlanOverviewRows(exercises)),
+          html: buildFullPlanOverviewCard(slotKey, exercises)
+        };
+      })
+      .filter(function (entry) {
+        return !!entry;
+      });
+
+    var cardsHtml = dayEntries.map(function (entry) {
+      return entry.html;
+    }).join("");
+
+    var totalRows = dayEntries.reduce(function (sum, entry) {
+      return sum + entry.rows;
+    }, 0);
+
+    var densityClass = "";
+    if (totalRows > 250 || dayEntries.length > 28) {
+      densityClass = " program-overview-grid-ultra";
+    } else if (totalRows > 160 || dayEntries.length > 20) {
+      densityClass = " program-overview-grid-dense";
+    }
+
+    return [
+      '<!DOCTYPE html>',
+      '<html lang="en">',
+      '<head>',
+      '<meta charset="UTF-8" />',
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+      '<title>' + escapeHtml(programTitle + ' - Program Overview') + '</title>',
+      '<style>',
+      'html, body { margin: 0; padding: 0; }',
+      'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif; color: #143636; background: linear-gradient(180deg, #f5f1ea 0%, #efe9de 100%); }',
+      '.program-overview-shell { max-width: 1320px; margin: 0 auto; padding: 1.15rem 1rem 1.4rem; }',
+      '.program-overview-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.9rem; margin-bottom: 0.85rem; border-bottom: 1px solid #dbcdb9; padding-bottom: 0.65rem; }',
+      '.program-overview-kicker { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: #c56a2c; font-weight: 800; }',
+      '.program-overview-title { margin: 0.16rem 0 0; font-size: 1.62rem; line-height: 1.15; color: #123434; }',
+      '.program-overview-sub { margin: 0.28rem 0 0; color: #567070; font-size: 0.88rem; }',
+      '.program-overview-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }',
+      '.program-overview-link { border: 1px solid #cfbea8; border-radius: 9px; background: #fff; color: #214848; font-size: 0.82rem; font-weight: 700; padding: 0.48rem 0.74rem; text-decoration: none; display: inline-flex; align-items: center; }',
+      '.program-overview-link:hover { background: #f6efe5; }',
+      '.program-overview-btn { border: 1px solid #cfbea8; border-radius: 9px; background: #fff; color: #214848; font-size: 0.82rem; font-weight: 700; padding: 0.48rem 0.74rem; cursor: pointer; }',
+      '.program-overview-btn:hover { background: #f6efe5; }',
+      '.program-overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.62rem; }',
+      '.program-overview-grid-dense { grid-template-columns: repeat(4, minmax(0, 1fr)); }',
+      '.program-overview-grid-ultra { grid-template-columns: repeat(5, minmax(0, 1fr)); }',
+      '.plan-overview-card { border: 1px solid #e0d4c3; border-radius: 10px; background: #fffdfa; padding: 0.44rem; }',
+      '.plan-overview-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.36rem; margin-bottom: 0.36rem; border-left: 3px solid #c56a2c; padding: 0.22rem 0.35rem; background: #f9f2e9; border-radius: 0 5px 5px 0; }',
+      '.plan-overview-title { font-size: 0.78rem; font-weight: 800; color: #133636; line-height: 1.2; }',
+      '.plan-overview-meta { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7f705f; white-space: nowrap; }',
+      '.plan-overview-section { margin-top: 0.34rem; }',
+      '.plan-overview-section:first-child { margin-top: 0; }',
+      '.plan-overview-section-label { font-size: 0.64rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #5a4331; margin-bottom: 0.18rem; }',
+      '.plan-overview-list { margin: 0; padding: 0 0 0 0.78rem; }',
+      '.plan-overview-list li { margin: 0 0 0.14rem; font-size: 0.69rem; line-height: 1.25; color: #2f2f2b; }',
+      '.plan-overview-list li span { color: #556c6c; }',
+      '.program-overview-empty { border: 1px solid #dccfbc; border-radius: 10px; background: #fff; padding: 1rem; color: #546b6b; }',
+      '@media print { .program-overview-actions { display: none !important; } }',
+      '@media (max-width: 1160px) { .program-overview-grid, .program-overview-grid-dense, .program-overview-grid-ultra { grid-template-columns: repeat(2, minmax(0, 1fr)); } }',
+      '@media (max-width: 720px) { .program-overview-grid, .program-overview-grid-dense, .program-overview-grid-ultra { grid-template-columns: 1fr; } .program-overview-header { flex-direction: column; } }',
+      '</style>',
+      '</head>',
+      '<body>',
+      '<main class="program-overview-shell">',
+      '<header class="program-overview-header">',
+      '<div>',
+      '<p class="program-overview-kicker">Nomadic Performance</p>',
+      '<h1 class="program-overview-title">' + escapeHtml(programTitle) + '</h1>',
+      '<p class="program-overview-sub">Athlete: ' + escapeHtml(athleteLabel) + ' • Updated ' + escapeHtml(generatedAt) + '</p>',
+      '</div>',
+      '<div class="program-overview-actions">',
+      (inlineMode && hasReturn
+        ? '<a class="program-overview-link" href="' + escapeAttribute(returnUrl) + '">Back to Dashboard</a>'
+        : '<button class="program-overview-btn" type="button" onclick="window.close()">Close</button>'),
+      '<button class="program-overview-btn" type="button" onclick="window.print()">Print Entire Program</button>',
+      '<button class="program-overview-btn" type="button" onclick="window.location.reload()">Refresh</button>',
+      '</div>',
+      '</header>',
+      (cardsHtml
+        ? '<section class="program-overview-grid' + densityClass + '">' + cardsHtml + '</section>'
+        : '<section class="program-overview-empty">No workout days are configured in this program yet.</section>'),
+      '</main>',
+      '</body>',
+      '</html>'
+    ].join('');
   }
 
   function buildWorkoutPrintDocument() {
@@ -9263,6 +10301,29 @@
     var emptyState = document.querySelector("[data-empty-state]");
     var tableWrap = document.querySelector(".program-demo-table-wrap");
     var mobileLog = document.querySelector("[data-athlete-mobile-log]");
+
+    renderAthleteWorkoutOverview();
+
+    if (isAthleteWorkoutOverviewMode()) {
+      var overviewContainer = document.querySelector("[data-athlete-workout-overview]");
+      if (state.workoutWalkthroughActive) {
+        if (overviewContainer) {
+          overviewContainer.hidden = true;
+        }
+        renderWorkoutWalkthrough();
+      }
+
+      if (tableWrap) {
+        tableWrap.style.display = "none";
+      }
+      if (mobileLog) {
+        mobileLog.style.display = "none";
+      }
+      if (emptyState) {
+        emptyState.style.display = "none";
+      }
+      return;
+    }
     
     if (!tbody) {
       return;
@@ -9380,6 +10441,7 @@
     applyReadOnlyFieldState();
     renderCompletionSummary();
     renderWorkoutCompletionSummary();
+    syncWorkoutLogFooterState();
   }
 
   function shouldShowStartWorkoutButton() {
@@ -9476,21 +10538,48 @@
   }
 
   function completeWorkoutFromWalkthrough() {
-    var startedAt = state.workoutWalkthroughStartedAt;
-    var finishedAt = Date.now();
+    var feedback = getWorkoutFeedbackValues();
+    finalizeWorkoutCompletion(state.workoutWalkthroughStartedAt || Date.now(), Date.now(), feedback, false);
+    stopWorkoutWalkthrough(true);
+  }
+
+  function finalizeWorkoutCompletion(startedAt, finishedAt, feedback, notifyCoach) {
+    var safeFeedback = feedback && typeof feedback === "object" ? feedback : { intensityRating: null, comments: "" };
 
     saveExercisesForDay(true);
 
-    state.workoutCompletionSummary = buildWorkoutCompletionSummary(startedAt, finishedAt);
+    state.workoutCompletionSummary = buildWorkoutCompletionSummary(startedAt, finishedAt, safeFeedback);
     renderWorkoutCompletionSummary();
 
     syncScheduledSessionStatusForCurrentDay();
     updateStats();
-    stopWorkoutWalkthrough(true);
+    state.workoutSessionStartedAt = null;
+    setWorkoutIntensityValue("");
+    var commentsInput = document.querySelector("[data-workout-complete-modal] [data-workout-feedback]");
+    if (commentsInput) {
+      commentsInput.value = "";
+    }
+
+    if (notifyCoach) {
+      sendWorkoutCompletionNotification(state.workoutCompletionSummary)
+        .then(function (sent) {
+          if (sent) {
+            setStatus("Workout completed and coach notified.", "success");
+            return;
+          }
+          setStatus("Workout completed. Progress has been saved.", "success");
+        })
+        .catch(function () {
+          setStatus("Workout completed. Progress has been saved.", "success");
+        });
+      return;
+    }
+
     setStatus("Workout completed. Progress has been saved.", "success");
   }
 
-  function buildWorkoutCompletionSummary(startedAt, finishedAt) {
+  function buildWorkoutCompletionSummary(startedAt, finishedAt, feedback) {
+    var safeFeedback = feedback && typeof feedback === "object" ? feedback : { intensityRating: null, comments: "" };
     var snapshot = getWorkoutCompletionSnapshot(state.exercises || []);
     var elapsedMs = Math.max(0, (parseInt(finishedAt, 10) || 0) - (parseInt(startedAt, 10) || 0));
     var elapsedLabel = formatDurationLabel(elapsedMs);
@@ -9527,14 +10616,50 @@
       ? Math.round((snapshot.doneSets / snapshot.totalSets) * 100)
       : 0;
 
+    var badges = buildWorkoutBadges({
+      completionPercent: completionPercent,
+      doneSets: snapshot.doneSets,
+      totalSets: snapshot.totalSets,
+      prCount: prItems.length,
+      intensityRating: safeFeedback.intensityRating
+    });
+
     return {
       elapsedLabel: elapsedLabel,
       doneSets: snapshot.doneSets,
       totalSets: snapshot.totalSets,
       completionPercent: completionPercent,
       prItems: prItems,
+      badges: badges,
+      intensityRating: safeFeedback.intensityRating,
+      athleteComments: safeFeedback.comments,
       comments: buildWorkoutCompletionComments(completionPercent, prItems.length)
     };
+  }
+
+  function buildWorkoutBadges(context) {
+    var safe = context && typeof context === "object" ? context : {};
+    var badges = [];
+
+    badges.push("Session Complete");
+
+    if ((safe.completionPercent || 0) >= 95) {
+      badges.push("Consistency Finisher");
+    }
+
+    if ((safe.prCount || 0) > 0) {
+      badges.push("PR Hunter");
+    }
+
+    if ((safe.doneSets || 0) >= 20) {
+      badges.push("Volume Builder");
+    }
+
+    if ((safe.intensityRating || 0) >= 8) {
+      badges.push("High Effort");
+    }
+
+    return badges;
   }
 
   function buildWorkoutCompletionComments(completionPercent, prCount) {
@@ -9681,6 +10806,11 @@
           '<li class="workout-summary-stat"><span class="workout-summary-stat-label">Completion</span><span class="workout-summary-stat-value">' + escapeHtml(String(summary.completionPercent) + '%') + '</span></li>' +
         '</ul>' +
         '<p class="workout-summary-comments">' + escapeHtml(summary.comments || '') + '</p>' +
+        (Array.isArray(summary.badges) && summary.badges.length
+          ? '<div class="workout-summary-badges">' + summary.badges.map(function (badge) {
+              return '<span class="workout-summary-badge">' + escapeHtml(badge) + '</span>';
+            }).join('') + '</div>'
+          : '') +
         (Array.isArray(summary.prItems) && summary.prItems.length
           ? '<ul class="workout-summary-pr-list">' + summary.prItems.map(function (item) {
               var prText = item.previousWeight == null
@@ -9689,7 +10819,98 @@
               return '<li>' + escapeHtml(prText) + '</li>';
             }).join('') + '</ul>'
           : '<p class="workout-summary-pr-empty">No new weight PRs this session yet. Keep stacking quality reps.</p>') +
+        '<p class="workout-summary-feedback">Intensity: ' + escapeHtml(summary.intensityRating ? String(summary.intensityRating) + '/10' : 'Not provided') + '</p>' +
+        (summary.athleteComments
+          ? '<p class="workout-summary-feedback">Comment sent to coach: ' + escapeHtml(summary.athleteComments) + '</p>'
+          : '') +
       '</article>';
+  }
+
+  function resolveCurrentUserId() {
+    if (state.currentUserId) {
+      return Promise.resolve(state.currentUserId);
+    }
+
+    if (!state.client || !state.client.auth) {
+      return Promise.resolve("");
+    }
+
+    return state.client.auth.getSession()
+      .then(function (result) {
+        var user = result && result.data && result.data.session && result.data.session.user;
+        if (user && user.id) {
+          state.currentUserId = String(user.id);
+          return state.currentUserId;
+        }
+
+        if (typeof state.client.auth.getUser === "function") {
+          return state.client.auth.getUser().then(function (userResult) {
+            var fallbackUser = userResult && userResult.data && userResult.data.user;
+            state.currentUserId = fallbackUser && fallbackUser.id ? String(fallbackUser.id) : "";
+            return state.currentUserId;
+          });
+        }
+
+        return "";
+      })
+      .catch(function () {
+        return "";
+      });
+  }
+
+  function sendWorkoutCompletionNotification(summary) {
+    if (!state.client || !state.assignedProgramInstanceId) {
+      return Promise.resolve(false);
+    }
+
+    var completion = summary && typeof summary === "object" ? summary : null;
+    return ensureAssignmentMessagingContext()
+      .then(function () {
+        var coachId = String(state.assignmentCoachUserId || "").trim();
+        var athleteId = String(state.assignmentAthleteUserId || "").trim();
+        if (!isUuid(coachId) || !isUuid(athleteId)) {
+          return false;
+        }
+
+        return resolveCurrentUserId().then(function (senderUserId) {
+          var senderId = isUuid(senderUserId) ? senderUserId : athleteId;
+          var prCount = completion && Array.isArray(completion.prItems) ? completion.prItems.length : 0;
+          var badges = completion && Array.isArray(completion.badges) ? completion.badges.join(", ") : "Session Complete";
+          var intensity = completion && completion.intensityRating ? String(completion.intensityRating) + "/10" : "not provided";
+          var note = completion && completion.athleteComments ? completion.athleteComments : "No additional comments.";
+          var body = [
+            "Workout completed: " + labelForSlot(state.day),
+            "Completion: " + String(completion && completion.completionPercent || 0) + "%",
+            "Intensity: " + intensity,
+            "PRs: " + String(prCount),
+            "Badges: " + badges,
+            "Athlete note: " + note
+          ].join(" | ");
+
+          return state.client
+            .from("coach_athlete_messages")
+            .insert([{
+              coach_user_id: coachId,
+              athlete_user_id: athleteId,
+              sender_user_id: senderId,
+              sender_role: "athlete",
+              delivery_scope: "direct",
+              delivery_label: "workout-complete",
+              body: body,
+              read_by_athlete_at: new Date().toISOString(),
+              read_by_coach_at: null
+            }])
+            .then(function (result) {
+              return !(result && result.error);
+            })
+            .catch(function () {
+              return false;
+            });
+        });
+      })
+      .catch(function () {
+        return false;
+      });
   }
 
   function buildWorkoutWalkthroughSteps() {
@@ -9825,6 +11046,7 @@
         section.classList.remove("is-walkthrough-active");
       }
       syncStartWorkoutButtonState();
+      syncWorkoutLogFooterState();
       return;
     }
 
@@ -9872,6 +11094,7 @@
     }
 
     syncStartWorkoutButtonState();
+    syncWorkoutLogFooterState();
 
     if (tableWrap) {
       tableWrap.style.display = "none";

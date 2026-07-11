@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Training Program Example - Nomadic Performance</title>
-  <link rel="stylesheet" href="css/style.css?v=20260711e" />
+  <link rel="stylesheet" href="css/style.css?v=20260711l" />
   <script defer src="js/analytics.js?v=20260711e"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js?v=20260711e"></script>
   <script defer src="js/auth-ui.js?v=20260711e"></script>
-  <script defer src="js/training-program-demo.js?v=20260711e"></script>
+  <script defer src="js/training-program-demo.js?v=20260711u"></script>
 </head>
 <body>
   <header>
@@ -201,12 +201,65 @@
 
       <div class="program-demo-actions-section" data-template-daily-programming>
         <button type="button" class="btn btn-secondary" data-print-full-plan>
-          <span>👁️</span> View Workout Program
+          View Workout
+        </button>
+        <button type="button" class="btn btn-secondary" data-print-workout>
+          Workout PDF
         </button>
         <button type="button" class="btn btn-secondary" data-save-workout>
           <span>💾</span> Save Daily Programming
         </button>
+        <button type="button" class="btn btn-secondary" data-start-workout>
+          <span>▶</span> Start Workout
+        </button>
       </div>
+
+      <section class="athlete-workout-overview" data-athlete-workout-overview hidden></section>
+
+      <section class="program-demo-workout-log" data-template-daily-programming>
+        <div class="program-demo-table-wrap">
+          <table class="program-demo-table" aria-label="Workout Log Table">
+            <thead>
+              <tr>
+                <th>Exercise</th>
+                <th>Set</th>
+                <th data-workout-header-primary>Reps</th>
+                <th data-workout-header-secondary>Weight / Time</th>
+                <th data-workout-header-tertiary>RPE</th>
+                <th data-workout-header-rest>Rest</th>
+                <th>Notes</th>
+                <th>Done</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody data-workout-rows></tbody>
+          </table>
+        </div>
+
+        <div class="profile-empty-state" data-empty-state style="display:none; margin-top: 0.8rem;">
+          <p class="profile-empty-state-title">No exercises programmed for this day</p>
+          <p class="profile-empty-state-copy">Pick another day or ask your coach to add this session.</p>
+        </div>
+
+        <div class="athlete-mobile-log" data-athlete-mobile-log style="display:none;"></div>
+
+        <div class="workout-walkthrough" data-workout-walkthrough hidden></div>
+
+        <div class="program-demo-log-actions" data-workout-log-actions hidden>
+          <div class="program-demo-log-actions-head">
+            <h3>Finish Workout</h3>
+            <p>Use Save Workout any time. Select Complete Workout to open the finish summary and feedback form.</p>
+          </div>
+          <div class="program-demo-log-actions-buttons">
+            <button type="button" class="btn btn-secondary" data-workout-footer-save>Save Workout</button>
+            <button type="button" class="btn btn-primary" data-workout-footer-complete>Complete Workout</button>
+          </div>
+        </div>
+
+        <div class="program-demo-workout-summary" data-workout-summary>
+          <div class="program-demo-completion-summary" data-completion-summary></div>
+        </div>
+      </section>
 
       <section class="program-builder-overview-panel" data-template-program-overview hidden>
         <div class="program-builder-overview-head">
@@ -225,6 +278,58 @@
       <p class="profile-status" role="status" aria-live="polite" data-workout-status></p>
     </section>
   </main>
+
+  <div class="workout-complete-modal" data-workout-complete-modal hidden>
+    <div class="workout-complete-modal-overlay" data-workout-complete-close></div>
+    <div class="workout-complete-modal-dialog" role="dialog" aria-modal="true" aria-label="Complete workout feedback">
+      <div class="workout-complete-modal-head">
+        <h3>Finish Workout</h3>
+        <button type="button" class="workout-complete-modal-close" data-workout-complete-close aria-label="Close">×</button>
+      </div>
+      <p class="workout-complete-modal-copy">Save your log, rate the workout intensity, and send any notes to your coach.</p>
+      <div class="workout-complete-preview" data-workout-complete-preview></div>
+      <div class="program-demo-log-actions-form">
+        <label class="program-builder-structure-field">
+          <span>Workout Intensity (1-10)</span>
+          <div class="workout-intensity-scale" data-workout-intensity-scale role="group" aria-label="Workout intensity rating">
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="1">1</button>
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="2">2</button>
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="3">3</button>
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="4">4</button>
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="5">5</button>
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="6">6</button>
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="7">7</button>
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="8">8</button>
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="9">9</button>
+            <button type="button" class="workout-intensity-option" data-workout-intensity-option="10">10</button>
+          </div>
+          <select data-workout-intensity class="workout-intensity-select-sr" aria-hidden="true" tabindex="-1">
+            <option value="">Select rating</option>
+            <option value="1">1 - Very Easy</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5 - Moderate</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8 - Hard</option>
+            <option value="9">9</option>
+            <option value="10">10 - Max Effort</option>
+          </select>
+          <p class="workout-intensity-scale-legend"><span>Very Easy</span><span>Max Effort</span></p>
+        </label>
+        <label class="program-builder-structure-field">
+          <span>Comments For Coach</span>
+          <textarea data-workout-feedback rows="4" maxlength="600" placeholder="How did this session feel? Any pain, wins, or adjustments needed?"></textarea>
+          <p class="workout-feedback-hint">Share how your body felt, what went well, and anything your coach should adjust next session.</p>
+        </label>
+      </div>
+      <div class="program-demo-log-actions-buttons">
+        <button type="button" class="btn btn-secondary" data-workout-complete-close>Cancel</button>
+        <button type="button" class="btn btn-primary" data-workout-complete-submit>Complete Workout</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Exercise Editor Modal -->
   <div class="exercise-editor-modal" data-exercise-editor-modal hidden>

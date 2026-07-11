@@ -44,6 +44,7 @@
           <div class="admin-quick-nav" aria-label="Coach Task Navigation">
             <a class="btn admin-btn-refresh" href="admin.html#admin-athletes">Athletes</a>
             <a class="btn admin-btn-refresh" href="coach-training-programs.html">Programming</a>
+            <a class="btn admin-btn-refresh" href="coach-forms-manager.html">Forms</a>
             <a class="btn admin-btn-refresh" href="coach-blog-manager.html">Blog</a>
             <a class="btn admin-btn-refresh" href="coach-tasks.html">Tasks</a>
           </div>
@@ -64,7 +65,7 @@
           <article class="admin-overview-card">
             <div class="admin-overview-card-head">
               <h2>Create New Task</h2>
-              <p>Save a reusable task template for future assignment.</p>
+              <p>Save a reusable task template and optionally attach a form template.</p>
             </div>
             <div class="admin-modal-info-row">
               <label for="coach-task-create-title">Task Title</label>
@@ -83,13 +84,13 @@
               <input id="coach-task-create-action-url" class="admin-search" type="url" placeholder="https://..." data-coach-task-create-action-url />
             </div>
             <div class="admin-modal-info-row">
-              <label>Form Questions (optional)</label>
-              <p class="admin-overview-item-meta">Build a form athletes will complete when this task is assigned.</p>
-              <div class="admin-overview-list" data-coach-task-question-list>
-                <p class="admin-loading">No form questions yet.</p>
-              </div>
-              <div class="admin-controls-actions" style="margin-top:0.5rem;">
-                <button class="btn admin-btn-small" type="button" data-coach-task-add-question>Add Question</button>
+              <label for="coach-task-create-attached-form">Attach Form (optional)</label>
+              <select id="coach-task-create-attached-form" class="admin-search" data-coach-task-create-attached-form>
+                <option value="">No attached form</option>
+              </select>
+              <p class="admin-overview-item-meta">Use Forms page to create/edit forms, then attach one here.</p>
+              <div class="admin-controls-actions" style="margin-top:0.4rem;">
+                <a class="btn admin-btn-small" href="coach-forms-manager.html">Manage Forms</a>
               </div>
             </div>
             <div class="admin-controls-actions">

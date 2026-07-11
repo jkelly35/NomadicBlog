@@ -4539,13 +4539,29 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
   function buildOnboardingQuestionField(question, responseData) {
     var q = question && typeof question === "object" ? question : {};
+    var type = String(q.type || "text").toLowerCase();
     var key = String(q.key || "").trim();
+    var label = String(q.label || formatQuestionKeyLabel(key));
+
+    if (type === "statement") {
+      var statementTitle = String(q.label || "Liability Waiver").trim() || "Liability Waiver";
+      var statementContent = String(q.content || "").trim();
+      var statementHtml = statementContent
+        ? escapeHtml(statementContent).replace(/\n/g, "<br />")
+        : '<span class="profile-empty-state-copy">No statement content configured.</span>';
+
+      return (
+        '<div class="form-group profile-waiver-statement">' +
+          '<label>' + escapeHtml(statementTitle) + '</label>' +
+          '<div class="profile-waiver-statement-body">' + statementHtml + '</div>' +
+        '</div>'
+      );
+    }
+
     if (!key) {
       return "";
     }
 
-    var label = String(q.label || formatQuestionKeyLabel(key));
-    var type = String(q.type || "text").toLowerCase();
     var required = !!q.required;
     var value = responseData && Object.prototype.hasOwnProperty.call(responseData, key)
       ? String(responseData[key] || "")
@@ -4606,7 +4622,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     var requiredQuestions = Array.isArray(assignment.form_schema && assignment.form_schema.questions)
       ? assignment.form_schema.questions.filter(function (question) {
-          return !!(question && question.required && question.key);
+          return !!(question && question.required && question.key && String(question.type || "").toLowerCase() !== "statement");
         })
       : [];
 
@@ -8354,10 +8370,14 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         '</div>';
     } else {
       html += '<div class="training-program-grid training-program-grid-active">';
-      activePrograms.forEach(function (program) {
-        var scheduleRows = safeScheduleMap[String(program.id || "")] || [];
-        html += buildTrainingProgramCard(program, true, scheduleRows);
-      });
+      if (!state.isCoachView) {
+        html += buildCombinedActiveProgramCard(activePrograms, safeScheduleMap);
+      } else {
+        activePrograms.forEach(function (program) {
+          var scheduleRows = safeScheduleMap[String(program.id || "")] || [];
+          html += buildTrainingProgramCard(program, true, scheduleRows);
+        });
+      }
       html += '</div>';
     }
 
@@ -8755,6 +8775,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       assignmentQuery +
       athleteQuery;
     var viewUrl = programUrl + "&view=1";
+    var returnToUrl = "profile.html#profile-training-programs-section";
+    var overviewUrl = viewUrl + "&overview=1&returnTo=" + encodeURIComponent(returnToUrl);
 
     var scheduleRows = Array.isArray(arguments[2]) ? arguments[2] : [];
     var nextSession = getNextScheduledSession(scheduleRows);
@@ -8767,7 +8789,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var scheduledProgramUrl = nextSession && nextSession.slot_key
       ? (programUrl + "&day=" + encodeURIComponent(nextSession.slot_key))
       : programUrl;
-    var overviewUrl = isActive ? viewUrl : viewUrl;
+    var overviewUrlResolved = isActive ? overviewUrl : viewUrl;
     var isAthleteActiveCard = isActive && !state.isCoachView;
 
     if (isAthleteActiveCard) {
@@ -8778,7 +8800,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         '<span><strong>Start:</strong> ' + escapeHtml(startDate) + '</span>',
         '<span><strong>Next:</strong> ' + escapeHtml(nextSessionLabel) + ' · ' + escapeHtml(nextSessionDate) + '</span>',
         '</div>',
-        '<a class="btn training-open-btn training-open-btn-compact" href="' + overviewUrl + '">Program Overview</a>',
+        '<a class="btn training-open-btn training-open-btn-compact" href="' + overviewUrlResolved + '">Program Overview</a>',
         '</div>'
       ].join("");
     }
@@ -8791,10 +8813,66 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       isActive
         ? '<p class="training-note">This program is currently active. Use the button below when it is complete.</p>'
         : '<p class="training-note">This program has been moved to your past training history.</p>',
-      '<a class="btn training-open-btn" href="' + (isActive ? overviewUrl : viewUrl) + '">' + (isActive ? 'Program Overview' : 'View Program') + '</a>',
+      '<a class="btn training-open-btn" href="' + (isActive ? overviewUrlResolved : viewUrl) + '">' + (isActive ? 'Program Overview' : 'View Program') + '</a>',
       isActive
         ? '<div class="training-card-actions"><button type="button" class="btn profile-btn-edit-profile training-complete-btn" data-complete-program="' + escapeAttribute(program.id || "") + '">Completed Training Program</button></div>'
         : '<div class="training-card-actions training-card-actions-past"><button type="button" class="btn profile-btn-edit-profile training-make-current-btn" data-make-current-program="' + escapeAttribute(program.id || "") + '">Make Current</button><button type="button" class="btn profile-btn-delete training-delete-past-btn" data-delete-past-program="' + escapeAttribute(program.id || "") + '">Delete</button></div>',
+      '</div>'
+    ].join("");
+  }
+
+  function buildCombinedActiveProgramCard(activePrograms, scheduleByAssignment) {
+    var programs = Array.isArray(activePrograms) ? activePrograms.slice() : [];
+    if (!programs.length) {
+      return "";
+    }
+
+    programs.sort(function (a, b) {
+      return String(b && b.assigned_at || "").localeCompare(String(a && a.assigned_at || ""));
+    });
+
+    var primaryProgram = programs[0] || {};
+    var athleteName =
+      (state.profile && state.profile.name) ||
+      (state.viewUser && state.viewUser.email) ||
+      "Athlete";
+
+    var title =
+      String(primaryProgram && (primaryProgram.program_name || (primaryProgram.training_program && primaryProgram.training_program.name)) || "").trim() ||
+      "Current Training Program";
+
+    var startDate = primaryProgram && primaryProgram.assigned_at ? formatDate(primaryProgram.assigned_at) : "—";
+
+    var allUpcoming = collectUpcomingScheduledItems(programs, scheduleByAssignment || {}, 60);
+    var nextSession = allUpcoming.length ? allUpcoming[0] : null;
+    var nextSessionLabel = nextSession
+      ? String(nextSession.session_label || nextSession.slot_key || "Scheduled Workout")
+      : "Not scheduled";
+    var nextSessionDate = nextSession && nextSession.scheduled_for
+      ? formatDate(nextSession.scheduled_for)
+      : "—";
+
+    var templateIds = programs
+      .map(function (program) { return String(program && program.program_id || "").trim(); })
+      .filter(Boolean)
+      .filter(function (id, index, arr) { return arr.indexOf(id) === index; });
+
+    var returnToUrl = "profile.html#profile-training-programs-section";
+    var overviewUrl =
+      "training-program-example.html?program=" + encodeURIComponent(title) +
+      "&athleteName=" + encodeURIComponent(athleteName) +
+      "&view=1&overview=1&aggregate=1" +
+      "&templateIds=" + encodeURIComponent(templateIds.join(",")) +
+      "&returnTo=" + encodeURIComponent(returnToUrl);
+
+    return [
+      '<div class="profile-training-details training-program-card is-active is-compact-active" data-training-program-id="combined-active-program">',
+      '<span class="training-program-link training-program-link-title">' + escapeHtml(title) + '</span>',
+      '<div class="training-program-meta">',
+      '<span><strong>Start:</strong> ' + escapeHtml(startDate) + '</span>',
+      '<span><strong>Next:</strong> ' + escapeHtml(nextSessionLabel) + ' · ' + escapeHtml(nextSessionDate) + '</span>',
+      '</div>',
+      '<a class="btn training-open-btn training-open-btn-compact" href="' + overviewUrl + '">Program Overview</a>',
       '</div>'
     ].join("");
   }
@@ -8998,7 +9076,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       (program.program_id ? "&templateId=" + encodeURIComponent(program.program_id) : "") +
       (program.id ? "&assignmentId=" + encodeURIComponent(program.id) : "") +
       "&athleteName=" + encodeURIComponent(athleteName) +
-      "&day=" + encodeURIComponent(String(item.slot_key || ""))
+      "&day=" + encodeURIComponent(String(item.slot_key || "")) +
+      (state.isCoachView ? "" : "&entry=overview")
     );
   }
 
