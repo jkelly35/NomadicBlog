@@ -116,6 +116,216 @@
     }
   };
 
+  var EXERCISE_LIBRARY_SEED = [
+    {
+      id: "seed_back_squat",
+      name: "Back Squat",
+      movement_pattern: "squat",
+      equipment: "barbell",
+      primary_muscle: "quads",
+      training_goal: "strength",
+      sport_tags: ["mixed", "skiing", "climbing"],
+      custom_tags: ["compound", "lower-body"],
+      description: "Primary lower-body strength lift.",
+      coaching_cues: "Brace trunk, control descent, drive evenly through full foot.",
+      video_demo_url: "",
+      default_section: "A Block",
+      default_mode: "reps",
+      default_set_count: 4,
+      default_rep_value: "5",
+      default_secondary_value: "",
+      default_intensity_value: "RPE 7",
+      default_rest_value: "120s",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_weighted_pull_up",
+      name: "Weighted Pull-Up",
+      movement_pattern: "pull",
+      equipment: "other",
+      primary_muscle: "back",
+      training_goal: "strength",
+      sport_tags: ["climbing", "mixed"],
+      custom_tags: ["upper-body", "vertical-pull"],
+      description: "Vertical pulling strength and scapular control.",
+      coaching_cues: "Start from dead hang, pull chest tall, avoid kipping.",
+      video_demo_url: "",
+      default_section: "A Block",
+      default_mode: "reps",
+      default_set_count: 4,
+      default_rep_value: "4",
+      default_secondary_value: "",
+      default_intensity_value: "RPE 8",
+      default_rest_value: "120s",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_split_squat",
+      name: "Rear Foot Elevated Split Squat",
+      movement_pattern: "squat",
+      equipment: "dumbbell",
+      primary_muscle: "glutes",
+      training_goal: "strength",
+      sport_tags: ["trail-running", "skiing", "mixed"],
+      custom_tags: ["unilateral", "knee-control"],
+      description: "Unilateral leg strength for durability and symmetry.",
+      coaching_cues: "Stay tall, front knee tracks over mid-foot, control tempo.",
+      video_demo_url: "",
+      default_section: "B Block",
+      default_mode: "reps",
+      default_set_count: 3,
+      default_rep_value: "8 / side",
+      default_secondary_value: "",
+      default_intensity_value: "RPE 7",
+      default_rest_value: "90s",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_deadlift",
+      name: "Trap Bar Deadlift",
+      movement_pattern: "hinge",
+      equipment: "barbell",
+      primary_muscle: "hamstrings",
+      training_goal: "strength",
+      sport_tags: ["mixed", "skiing", "snowboarding"],
+      custom_tags: ["posterior-chain", "power"],
+      description: "Posterior-chain strength with reduced spinal loading.",
+      coaching_cues: "Neutral spine, push floor away, lockout with glutes.",
+      video_demo_url: "",
+      default_section: "A Block",
+      default_mode: "reps",
+      default_set_count: 4,
+      default_rep_value: "3",
+      default_secondary_value: "",
+      default_intensity_value: "RPE 8",
+      default_rest_value: "150s",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_box_jump",
+      name: "Box Jump",
+      movement_pattern: "plyometric",
+      equipment: "other",
+      primary_muscle: "full-body",
+      training_goal: "power",
+      sport_tags: ["climbing", "skiing", "mixed"],
+      custom_tags: ["explosive", "low-volume"],
+      description: "Explosive intent and landing mechanics.",
+      coaching_cues: "Max intent on jump, quiet landing, full reset each rep.",
+      video_demo_url: "",
+      default_section: "B Block",
+      default_mode: "reps",
+      default_set_count: 4,
+      default_rep_value: "3",
+      default_secondary_value: "",
+      default_intensity_value: "Fast",
+      default_rest_value: "90s",
+      default_show_weight: false,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_plank",
+      name: "RKC Plank",
+      movement_pattern: "core",
+      equipment: "bodyweight",
+      primary_muscle: "core",
+      training_goal: "stability",
+      sport_tags: ["mixed", "trail-running", "climbing"],
+      custom_tags: ["trunk-stability"],
+      description: "High-tension anti-extension core drill.",
+      coaching_cues: "Posterior pelvic tilt, ribs down, breathe behind brace.",
+      video_demo_url: "",
+      default_section: "C Block",
+      default_mode: "time",
+      default_set_count: 3,
+      default_rep_value: "30s",
+      default_secondary_value: "BW",
+      default_intensity_value: "RPE 7",
+      default_rest_value: "45s",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_zone2_run",
+      name: "Zone 2 Run",
+      movement_pattern: "locomotion",
+      equipment: "bodyweight",
+      primary_muscle: "full-body",
+      training_goal: "endurance",
+      sport_tags: ["trail-running", "mixed", "skiing"],
+      custom_tags: ["aerobic-base"],
+      description: "Steady aerobic conditioning session.",
+      coaching_cues: "Nasal breathing as possible, conversational pace.",
+      video_demo_url: "",
+      default_section: "A Block",
+      default_mode: "endurance",
+      default_set_count: 1,
+      default_rep_value: "45:00",
+      default_secondary_value: "Zone 2",
+      default_intensity_value: "Z2",
+      default_rest_value: "",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: false
+    },
+    {
+      id: "seed_hangboard_repeaters",
+      name: "Hangboard Repeaters",
+      movement_pattern: "pull",
+      equipment: "other",
+      primary_muscle: "back",
+      training_goal: "strength",
+      sport_tags: ["climbing"],
+      custom_tags: ["fingers", "forearm"],
+      description: "Finger strength repeaters on edge protocol.",
+      coaching_cues: "Strict shoulder position, stop before form breakdown.",
+      video_demo_url: "",
+      default_section: "A Block",
+      default_mode: "time",
+      default_set_count: 6,
+      default_rep_value: "10s",
+      default_secondary_value: "20mm edge",
+      default_intensity_value: "Submax",
+      default_rest_value: "50s",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_mobility_flow",
+      name: "Mobility Flow",
+      movement_pattern: "core",
+      equipment: "bodyweight",
+      primary_muscle: "full-body",
+      training_goal: "mobility",
+      sport_tags: ["mixed", "climbing", "skiing", "trail-running"],
+      custom_tags: ["recovery"],
+      description: "Low-intensity mobility sequence for recovery days.",
+      coaching_cues: "Move slowly through full range, keep nasal breathing.",
+      video_demo_url: "",
+      default_section: "Cool Down",
+      default_mode: "time",
+      default_set_count: 1,
+      default_rep_value: "10:00",
+      default_secondary_value: "",
+      default_intensity_value: "Easy",
+      default_rest_value: "",
+      default_show_weight: false,
+      default_show_rpe: true,
+      default_show_rest: false
+    }
+  ];
+
   var PROGRAM_TYPE_OPTIONS = [
     "hybrid",
     "strength",
@@ -739,7 +949,7 @@
   }
 
   function shouldUsePhaseDailyNavigator() {
-    return !!(state.isTemplateBuilder && state.builderStep === 3);
+    return !!((state.isTemplateBuilder || state.isCoachAssignedProgramEdit) && state.builderStep === 3);
   }
 
   function getDailyNavigatorPhases() {
@@ -776,8 +986,8 @@
       state.dailyProgrammingPhaseIndex = matchedPhaseIndex > -1 ? matchedPhaseIndex : 0;
     }
 
-    if (state.dailyProgrammingViewMode !== "week" && state.dailyProgrammingViewMode !== "phase") {
-      state.dailyProgrammingViewMode = "week";
+    if (state.dailyProgrammingViewMode !== "day" && state.dailyProgrammingViewMode !== "week" && state.dailyProgrammingViewMode !== "phase") {
+      state.dailyProgrammingViewMode = state.isCoachAssignedProgramEdit ? "day" : "week";
     }
 
     var phase = getSelectedDailyNavigatorPhase();
@@ -823,6 +1033,9 @@
     var phases = getDailyNavigatorPhases();
 
     if (modeSelect) {
+      if (!modeSelect.querySelector('option[value="day"]')) {
+        modeSelect.insertAdjacentHTML("afterbegin", '<option value="day">Day View</option>');
+      }
       modeSelect.value = state.dailyProgrammingViewMode;
     }
 
@@ -863,11 +1076,11 @@
     }
 
     if (weekWrap) {
-      weekWrap.hidden = state.dailyProgrammingViewMode !== "week";
+      weekWrap.hidden = state.dailyProgrammingViewMode === "phase";
     }
 
     if (dayWrap) {
-      dayWrap.hidden = state.dailyProgrammingViewMode !== "phase";
+      dayWrap.hidden = state.dailyProgrammingViewMode === "week";
     }
   }
 
@@ -879,8 +1092,12 @@
     var daySelect = document.querySelector("[data-daily-nav-day]");
 
     if (modeSelect) {
-      var nextMode = String(modeSelect.value || "week").trim().toLowerCase();
-      state.dailyProgrammingViewMode = nextMode === "phase" ? "phase" : "week";
+      var nextMode = String(modeSelect.value || (state.isCoachAssignedProgramEdit ? "day" : "week")).trim().toLowerCase();
+      state.dailyProgrammingViewMode = nextMode === "phase"
+        ? "phase"
+        : nextMode === "day"
+          ? "day"
+          : "week";
     }
 
     var phases = getDailyNavigatorPhases();
@@ -914,7 +1131,14 @@
     var axis = parseInt(axisValue, 10);
     var phaseWeeks = getPhaseLengthWeeks(phase);
     var effectiveDays = getEffectivePhaseTrainingDays(phase);
-    if (state.dailyProgrammingViewMode === "week") {
+    if (state.dailyProgrammingViewMode === "day") {
+      var parsed = parseSlotKey(axisValue);
+      if (!parsed) {
+        return;
+      }
+      state.dailyProgrammingWeekInPhase = clampNumber(parsed.week - Number(phase.start_week || 1) + 1, 1, phaseWeeks, state.dailyProgrammingWeekInPhase || 1);
+      state.dailyProgrammingDayInPhase = clampNumber(parsed.workout, 1, effectiveDays, state.dailyProgrammingDayInPhase || 1);
+    } else if (state.dailyProgrammingViewMode === "week") {
       state.dailyProgrammingDayInPhase = clampNumber(axis, 1, effectiveDays, state.dailyProgrammingDayInPhase || 1);
     } else {
       state.dailyProgrammingWeekInPhase = clampNumber(axis, 1, phaseWeeks, state.dailyProgrammingWeekInPhase || 1);
@@ -963,6 +1187,10 @@
     var phaseWeeks = getPhaseLengthWeeks(phase);
     var effectiveDays = getEffectivePhaseTrainingDays(phase);
 
+    if (state.dailyProgrammingViewMode === "day") {
+      return [buildSlotKeyFromDailyNavigator()];
+    }
+
     if (state.dailyProgrammingViewMode === "week") {
       var globalWeek = clampNumber(phaseStart + state.dailyProgrammingWeekInPhase - 1, phaseStart, phaseStart + phaseWeeks - 1, phaseStart);
       return new Array(effectiveDays).fill("").map(function (_, index) {
@@ -994,17 +1222,29 @@
       return;
     }
 
-    container.innerHTML = slotKeys.map(function (slotKey, index) {
+    container.innerHTML = buildDailyAxisEditorCardsHtml(slotKeys, true);
+    applyDailyAxisSelectValues(container, slotKeys);
+  }
+
+  function buildDailyAxisEditorCardsHtml(slotKeys, useNavigatorLabels) {
+    return (Array.isArray(slotKeys) ? slotKeys : []).map(function (slotKey, index) {
       var parsed = parseSlotKey(slotKey) || { week: 1, workout: 1 };
       var plan = getSessionPlanForSlot(slotKey);
-      var axisTitle = state.dailyProgrammingViewMode === "week"
-        ? "Day " + String(index + 1)
-        : "Week " + String(index + 1);
+      var axisTitle = useNavigatorLabels
+        ? (state.dailyProgrammingViewMode === "day"
+          ? "Scheduled Day"
+          : state.dailyProgrammingViewMode === "week"
+          ? "Day " + String(index + 1)
+          : "Week " + String(index + 1))
+        : "Scheduled Day";
+      var axisSubtitle = useNavigatorLabels
+        ? "Week " + String(parsed.week) + " • Day " + String(parsed.workout)
+        : String(labelForSlot(slotKey) || ("Week " + String(parsed.week) + " • Day " + String(parsed.workout)));
       return [
         '<article class="program-builder-axis-card">',
         '<div class="program-builder-axis-card-head">',
         '<h3>' + escapeHtml(axisTitle) + '</h3>',
-        '<p>' + escapeHtml("Week " + String(parsed.week) + " • Day " + String(parsed.workout)) + '</p>',
+        '<p>' + escapeHtml(axisSubtitle) + '</p>',
         '</div>',
         '<label class="program-builder-structure-field">',
         '<span>Session Title</span>',
@@ -1045,8 +1285,14 @@
         '</article>'
       ].join('');
     }).join('');
+  }
 
-    slotKeys.forEach(function (slotKey) {
+  function applyDailyAxisSelectValues(container, slotKeys) {
+    if (!container) {
+      return;
+    }
+
+    (Array.isArray(slotKeys) ? slotKeys : []).forEach(function (slotKey) {
       var select = container.querySelector('[data-axis-slot="' + slotKey + '"][data-axis-field="session_type"]');
       if (!select) {
         return;
@@ -2524,11 +2770,12 @@
         } catch (error) {
           state.isTemplateBuilder = false;
           state.coachUserId = null;
-          lockBuilderToReadOnly();
-          refreshTemplateDayTools();
-          setStatus("Template editor could not be initialized: " + (error && error.message ? error.message : "unknown error") + ".", "error");
-          console.error("Template builder initialization failed", error);
         }
+            var phases = getDailyNavigatorPhases();
+            if (!phases.length) {
+              state.dailyProgrammingViewMode = "week"; // Default to week if no phases
+              return;
+            }
       }).catch(function () {
         state.isTemplateBuilder = false;
         state.coachUserId = null;
@@ -2907,6 +3154,9 @@
     var startWorkoutBtn = document.querySelector("[data-start-workout]");
     var backLink = document.querySelector("[data-program-back-link]");
     var subtitle = document.querySelector(".program-demo-subtitle");
+    var prevDailyBtn = document.querySelector("[data-template-prev-step-daily]");
+    var dailyNavGrid = document.querySelector(".program-builder-daily-nav-grid");
+    var daySelectorTitle = document.querySelector(".day-selector-title");
 
     state.builderStep = 3;
     state.isProgramReadOnly = false;
@@ -2937,14 +3187,35 @@
       startWorkoutBtn.style.display = "none";
     }
     if (backLink) {
-      backLink.href = "coach-schedule-calendar.html";
-      backLink.textContent = "← Back to Coach Schedule";
+      backLink.href = buildCoachAssignedProgramReturnUrl();
+      backLink.textContent = "← Back to Training Calendar Manager";
     }
     if (subtitle) {
       subtitle.textContent = "Coach edit mode: review and adjust this athlete's assigned workout day.";
     }
+    if (prevDailyBtn) {
+      prevDailyBtn.style.display = "none";
+    }
+    if (dailyNavGrid) {
+      dailyNavGrid.style.display = "grid";
+    }
+    if (daySelectorTitle) {
+      daySelectorTitle.textContent = "Edit Scheduled Workout";
+    }
+
+    state.dailyProgrammingViewMode = "day";
+    ensureDailyNavigatorState();
+    renderDailyNavigatorControls();
 
     setBuilderStep(3);
+  }
+
+  function buildCoachAssignedProgramReturnUrl() {
+    if (state.targetAthleteId) {
+      return "athlete-insight.html?athleteId=" + encodeURIComponent(state.targetAthleteId) + "&tab=training&trainingTab=current";
+    }
+
+    return "admin.html#admin-athletes";
   }
 
   function getPreferredDayFromQuery() {
@@ -3466,10 +3737,6 @@
 
     var returnUrl = String(window.location.href || "training-program-example.html");
     var previewWindow = window.open("", "_self");
-    if (!previewWindow) {
-      setStatus("Could not open program overview in this tab.", "error");
-      return;
-    }
 
     previewWindow.document.open();
     previewWindow.document.write(buildTemplateProgramOverviewDocument(returnUrl));
@@ -3479,98 +3746,17 @@
 
   function buildTemplateProgramOverviewDocument(returnUrl) {
     var slotKeys = getAllSlotKeys();
-    var totalWeeks = clampNumber(parseInt(state.structure && state.structure.weeks, 10), 1, 52, 1);
-    var workoutsPerWeek = clampNumber(parseInt(state.structure && state.structure.workoutsPerWeek, 10), 1, 14, 1);
+    var totalWeeks = Math.max(1, parseInt(state.structure && state.structure.weeks, 10) || 1);
+    var workoutsPerWeek = Math.max(1, parseInt(state.structure && state.structure.workoutsPerWeek, 10) || 1);
     var phases = Array.isArray(state.programPhases) ? state.programPhases : [];
+    var phaseCards = phases.map(function (phase) {
+      return buildTemplateOverviewPhaseCard(phase, slotKeys);
+    }).join('');
     var calendarData = buildTemplateOverviewCalendarData(slotKeys, totalWeeks);
     var serializedCalendarData = JSON.stringify(calendarData).replace(/</g, "\\u003c");
     var safeReturnUrl = String(returnUrl || "training-program-example.html").replace(/"/g, "&quot;");
-    var phaseCards = phases.length
-      ? phases.map(function (phase) {
-          return buildTemplateOverviewPhaseCard(phase, slotKeys);
-        }).join("")
-      : '<article class="overview-phase-card"><h3>No phases yet</h3><p>Add program phases to see the high-level structure.</p></article>';
 
     return [
-      "<!DOCTYPE html>",
-      "<html lang=\"en\">",
-      "<head>",
-      "<meta charset=\"UTF-8\" />",
-      "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />",
-      "<title>Program Overview</title>",
-      "<style>",
-      "* { box-sizing: border-box; }",
-      "body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(140deg,#f2ece3 0%,#e9e1d5 100%); color: #143737; }",
-      ".overview-wrap { max-width: 1320px; margin: 0 auto; padding: 28px 22px 36px; }",
-      ".overview-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }",
-      ".overview-head-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }",
-      ".overview-btn { border: 1px solid #c8b49e; background: #fff7ec; color: #184040; border-radius: 9px; padding: 9px 12px; font-size: 0.86rem; font-weight: 700; cursor: pointer; }",
-      ".overview-btn.is-primary { background: linear-gradient(135deg, #c56a2c 0%, #b86127 100%); border-color: #a95c24; color: #fff; }",
-      ".overview-btn[hidden] { display: none !important; }",
-      ".overview-head h1 { margin: 0; font-size: 1.8rem; color: #0f2d2d; }",
-      ".overview-head p { margin: 8px 0 0; color: #4d6464; max-width: 720px; }",
-      ".overview-panel[hidden] { display: none !important; }",
-      ".overview-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }",
-      ".overview-summary-card { background: #fffdf9; border: 1px solid #dfd2c0; border-radius: 12px; padding: 12px 13px; }",
-      ".overview-summary-card h2 { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #5f7373; }",
-      ".overview-summary-card p { margin: 8px 0 0; font-size: 1.25rem; font-weight: 800; color: #183d3d; }",
-      ".overview-phase-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }",
-      ".overview-phase-card { background: #fffdf9; border: 1px solid #dfd2c0; border-radius: 12px; padding: 14px; display: grid; gap: 10px; }",
-      ".overview-phase-card h3 { margin: 0; color: #123636; font-size: 1.02rem; }",
-      ".overview-phase-meta { color: #607575; font-size: 0.84rem; }",
-      ".overview-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }",
-      ".overview-chip { border: 1px solid #d6c9b6; background: #f9f3e8; color: #4f4436; border-radius: 999px; padding: 3px 9px; font-size: 0.76rem; font-weight: 700; }",
-      ".overview-section-title { margin: 2px 0 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #607575; }",
-      ".calendar-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }",
-      ".calendar-week-card { background: #fffdf9; border: 1px solid #dfd2c0; border-radius: 12px; padding: 13px; display: grid; gap: 10px; }",
-      ".calendar-week-card h3 { margin: 0; font-size: 1rem; color: #133737; }",
-      ".calendar-controls { display: grid; gap: 7px; }",
-      ".calendar-control-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(122px, 170px); gap: 8px; align-items: center; }",
-      ".calendar-control-row label { font-size: 0.83rem; color: #335252; font-weight: 700; }",
-      ".calendar-control-row select { border: 1px solid #ccbba6; border-radius: 8px; padding: 6px 8px; font-size: 0.85rem; background: #fff; }",
-      ".calendar-week-grid { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 7px; }",
-      ".calendar-day { border: 1px solid #e2d5c4; border-radius: 10px; background: #fffcf7; min-height: 100px; padding: 7px; display: grid; gap: 5px; align-content: start; }",
-      ".calendar-day h4 { margin: 0; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: #496262; }",
-      ".calendar-workout { border: 1px solid #d6c7b4; border-radius: 8px; background: #f9f1e4; color: #3f3427; padding: 4px 5px; font-size: 0.72rem; font-weight: 700; line-height: 1.2; cursor: grab; display: grid; gap: 2px; }",
-      ".calendar-workout-meta { font-size: 0.62rem; font-weight: 700; color: #6c6256; text-transform: uppercase; letter-spacing: 0.05em; }",
-      ".calendar-workout.is-dragging { opacity: 0.5; }",
-      ".calendar-day.is-drop-target { outline: 2px dashed #c56a2c; outline-offset: 2px; }",
-      ".calendar-empty { color: #95a2a3; font-size: 0.72rem; font-style: italic; }",
-      ".calendar-meta { color: #688080; font-size: 0.8rem; margin: 0; }",
-      ".calendar-note { margin: 0 0 10px; color: #5f7373; font-size: 0.84rem; }",
-      "@media (max-width: 980px) { .overview-summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } .overview-phase-grid { grid-template-columns: 1fr; } }",
-      "@media (max-width: 980px) { .calendar-grid { grid-template-columns: 1fr; } .calendar-week-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }",
-      "</style>",
-      "</head>",
-      "<body>",
-      "<main class=\"overview-wrap\">",
-      "<header class=\"overview-head\">",
-      "<div>",
-      "<h1>Workout Program Overview</h1>",
-      "<p>Birds-eye review of the full template structure before saving: program length, phases, and movement/session distribution.</p>",
-      "</div>",
-      "<div class=\"overview-head-actions\">",
-      "<button type=\"button\" class=\"overview-btn\" id=\"backToBuilderBtn\">Back to Daily Workout Programming</button>",
-      "<button type=\"button\" class=\"overview-btn is-primary\" id=\"saveTemplateFromOverviewBtn\">Save Template</button>",
-      "<button type=\"button\" class=\"overview-btn is-primary\" id=\"viewCalendarBtn\">View in Calendar</button>",
-      "<button type=\"button\" class=\"overview-btn\" id=\"backToOverviewBtn\" hidden>Back to Overview</button>",
-      "</div>",
-      "</header>",
-      "<section class=\"overview-panel\" id=\"overviewPanel\">",
-      "<section class=\"overview-summary-grid\">",
-      '<article class=\"overview-summary-card\"><h2>Program Length</h2><p>' + String(totalWeeks) + ' weeks</p></article>',
-      '<article class=\"overview-summary-card\"><h2>Workouts / Week</h2><p>' + String(workoutsPerWeek) + '</p></article>',
-      '<article class=\"overview-summary-card\"><h2>Total Session Slots</h2><p>' + String(slotKeys.length) + '</p></article>',
-      '<article class=\"overview-summary-card\"><h2>Phases</h2><p>' + String(phases.length) + '</p></article>',
-      "</section>",
-      "<section class=\"overview-phase-grid\">",
-      phaseCards,
-      "</section>",
-      "</section>",
-      "<section class=\"overview-panel\" id=\"calendarPanel\" hidden>",
-      "<p class=\"calendar-note\">Move workouts across Monday-Sunday by selecting weekdays. Layout saves locally for this template overview.</p>",
-      "<div class=\"calendar-grid\" id=\"calendarWeeks\"></div>",
-      "</section>",
       "</main>",
       '<script>window.__OVERVIEW_DATA__ = ' + serializedCalendarData + ';window.__RETURN_URL__ = "' + safeReturnUrl + '";<\/script>',
       "<script>",
@@ -3888,7 +4074,9 @@
       ensureDailyNavigatorState();
       var phase = getSelectedDailyNavigatorPhase();
       var phaseName = phase && phase.name ? String(phase.name) : "Phase";
-      if (state.dailyProgrammingViewMode === "week") {
+      if (state.dailyProgrammingViewMode === "day") {
+        dayInfo.textContent = "Day View • " + phaseName + " • Editing " + String(labelForSlot(state.day) || state.day) + ".";
+      } else if (state.dailyProgrammingViewMode === "week") {
         dayInfo.textContent = "Week View • " + phaseName + " • Week " + String(state.dailyProgrammingWeekInPhase) + " • Editing day variations within this week.";
       } else {
         dayInfo.textContent = "Phase View • " + phaseName + " • Day " + String(state.dailyProgrammingDayInPhase) + " • Editing progression across phase weeks.";
@@ -5217,6 +5405,7 @@
     var cancelBtn = document.querySelector("[data-exercise-editor-cancel]");
     var submitBtn = document.querySelector("[data-exercise-editor-submit]");
     var nameInput = document.querySelector("[data-exercise-name-input]");
+    var librarySelect = document.querySelector("[data-exercise-library-select]");
     var suggestions = document.querySelector("[data-exercise-suggestions]");
 
     if (!modal || !overlay || !closeBtn || !cancelBtn || !submitBtn) {
@@ -5246,6 +5435,16 @@
         }
 
         applyExerciseLibrarySelection(option.getAttribute("data-exercise-suggestion-id"));
+      });
+    }
+
+    if (librarySelect) {
+      librarySelect.addEventListener("change", function () {
+        var libraryId = String(librarySelect.value || "").trim();
+        if (!libraryId) {
+          return;
+        }
+        applyExerciseLibrarySelection(libraryId);
       });
     }
 
@@ -5282,6 +5481,7 @@
     var restToggle = document.querySelector("[data-exercise-toggle-rest]");
     var notesInput = document.querySelector("[data-exercise-notes-input]");
     var libraryIdInput = document.querySelector("[data-exercise-library-id]");
+    var librarySelect = document.querySelector("[data-exercise-library-select]");
 
     if (!modal) return;
 
@@ -5299,6 +5499,10 @@
     if (libraryIdInput) {
       libraryIdInput.value = "";
     }
+    if (librarySelect) {
+      librarySelect.value = "";
+    }
+    renderExerciseLibrarySelectOptions("");
     updateExerciseLibraryPreview(null);
     hideExerciseSuggestions();
 
@@ -5320,6 +5524,7 @@
       if (libraryIdInput) {
         libraryIdInput.value = String(exercise.library_id || "");
       }
+      renderExerciseLibrarySelectOptions(String(exercise.library_id || ""));
       if (exercise.library_id) {
         updateExerciseLibraryPreview(findExerciseLibraryItemById(exercise.library_id));
       } else {
@@ -5434,10 +5639,10 @@
 
       for (var i = 0; i < numSets; i++) {
         newExercise.sets.push({
-          reps: "",
-          weight: "",
-          rpe: "",
-          rest: "",
+          reps: libraryItem && libraryItem.default_rep_value ? String(libraryItem.default_rep_value) : "",
+          weight: libraryItem && libraryItem.default_secondary_value ? String(libraryItem.default_secondary_value) : "",
+          rpe: libraryItem && libraryItem.default_intensity_value ? String(libraryItem.default_intensity_value) : "",
+          rest: libraryItem && libraryItem.default_rest_value ? String(libraryItem.default_rest_value) : "",
           notes: "",
           done: false
         });
@@ -5457,16 +5662,20 @@
   function loadExerciseLibraryForEditor() {
     if (!state.client) {
       state.exerciseLibrary = readExerciseLibraryFromStorage();
+      ensureSeedExerciseLibrary();
+      renderExerciseLibrarySelectOptions("");
       return;
     }
 
     state.client
       .from(EXERCISE_LIBRARY_TABLE)
-      .select("id,name,movement_pattern,equipment,primary_muscle,training_goal,sport_tags,custom_tags,description,coaching_cues,video_demo_url,updated_at")
+      .select("id,name,movement_pattern,equipment,primary_muscle,training_goal,sport_tags,custom_tags,description,coaching_cues,video_demo_url,default_section,default_mode,default_set_count,default_rep_value,default_secondary_value,default_intensity_value,default_rest_value,default_show_weight,default_show_rpe,default_show_rest,updated_at")
       .order("name", { ascending: true })
       .then(function (result) {
         if (result.error) {
           state.exerciseLibrary = readExerciseLibraryFromStorage();
+          ensureSeedExerciseLibrary();
+          renderExerciseLibrarySelectOptions("");
           return;
         }
 
@@ -5474,9 +5683,13 @@
         if (!state.exerciseLibrary.length) {
           state.exerciseLibrary = readExerciseLibraryFromStorage();
         }
+        ensureSeedExerciseLibrary();
+        renderExerciseLibrarySelectOptions("");
       })
       .catch(function () {
         state.exerciseLibrary = readExerciseLibraryFromStorage();
+        ensureSeedExerciseLibrary();
+        renderExerciseLibrarySelectOptions("");
       });
   }
 
@@ -5492,8 +5705,54 @@
       custom_tags: item && Array.isArray(item.custom_tags) ? item.custom_tags : [],
       description: item && item.description ? String(item.description) : "",
       coaching_cues: item && item.coaching_cues ? String(item.coaching_cues) : "",
-      video_demo_url: item && item.video_demo_url ? String(item.video_demo_url) : ""
+      video_demo_url: item && item.video_demo_url ? String(item.video_demo_url) : "",
+      default_section: item && item.default_section ? String(item.default_section) : "A Block",
+      default_mode: item && item.default_mode ? String(item.default_mode) : "reps",
+      default_set_count: item && item.default_set_count != null ? clampNumber(parseInt(item.default_set_count, 10), 1, 10, 3) : 3,
+      default_rep_value: item && item.default_rep_value ? String(item.default_rep_value) : "",
+      default_secondary_value: item && item.default_secondary_value ? String(item.default_secondary_value) : "",
+      default_intensity_value: item && item.default_intensity_value ? String(item.default_intensity_value) : "",
+      default_rest_value: item && item.default_rest_value ? String(item.default_rest_value) : "",
+      default_show_weight: item && item.default_show_weight != null ? !!item.default_show_weight : true,
+      default_show_rpe: item && item.default_show_rpe != null ? !!item.default_show_rpe : true,
+      default_show_rest: item && item.default_show_rest != null ? !!item.default_show_rest : false
     };
+  }
+
+  function writeExerciseLibraryToStorage(items) {
+    try {
+      window.localStorage.setItem(EXERCISE_LIBRARY_KEY, JSON.stringify(Array.isArray(items) ? items : []));
+    } catch (e) {
+      // Ignore storage write errors.
+    }
+  }
+
+  function ensureSeedExerciseLibrary() {
+    if (Array.isArray(state.exerciseLibrary) && state.exerciseLibrary.length) {
+      return;
+    }
+    state.exerciseLibrary = EXERCISE_LIBRARY_SEED.map(normalizeExerciseLibraryItem);
+    writeExerciseLibraryToStorage(state.exerciseLibrary);
+  }
+
+  function renderExerciseLibrarySelectOptions(selectedId) {
+    var select = document.querySelector("[data-exercise-library-select]");
+    if (!select) {
+      return;
+    }
+
+    var selected = String(selectedId || "").trim();
+    var options = ['<option value="">Choose from exercise library...</option>'];
+    (Array.isArray(state.exerciseLibrary) ? state.exerciseLibrary : []).forEach(function (item) {
+      var id = String(item && item.id || "").trim();
+      var name = String(item && item.name || "").trim();
+      if (!id || !name) {
+        return;
+      }
+      options.push('<option value="' + escapeAttribute(id) + '"' + (selected === id ? ' selected' : '') + '>' + escapeHtml(name) + '</option>');
+    });
+
+    select.innerHTML = options.join("");
   }
 
   function readExerciseLibraryFromStorage() {
@@ -5588,6 +5847,13 @@
   function applyExerciseLibrarySelection(libraryId) {
     var item = findExerciseLibraryItemById(libraryId);
     var nameInput = document.querySelector("[data-exercise-name-input]");
+    var sectionSelect = document.querySelector("[data-exercise-section-select]");
+    var modeSelect = document.querySelector("[data-exercise-mode-select]");
+    var setsInput = document.querySelector("[data-exercise-sets-input]");
+    var weightToggle = document.querySelector("[data-exercise-toggle-weight]");
+    var rpeToggle = document.querySelector("[data-exercise-toggle-rpe]");
+    var restToggle = document.querySelector("[data-exercise-toggle-rest]");
+    var librarySelect = document.querySelector("[data-exercise-library-select]");
     var notesInput = document.querySelector("[data-exercise-notes-input]");
     var libraryIdInput = document.querySelector("[data-exercise-library-id]");
 
@@ -5598,6 +5864,28 @@
     nameInput.value = item.name || "";
     if (libraryIdInput) {
       libraryIdInput.value = item.id || "";
+    }
+    if (librarySelect) {
+      librarySelect.value = item.id || "";
+    }
+
+    if (sectionSelect && item.default_section) {
+      sectionSelect.value = item.default_section;
+    }
+    if (modeSelect && item.default_mode) {
+      modeSelect.value = item.default_mode;
+    }
+    if (setsInput && item.default_set_count) {
+      setsInput.value = String(item.default_set_count);
+    }
+    if (weightToggle && item.default_show_weight != null) {
+      weightToggle.checked = !!item.default_show_weight;
+    }
+    if (rpeToggle && item.default_show_rpe != null) {
+      rpeToggle.checked = !!item.default_show_rpe;
+    }
+    if (restToggle && item.default_show_rest != null) {
+      restToggle.checked = !!item.default_show_rest;
     }
 
     if (notesInput && !String(notesInput.value || "").trim()) {
@@ -6950,6 +7238,12 @@
           state.day = daySelect.value || getAllSlotKeys()[0] || "w1d1";
         }
 
+        if (state.isCoachAssignedProgramEdit) {
+          state.dailyProgrammingViewMode = "day";
+          applyDailyNavigatorSelectionFromAxisValue(state.day);
+          renderDailyNavigatorControls();
+        }
+
         state.assignedTemplateDays = normalizeAssignedTemplateDays(payload.days);
         if (!new URLSearchParams(window.location.search).get("program") && row.name) {
           state.templateName = row.name;
@@ -6957,6 +7251,7 @@
 
         loadExercisesForDay();
         renderRows();
+        renderDailyProgrammingDesigner();
         updateDayInfo();
         refreshTemplateDayTools();
         updateStats();
@@ -8792,7 +9087,18 @@
       var effectiveDays = getEffectivePhaseTrainingDays(phase);
       var axisOptions = [];
 
-      if (state.dailyProgrammingViewMode === "week") {
+      if (state.dailyProgrammingViewMode === "day") {
+        axisOptions = [];
+        for (var weekIndex = 0; weekIndex < phaseWeeks; weekIndex++) {
+          for (var dayIndex = 0; dayIndex < effectiveDays; dayIndex++) {
+            var slotKey = "w" + String(Number(phase.start_week || 1) + weekIndex) + "d" + String(dayIndex + 1);
+            axisOptions.push({
+              value: slotKey,
+              label: labelForSlot(slotKey)
+            });
+          }
+        }
+      } else if (state.dailyProgrammingViewMode === "week") {
         axisOptions = new Array(effectiveDays).fill("").map(function (_, index) {
           var dayNumber = index + 1;
           var slotKey = "w" + String(Number(phase.start_week || 1) + state.dailyProgrammingWeekInPhase - 1) + "d" + String(dayNumber);
@@ -8816,7 +9122,9 @@
         return '<option value="' + escapeAttribute(option.value) + '">' + escapeHtml(option.label) + '</option>';
       }).join("");
 
-      if (state.dailyProgrammingViewMode === "week") {
+      if (state.dailyProgrammingViewMode === "day") {
+        daySelect.value = buildSlotKeyFromDailyNavigator();
+      } else if (state.dailyProgrammingViewMode === "week") {
         daySelect.value = String(state.dailyProgrammingDayInPhase);
       } else {
         daySelect.value = String(state.dailyProgrammingWeekInPhase);

@@ -5,6 +5,73 @@
   var DEFAULT_SECTION = "A Block";
   var DEFAULT_MODE = "reps";
   var SECTION_OPTIONS = ["Warm Up", "A Block", "B Block", "C Block", "Cool Down"];
+  var STARTER_LIBRARY_ITEMS = [
+    {
+      title: "Back Squat",
+      section: "A Block",
+      tags: ["strength", "lower-body", "compound"],
+      exercises: [
+        {
+          name: "Back Squat",
+          section: "A Block",
+          mode: "reps",
+          sets: [{ reps: "5", weight: "", rpe: "RPE 7", rest: "120s", notes: "Brace trunk, controlled descent.", done: false }]
+        }
+      ]
+    },
+    {
+      title: "Weighted Pull-Up",
+      section: "A Block",
+      tags: ["strength", "upper-body", "climbing"],
+      exercises: [
+        {
+          name: "Weighted Pull-Up",
+          section: "A Block",
+          mode: "reps",
+          sets: [{ reps: "4", weight: "", rpe: "RPE 8", rest: "120s", notes: "Full hang start, no kip.", done: false }]
+        }
+      ]
+    },
+    {
+      title: "RFESS",
+      section: "B Block",
+      tags: ["strength", "unilateral", "durability"],
+      exercises: [
+        {
+          name: "Rear Foot Elevated Split Squat",
+          section: "B Block",
+          mode: "reps",
+          sets: [{ reps: "8 / side", weight: "", rpe: "RPE 7", rest: "90s", notes: "Stay tall, control tempo.", done: false }]
+        }
+      ]
+    },
+    {
+      title: "Zone 2 Run",
+      section: "A Block",
+      tags: ["endurance", "aerobic", "running"],
+      exercises: [
+        {
+          name: "Zone 2 Run",
+          section: "A Block",
+          mode: "endurance",
+          sets: [{ reps: "45:00", weight: "Zone 2", rpe: "Z2", rest: "", notes: "Conversational effort.", done: false }]
+        }
+      ]
+    },
+    {
+      title: "Mobility Flow",
+      section: "Cool Down",
+      tags: ["mobility", "recovery"],
+      exercises: [
+        {
+          name: "Mobility Flow",
+          section: "Cool Down",
+          mode: "time",
+          sets: [{ reps: "10:00", weight: "", rpe: "Easy", rest: "", notes: "Slow breathing and full range.", done: false }]
+        }
+      ]
+    }
+  ];
 
   var state = {
     client: null,
@@ -307,12 +374,31 @@
       .order("created_at", { ascending: false })
       .then(function (result) {
         if (result.error) {
+          if (!state.items.length) {
+            seedStarterLibraryItems().then(function (seeded) {
+              state.items = sortItems(seeded);
+              writeItemsToStorage(state.items);
+              renderItems();
+              setStatus("Added starter preset exercises.", "success");
+            });
+            return;
+          }
           setStatus("Using local cache. Cloud read failed.", "info");
           return;
         }
 
         var cloudItems = normalizeCloudItems(result.data || []);
         mergeAndBackfillCloudItems(cloudItems).then(function (merged) {
+          if (!merged.length) {
+            seedStarterLibraryItems().then(function (seeded) {
+              state.items = sortItems(seeded);
+              writeItemsToStorage(state.items);
+              renderItems();
+              setStatus("Added starter preset exercises.", "success");
+            });
+            return;
+          }
+
           state.items = sortItems(merged);
           writeItemsToStorage(state.items);
           renderItems();
@@ -320,7 +406,53 @@
         });
       })
       .catch(function () {
+        if (!state.items.length) {
+          seedStarterLibraryItems().then(function (seeded) {
+            state.items = sortItems(seeded);
+            writeItemsToStorage(state.items);
+            renderItems();
+            setStatus("Added starter preset exercises.", "success");
+          });
+          return;
+        }
         setStatus("Using local cache. Cloud read failed.", "info");
+      });
+  }
+
+  function seedStarterLibraryItems() {
+    var baseItems = STARTER_LIBRARY_ITEMS.map(function (item, index) {
+      var now = new Date().toISOString();
+      return {
+        id: "seed_" + String(index + 1) + "_" + String(Date.now()) + "_" + String(Math.floor(Math.random() * 1000)),
+        title: String(item && item.title || "Library Item"),
+        section: String(item && item.section || DEFAULT_SECTION),
+        tags: normalizeTags(item && item.tags || []),
+        sort_order: index,
+        exercises: normalizeExercises(item && item.exercises || []),
+        created_at: now,
+        updated_at: now
+      };
+    });
+
+    if (!state.client || !state.coachUserId || !baseItems.length) {
+      return Promise.resolve(baseItems);
+    }
+
+    return state.client
+      .from("coach_workout_blocks")
+      .insert(baseItems.map(function (item) { return buildCloudPayload(item); }))
+      .select("id,title,source_section,tags,sort_order,exercises,created_at,updated_at")
+      .then(function (result) {
+        if (result && !result.error) {
+          var inserted = normalizeCloudItems(result.data || []);
+          if (inserted.length) {
+            return sortItems(inserted);
+          }
+        }
+        return baseItems;
+      })
+      .catch(function () {
+        return baseItems;
       });
   }
 

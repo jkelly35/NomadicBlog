@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Training Program Example - Nomadic Performance</title>
-  <link rel="stylesheet" href="css/style.css" />
-  <script defer src="js/analytics.js"></script>
+  <link rel="stylesheet" href="css/style.css?v=20260711e" />
+  <script defer src="js/analytics.js?v=20260711e"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script defer src="js/supabase-config.js"></script>
-  <script defer src="js/auth-ui.js"></script>
-  <script defer src="js/training-program-demo.js"></script>
+  <script defer src="js/supabase-config.js?v=20260711e"></script>
+  <script defer src="js/auth-ui.js?v=20260711e"></script>
+  <script defer src="js/training-program-demo.js?v=20260711e"></script>
 </head>
 <body>
   <header>
@@ -175,6 +175,7 @@
             <label class="program-builder-structure-field">
               <span>View Mode</span>
               <select data-daily-nav-mode>
+                <option value="day">Day View</option>
                 <option value="week">Week View</option>
                 <option value="phase">Phase View</option>
               </select>
@@ -238,6 +239,9 @@
           <label for="exercise-name-input">Exercise Name *</label>
           <input type="text" id="exercise-name-input" placeholder="e.g., Back Squat" required data-exercise-name-input />
           <input type="hidden" data-exercise-library-id />
+          <select data-exercise-library-select>
+            <option value="">Choose from exercise library...</option>
+          </select>
           <div class="exercise-editor-suggestions" data-exercise-suggestions hidden></div>
           <div class="exercise-editor-library-preview" data-exercise-library-preview hidden>
             <p class="exercise-editor-library-meta" data-exercise-library-meta></p>

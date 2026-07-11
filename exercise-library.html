@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Exercise Library - Nomadic Performance</title>
-  <link rel="stylesheet" href="css/style.css" />
-  <script defer src="js/analytics.js"></script>
+  <link rel="stylesheet" href="css/style.css?v=20260711e" />
+  <script defer src="js/analytics.js?v=20260711e"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script defer src="js/supabase-config.js"></script>
-  <script defer src="js/auth-ui.js"></script>
-  <script defer src="js/exercise-library.js"></script>
+  <script defer src="js/supabase-config.js?v=20260711e"></script>
+  <script defer src="js/auth-ui.js?v=20260711e"></script>
+  <script defer src="js/exercise-library.js?v=20260711e"></script>
 </head>
 <body>
   <header>
@@ -143,6 +143,63 @@
                   <option value="rehab">Rehab</option>
                 </select>
               </div>
+            </div>
+
+            <h3 style="margin: 0.5rem 0 0.25rem; color:#123f3f;">Default Programming Preset</h3>
+            <div class="admin-library-grid">
+              <div class="admin-modal-info-row">
+                <label>Default Section</label>
+                <select data-library-default-section>
+                  <option value="Warm Up">Warm Up</option>
+                  <option value="A Block" selected>A Block</option>
+                  <option value="B Block">B Block</option>
+                  <option value="C Block">C Block</option>
+                  <option value="Cool Down">Cool Down</option>
+                </select>
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Default Mode</label>
+                <select data-library-default-mode>
+                  <option value="reps" selected>Reps</option>
+                  <option value="time">Time</option>
+                  <option value="endurance">Endurance</option>
+                </select>
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Default Set Count</label>
+                <input type="number" min="1" max="10" value="3" data-library-default-set-count />
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Default Reps / Duration</label>
+                <input type="text" data-library-default-rep-value placeholder="e.g., 5 or 45s or 20:00" />
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Default Weight / Time Field</label>
+                <input type="text" data-library-default-secondary-value placeholder="e.g., BW, 20kg, Zone 2" />
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Default Intensity</label>
+                <input type="text" data-library-default-intensity-value placeholder="e.g., RPE 7, Fast, Z2" />
+              </div>
+              <div class="admin-modal-info-row">
+                <label>Default Rest</label>
+                <input type="text" data-library-default-rest-value placeholder="e.g., 90s" />
+              </div>
+            </div>
+
+            <div class="exercise-editor-toggles" style="margin: 0.2rem 0 0.6rem;">
+              <label class="checkbox-label">
+                <input type="checkbox" checked data-library-default-show-weight />
+                <span>Show Weight/Time field</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" checked data-library-default-show-rpe />
+                <span>Show RPE/Zone field</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" data-library-default-show-rest />
+                <span>Show Rest field</span>
+              </label>
             </div>
 
             <div class="admin-modal-info-row">

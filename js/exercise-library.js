@@ -11,6 +11,124 @@
     exercises: []
   };
 
+  var DEFAULT_LIBRARY_EXERCISES = [
+    {
+      id: "seed_back_squat",
+      name: "Back Squat",
+      movement_pattern: "squat",
+      equipment: "barbell",
+      primary_muscle: "quads",
+      training_goal: "strength",
+      sport_tags: ["mixed", "skiing", "climbing"],
+      custom_tags: ["compound", "lower-body"],
+      description: "Primary lower-body strength lift.",
+      coaching_cues: "Brace trunk, control descent, drive evenly through full foot.",
+      video_demo_url: "",
+      default_section: "A Block",
+      default_mode: "reps",
+      default_set_count: 4,
+      default_rep_value: "5",
+      default_secondary_value: "",
+      default_intensity_value: "RPE 7",
+      default_rest_value: "120s",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_weighted_pull_up",
+      name: "Weighted Pull-Up",
+      movement_pattern: "pull",
+      equipment: "other",
+      primary_muscle: "back",
+      training_goal: "strength",
+      sport_tags: ["climbing", "mixed"],
+      custom_tags: ["upper-body", "vertical-pull"],
+      description: "Vertical pulling strength and scapular control.",
+      coaching_cues: "Start from dead hang, pull chest tall, avoid kipping.",
+      video_demo_url: "",
+      default_section: "A Block",
+      default_mode: "reps",
+      default_set_count: 4,
+      default_rep_value: "4",
+      default_secondary_value: "",
+      default_intensity_value: "RPE 8",
+      default_rest_value: "120s",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_zone2_run",
+      name: "Zone 2 Run",
+      movement_pattern: "locomotion",
+      equipment: "bodyweight",
+      primary_muscle: "full-body",
+      training_goal: "endurance",
+      sport_tags: ["trail-running", "mixed", "skiing"],
+      custom_tags: ["aerobic-base"],
+      description: "Steady aerobic conditioning session.",
+      coaching_cues: "Nasal breathing as possible, conversational pace.",
+      video_demo_url: "",
+      default_section: "A Block",
+      default_mode: "endurance",
+      default_set_count: 1,
+      default_rep_value: "45:00",
+      default_secondary_value: "Zone 2",
+      default_intensity_value: "Z2",
+      default_rest_value: "",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: false
+    },
+    {
+      id: "seed_hangboard_repeaters",
+      name: "Hangboard Repeaters",
+      movement_pattern: "pull",
+      equipment: "other",
+      primary_muscle: "back",
+      training_goal: "strength",
+      sport_tags: ["climbing"],
+      custom_tags: ["fingers", "forearm"],
+      description: "Finger strength repeaters on edge protocol.",
+      coaching_cues: "Strict shoulder position, stop before form breakdown.",
+      video_demo_url: "",
+      default_section: "A Block",
+      default_mode: "time",
+      default_set_count: 6,
+      default_rep_value: "10s",
+      default_secondary_value: "20mm edge",
+      default_intensity_value: "Submax",
+      default_rest_value: "50s",
+      default_show_weight: true,
+      default_show_rpe: true,
+      default_show_rest: true
+    },
+    {
+      id: "seed_mobility_flow",
+      name: "Mobility Flow",
+      movement_pattern: "core",
+      equipment: "bodyweight",
+      primary_muscle: "full-body",
+      training_goal: "mobility",
+      sport_tags: ["mixed", "climbing", "skiing", "trail-running"],
+      custom_tags: ["recovery"],
+      description: "Low-intensity mobility sequence for recovery days.",
+      coaching_cues: "Move slowly through full range, keep nasal breathing.",
+      video_demo_url: "",
+      default_section: "Cool Down",
+      default_mode: "time",
+      default_set_count: 1,
+      default_rep_value: "10:00",
+      default_secondary_value: "",
+      default_intensity_value: "Easy",
+      default_rest_value: "",
+      default_show_weight: false,
+      default_show_rpe: true,
+      default_show_rest: false
+    }
+  ];
+
   document.addEventListener("DOMContentLoaded", function () {
     init();
   });
@@ -116,24 +234,27 @@
   function loadExercises() {
     if (!state.client) {
       state.exercises = readLocal();
+      ensureSeedExercises();
       renderExercises();
       return;
     }
 
     state.client
       .from(EXERCISE_LIBRARY_TABLE)
-      .select("id,name,movement_pattern,equipment,primary_muscle,training_goal,sport_tags,custom_tags,description,coaching_cues,video_demo_url,created_at,updated_at")
+      .select("id,name,movement_pattern,equipment,primary_muscle,training_goal,sport_tags,custom_tags,description,coaching_cues,video_demo_url,default_section,default_mode,default_set_count,default_rep_value,default_secondary_value,default_intensity_value,default_rest_value,default_show_weight,default_show_rpe,default_show_rest,created_at,updated_at")
       .order("updated_at", { ascending: false })
       .then(function (result) {
         if (result.error) {
           if (isMissingTableError(result.error)) {
             state.exercises = readLocal();
+            ensureSeedExercises();
             renderExercises();
             setStatus("Using local exercise library until Supabase table is created.", "info");
             return;
           }
 
           state.exercises = readLocal();
+          ensureSeedExercises();
           renderExercises();
           setStatus(result.error.message, "error");
           return;
@@ -148,12 +269,19 @@
             syncLocal(local);
             return;
           }
+
+          ensureSeedExercises();
+          renderExercises();
+          syncLocal(state.exercises);
+          setStatus("Added starter exercises to your library.", "success");
+          return;
         }
 
         renderExercises();
       })
       .catch(function () {
         state.exercises = readLocal();
+        ensureSeedExercises();
         renderExercises();
       });
   }
@@ -233,6 +361,11 @@
           '</div>' +
           '</div>' +
           '<p>' + escapeHtml(item.description || "No description yet.") + '</p>' +
+          '<p class="admin-library-help">Default: ' +
+            escapeHtml(String(item.default_section || "A Block")) + ' • ' +
+            escapeHtml(String(item.default_mode || "reps")) + ' • ' +
+            escapeHtml(String(item.default_set_count != null ? item.default_set_count : 3)) + ' set(s)' +
+          '</p>' +
           (item.video_demo_url
             ? '<p class="admin-library-video-row"><a href="' + escapeAttribute(item.video_demo_url) + '" target="_blank" rel="noopener">Open demonstration video</a></p>'
             : '') +
@@ -292,6 +425,16 @@
       description: String((document.querySelector("[data-library-description]") || {}).value || "").trim(),
       coaching_cues: String((document.querySelector("[data-library-cues]") || {}).value || "").trim(),
       video_demo_url: String((document.querySelector("[data-library-video-url]") || {}).value || "").trim(),
+      default_section: String((document.querySelector("[data-library-default-section]") || {}).value || "A Block").trim() || "A Block",
+      default_mode: String((document.querySelector("[data-library-default-mode]") || {}).value || "reps").trim() || "reps",
+      default_set_count: Math.max(1, Math.min(10, parseInt((document.querySelector("[data-library-default-set-count]") || {}).value || "3", 10) || 3)),
+      default_rep_value: String((document.querySelector("[data-library-default-rep-value]") || {}).value || "").trim(),
+      default_secondary_value: String((document.querySelector("[data-library-default-secondary-value]") || {}).value || "").trim(),
+      default_intensity_value: String((document.querySelector("[data-library-default-intensity-value]") || {}).value || "").trim(),
+      default_rest_value: String((document.querySelector("[data-library-default-rest-value]") || {}).value || "").trim(),
+      default_show_weight: !!((document.querySelector("[data-library-default-show-weight]") || {}).checked),
+      default_show_rpe: !!((document.querySelector("[data-library-default-show-rpe]") || {}).checked),
+      default_show_rest: !!((document.querySelector("[data-library-default-show-rest]") || {}).checked),
       created_at: existing ? existing.created_at : now,
       updated_at: now
     };
@@ -362,6 +505,25 @@
     setInputValue("[data-library-description]", entry.description || "");
     setInputValue("[data-library-cues]", entry.coaching_cues || "");
     setInputValue("[data-library-video-url]", entry.video_demo_url || "");
+    setInputValue("[data-library-default-section]", entry.default_section || "A Block");
+    setInputValue("[data-library-default-mode]", entry.default_mode || "reps");
+    setInputValue("[data-library-default-set-count]", String(entry.default_set_count != null ? entry.default_set_count : 3));
+    setInputValue("[data-library-default-rep-value]", entry.default_rep_value || "");
+    setInputValue("[data-library-default-secondary-value]", entry.default_secondary_value || "");
+    setInputValue("[data-library-default-intensity-value]", entry.default_intensity_value || "");
+    setInputValue("[data-library-default-rest-value]", entry.default_rest_value || "");
+    var showWeight = document.querySelector("[data-library-default-show-weight]");
+    var showRpe = document.querySelector("[data-library-default-show-rpe]");
+    var showRest = document.querySelector("[data-library-default-show-rest]");
+    if (showWeight) {
+      showWeight.checked = entry.default_show_weight !== false;
+    }
+    if (showRpe) {
+      showRpe.checked = entry.default_show_rpe !== false;
+    }
+    if (showRest) {
+      showRest.checked = !!entry.default_show_rest;
+    }
     updateVideoPreview(entry.video_demo_url || "");
 
     var sports = Array.isArray(entry.sport_tags) ? entry.sport_tags : [];
@@ -471,9 +633,27 @@
       description: item && item.description ? item.description : "",
       coaching_cues: item && item.coaching_cues ? item.coaching_cues : "",
       video_demo_url: item && item.video_demo_url ? item.video_demo_url : "",
+      default_section: item && item.default_section ? item.default_section : "A Block",
+      default_mode: item && item.default_mode ? item.default_mode : "reps",
+      default_set_count: item && item.default_set_count != null ? Math.max(1, Math.min(10, parseInt(item.default_set_count, 10) || 3)) : 3,
+      default_rep_value: item && item.default_rep_value ? item.default_rep_value : "",
+      default_secondary_value: item && item.default_secondary_value ? item.default_secondary_value : "",
+      default_intensity_value: item && item.default_intensity_value ? item.default_intensity_value : "",
+      default_rest_value: item && item.default_rest_value ? item.default_rest_value : "",
+      default_show_weight: item && item.default_show_weight != null ? !!item.default_show_weight : true,
+      default_show_rpe: item && item.default_show_rpe != null ? !!item.default_show_rpe : true,
+      default_show_rest: item && item.default_show_rest != null ? !!item.default_show_rest : false,
       created_at: item && item.created_at,
       updated_at: item && item.updated_at
     };
+  }
+
+  function ensureSeedExercises() {
+    if (Array.isArray(state.exercises) && state.exercises.length) {
+      return;
+    }
+    state.exercises = DEFAULT_LIBRARY_EXERCISES.map(normalizeRow);
+    writeLocal(state.exercises);
   }
 
   function updateVideoPreview(urlValue) {

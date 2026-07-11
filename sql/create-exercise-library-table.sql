@@ -13,12 +13,34 @@ create table if not exists public.exercise_library (
   description text,
   coaching_cues text,
   video_demo_url text,
+  default_section text,
+  default_mode text,
+  default_set_count int,
+  default_rep_value text,
+  default_secondary_value text,
+  default_intensity_value text,
+  default_rest_value text,
+  default_show_weight boolean,
+  default_show_rpe boolean,
+  default_show_rest boolean,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.exercise_library
   add column if not exists video_demo_url text;
+
+alter table public.exercise_library
+  add column if not exists default_section text,
+  add column if not exists default_mode text,
+  add column if not exists default_set_count int,
+  add column if not exists default_rep_value text,
+  add column if not exists default_secondary_value text,
+  add column if not exists default_intensity_value text,
+  add column if not exists default_rest_value text,
+  add column if not exists default_show_weight boolean,
+  add column if not exists default_show_rpe boolean,
+  add column if not exists default_show_rest boolean;
 
 create index if not exists exercise_library_updated_at_idx
   on public.exercise_library (updated_at desc);

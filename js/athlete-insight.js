@@ -22,7 +22,7 @@
     athleteAccountEmail: "",
     onboardingTemplates: [],
     foundingSubscriptionRows: [],
-    scheduleRows: [],
+    calendarRows: [],
     stravaRows: [],
     trainingTab: "current",
     calendarDraftDate: "",
@@ -34,8 +34,8 @@
     isAssigningCoachTask: false,
     isAssigningQuickTask: false,
     calendarMonthKey: "",
-    draggingScheduleId: null,
-    selectedScheduleId: null
+    draggingCalendarRowId: null,
+    initialTab: "overview"
   };
 
   // ─── Sport overview field labels ─────────────────────────────────────────────
@@ -173,6 +173,8 @@
   document.addEventListener("DOMContentLoaded", function () {
     var params = new URLSearchParams(window.location.search);
     state.athleteId = params.get("athleteId") || "";
+    state.initialTab = normalizeInsightTab(params.get("tab") || "overview");
+    state.trainingTab = normalizeTrainingTab(params.get("trainingTab") || state.trainingTab);
 
     if (!state.athleteId) {
       showGuardError("No athlete ID provided. Return to the Coaching Dashboard.");
@@ -207,6 +209,7 @@
       }
 
       setupTabNavigation();
+  activateTab(state.initialTab);
       wireActionLinks();
       state.onboardingTemplates = getDefaultOnboardingTemplates();
       loadAll();
@@ -227,6 +230,17 @@
         }
       });
     });
+  }
+
+  function normalizeInsightTab(tab) {
+    var value = String(tab || "").trim().toLowerCase();
+    return value === "metrics" || value === "training" || value === "forms" || value === "load" || value === "notes"
+      ? value
+      : "overview";
+  }
+
+  function normalizeTrainingTab(tab) {
+    return String(tab || "").trim().toLowerCase() === "past" ? "past" : "current";
   }
 
   function activateTab(tab) {
@@ -284,18 +298,18 @@
       state.templates = Array.isArray(results[6]) ? results[6] : [];
 
       return Promise.all([
-        fetchScheduleRows(state.programs),
+        fetchCalendarRows(state.programs),
         fetchFoundingSubscriptionPayments()
       ]).then(function (nextResults) {
-        var scheduleRows = nextResults[0] || [];
+        var calendarRows = nextResults[0] || [];
         var subscriptionRows = nextResults[1] || [];
-        state.scheduleRows = scheduleRows || [];
+        state.calendarRows = calendarRows || [];
         state.foundingSubscriptionRows = Array.isArray(subscriptionRows) ? subscriptionRows : [];
 
         renderHero(authUser, profile);
         renderOverviewPanel(profile);
         renderMetricsPanel(state.metrics);
-        renderTrainingPanel(state.programs, state.scheduleRows);
+        renderTrainingPanel(state.programs, state.calendarRows);
         renderFormsAndTasksPanel(state.onboardingAssignments, state.onboardingAssignmentsError);
         renderLoadPanel(state.stravaRows);
       });
@@ -529,7 +543,7 @@
     };
   }
 
-  function fetchScheduleRows(programs) {
+  function fetchCalendarRows(programs) {
     var assignmentIds = (Array.isArray(programs) ? programs : [])
       .map(function (program) { return program && program.id ? String(program.id) : ""; })
       .filter(function (id) { return !!id; });
@@ -1373,10 +1387,10 @@
   }
 
   // ─── Training programs panel ──────────────────────────────────────────────────
-  function renderTrainingPanel(programs, scheduleRows) {
+  function renderTrainingPanel(programs, calendarRows) {
     var activeEl  = document.querySelector("[data-training-active]");
     var historyEl = document.querySelector("[data-training-history]");
-    var rows = Array.isArray(scheduleRows) ? scheduleRows : [];
+    var rows = Array.isArray(calendarRows) ? calendarRows : [];
 
     var active  = programs.filter(function (p) { return p.is_active; });
     var inactive = programs.filter(function (p) { return !p.is_active; });
@@ -1410,9 +1424,9 @@
     wireCalendarManagerActions();
   }
 
-  function buildCalendarManagerHtml(activePrograms, scheduleRows) {
+  function buildCalendarManagerHtml(activePrograms, calendarRows) {
     var programs = Array.isArray(activePrograms) ? activePrograms : [];
-    var rows = Array.isArray(scheduleRows) ? scheduleRows : [];
+    var rows = Array.isArray(calendarRows) ? calendarRows : [];
     var activeIdMap = {};
 
     programs.forEach(function (program) {
@@ -1453,29 +1467,14 @@
       state.calendarMonthKey = toMonthKey(firstDate) || toMonthKey(getTodayDateInputValue());
     }
 
-    if (state.selectedScheduleId) {
-      var selectedStillExists = scopedRows.some(function (row) {
-        return String(row && row.id || "") === String(state.selectedScheduleId);
-      });
-      if (!selectedStillExists) {
-        state.selectedScheduleId = null;
-      }
-    }
-
-    if (!state.selectedScheduleId && scopedRows.length) {
-      state.selectedScheduleId = String(scopedRows[0].id || "");
-    }
-
     var monthLabel = formatMonthLabel(state.calendarMonthKey);
     var gridHtml = buildCalendarMonthGridHtml(
       state.calendarMonthKey,
       scopedRows,
       activeIdMap,
-      state.selectedScheduleId,
       assignmentOptions,
       programs.length > 0
     );
-    var editorHtml = buildCalendarEditorHtml(scopedRows, activeIdMap, state.selectedScheduleId);
 
     return [
       '<section class="insight-section insight-calendar-manager">',
@@ -1495,7 +1494,6 @@
       '<button type="button" class="btn insight-action-btn-sm" data-cal-month-today>Today</button>',
       '</div>',
       '<div class="insight-calendar-month-wrap">' + gridHtml + '</div>',
-      editorHtml,
       '</section>'
     ].join("");
   }
@@ -1519,7 +1517,7 @@
     return options.join("");
   }
 
-  function buildCalendarMonthGridHtml(monthKey, scopedRows, activeIdMap, selectedScheduleId, assignmentOptionsMarkup, hasPrograms) {
+  function buildCalendarMonthGridHtml(monthKey, scopedRows, activeIdMap, assignmentOptionsMarkup, hasPrograms) {
     var monthStart = parseMonthKey(monthKey);
     if (!monthStart) {
       return '<p class="insight-empty">Could not render calendar month.</p>';
@@ -1553,14 +1551,17 @@
         var program = activeIdMap[assignmentId] || {};
         var programName = String(program.program_name || program.name || "Program");
         var rowId = String(row && row.id || "");
-        var isSelected = String(selectedScheduleId || "") === rowId;
         var status = String(row && row.status || "scheduled");
+        var openUrl = buildInsightCalendarWorkoutUrl(row, program);
 
         return [
-          '<article class="insight-cal-session' + (isSelected ? ' is-selected' : '') + '" data-cal-select="' + escapeAttribute(rowId) + '">',
+          '<article class="insight-cal-session" data-cal-session="' + escapeAttribute(rowId) + '" data-cal-open-url="' + escapeAttribute(openUrl) + '" title="Double-click to open training day editor">',
           '<div class="insight-cal-topline">',
           '<span class="insight-cal-drag-handle" draggable="true" data-cal-drag="' + escapeAttribute(rowId) + '" title="Drag to move this session">Move</span>',
+          '<div class="insight-cal-topline-actions">',
           '<span class="insight-cal-status is-' + escapeAttribute(status) + '">' + escapeHtml(capitalize(status)) + '</span>',
+          buildCalendarSessionMenuHtml(row, program, openUrl),
+          '</div>',
           '</div>',
           '<p class="insight-cal-title">' + escapeHtml(String(row && row.slot_key || "")) + ' · ' + escapeHtml(String(row && row.session_label || 'Workout')) + '</p>',
           '<div class="insight-cal-bottomline">',
@@ -1592,6 +1593,32 @@
     ].join("");
   }
 
+  function buildCalendarSessionMenuHtml(row, program, openUrl) {
+    var safeRow = row && typeof row === "object" ? row : {};
+    var safeProgram = program && typeof program === "object" ? program : {};
+    var rowId = String(safeRow.id || "").trim();
+    var status = String(safeRow.status || "scheduled").trim().toLowerCase() || "scheduled";
+    var programName = String(safeProgram.program_name || safeProgram.name || "Program");
+
+    return [
+      '<details class="insight-cal-menu" data-cal-menu="' + escapeAttribute(rowId) + '">',
+      '<summary class="insight-cal-menu-trigger" aria-label="Session actions" title="Session actions">⋮</summary>',
+      '<div class="insight-cal-menu-list">',
+      '<div class="insight-cal-menu-label">' + escapeHtml(programName) + '</div>',
+      '<a class="insight-cal-menu-item" href="' + escapeAttribute(openUrl) + '">Open Workout</a>',
+      '<button type="button" class="insight-cal-menu-item" data-cal-action="rename" data-cal-row-id="' + escapeAttribute(rowId) + '">Rename Workout</button>',
+      '<button type="button" class="insight-cal-menu-item" data-cal-action="slot" data-cal-row-id="' + escapeAttribute(rowId) + '">Edit Slot</button>',
+      '<button type="button" class="insight-cal-menu-item" data-cal-action="date" data-cal-row-id="' + escapeAttribute(rowId) + '">Reschedule Date</button>',
+      '<button type="button" class="insight-cal-menu-item' + (status === 'scheduled' ? ' is-active' : '') + '" data-cal-action="status" data-cal-row-id="' + escapeAttribute(rowId) + '" data-cal-status-value="scheduled">Mark Scheduled</button>',
+      '<button type="button" class="insight-cal-menu-item' + (status === 'completed' ? ' is-active' : '') + '" data-cal-action="status" data-cal-row-id="' + escapeAttribute(rowId) + '" data-cal-status-value="completed">Mark Completed</button>',
+      '<button type="button" class="insight-cal-menu-item' + (status === 'missed' ? ' is-active' : '') + '" data-cal-action="status" data-cal-row-id="' + escapeAttribute(rowId) + '" data-cal-status-value="missed">Mark Missed</button>',
+      '<button type="button" class="insight-cal-menu-item' + (status === 'skipped' ? ' is-active' : '') + '" data-cal-action="status" data-cal-row-id="' + escapeAttribute(rowId) + '" data-cal-status-value="skipped">Mark Skipped</button>',
+      '<button type="button" class="insight-cal-menu-item is-danger" data-cal-action="delete" data-cal-row-id="' + escapeAttribute(rowId) + '">Delete Session</button>',
+      '</div>',
+      '</details>'
+    ].join('');
+  }
+
   function buildInlineCalendarAddFormHtml(dateKey, assignmentOptionsMarkup, hasPrograms) {
     if (!hasPrograms) {
       return '<p class="insight-empty" style="margin:0.15rem 0 0;">No assigned programs available yet.</p>';
@@ -1612,53 +1639,23 @@
     ].join('');
   }
 
-  function buildCalendarEditorHtml(scopedRows, activeIdMap, selectedScheduleId) {
-    var selected = (Array.isArray(scopedRows) ? scopedRows : []).find(function (row) {
-      return String(row && row.id || "") === String(selectedScheduleId || "");
-    });
+  function buildInsightCalendarWorkoutUrl(row, program) {
+    var safeRow = row && typeof row === "object" ? row : {};
+    var safeProgram = program && typeof program === "object" ? program : {};
+    var assignmentId = String(safeRow.user_training_program_id || "").trim();
+    var programName = String(safeProgram.program_name || safeProgram.name || "Program").trim() || "Program";
+    var templateId = String(safeRow.program_id || safeProgram.program_id || "").trim();
+    var athleteId = String(state.athleteId || "").trim();
+    var athleteName = String((state.profile && state.profile.name) || "Athlete").trim() || "Athlete";
+    var slotKey = String(safeRow.slot_key || "").trim();
 
-    if (!selected) {
-      return [
-        '<section class="insight-cal-editor insight-cal-editor-empty">',
-        '<h3>Session Editor</h3>',
-        '<p class="insight-empty">Select a session in the calendar to edit details.</p>',
-        '</section>'
-      ].join("");
-    }
-
-    var assignmentId = String(selected.user_training_program_id || "");
-    var program = activeIdMap[assignmentId] || {};
-    var programName = String(program.program_name || program.name || "Program");
-    var rowId = String(selected.id || "");
-    var dayUrl =
-      'training-program-example.html?program=' + encodeURIComponent(programName) +
-      (program.program_id ? '&templateId=' + encodeURIComponent(program.program_id) : '') +
+    return 'training-program-example.html?program=' + encodeURIComponent(programName) +
+      (templateId ? '&templateId=' + encodeURIComponent(templateId) : '') +
       (assignmentId ? '&assignmentId=' + encodeURIComponent(assignmentId) : '') +
-      '&athleteName=' + encodeURIComponent((state.profile && state.profile.name) || 'Athlete') +
-      '&day=' + encodeURIComponent(String(selected.slot_key || ''));
-
-    return [
-      '<section class="insight-cal-editor" data-cal-editor-wrap>',
-      '<h3>Session Editor</h3>',
-      '<p class="insight-calendar-help">Selected: ' + escapeHtml(String(selected.slot_key || "")) + ' on ' + escapeHtml(formatDate(String(selected.scheduled_for || ""))) + '</p>',
-      '<div class="insight-cal-editor-grid">',
-      '<label><span>Date</span><input type="date" class="insight-calendar-input" data-cal-date="' + escapeAttribute(rowId) + '" value="' + escapeAttribute(String(selected.scheduled_for || '')) + '" /></label>',
-      '<label><span>Slot</span><input type="text" class="insight-calendar-input" data-cal-slot="' + escapeAttribute(rowId) + '" value="' + escapeAttribute(String(selected.slot_key || '')) + '" /></label>',
-      '<label><span>Session Label</span><input type="text" class="insight-calendar-input" data-cal-label="' + escapeAttribute(rowId) + '" value="' + escapeAttribute(String(selected.session_label || 'Workout')) + '" /></label>',
-      '<label><span>Status</span><select class="insight-calendar-input" data-cal-status="' + escapeAttribute(rowId) + '">' +
-        '<option value="scheduled"' + (selected.status === 'scheduled' ? ' selected' : '') + '>Scheduled</option>' +
-        '<option value="completed"' + (selected.status === 'completed' ? ' selected' : '') + '>Completed</option>' +
-        '<option value="missed"' + (selected.status === 'missed' ? ' selected' : '') + '>Missed</option>' +
-        '<option value="skipped"' + (selected.status === 'skipped' ? ' selected' : '') + '>Skipped</option>' +
-      '</select></label>',
-      '</div>',
-      '<div class="insight-cal-editor-actions">',
-      '<span class="insight-cal-program">' + escapeHtml(programName) + '</span>',
-      '<a class="btn insight-action-btn-sm" href="' + dayUrl + '">Open Workout</a>',
-      '<button type="button" class="insight-program-delete-btn" data-cal-delete="' + escapeAttribute(rowId) + '">Delete Session</button>',
-      '</div>',
-      '</section>'
-    ].join("");
+      (athleteId ? '&athleteId=' + encodeURIComponent(athleteId) : '') +
+      '&coachEdit=1' +
+      '&athleteName=' + encodeURIComponent(athleteName) +
+      (slotKey ? '&day=' + encodeURIComponent(slotKey) : '');
   }
 
   function wireCalendarManagerActions() {
@@ -1677,7 +1674,7 @@
       prevBtn.setAttribute("data-cal-month-prev-wired", "1");
       prevBtn.addEventListener("click", function () {
         state.calendarMonthKey = shiftMonthKey(state.calendarMonthKey, -1);
-        renderTrainingPanel(state.programs, state.scheduleRows);
+        renderTrainingPanel(state.programs, state.calendarRows);
       });
     }
 
@@ -1686,7 +1683,7 @@
       nextBtn.setAttribute("data-cal-month-next-wired", "1");
       nextBtn.addEventListener("click", function () {
         state.calendarMonthKey = shiftMonthKey(state.calendarMonthKey, 1);
-        renderTrainingPanel(state.programs, state.scheduleRows);
+        renderTrainingPanel(state.programs, state.calendarRows);
       });
     }
 
@@ -1695,46 +1692,83 @@
       todayBtn.setAttribute("data-cal-month-today-wired", "1");
       todayBtn.addEventListener("click", function () {
         state.calendarMonthKey = toMonthKey(getTodayDateInputValue());
-        renderTrainingPanel(state.programs, state.scheduleRows);
+        renderTrainingPanel(state.programs, state.calendarRows);
       });
     }
 
-    document.querySelectorAll("[data-cal-select]").forEach(function (card) {
-      if (card.getAttribute("data-cal-select-wired") === "1") {
+    document.querySelectorAll("[data-cal-session]").forEach(function (card) {
+      if (card.getAttribute("data-cal-session-wired") === "1") {
         return;
       }
-      card.setAttribute("data-cal-select-wired", "1");
-      card.addEventListener("click", function (event) {
-        if (event && event.target && event.target.closest("[data-cal-drag]")) {
+      card.setAttribute("data-cal-session-wired", "1");
+
+      card.addEventListener("dblclick", function (event) {
+        if (event && event.target && event.target.closest("[data-cal-drag], [data-cal-menu], button, a, input, select, textarea, label")) {
           return;
         }
-        var rowId = String(card.getAttribute("data-cal-select") || "").trim();
-        if (!rowId || rowId === state.selectedScheduleId) {
+
+        var openUrl = String(card.getAttribute("data-cal-open-url") || "").trim();
+        if (!openUrl) {
           return;
         }
-        state.selectedScheduleId = rowId;
-        renderTrainingPanel(state.programs, state.scheduleRows);
+
+        event.preventDefault();
+        window.location.assign(openUrl);
       });
     });
 
-    document.querySelectorAll("[data-cal-delete]").forEach(function (btn) {
-      if (btn.getAttribute("data-cal-delete-wired") === "1") {
+    document.querySelectorAll("[data-cal-menu-trigger]").forEach(function (trigger) {
+      if (trigger.getAttribute("data-cal-menu-wired") === "1") {
         return;
       }
-      btn.setAttribute("data-cal-delete-wired", "1");
-      btn.addEventListener("click", function () {
-        var rowId = String(btn.getAttribute("data-cal-delete") || "").trim();
-        if (!rowId) {
-          return;
+      trigger.setAttribute("data-cal-menu-wired", "1");
+      trigger.addEventListener("click", function (event) {
+        if (event) {
+          event.stopPropagation();
         }
-        deleteCalendarSession(rowId);
       });
     });
 
-    bindCalendarAutoSave("[data-cal-date]", "data-cal-date", "scheduled_for");
-    bindCalendarAutoSave("[data-cal-slot]", "data-cal-slot", "slot_key");
-    bindCalendarAutoSave("[data-cal-label]", "data-cal-label", "session_label");
-    bindCalendarAutoSave("[data-cal-status]", "data-cal-status", "status");
+    document.querySelectorAll("[data-cal-action]").forEach(function (btn) {
+      if (btn.getAttribute("data-cal-action-wired") === "1") {
+        return;
+      }
+      btn.setAttribute("data-cal-action-wired", "1");
+      btn.addEventListener("click", function (event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+
+        var rowId = String(btn.getAttribute("data-cal-row-id") || "").trim();
+        var action = String(btn.getAttribute("data-cal-action") || "").trim();
+        if (!rowId || !action) {
+          return;
+        }
+
+        closeCalendarSessionMenu(btn);
+
+        if (action === "delete") {
+          deleteCalendarSession(rowId);
+          return;
+        }
+        if (action === "rename") {
+          promptRenameCalendarSession(rowId);
+          return;
+        }
+        if (action === "slot") {
+          promptCalendarSessionSlot(rowId);
+          return;
+        }
+        if (action === "date") {
+          promptCalendarSessionDate(rowId);
+          return;
+        }
+        if (action === "status") {
+          updateCalendarSession(rowId, { status: String(btn.getAttribute("data-cal-status-value") || "scheduled").trim() || "scheduled" });
+        }
+      });
+    });
 
     document.querySelectorAll("[data-cal-add-open]").forEach(function (btn) {
       if (btn.getAttribute("data-cal-add-open-wired") === "1") {
@@ -1754,7 +1788,7 @@
         }
 
         state.inlineAddDate = dateValue;
-        renderTrainingPanel(state.programs, state.scheduleRows);
+        renderTrainingPanel(state.programs, state.calendarRows);
       });
     });
 
@@ -1766,7 +1800,7 @@
       btn.setAttribute("data-cal-add-cancel-wired", "1");
       btn.addEventListener("click", function () {
         state.inlineAddDate = "";
-        renderTrainingPanel(state.programs, state.scheduleRows);
+        renderTrainingPanel(state.programs, state.calendarRows);
       });
     });
 
@@ -1915,7 +1949,7 @@
     state.pendingAssignTemplateName = String(template.name || "Training Plan");
     closeAssignTrainingPlanModal();
     setStatus("Click a day on the calendar to set the starting day for " + state.pendingAssignTemplateName + ".", "info");
-    renderTrainingPanel(state.programs, state.scheduleRows);
+    renderTrainingPanel(state.programs, state.calendarRows);
   }
 
   function assignTrainingPlanToAthlete(templateId, startDate) {
@@ -1978,7 +2012,7 @@
           return;
         }
 
-        var scheduleRows = scheduleBlueprint.map(function (entry) {
+        var calendarRows = scheduleBlueprint.map(function (entry) {
           return {
             athlete_user_id: state.athleteId,
             user_training_program_id: assignmentId,
@@ -1994,7 +2028,7 @@
           return isIsoDate(row.scheduled_for);
         });
 
-        if (!scheduleRows.length) {
+        if (!calendarRows.length) {
           setStatus("Plan assigned, but no calendar sessions could be generated.", "info");
           state.pendingAssignTemplateId = "";
           state.pendingAssignTemplateName = "";
@@ -2004,7 +2038,7 @@
 
         state.client
           .from("athlete_program_schedule")
-          .insert(scheduleRows)
+          .insert(calendarRows)
           .then(function (scheduleResult) {
             if (scheduleResult.error) {
               setStatus("Plan assigned, but schedule save failed: " + scheduleResult.error.message, "error");
@@ -2098,7 +2132,7 @@
 
       grid.addEventListener("dragover", function (event) {
         var dayCell = event.target && event.target.closest("[data-cal-day-date]");
-        if (!dayCell || !state.draggingScheduleId) {
+        if (!dayCell || !state.draggingCalendarRowId) {
           return;
         }
 
@@ -2108,7 +2142,7 @@
 
       grid.addEventListener("dragenter", function (event) {
         var dayCell = event.target && event.target.closest("[data-cal-day-date]");
-        if (!dayCell || !state.draggingScheduleId) {
+        if (!dayCell || !state.draggingCalendarRowId) {
           return;
         }
 
@@ -2126,7 +2160,7 @@
 
       grid.addEventListener("drop", function (event) {
         var dayCell = event.target && event.target.closest("[data-cal-day-date]");
-        if (!dayCell || !state.draggingScheduleId) {
+        if (!dayCell || !state.draggingCalendarRowId) {
           return;
         }
 
@@ -2138,7 +2172,7 @@
           return;
         }
 
-        moveCalendarSessionToDate(state.draggingScheduleId, targetDate);
+        moveCalendarSessionToDate(state.draggingCalendarRowId, targetDate);
       });
     }
 
@@ -2154,7 +2188,7 @@
           return;
         }
 
-        state.draggingScheduleId = rowId;
+        state.draggingCalendarRowId = rowId;
         handle.classList.add("is-dragging");
         if (event && event.dataTransfer) {
           event.dataTransfer.effectAllowed = "move";
@@ -2163,7 +2197,7 @@
       });
 
       handle.addEventListener("dragend", function () {
-        state.draggingScheduleId = null;
+        state.draggingCalendarRowId = null;
         handle.classList.remove("is-dragging");
         document.querySelectorAll("[data-cal-day-date].is-drop-target").forEach(function (dayCell) {
           dayCell.classList.remove("is-drop-target");
@@ -2173,7 +2207,7 @@
   }
 
   function moveCalendarSessionToDate(rowId, targetDate) {
-    var row = (state.scheduleRows || []).find(function (item) {
+    var row = (state.calendarRows || []).find(function (item) {
       return String(item && item.id || "") === String(rowId || "");
     });
 
@@ -2185,24 +2219,85 @@
     updateCalendarSession(rowId, { scheduled_for: targetDate });
   }
 
-  function bindCalendarAutoSave(selector, attr, fieldName) {
-    document.querySelectorAll(selector).forEach(function (input) {
-      if (input.getAttribute(attr + "-wired") === "1") {
-        return;
-      }
+  function closeCalendarSessionMenu(element) {
+    var menu = element && element.closest ? element.closest("[data-cal-menu]") : null;
+    if (menu) {
+      menu.removeAttribute("open");
+    }
+  }
 
-      input.setAttribute(attr + "-wired", "1");
-      input.addEventListener("change", function () {
-        var rowId = String(input.getAttribute(attr) || "").trim();
-        if (!rowId) {
-          return;
-        }
+  function findCalendarRowById(rowId) {
+    return (state.calendarRows || []).find(function (item) {
+      return String(item && item.id || "") === String(rowId || "");
+    }) || null;
+  }
 
-        var patch = {};
-        patch[fieldName] = String(input.value || "").trim();
-        updateCalendarSession(rowId, patch);
-      });
-    });
+  function promptRenameCalendarSession(rowId) {
+    var row = findCalendarRowById(rowId);
+    if (!row) {
+      return;
+    }
+
+    var currentLabel = String(row.session_label || "Workout").trim() || "Workout";
+    var nextLabel = window.prompt("Rename this workout:", currentLabel);
+    if (nextLabel === null) {
+      return;
+    }
+
+    var cleaned = String(nextLabel || "").trim();
+    if (!cleaned || cleaned === currentLabel) {
+      return;
+    }
+
+    updateCalendarSession(rowId, { session_label: cleaned });
+  }
+
+  function promptCalendarSessionSlot(rowId) {
+    var row = findCalendarRowById(rowId);
+    if (!row) {
+      return;
+    }
+
+    var currentSlot = String(row.slot_key || "w1d1").trim() || "w1d1";
+    var nextSlot = window.prompt("Edit the workout slot (example: w1d1):", currentSlot);
+    if (nextSlot === null) {
+      return;
+    }
+
+    var cleaned = String(nextSlot || "").trim().toLowerCase();
+    if (!cleaned || cleaned === currentSlot) {
+      return;
+    }
+    if (!/^w\d+d\d+$/i.test(cleaned)) {
+      setStatus("Use a slot key like w1d1.", "error");
+      return;
+    }
+
+    updateCalendarSession(rowId, { slot_key: cleaned });
+  }
+
+  function promptCalendarSessionDate(rowId) {
+    var row = findCalendarRowById(rowId);
+    if (!row) {
+      return;
+    }
+
+    var currentDate = String(row.scheduled_for || "").trim();
+    var nextDate = window.prompt("Reschedule this workout to which date? Use YYYY-MM-DD.", currentDate);
+    if (nextDate === null) {
+      return;
+    }
+
+    var cleaned = String(nextDate || "").trim();
+    if (!cleaned || cleaned === currentDate) {
+      return;
+    }
+    if (!isIsoDate(cleaned)) {
+      setStatus("Use a valid date in YYYY-MM-DD format.", "error");
+      return;
+    }
+
+    updateCalendarSession(rowId, { scheduled_for: cleaned });
   }
 
   function onAddCalendarSession() {
@@ -2650,9 +2745,9 @@
   function refreshPrograms() {
     fetchPrograms().then(function (programs) {
       state.programs = programs || [];
-      return fetchScheduleRows(state.programs).then(function (scheduleRows) {
-        state.scheduleRows = scheduleRows || [];
-        renderTrainingPanel(state.programs, state.scheduleRows);
+      return fetchCalendarRows(state.programs).then(function (calendarRows) {
+        state.calendarRows = calendarRows || [];
+        renderTrainingPanel(state.programs, state.calendarRows);
       });
     }).catch(function (err) {
       setStatus(err && err.message ? err.message : "Failed to refresh training programs.", "error");
