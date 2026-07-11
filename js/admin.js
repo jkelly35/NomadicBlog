@@ -3,6 +3,7 @@
   var TEMPLATE_LIBRARY_KEY = "nomadic_training_program_templates_v1";
   var HIDDEN_ATHLETES_KEY = "nomadic_hidden_athletes_v1";
   var COACH_TODO_KEY = "nomadic_coach_todo_v1";
+  var COACH_AUTOMATED_TODO_DISMISSED_KEY = "nomadic_coach_automated_todo_dismissed_v1";
   var COACH_FLAGS_KEY = "nomadic_coach_flags_v1";
   var MEMBERSHIP_PAYMENT_TASK_FORM_ID = "membership-payment-task-v1";
   var MEMBERSHIP_PAYMENT_TASK_NAME = "Complete Membership Payment";
@@ -160,6 +161,8 @@
     coachReadinessByAthlete: {},
     coachStravaRows: [],
     coachTodos: [],
+    dismissedAutomatedTodoKeys: [],
+    activeRequestPreviewKey: "",
     coachFlags: [],
     foundingOnboardingRows: [],
     membershipInquiries: [],
@@ -224,6 +227,7 @@
     hideGuard();
     showContent();
     state.coachTodos = readCoachTodos();
+    state.dismissedAutomatedTodoKeys = readDismissedAutomatedTodoKeys();
     state.coachFlags = readCoachFlags();
     setupEventHandlers();
     loadAthletes();
@@ -287,6 +291,7 @@
 
     var automatedTodoList = document.querySelector("[data-admin-todo-automated-list]");
     if (automatedTodoList) {
+      automatedTodoList.addEventListener("click", onDismissAutomatedTodoClick);
       automatedTodoList.addEventListener("click", onMembershipInquiryActionClick);
       automatedTodoList.addEventListener("click", onCustomPlanInquiryActionClick);
     }
@@ -1445,23 +1450,25 @@
         var isActive = athlete.is_active !== false;
         var statusLabel = isActive ? "Active" : "Inactive";
         var insightsHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
+        var sportLabel = athlete.sport ? escapeHtml(athlete.sport) : "Not set";
+        var levelLabel = athlete.level ? escapeHtml(athlete.level) : "Not set";
         return (
           "<tr>" +
-          "<td>" + escapeHtml(athlete.email || "N/A") + "</td>" +
-          "<td>" + (athlete.name ? escapeHtml(athlete.name) : "—") + "</td>" +
-          "<td>" + (athlete.sport ? escapeHtml(athlete.sport) : "—") + "</td>" +
-          "<td>" + (athlete.level ? escapeHtml(athlete.level) : "—") + "</td>" +
-          "<td><span class='admin-risk-chip " + (isActive ? "is-stable" : "") + "'>" + escapeHtml(statusLabel) + "</span></td>" +
+          "<td class='admin-cell-email'>" + escapeHtml(athlete.email || "N/A") + "</td>" +
+          "<td class='admin-cell-name'>" + (athlete.name ? escapeHtml(athlete.name) : "—") + "</td>" +
+          "<td><span class='admin-table-chip'>" + sportLabel + "</span></td>" +
+          "<td><span class='admin-table-chip is-muted'>" + levelLabel + "</span></td>" +
+          "<td><span class='admin-status-pill " + (isActive ? "is-active" : "is-inactive") + "'>" + escapeHtml(statusLabel) + "</span></td>" +
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
-          "<td><div class='admin-table-actions'><a class='btn admin-btn-small' href='" +
+          "<td><div class='admin-table-actions'><a class='btn admin-btn-small admin-action-insights' href='" +
           insightsHref +
-          "'>Insights</a><button type='button' class='btn admin-btn-small' data-admin-toggle-active='1' data-athlete-active='" +
+          "'>Insights</a><button type='button' class='btn admin-btn-small admin-action-toggle' data-admin-toggle-active='1' data-athlete-active='" +
           (isActive ? "true" : "false") +
           "' data-athlete-id='" +
           escapeAttribute(athleteId) +
           "'>" +
           (isActive ? "Deactivate" : "Activate") +
-          "</button><button type='button' class='btn admin-btn-delete-mini' data-admin-delete-athlete='1' data-athlete-id='" +
+          "</button><button type='button' class='btn admin-btn-delete-mini admin-action-delete' data-admin-delete-athlete='1' data-athlete-id='" +
           escapeAttribute(athleteId) +
           "'>Delete</button></div></td>" +
           "</tr>"
@@ -1553,7 +1560,7 @@
 
     var coachViewLink = document.querySelector("[data-admin-coach-view-link]");
     if (coachViewLink) {
-      coachViewLink.href = "profile.html?coachView=1&athleteId=" + encodeURIComponent(athlete.user_id || "");
+      coachViewLink.href = "athlete-insight.html?athleteId=" + encodeURIComponent(athlete.user_id || "");
     }
 
     var metricRows = document.querySelector("[data-admin-metric-rows]");
@@ -2949,16 +2956,6 @@
       .order("created_at", { ascending: false })
       .limit(500);
 
-    var nutritionTargetsRequest = state.client
-      .from("athlete_nutrition_targets")
-      .select("user_id,target_calories");
-
-    var nutritionLogsRequest = state.client
-      .from("athlete_nutrition_logs")
-      .select("user_id,logged_on,calories")
-      .order("logged_on", { ascending: false })
-      .limit(5000);
-
     var stravaMetricsRequest = state.client
       .from("athlete_strava_daily_metrics")
       .select("user_id,metric_date,recovery_score")
@@ -3008,15 +3005,13 @@
 
     var foundingIntakeAssignmentsRequest = state.client
       .from("athlete_onboarding_intake_assignments")
-      .select("athlete_user_id,status,updated_at")
+      .select("athlete_user_id,form_id,form_name,status,assigned_at,submitted_at,due_date,updated_at")
       .order("updated_at", { ascending: false })
       .limit(5000);
 
     Promise.all([
       activeProgramsRequest,
       goalEventsRequest,
-      nutritionTargetsRequest,
-      nutritionLogsRequest,
       stravaMetricsRequest,
       athleteMetricsRequest,
       athleteProfilesRequest,
@@ -3030,17 +3025,15 @@
       .then(function (results) {
         var programsResult = results[0];
         var goalsResult = results[1];
-        var targetsResult = results[2];
-        var logsResult = results[3];
-        var stravaResult = results[4];
-        var metricsResult = results[5];
-        var profilesResult = results[6];
-        var foundingOnboardingResult = results[7];
-        var foundingSignaturesResult = results[8];
-        var membershipInquiriesResult = results[9];
-        var customPlanInquiriesResult = results[10];
-        var foundingSubscriptionsResult = results[11];
-        var foundingIntakeAssignmentsResult = results[12];
+        var stravaResult = results[2];
+        var metricsResult = results[3];
+        var profilesResult = results[4];
+        var foundingOnboardingResult = results[5];
+        var foundingSignaturesResult = results[6];
+        var membershipInquiriesResult = results[7];
+        var customPlanInquiriesResult = results[8];
+        var foundingSubscriptionsResult = results[9];
+        var foundingIntakeAssignmentsResult = results[10];
 
         if (programsResult && !programsResult.error) {
           state.activePrograms = programsResult.data || [];
@@ -3063,18 +3056,6 @@
           });
         } else {
           state.athleteGoalEvents = [];
-        }
-
-        var nutritionTargets = [];
-        if (targetsResult && !targetsResult.error) {
-          nutritionTargets = Array.isArray(targetsResult.data) ? targetsResult.data : [];
-        }
-
-        var nutritionLogs = [];
-        if (logsResult && !logsResult.error) {
-          nutritionLogs = Array.isArray(logsResult.data) ? logsResult.data : [];
-        } else if (logsResult && logsResult.error && !isMissingTableError(logsResult.error)) {
-          console.warn("Nutrition logs load failed:", logsResult.error);
         }
 
         var stravaRows = [];
@@ -3242,8 +3223,8 @@
           state.athletes,
           state.activePrograms,
           state.athleteGoalEvents,
-          nutritionTargets,
-          nutritionLogs,
+          [],
+          [],
           stravaRows
         );
         state.coachStravaRows = stravaRows;
@@ -3285,16 +3266,33 @@
       return;
     }
 
+    var dismissedLookup = {};
+    (state.dismissedAutomatedTodoKeys || []).forEach(function (key) {
+      var value = String(key || "").trim();
+      if (value) {
+        dismissedLookup[value] = true;
+      }
+    });
+
     var inquiries = Array.isArray(state.membershipInquiries) ? state.membershipInquiries.slice() : [];
     var openInquiries = inquiries.filter(function (inquiry) {
       var status = String(inquiry && inquiry.status || "new").toLowerCase();
-      return status !== "archived" && status !== "declined";
+      var inquiryId = String(inquiry && inquiry.id || "").trim();
+      var requestKey = "membership:" + inquiryId;
+      return status !== "archived" && status !== "declined" && !dismissedLookup[requestKey];
     });
     var customPlanInquiries = Array.isArray(state.customPlanInquiries) ? state.customPlanInquiries.slice() : [];
     var openCustomPlanInquiries = customPlanInquiries.filter(function (inquiry) {
       var status = String(inquiry && inquiry.status || "new").toLowerCase();
-      return status !== "archived" && status !== "declined";
+      var inquiryId = String(inquiry && inquiry.id || "").trim();
+      var requestKey = "custom:" + inquiryId;
+      return status !== "archived" && status !== "declined" && !dismissedLookup[requestKey];
     });
+
+    openInquiries.sort(sortInquiryRowsByPriority);
+    openCustomPlanInquiries.sort(sortInquiryRowsByPriority);
+
+    var recentCompletionNotifications = buildRecentCoachCompletionNotifications(dismissedLookup);
 
     var athleteByEmail = {};
     (state.athletes || []).forEach(function (athlete) {
@@ -3304,6 +3302,72 @@
       }
       athleteByEmail[email] = athlete;
     });
+
+    var recentAthleteAccountNotifications = (state.athletes || [])
+      .map(function (athlete) {
+        var athleteId = String(athlete && athlete.user_id || "").trim();
+        var createdAt = String(athlete && athlete.user_created_at || "").trim();
+        var createdMs = Date.parse(createdAt);
+        return {
+          athleteId: athleteId,
+          createdAt: createdAt,
+          createdMs: Number.isFinite(createdMs) ? createdMs : null,
+          athlete: athlete
+        };
+      })
+      .filter(function (item) {
+        if (!item.athleteId || item.createdMs == null) {
+          return false;
+        }
+
+        var daysSinceCreated = Math.floor((Date.now() - item.createdMs) / (24 * 60 * 60 * 1000));
+        if (!Number.isFinite(daysSinceCreated) || daysSinceCreated < 0 || daysSinceCreated > 14) {
+          return false;
+        }
+
+        var requestKey = "athlete_created:" + item.athleteId;
+        return !dismissedLookup[requestKey];
+      })
+      .sort(function (a, b) {
+        return (b.createdMs || 0) - (a.createdMs || 0);
+      })
+      .slice(0, 8);
+
+    var accountNotificationMarkup = recentAthleteAccountNotifications
+      .map(function (item) {
+        var athlete = item.athlete || {};
+        var athleteId = String(item.athleteId || "");
+        var createdAt = String(item.createdAt || "");
+        var accountName = String(athlete && athlete.name || "").trim() || String(athlete && athlete.email || "").trim() || "Athlete";
+        var accountEmail = String(athlete && athlete.email || "").trim();
+        var accountSport = String(athlete && athlete.sport || "").trim();
+        var requestKey = "athlete_created:" + athleteId;
+        var accountHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
+
+        return (
+          '<div class="admin-overview-item">' +
+            '<div class="admin-overview-item-head">' +
+              '<p class="admin-overview-item-title">' + escapeHtml(accountName) + '</p>' +
+              '<span class="admin-request-type-chip">Account</span>' +
+            '</div>' +
+            '<div>' +
+              '<p class="admin-overview-item-meta">' +
+                escapeHtml(accountEmail || "No email provided") +
+                (accountSport ? (' • ' + escapeHtml(accountSport)) : '') +
+              '</p>' +
+              '<p class="admin-overview-item-meta">New athlete account created • ' + escapeHtml(formatDate(createdAt)) + ' • ' + escapeHtml(formatRelativeDaysLabel(createdAt)) + '</p>' +
+            '</div>' +
+            '<div class="admin-request-side">' +
+              '<span class="admin-risk-chip">new</span>' +
+              '<div class="admin-request-actions">' +
+                '<a class="btn admin-btn-refresh" href="' + escapeAttribute(accountHref) + '">View Account</a>' +
+                '<button type="button" class="btn admin-btn-small" data-automated-todo-complete="' + escapeAttribute(requestKey) + '">Completed</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      })
+      .join("");
 
     var membershipQueueMarkup = openInquiries
       .slice(0, 12)
@@ -3317,11 +3381,16 @@
           ? "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId)
           : "";
         var submittedLabel = inquiry.created_at ? formatDate(inquiry.created_at) : "Unknown";
+        var requestKey = "membership:" + String(inquiry.id || "");
+        var previewOpen = state.activeRequestPreviewKey === requestKey;
 
         return (
           '<div class="admin-overview-item">' +
-            '<div>' +
+            '<div class="admin-overview-item-head">' +
               '<p class="admin-overview-item-title">' + escapeHtml(inquiry.full_name || inquiry.email || "Prospect") + '</p>' +
+              '<span class="admin-request-type-chip">Membership</span>' +
+            '</div>' +
+            '<div>' +
               '<p class="admin-overview-item-meta">' +
                 escapeHtml(inquiry.email || "") +
                 ' • ' +
@@ -3329,17 +3398,25 @@
                 ' • Goal: ' +
                 escapeHtml(inquiry.primary_goal || "") +
               '</p>' +
-              '<p class="admin-overview-item-meta">Submitted ' + escapeHtml(submittedLabel) + (inquiry.notes ? ' • Notes: ' + escapeHtml(inquiry.notes) : '') + '</p>' +
+              '<p class="admin-overview-item-meta">Submitted ' + escapeHtml(submittedLabel) + ' • ' + escapeHtml(formatRelativeDaysLabel(inquiry.created_at)) + (inquiry.notes ? ' • Notes: ' + escapeHtml(inquiry.notes) : '') + '</p>' +
             '</div>' +
-            '<div style="display:flex; flex-direction:column; align-items:flex-end; gap:0.4rem;">' +
+            '<div class="admin-request-side">' +
               '<span class="admin-risk-chip ' + statusToneClass + '">' + escapeHtml(status) + '</span>' +
-              '<div style="display:flex; gap:0.35rem; flex-wrap:wrap; justify-content:flex-end;">' +
-                '<button type="button" class="btn admin-btn-small" data-membership-inquiry-action="view" data-membership-inquiry-id="' + escapeAttribute(inquiry.id) + '">Open Request</button>' +
+              '<div class="admin-request-actions">' +
+                '<button type="button" class="btn admin-btn-small" data-membership-inquiry-action="view" data-membership-inquiry-id="' + escapeAttribute(inquiry.id) + '">' + (previewOpen ? 'Hide Request' : 'Open Request') + '</button>' +
                 (hasAthleteAccount
                   ? '<a class="btn admin-btn-refresh" href="' + escapeAttribute(insightHref) + '">Open Insights</a>'
                   : '<button type="button" class="btn admin-btn-refresh" disabled title="No athlete account found for this email yet.">Open Insights</button>') +
+                '<button type="button" class="btn admin-btn-small" data-automated-todo-complete="' + escapeAttribute(requestKey) + '">Completed</button>' +
               '</div>' +
             '</div>' +
+            (previewOpen
+              ? '<div class="admin-request-detail">' +
+                  '<p><strong>Sport:</strong> ' + escapeHtml(inquiry.primary_sports || 'Not provided') + '</p>' +
+                  '<p><strong>Goal:</strong> ' + escapeHtml(inquiry.primary_goal || 'Not provided') + '</p>' +
+                  '<p><strong>Notes:</strong> ' + escapeHtml(inquiry.notes || 'None') + '</p>' +
+                '</div>'
+              : '') +
           '</div>'
         );
       })
@@ -3354,11 +3431,16 @@
         var durationLabel = inquiry.desired_duration_weeks == null ? "" : String(inquiry.desired_duration_weeks) + " weeks";
         var daysPerWeekLabel = inquiry.desired_days_per_week == null ? "" : String(inquiry.desired_days_per_week) + " days/week";
         var volumeLabel = [durationLabel, daysPerWeekLabel].filter(Boolean).join(" • ");
+        var requestKey = "custom:" + String(inquiry.id || "");
+        var previewOpen = state.activeRequestPreviewKey === requestKey;
 
         return (
           '<div class="admin-overview-item">' +
-            '<div>' +
+            '<div class="admin-overview-item-head">' +
               '<p class="admin-overview-item-title">' + escapeHtml(inquiry.full_name || inquiry.email || "Prospect") + '</p>' +
+              '<span class="admin-request-type-chip is-individualized">Individualized</span>' +
+            '</div>' +
+            '<div>' +
               '<p class="admin-overview-item-meta">' +
                 escapeHtml(inquiry.email || "") +
                 ' • ' +
@@ -3366,20 +3448,185 @@
                 ' • Goal: ' +
                 escapeHtml(inquiry.primary_goal || "") +
               '</p>' +
-              '<p class="admin-overview-item-meta">Submitted ' + escapeHtml(submittedLabel) + (volumeLabel ? ' • ' + escapeHtml(volumeLabel) : '') + (inquiry.notes ? ' • Notes: ' + escapeHtml(inquiry.notes) : '') + '</p>' +
+              '<p class="admin-overview-item-meta">Submitted ' + escapeHtml(submittedLabel) + ' • ' + escapeHtml(formatRelativeDaysLabel(inquiry.created_at)) + (volumeLabel ? ' • ' + escapeHtml(volumeLabel) : '') + (inquiry.notes ? ' • Notes: ' + escapeHtml(inquiry.notes) : '') + '</p>' +
             '</div>' +
-            '<div style="display:flex; flex-direction:column; align-items:flex-end; gap:0.4rem;">' +
+            '<div class="admin-request-side">' +
               '<span class="admin-risk-chip ' + statusToneClass + '">' + escapeHtml(status) + '</span>' +
-              '<div style="display:flex; gap:0.35rem; flex-wrap:wrap; justify-content:flex-end;">' +
-                '<button type="button" class="btn admin-btn-small" data-custom-plan-inquiry-action="view" data-custom-plan-inquiry-id="' + escapeAttribute(inquiry.id) + '">Open Request</button>' +
+              '<div class="admin-request-actions">' +
+                '<button type="button" class="btn admin-btn-small" data-custom-plan-inquiry-action="view" data-custom-plan-inquiry-id="' + escapeAttribute(inquiry.id) + '">' + (previewOpen ? 'Hide Request' : 'Open Request') + '</button>' +
+                '<button type="button" class="btn admin-btn-small" data-automated-todo-complete="' + escapeAttribute(requestKey) + '">Completed</button>' +
               '</div>' +
             '</div>' +
+            (previewOpen
+              ? '<div class="admin-request-detail">' +
+                  '<p><strong>Sport:</strong> ' + escapeHtml(inquiry.primary_sports || 'Not provided') + '</p>' +
+                  '<p><strong>Goal:</strong> ' + escapeHtml(inquiry.primary_goal || 'Not provided') + '</p>' +
+                  '<p><strong>Preferred Volume:</strong> ' + escapeHtml(volumeLabel || 'Not provided') + '</p>' +
+                  '<p><strong>Notes:</strong> ' + escapeHtml(inquiry.notes || 'None') + '</p>' +
+                '</div>'
+              : '') +
           '</div>'
         );
       })
       .join("");
 
-    container.innerHTML = membershipQueueMarkup + customPlanQueueMarkup;
+    container.innerHTML = recentCompletionNotifications + accountNotificationMarkup + membershipQueueMarkup + customPlanQueueMarkup;
+  }
+
+  function buildRecentCoachCompletionNotifications(dismissedLookup) {
+    var athleteById = {};
+    (state.athletes || []).forEach(function (athlete) {
+      var athleteId = String(athlete && athlete.user_id || "").trim();
+      if (!athleteId) {
+        return;
+      }
+
+      athleteById[athleteId] = athlete;
+    });
+
+    var items = [];
+
+    (state.foundingOnboardingRows || []).forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      if (!athleteId || !athleteById[athleteId]) {
+        return;
+      }
+
+      var athlete = athleteById[athleteId] || {};
+      var athleteLabel = String(athlete.name || athlete.email || "Athlete").trim();
+
+      if (row && row.docs_signed_at) {
+        var waiverKey = "waiver:" + athleteId + ":" + String(row.docs_signed_at || "");
+        var waiverMs = Date.parse(row.docs_signed_at);
+        if (Number.isFinite(waiverMs) && !dismissedLookup[waiverKey]) {
+          items.push({
+            key: waiverKey,
+            title: athleteLabel + " completed liability waiver",
+            meta: "Signed " + formatDate(row.docs_signed_at) + " • " + formatRelativeDaysLabel(row.docs_signed_at),
+            chip: "Waiver",
+            href: "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId),
+            sortMs: waiverMs
+          });
+        }
+      }
+
+      if (row && row.payment_completed_at) {
+        var paymentKey = "payment:" + athleteId + ":" + String(row.payment_completed_at || "");
+        var paymentMs = Date.parse(row.payment_completed_at);
+        if (Number.isFinite(paymentMs) && !dismissedLookup[paymentKey]) {
+          items.push({
+            key: paymentKey,
+            title: athleteLabel + " completed payment",
+            meta: "Completed " + formatDate(row.payment_completed_at) + " • " + formatRelativeDaysLabel(row.payment_completed_at),
+            chip: "Payment",
+            href: "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId),
+            sortMs: paymentMs
+          });
+        }
+      }
+    });
+
+    (state.foundingIntakeAssignmentRows || []).forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      if (!athleteId || !athleteById[athleteId]) {
+        return;
+      }
+
+      var status = String(row && row.status || "").toLowerCase();
+      if (status !== "submitted") {
+        return;
+      }
+
+      var updatedAt = String(row && row.updated_at || row && row.submitted_at || row && row.assigned_at || "").trim();
+      var updatedMs = Date.parse(updatedAt);
+      if (!Number.isFinite(updatedMs)) {
+        return;
+      }
+
+      var athlete = athleteById[athleteId] || {};
+      var athleteLabel = String(athlete.name || athlete.email || "Athlete").trim();
+      var formLabel = getCoachCompletionTaskLabel(row);
+      var taskKey = "task:" + athleteId + ":" + String(row && row.form_id || row && row.form_name || row && row.task_name || updatedAt || "");
+      if (dismissedLookup[taskKey]) {
+        return;
+      }
+
+      items.push({
+        key: taskKey,
+        title: athleteLabel + " completed " + formLabel,
+        meta: "Submitted " + formatDate(updatedAt) + " • " + formatRelativeDaysLabel(updatedAt),
+        chip: "Task",
+        href: "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId),
+        sortMs: updatedMs
+      });
+    });
+
+    if (!items.length) {
+      return (
+        '<div class="admin-overview-item admin-widget-summary">' +
+          '<p class="admin-overview-item-title">Open Coach Notifications</p>' +
+          '<p class="admin-overview-item-meta">No open waiver, payment, or task notifications.</p>' +
+        '</div>'
+      );
+    }
+
+    items.sort(function (a, b) {
+      return (Number(b && b.sortMs) || 0) - (Number(a && a.sortMs) || 0);
+    });
+
+    return (
+      '<div class="admin-overview-item admin-widget-summary">' +
+        '<p class="admin-overview-item-title">Open Coach Notifications</p>' +
+      '</div>' +
+      items.slice(0, 8).map(function (item) {
+        return (
+          '<div class="admin-overview-item admin-widget-row">' +
+            '<div>' +
+              '<p class="admin-overview-item-title">' + escapeHtml(item.title) + '</p>' +
+              '<p class="admin-overview-item-meta">' + escapeHtml(item.meta) + '</p>' +
+            '</div>' +
+            '<div class="admin-request-side">' +
+              '<span class="admin-request-type-chip">' + escapeHtml(item.chip) + '</span>' +
+              '<div class="admin-request-actions">' +
+                '<a class="btn admin-btn-refresh" href="' + escapeAttribute(item.href) + '">View Athlete</a>' +
+                '<button type="button" class="btn admin-btn-small" data-automated-todo-complete="' + escapeAttribute(item.key) + '">Completed</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join("")
+    );
+  }
+
+  function getCoachCompletionTaskLabel(row) {
+    var schema = row && row.form_schema && typeof row.form_schema === "object" ? row.form_schema : {};
+    var rawName = String(row && row.form_name || row && row.task_name || row && row.title || "").trim();
+    var schemaName = String(schema.title || schema.task_name || schema.name || schema.label || "").trim();
+    var schemaDescription = String(schema.description || "").trim();
+    var schemaActionLabel = String(schema.action_label || "").trim();
+
+    if (rawName && !isGenericCoachTaskLabel(rawName)) {
+      return rawName;
+    }
+
+    if (schemaName && !isGenericCoachTaskLabel(schemaName)) {
+      return schemaName;
+    }
+
+    if (schemaActionLabel && !isGenericCoachTaskLabel(schemaActionLabel)) {
+      return schemaActionLabel;
+    }
+
+    if (schemaDescription) {
+      return schemaDescription.length > 72 ? schemaDescription.slice(0, 69).trim() + "..." : schemaDescription;
+    }
+
+    return rawName || "Assigned task";
+  }
+
+  function isGenericCoachTaskLabel(label) {
+    var value = String(label || "").trim().toLowerCase();
+    return !value || value === "assigned task" || value === "assigned tasks" || value === "task form" || value === "task" || value.indexOf("untitled") === 0;
   }
 
   function onMembershipInquiryActionClick(event) {
@@ -3395,8 +3642,34 @@
     }
 
     if (action === "view") {
-      openMembershipInquiryRequest(inquiryId);
+      toggleRequestPreview("membership:" + inquiryId);
     }
+  }
+
+  function onDismissAutomatedTodoClick(event) {
+    var actionBtn = event.target && event.target.closest("[data-automated-todo-complete]");
+    if (!actionBtn) {
+      return;
+    }
+
+    var requestKey = String(actionBtn.getAttribute("data-automated-todo-complete") || "").trim();
+    if (!requestKey) {
+      return;
+    }
+
+    var next = Array.isArray(state.dismissedAutomatedTodoKeys)
+      ? state.dismissedAutomatedTodoKeys.slice()
+      : [];
+    if (next.indexOf(requestKey) < 0) {
+      next.push(requestKey);
+    }
+
+    state.dismissedAutomatedTodoKeys = next;
+    writeDismissedAutomatedTodoKeys(next);
+    if (state.activeRequestPreviewKey === requestKey) {
+      state.activeRequestPreviewKey = "";
+    }
+    renderMembershipInquiries();
   }
 
   function onCustomPlanInquiryActionClick(event) {
@@ -3412,64 +3685,57 @@
     }
 
     if (action === "view") {
-      openCustomPlanInquiryRequest(inquiryId);
+      toggleRequestPreview("custom:" + inquiryId);
     }
   }
 
-  function openMembershipInquiryRequest(inquiryId) {
-    var inquiry = (state.membershipInquiries || []).find(function (row) {
-      return String(row && row.id || "") === String(inquiryId || "");
-    });
-    if (!inquiry) {
-      setStatus("Membership request not found.", "error");
-      return;
-    }
-
-    var lines = [
-      "Membership request",
-      "Name: " + String(inquiry.full_name || "Prospect"),
-      "Email: " + String(inquiry.email || ""),
-      "Sport: " + String(inquiry.primary_sports || ""),
-      "Goal: " + String(inquiry.primary_goal || ""),
-      "Submitted: " + (inquiry.created_at ? formatDate(inquiry.created_at) : "Unknown")
-    ];
-
-    if (inquiry.notes) {
-      lines.push("Notes: " + String(inquiry.notes));
-    }
-
-    window.alert(lines.join("\n"));
+  function toggleRequestPreview(requestKey) {
+    var key = String(requestKey || "");
+    state.activeRequestPreviewKey = state.activeRequestPreviewKey === key ? "" : key;
+    renderMembershipInquiries();
   }
 
-  function openCustomPlanInquiryRequest(inquiryId) {
-    var inquiry = (state.customPlanInquiries || []).find(function (row) {
-      return String(row && row.id || "") === String(inquiryId || "");
-    });
-    if (!inquiry) {
-      setStatus("Individualized programming request not found.", "error");
-      return;
+  function sortInquiryRowsByPriority(a, b) {
+    var rankA = getInquiryStatusRank(a && a.status);
+    var rankB = getInquiryStatusRank(b && b.status);
+    if (rankA !== rankB) {
+      return rankA - rankB;
     }
 
-    var lines = [
-      "Individualized programming request",
-      "Name: " + String(inquiry.full_name || "Prospect"),
-      "Email: " + String(inquiry.email || ""),
-      "Sport: " + String(inquiry.primary_sports || ""),
-      "Goal: " + String(inquiry.primary_goal || ""),
-      "Submitted: " + (inquiry.created_at ? formatDate(inquiry.created_at) : "Unknown")
-    ];
+    var timeA = Date.parse(a && a.created_at ? a.created_at : "") || 0;
+    var timeB = Date.parse(b && b.created_at ? b.created_at : "") || 0;
+    return timeB - timeA;
+  }
 
-    if (inquiry.desired_duration_weeks != null) {
-      lines.push("Duration: " + String(inquiry.desired_duration_weeks) + " weeks");
+  function getInquiryStatusRank(status) {
+    var normalized = String(status || "new").toLowerCase();
+    if (normalized === "approved") {
+      return 0;
     }
-    if (inquiry.desired_days_per_week != null) {
-      lines.push("Days per week: " + String(inquiry.desired_days_per_week));
+    if (normalized === "pending" || normalized === "new") {
+      return 1;
     }
-    if (inquiry.notes) {
-      lines.push("Notes: " + String(inquiry.notes));
+    return 2;
+  }
+
+  function formatRelativeDaysLabel(dateString) {
+    if (!dateString) {
+      return "date unknown";
     }
 
-    window.alert(lines.join("\n"));
+    var time = Date.parse(dateString);
+    if (!Number.isFinite(time)) {
+      return "date unknown";
+    }
+
+    var days = Math.floor((Date.now() - time) / (24 * 60 * 60 * 1000));
+    if (days <= 0) {
+      return "today";
+    }
+    if (days === 1) {
+      return "1 day ago";
+    }
+    return String(days) + " days ago";
   }
 
   function updateMembershipInquiryStatus(inquiryId, status, options) {
@@ -3515,54 +3781,6 @@
       .catch(function (error) {
         if (!silent) {
           setStatus(error && error.message ? error.message : "Failed to update inquiry.", "error");
-        }
-        return false;
-      });
-  }
-
-  function updateCustomPlanInquiryStatus(inquiryId, status, options) {
-    var config = options && typeof options === "object" ? options : {};
-    var silent = !!config.silent;
-
-    if (!state.client || !inquiryId || !status) {
-      return Promise.resolve(false);
-    }
-
-    if (!silent) {
-      setStatus("Updating custom plan inquiry status...", "info");
-    }
-
-    return state.client
-      .from("custom_plan_inquiries")
-      .update({
-        status: status,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", inquiryId)
-      .then(function (result) {
-        if (result.error) {
-          if (!silent) {
-            setStatus(result.error.message, "error");
-          }
-          return false;
-        }
-
-        state.customPlanInquiries = (state.customPlanInquiries || []).map(function (inquiry) {
-          if (String(inquiry && inquiry.id || "") !== inquiryId) {
-            return inquiry;
-          }
-          return Object.assign({}, inquiry, { status: status, updated_at: new Date().toISOString() });
-        });
-
-        renderMembershipInquiries();
-        if (!silent) {
-          setStatus("Custom plan inquiry updated.", "success");
-        }
-        return true;
-      })
-      .catch(function (error) {
-        if (!silent) {
-          setStatus(error && error.message ? error.message : "Failed to update custom plan inquiry.", "error");
         }
         return false;
       });
@@ -4677,6 +4895,17 @@
   }
 
   function onCoachTodoListClick(event) {
+    var completeBtn = event.target && event.target.closest("[data-todo-complete]");
+    if (completeBtn) {
+      var completeTodoId = String(completeBtn.getAttribute("data-todo-complete") || "").trim();
+      state.coachTodos = state.coachTodos.filter(function (todo) {
+        return todo.id !== completeTodoId;
+      });
+      writeCoachTodos(state.coachTodos);
+      renderCoachTodoList();
+      return;
+    }
+
     var removeBtn = event.target && event.target.closest("[data-todo-remove]");
     if (!removeBtn) {
       return;
@@ -4709,6 +4938,7 @@
           '<div class="admin-overview-item admin-todo-item ' + (todo.done ? 'is-done' : '') + '">' +
             '<input type="checkbox" data-todo-toggle="' + escapeAttribute(todo.id) + '" ' + (todo.done ? 'checked' : '') + ' />' +
             '<p class="admin-overview-item-title">' + escapeHtml(todo.text) + '</p>' +
+            '<button type="button" class="btn admin-btn-small" data-todo-complete="' + escapeAttribute(todo.id) + '">Completed</button>' +
             '<button type="button" class="btn admin-btn-delete-mini" data-todo-remove="' + escapeAttribute(todo.id) + '">Remove</button>' +
           '</div>'
         );
@@ -5780,6 +6010,35 @@
       window.localStorage.setItem(COACH_TODO_KEY, JSON.stringify(Array.isArray(todos) ? todos : []));
     } catch (e) {
       setStatus("Could not save coach to-do list in this browser.", "error");
+    }
+  }
+
+  function readDismissedAutomatedTodoKeys() {
+    try {
+      var raw = window.localStorage.getItem(COACH_AUTOMATED_TODO_DISMISSED_KEY);
+      if (!raw) {
+        return [];
+      }
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed.map(function (key) {
+        return String(key || "").trim();
+      }).filter(Boolean);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function writeDismissedAutomatedTodoKeys(keys) {
+    try {
+      window.localStorage.setItem(
+        COACH_AUTOMATED_TODO_DISMISSED_KEY,
+        JSON.stringify(Array.isArray(keys) ? keys : [])
+      );
+    } catch (e) {
+      setStatus("Could not save automated to-do dismissals in this browser.", "error");
     }
   }
 

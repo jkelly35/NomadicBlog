@@ -36,6 +36,7 @@
     whoopManualExpiresIn: null,
     whoopManualUserId: null,
     whoopManualCancelBtn: null,
+    coachCompassSection: null,
     sportOverviewTemplates: {
       climbing: [
         {
@@ -159,6 +160,7 @@
     state.whoopManualExpiresIn = document.querySelector("[data-athlete-editor-whoop-expires-in]");
     state.whoopManualUserId = document.querySelector("[data-athlete-editor-whoop-user-id]");
     state.whoopManualCancelBtn = document.querySelector("[data-athlete-editor-whoop-manual-cancel]");
+    state.coachCompassSection = document.querySelector("[data-athlete-editor-compass-section]");
 
     if (!window.supabase || !window.supabase.createClient) {
       showError("Supabase client library failed to load.");
@@ -308,6 +310,9 @@
     if (state.accountActionsSection) {
       state.accountActionsSection.hidden = !state.isPersonal;
     }
+    if (state.coachCompassSection) {
+      state.coachCompassSection.hidden = !!state.isPersonal;
+    }
     if (state.wearablesSection) {
       state.wearablesSection.hidden = !state.isPersonal;
     }
@@ -361,6 +366,10 @@
     setInputValue("height_cm", athlete.height_cm);
     setInputValue("weight_kg", athlete.weight_kg);
     setInputValue("sex", getProfileSexForFormValue(athlete));
+    setInputValue("compass_training_status", athlete.compass_training_status);
+    setInputValue("compass_current_phase", athlete.compass_current_phase);
+    setInputValue("compass_next_objective", athlete.compass_next_objective);
+    setInputValue("compass_coach_note", athlete.compass_coach_note);
 
     updateCalculatedAgeDisplay(getDobFromProfile(athlete), athlete.age);
 
@@ -427,6 +436,10 @@
       height_cm: parseFloat(formData.get("height_cm") || "") || null,
       weight_kg: parseFloat(formData.get("weight_kg") || "") || null,
       sex: String(formData.get("sex") || "").trim() || null,
+      compass_training_status: String(formData.get("compass_training_status") || "").trim(),
+      compass_current_phase: String(formData.get("compass_current_phase") || "").trim(),
+      compass_next_objective: String(formData.get("compass_next_objective") || "").trim(),
+      compass_coach_note: String(formData.get("compass_coach_note") || "").trim(),
       updated_at: new Date().toISOString()
     };
 
@@ -452,6 +465,10 @@
     var payload = Object.assign({}, profileData);
     var droppedColumns = {};
     var optionalColumnsFallbackOrder = [
+      "compass_coach_note",
+      "compass_next_objective",
+      "compass_current_phase",
+      "compass_training_status",
       "sport_overview",
       "sports",
       "height_cm",

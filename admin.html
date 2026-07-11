@@ -40,15 +40,20 @@
       <!-- Admin Dashboard -->
       <div class="admin-content" hidden data-admin-content>
         <div class="admin-header">
-          <h1>Coaching Dashboard</h1>
-          <p class="admin-subtitle">Manage all athletes, profiles, and account settings</p>
+          <div class="admin-header-top">
+            <div>
+              <h1>Coaching Dashboard</h1>
+              <p class="admin-subtitle">Manage all athletes, profiles, and account settings</p>
+            </div>
+            <a class="coach-header-alert" href="coach-inbox.html" data-coach-msg-header-alert>
+              <span class="coach-header-alert-label">Inbox</span>
+              <span class="coach-header-alert-copy" data-coach-msg-header-copy>Open unified inbox</span>
+              <span class="coach-header-alert-badge" data-coach-msg-header-count hidden>0</span>
+            </a>
+          </div>
           <div class="admin-quick-nav" aria-label="Coach Quick Navigation">
-            <a class="btn admin-btn-refresh" href="#coach-overview">Overview</a>
             <a class="btn admin-btn-refresh" href="#admin-athletes">Athletes</a>
-            <a class="btn admin-btn-refresh" href="#coach-messages">Message Alerts</a>
-            <a class="btn admin-btn-refresh" href="nutrition-foodbank-settings.html">Foodbank</a>
-            <a class="btn admin-btn-refresh" href="coach-training-programs.html">Programs</a>
-            <a class="btn admin-btn-refresh" href="coach-workout-blocks.html">Workout Blocks</a>
+            <a class="btn admin-btn-refresh" href="coach-training-programs.html">Programming</a>
             <a class="btn admin-btn-refresh" href="coach-blog-manager.html">Blog</a>
           </div>
         </div>
@@ -95,7 +100,7 @@
           <article class="admin-overview-card">
             <div class="admin-overview-card-head">
               <h2>Coach To-Do</h2>
-              <p>Track priorities that need attention, including automated coaching follow-ups.</p>
+              <p>Track priorities, recent athlete completions, and automated coaching follow-ups.</p>
             </div>
             <form class="admin-inline-form" data-admin-todo-form>
               <input type="text" class="admin-search" placeholder="Add a task..." data-admin-todo-input />
@@ -109,47 +114,6 @@
             </div>
           </article>
 
-        </section>
-
-        <section class="admin-athletes-panel" id="coach-messages" aria-label="Coach Message Alerts">
-          <div class="admin-controls">
-            <div class="admin-controls-search-wrap">
-              <h2 style="margin:0;">Message Alerts</h2>
-              <p class="admin-results-summary">Unread notifications and shortcuts to your unified inbox.</p>
-            </div>
-            <div class="admin-controls-actions">
-              <a class="btn admin-btn-refresh" href="coach-inbox.html">Open Unified Inbox</a>
-            </div>
-          </div>
-
-          <div class="coach-message-summary-grid">
-            <article class="admin-overview-card">
-              <div class="admin-overview-card-head">
-                <h3>Unread Messages</h3>
-                <p>Athlete replies waiting on coach review.</p>
-              </div>
-              <p class="coach-summary-metric" data-coach-msg-summary-unread>0</p>
-            </article>
-
-            <article class="admin-overview-card">
-              <div class="admin-overview-card-head">
-                <h3>Active Threads</h3>
-                <p>Total athlete conversations in inbox.</p>
-              </div>
-              <p class="coach-summary-metric" data-coach-msg-summary-threads>0</p>
-            </article>
-
-            <article class="admin-overview-card coach-message-summary-list-card">
-              <div class="admin-overview-card-head">
-                <h3>Recent Notifications</h3>
-                <p>Newest threads and unread indicators.</p>
-              </div>
-              <div class="coach-message-summary-list" data-coach-msg-summary-list>
-                <p class="admin-loading">Loading message notifications...</p>
-              </div>
-            </article>
-          </div>
-          <p class="admin-status" role="status" aria-live="polite" data-coach-msg-summary-status></p>
         </section>
 
         <section class="admin-athletes-panel" id="admin-athletes" aria-label="Athletes">
@@ -186,8 +150,7 @@
                 <summary class="btn admin-btn-refresh">Tools</summary>
                 <div class="admin-tools-menu-list">
                   <a class="admin-tools-menu-link" href="exercise-library.html">Exercise Library</a>
-                  <a class="admin-tools-menu-link" href="nutrition-foodbank-settings.html">Nutrition Foodbank</a>
-                  <a class="admin-tools-menu-link" href="coach-training-programs.html">Training Programs</a>
+                  <a class="admin-tools-menu-link" href="coach-training-programs.html">Programming</a>
                   <a class="admin-tools-menu-link" href="coach-blog-manager.html">Blog Manager</a>
                 </div>
               </details>

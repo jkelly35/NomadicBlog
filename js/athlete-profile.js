@@ -694,8 +694,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     statusLoadPct: 0,
     statusDurabilityPct: 0,
     statusProgressPct: 0,
-    compassNextObjective: "Set your next race, trip, or milestone.",
+    compassTrainingStatus: "Awaiting Assessment",
+    compassCurrentPhase: "Awaiting Assessment",
+    compassNextObjective: "Schedule Initial Assessment",
     compassNextObjectiveDate: null,
+    compassCoachNote: "Welcome to Nomadic Performance. We are excited to get started and will update this section after your assessment.",
     calendarDragPayload: null,
     lastCalendarMove: null,
     calendarSuppressClickUntil: 0,
@@ -2854,11 +2857,6 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var coachIntakeOpenBtn = document.querySelector("[data-coach-intake-open]");
     if (coachIntakeOpenBtn) {
       coachIntakeOpenBtn.addEventListener("click", openCoachIntakeModal);
-    }
-
-    var coachTaskOpenBtn = document.querySelector("[data-coach-task-open]");
-    if (coachTaskOpenBtn) {
-      coachTaskOpenBtn.addEventListener("click", openCoachIntakeModal);
     }
 
     document.querySelectorAll("[data-coach-intake-close]").forEach(function (btn) {
@@ -6840,10 +6838,39 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
-    trainingStatusEl.textContent = statusText;
-    phaseEl.textContent = String(phaseLabel || "Strength + Durability");
-    objectiveEl.textContent = String(state.compassNextObjective || "Set your next race, trip, or milestone.");
-    coachNoteEl.textContent = buildCoachCompassNote(statusText, readiness, load, durability, progress);
+    var compassCopy = getCoachEditableCompassCopy();
+    trainingStatusEl.textContent = compassCopy.trainingStatus;
+    phaseEl.textContent = compassCopy.currentPhase;
+    objectiveEl.textContent = compassCopy.nextObjective;
+    coachNoteEl.textContent = compassCopy.coachNote;
+  }
+
+  function getCoachEditableCompassCopy() {
+    var profile = state.profile && typeof state.profile === "object" ? state.profile : {};
+    var trainingStatus = readCompassText(profile.compass_training_status, "Awaiting Assessment");
+    var currentPhase = readCompassText(profile.compass_current_phase, "Awaiting Assessment");
+    var nextObjective = readCompassText(profile.compass_next_objective, "Schedule Initial Assessment");
+    var coachNote = readCompassText(
+      profile.compass_coach_note,
+      "Welcome to Nomadic Performance. We are excited to get started and will update this section after your assessment."
+    );
+
+    state.compassTrainingStatus = trainingStatus;
+    state.compassCurrentPhase = currentPhase;
+    state.compassNextObjective = nextObjective;
+    state.compassCoachNote = coachNote;
+
+    return {
+      trainingStatus: trainingStatus,
+      currentPhase: currentPhase,
+      nextObjective: nextObjective,
+      coachNote: coachNote
+    };
+  }
+
+  function readCompassText(value, fallback) {
+    var text = String(value || "").trim();
+    return text || String(fallback || "");
   }
 
   function buildCoachCompassNote(statusText, readiness, load, durability, progress) {
@@ -8301,6 +8328,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
     var browseProgramsEnabled = state.isCoachView || !!(accessContext && accessContext.features && accessContext.features.browsePrograms);
     var trainingEmptyStateActionsHtml = "";
+    var hasActiveMembership = hasCompletedMembershipPayment(state.foundingOnboardingRow);
 
     if (!state.isCoachView) {
       if (browseProgramsEnabled) {
@@ -8309,8 +8337,10 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         trainingEmptyStateActionsHtml += '<a class="btn profile-btn-cancel" href="#profile-tasks-section">Complete Liability Waiver First</a>';
       }
 
-      trainingEmptyStateActionsHtml += '<a class="btn profile-btn-cancel" href="custom-plan-inquiry.html">Inquire About Individualized Programming</a>';
-      trainingEmptyStateActionsHtml += '<a class="btn profile-btn-cancel" href="membership-inquiry.html">Inquire About Membership</a>';
+      if (!hasActiveMembership) {
+        trainingEmptyStateActionsHtml += '<a class="btn profile-btn-cancel" href="custom-plan-inquiry.html">Inquire About Individualized Programming</a>';
+        trainingEmptyStateActionsHtml += '<a class="btn profile-btn-cancel" href="membership-inquiry.html">Inquire About Membership</a>';
+      }
     }
 
     if (!activePrograms.length) {
@@ -8354,8 +8384,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.statusProgressPct = 0;
     state.dashboardUpcomingTrainingItems = [];
     state.trainingConsistencyMessage = "";
-    state.compassNextObjective = "Set your next race, trip, or milestone.";
+    state.compassTrainingStatus = "Awaiting Assessment";
+    state.compassCurrentPhase = "Awaiting Assessment";
+    state.compassNextObjective = "Schedule Initial Assessment";
     state.compassNextObjectiveDate = null;
+    state.compassCoachNote = "Welcome to Nomadic Performance. We are excited to get started and will update this section after your assessment.";
     updateQuickGlanceCard("training", "Loading...", "Checking today's session", "");
     updateQuickGlanceCard("goals", "Loading...", "Finding your next event", "");
     updateQuickGlanceCard("nutrition", "Loading...", "Checking today's intake", "");

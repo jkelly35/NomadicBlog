@@ -31,6 +31,9 @@
     summaryThreadsEl: null,
     summaryListEl: null,
     summaryStatusEl: null,
+    headerAlertEl: null,
+    headerAlertCountEl: null,
+    headerAlertCopyEl: null,
     refreshTimer: null,
     pinnedAthletes: {},
     isCoachAdmin: false
@@ -43,6 +46,9 @@
     state.summaryThreadsEl = document.querySelector("[data-coach-msg-summary-threads]");
     state.summaryListEl = document.querySelector("[data-coach-msg-summary-list]");
     state.summaryStatusEl = document.querySelector("[data-coach-msg-summary-status]");
+    state.headerAlertEl = document.querySelector("[data-coach-msg-header-alert]");
+    state.headerAlertCountEl = document.querySelector("[data-coach-msg-header-count]");
+    state.headerAlertCopyEl = document.querySelector("[data-coach-msg-header-copy]");
     state.inboxEl = document.querySelector("[data-coach-msg-inbox]");
     state.searchEl = document.querySelector("[data-coach-msg-search]");
     state.sortEl = document.querySelector("[data-coach-msg-sort]");
@@ -63,7 +69,7 @@
     state.bodyEl = document.querySelector("[data-coach-msg-body]");
     state.statusEl = document.querySelector("[data-coach-msg-status]");
 
-    if ((!state.inboxEl && !state.summaryListEl) || !window.supabase || !window.supabase.createClient) {
+    if ((!state.inboxEl && !state.summaryListEl && !state.headerAlertEl) || !window.supabase || !window.supabase.createClient) {
       return;
     }
 
@@ -352,7 +358,8 @@
   }
 
   function renderSummary() {
-    if (!state.summaryListEl) return;
+    var hasSummaryTargets = !!(state.summaryListEl || state.summaryUnreadEl || state.summaryThreadsEl || state.headerAlertEl);
+    if (!hasSummaryTargets) return;
 
     var threads = getThreadSummaries();
     var unreadTotal = threads.reduce(function (sum, thread) {
@@ -365,6 +372,34 @@
 
     if (state.summaryThreadsEl) {
       state.summaryThreadsEl.textContent = String(threads.length);
+    }
+
+    if (state.headerAlertEl) {
+      state.headerAlertEl.hidden = false;
+      if (unreadTotal > 0) {
+        state.headerAlertEl.setAttribute("aria-label", "Open inbox: " + unreadTotal + " unread message" + (unreadTotal === 1 ? "" : "s"));
+      } else {
+        state.headerAlertEl.setAttribute("aria-label", "Open unified inbox");
+      }
+    }
+
+    if (state.headerAlertCountEl) {
+      state.headerAlertCountEl.textContent = String(unreadTotal);
+      state.headerAlertCountEl.hidden = unreadTotal <= 0;
+    }
+
+    if (state.headerAlertCopyEl) {
+      if (unreadTotal === 1) {
+        state.headerAlertCopyEl.textContent = "1 unread message";
+      } else if (unreadTotal > 1) {
+        state.headerAlertCopyEl.textContent = String(unreadTotal) + " unread messages";
+      } else {
+        state.headerAlertCopyEl.textContent = "Open unified inbox";
+      }
+    }
+
+    if (!state.summaryListEl) {
+      return;
     }
 
     if (!threads.length) {

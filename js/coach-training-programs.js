@@ -115,11 +115,6 @@
           return;
         }
 
-        if (action === "calendar") {
-          window.location.href = "coach-schedule-calendar.html?templateId=" + encodeURIComponent(templateId);
-          return;
-        }
-
         if (action === "duplicate") {
           onDuplicateTemplate(templateId);
           return;
@@ -282,7 +277,6 @@
           '<div class="admin-program-item-actions">' +
           '<button type="button" class="btn admin-btn-small" data-program-action="edit" data-program-id="' + escapeAttribute(template.id) + '">Edit</button>' +
           '<button type="button" class="btn admin-btn-small" data-program-action="assign" data-program-id="' + escapeAttribute(template.id) + '">Assign</button>' +
-          '<button type="button" class="btn admin-btn-small" data-program-action="calendar" data-program-id="' + escapeAttribute(template.id) + '">Calendar</button>' +
           '<button type="button" class="btn admin-btn-small" data-program-action="duplicate" data-program-id="' + escapeAttribute(template.id) + '">Duplicate</button>' +
           '<button type="button" class="btn admin-btn-archive-mini" data-program-action="archive" data-program-id="' + escapeAttribute(template.id) + '">' + archiveLabel + '</button>' +
           '<button type="button" class="btn admin-btn-delete-mini" data-program-action="delete" data-program-id="' + escapeAttribute(template.id) + '">Delete</button>' +

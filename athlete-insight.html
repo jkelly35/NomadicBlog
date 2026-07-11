@@ -41,11 +41,6 @@
         <!-- Page header bar -->
         <div class="insight-header-bar">
           <a href="admin.html" class="btn insight-back-btn">← Coaching Dashboard</a>
-          <div class="insight-header-actions">
-            <a href="#" class="btn insight-action-btn" data-insight-edit-link>Edit Full Profile</a>
-            <a href="#" class="btn insight-action-btn" data-insight-metrics-link>Manage Metrics</a>
-            <a href="#" class="btn insight-action-btn" data-insight-programs-link>Manage Programs</a>
-          </div>
         </div>
 
         <!-- Athlete hero -->
@@ -87,6 +82,7 @@
           <button class="insight-tab is-active" role="tab" aria-selected="true" aria-controls="panel-overview" data-tab="overview">Overview</button>
           <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-metrics" data-tab="metrics">Metrics &amp; Testing</button>
           <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-training" data-tab="training">Training Programs</button>
+          <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-forms" data-tab="forms">Forms &amp; Tasks</button>
           <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-load" data-tab="load">Load &amp; Activity</button>
           <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-notes" data-tab="notes">Coach Notes</button>
         </nav>
@@ -132,8 +128,42 @@
           <div class="insight-panel-toolbar">
             <span class="insight-panel-toolbar-label" data-metrics-count>Loading metrics…</span>
             <a href="#" class="btn insight-action-btn-sm" data-insight-metrics-report-link>Print Performance Report</a>
-            <a href="#" class="btn insight-action-btn-sm" data-insight-metrics-link2>Open Metrics Editor</a>
           </div>
+
+          <section class="insight-section insight-metric-composer">
+            <h2 class="insight-section-title">Add &amp; Track Metrics</h2>
+            <div class="insight-metric-composer-top">
+              <select class="insight-metric-input" data-insight-metric-assessment>
+                <option value="">+ Add Assessment Set...</option>
+              </select>
+              <select class="insight-metric-input" data-insight-metric-preset>
+                <option value="">+ Add Preset Metric...</option>
+              </select>
+              <button type="button" class="btn insight-action-btn-sm" data-insight-metric-custom>Custom Metric</button>
+            </div>
+            <div class="insight-metric-composer-grid">
+              <input type="text" class="insight-metric-input" data-insight-metric-name placeholder="Metric name" />
+              <input type="text" class="insight-metric-input" data-insight-metric-value placeholder="Value" />
+              <input type="text" class="insight-metric-input" data-insight-metric-unit placeholder="Unit" />
+              <select class="insight-metric-input" data-insight-metric-category>
+                <option value="Readiness">Readiness</option>
+                <option value="Recovery">Recovery</option>
+                <option value="Load">Load</option>
+                <option value="Strength">Strength</option>
+                <option value="Power">Power</option>
+                <option value="Cardio">Cardio</option>
+                <option value="Mobility">Mobility</option>
+                <option value="Performance" selected>Performance</option>
+                <option value="Sport-Specific">Sport-Specific</option>
+                <option value="Health">Health</option>
+                <option value="Other">Other</option>
+              </select>
+              <button type="button" class="btn insight-action-btn-sm" data-insight-metric-save>Log Metric</button>
+            </div>
+            <p class="insight-panel-toolbar-label" data-insight-metric-form-mode>Logging a new metric entry.</p>
+            <p class="insight-status" data-insight-metric-status role="status" aria-live="polite"></p>
+          </section>
+
           <div class="insight-metrics-grid" data-metrics-grid>
             <p class="insight-loading">Loading metrics…</p>
           </div>
@@ -143,7 +173,6 @@
         <div id="panel-training" class="insight-panel" role="tabpanel" data-panel="training" hidden>
           <div class="insight-panel-toolbar">
             <span class="insight-panel-toolbar-label">Training Programs</span>
-            <a href="#" class="btn insight-action-btn-sm" data-insight-programs-link2>Assign / Manage Programs</a>
           </div>
 
           <div class="insight-tabs insight-training-tabs" role="tablist" aria-label="Training program sections">
@@ -180,6 +209,20 @@
               <p class="insight-loading">Loading past programs…</p>
             </div>
           </section>
+        </div>
+
+        <!-- ====== FORMS & TASKS PANEL ====== -->
+        <div id="panel-forms" class="insight-panel" role="tabpanel" data-panel="forms" hidden>
+          <div class="insight-panel-toolbar">
+            <span class="insight-panel-toolbar-label" data-completed-forms-count>Loading forms and tasks…</span>
+            <div class="insight-panel-toolbar-actions insight-forms-actions">
+              <button type="button" class="btn insight-action-btn-sm" data-forms-assign-template>Assign Task</button>
+            </div>
+          </div>
+
+          <div class="insight-forms-list" data-completed-forms-list>
+            <p class="insight-loading">Loading forms and tasks…</p>
+          </div>
         </div>
 
         <!-- ====== LOAD & ACTIVITY PANEL ====== -->
@@ -248,6 +291,67 @@
       </div><!-- /insight-content -->
     </div><!-- /insight-container -->
   </main>
+
+  <div class="admin-modal" data-cal-assign-modal hidden>
+    <div class="admin-modal-backdrop" data-cal-assign-close></div>
+    <div class="admin-modal-panel" role="dialog" aria-modal="true" aria-labelledby="cal-assign-title">
+      <button type="button" class="admin-modal-close" data-cal-assign-close aria-label="Close">&times;</button>
+      <h2 id="cal-assign-title">Assign Training Plan</h2>
+      <div class="admin-modal-content">
+        <div class="admin-modal-section">
+          <div class="admin-modal-info-row">
+            <label for="cal-assign-template-select">Training plan</label>
+            <select id="cal-assign-template-select" data-cal-assign-template></select>
+          </div>
+          <p class="insight-calendar-help" style="margin-bottom:0;">After choosing a plan, click Assign To Athlete, then click the starting day in the calendar.</p>
+        </div>
+        <div class="admin-modal-section">
+          <div class="admin-modal-actions">
+            <button type="button" class="btn" data-cal-assign-submit>Assign To Athlete</button>
+            <button type="button" class="btn admin-btn-outline" data-cal-assign-close>Cancel</button>
+          </div>
+        </div>
+      </div>
+      <p class="admin-modal-status" role="status" aria-live="polite" data-cal-assign-status></p>
+    </div>
+  </div>
+
+  <div class="admin-modal" data-forms-assign-modal hidden>
+    <div class="admin-modal-backdrop" data-forms-assign-close></div>
+    <div class="admin-modal-panel admin-assign-modal-panel" role="dialog" aria-modal="true" aria-labelledby="forms-assign-title">
+      <button type="button" class="admin-modal-close" data-forms-assign-close aria-label="Close">&times;</button>
+      <h2 id="forms-assign-title">Assign Forms and Tasks</h2>
+      <div class="admin-modal-content">
+        <div class="admin-modal-section">
+          <h3 data-forms-assign-athlete-label>Selected athlete</h3>
+          <input type="text" class="admin-search" placeholder="Search task forms by name..." data-forms-assign-search />
+          <div class="admin-assign-list" data-forms-assign-list>
+            <p class="admin-loading">Loading task forms...</p>
+          </div>
+          <div class="admin-modal-info-row">
+            <label for="forms-quick-task-title">Quick Task Title (optional)</label>
+            <input id="forms-quick-task-title" type="text" placeholder="e.g. Upload mobility video" data-forms-quick-task-title />
+          </div>
+          <div class="admin-modal-info-row">
+            <label for="forms-quick-task-description">Quick Task Details (optional)</label>
+            <textarea id="forms-quick-task-description" rows="3" placeholder="What should the athlete do, and how should they confirm completion?" data-forms-quick-task-description></textarea>
+          </div>
+          <div class="admin-modal-info-row">
+            <label for="forms-assign-due-date">Due Date (optional)</label>
+            <input id="forms-assign-due-date" type="date" data-forms-assign-due-date />
+          </div>
+        </div>
+        <div class="admin-modal-section">
+          <div class="admin-modal-actions">
+            <button type="button" class="btn admin-btn-primary" data-forms-assign-submit>Assign Selected Task</button>
+            <button type="button" class="btn profile-btn-cancel" data-forms-assign-quick-submit>Assign Quick Task</button>
+            <button type="button" class="btn admin-btn-reset-password" data-forms-assign-close>Cancel</button>
+          </div>
+        </div>
+        <p class="admin-modal-status" role="status" aria-live="polite" data-forms-assign-status></p>
+      </div>
+    </div>
+  </div>
 
   <footer style="background: #0e4749; color: #fff; padding: 32px 0 16px 0; text-align: center; margin-top: 48px;">
     <p style="font-size: 1rem; opacity: 0.8;">&copy; 2026 Nomadic Performance. All rights reserved.</p>

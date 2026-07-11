@@ -2,6 +2,11 @@
   "use strict";
 
   var ADMIN_EMAIL = "joe@nomadicperformance.com";
+  var TEMPLATE_LIBRARY_KEY = "nomadic_training_program_templates_v1";
+  var TEMPLATE_MARKER = "__NOMADIC_TEMPLATE__";
+  var MEMBERSHIP_PAYMENT_TASK_FORM_ID = "membership-payment-task-v1";
+  var MEMBERSHIP_PAYMENT_TASK_NAME = "Complete Membership Payment";
+  var MEMBERSHIP_PAYMENT_TASK_URL = "founding-member.html?checkout=start";
 
   var state = {
     client: null,
@@ -10,9 +15,21 @@
     authUser: null,
     metrics: [],
     programs: [],
+    templates: [],
+    onboardingAssignments: [],
+    onboardingAssignmentsError: "",
+    onboardingTemplates: [],
     scheduleRows: [],
     stravaRows: [],
     trainingTab: "current",
+    calendarDraftDate: "",
+    inlineAddDate: "",
+    assignTemplateId: "",
+    pendingAssignTemplateId: "",
+    pendingAssignTemplateName: "",
+    selectedOnboardingTemplateId: "",
+    isAssigningCoachTask: false,
+    isAssigningQuickTask: false,
     calendarMonthKey: "",
     draggingScheduleId: null,
     selectedScheduleId: null
@@ -37,6 +54,117 @@
     upcoming_event:         "Upcoming Event / Race",
     notes:                  "Notes"
   };
+
+  var METRIC_CATEGORIES = [
+    "Readiness",
+    "Recovery",
+    "Load",
+    "Strength",
+    "Power",
+    "Cardio",
+    "Mobility",
+    "Performance",
+    "Sport-Specific",
+    "Health",
+    "Other"
+  ];
+
+  var PRESET_METRICS = [
+    { name: "Readiness", unit: "score", category: "Readiness" },
+    { name: "HRV", unit: "ms", category: "Recovery" },
+    { name: "Resting HR", unit: "bpm", category: "Recovery" },
+    { name: "Sleep", unit: "h", category: "Recovery" },
+    { name: "Fatigue", unit: "score", category: "Readiness" },
+    { name: "Training Load", unit: "AU", category: "Load" },
+    { name: "Recovery Score", unit: "score", category: "Recovery" },
+    { name: "VO2 Max", unit: "ml/kg/min", category: "Cardio" },
+    { name: "Grip Strength", unit: "kg", category: "Strength" },
+    { name: "Countermovement Push-Up (CMPU)", unit: "reps", category: "Strength" },
+    { name: "20mm Edge Pull Strength", unit: "kg", category: "Strength" },
+    { name: "Max Pull Ups", unit: "reps", category: "Strength" },
+    { name: "Max Hang Time", unit: "sec", category: "Strength" },
+    { name: "Ape Index", unit: "cm", category: "Performance" },
+    { name: "Vertical Jump Height", unit: "cm", category: "Power" },
+    { name: "Broad Jump", unit: "cm", category: "Power" },
+    { name: "Single Leg Squat Test", unit: "reps", category: "Strength" },
+    { name: "Single Leg Heel Raise", unit: "reps", category: "Strength" },
+    { name: "Side Plank with Hip Abduction Hold", unit: "sec", category: "Strength" },
+    { name: "Y Balance (Anterior Reach)", unit: "cm", category: "Mobility" },
+    { name: "Climbing Grades", unit: "grade", category: "Sport-Specific" }
+  ];
+
+  var ASSESSMENT_CLUSTERS = {
+    climbing: [
+      "Countermovement Push-Up (CMPU)",
+      "20mm Edge Pull Strength",
+      "Max Pull Ups",
+      "Max Hang Time",
+      "Ape Index",
+      "Climbing Grades",
+      "Grip Strength"
+    ],
+    running: [
+      "Vertical Jump Height",
+      "Single Leg Squat Test",
+      "Single Leg Heel Raise",
+      "Side Plank with Hip Abduction Hold",
+      "Y Balance (Anterior Reach)",
+      "VO2 Max"
+    ],
+    readiness: [
+      "Readiness",
+      "HRV",
+      "Resting HR",
+      "Sleep",
+      "Fatigue",
+      "Training Load",
+      "Recovery Score"
+    ]
+  };
+
+  var PRESET_DEFAULTS = buildPresetDefaults();
+
+  function getDefaultOnboardingTemplates() {
+    return [
+      {
+        id: MEMBERSHIP_PAYMENT_TASK_FORM_ID,
+        name: MEMBERSHIP_PAYMENT_TASK_NAME,
+        description: "Assign this when an athlete is approved for membership. Includes a direct checkout link.",
+        task_type: "custom_task",
+        action_label: "Open Payment",
+        action_url: MEMBERSHIP_PAYMENT_TASK_URL,
+        action_target: "_self",
+        questions: []
+      },
+      {
+        id: "founding-member-intake-v1",
+        name: "Founding Member Intake",
+        description: "Baseline onboarding form to align goals, history, equipment, and schedule.",
+        questions: [
+          { key: "primary_goal", label: "Primary Performance Goal", type: "text", required: true, placeholder: "What is your #1 goal for this cohort?" },
+          { key: "event_date", label: "Key Event / Race Date", type: "date" },
+          { key: "training_days", label: "Preferred Training Days", type: "text", required: true, placeholder: "e.g. Mon, Wed, Fri" },
+          { key: "minutes_per_session", label: "Typical Session Length (minutes)", type: "number", min: 10, max: 240 },
+          { key: "injury_history", label: "Recent Injury History", type: "textarea", rows: 3, placeholder: "Any injuries, pain, or limitations in the last 12 months?" },
+          { key: "equipment_access", label: "Equipment Access", type: "textarea", rows: 3, placeholder: "Gym, home setup, trail access, wearables, etc." },
+          { key: "experience_level", label: "Current Experience Level", type: "select", options: ["Beginner", "Intermediate", "Advanced"] },
+          { key: "coaching_preferences", label: "Coaching Preferences", type: "textarea", rows: 3, placeholder: "How do you prefer feedback and accountability?" }
+        ]
+      },
+      {
+        id: "performance-readiness-screen-v1",
+        name: "Performance Readiness Screen",
+        description: "Quick readiness and lifestyle intake before plan build.",
+        questions: [
+          { key: "sleep_hours", label: "Average Sleep (hours/night)", type: "number", min: 0, max: 14, step: 0.5, required: true },
+          { key: "stress_level", label: "Current Life Stress", type: "select", options: ["Low", "Moderate", "High"], required: true },
+          { key: "work_schedule", label: "Work / School Schedule Constraints", type: "textarea", rows: 3 },
+          { key: "nutrition_notes", label: "Nutrition Notes", type: "textarea", rows: 3, placeholder: "Allergies, restrictions, fueling challenges" },
+          { key: "confidence_score", label: "Confidence Score (1-10)", type: "number", min: 1, max: 10 }
+        ]
+      }
+    ];
+  }
 
   // ─── Boot ─────────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", function () {
@@ -77,6 +205,7 @@
 
       setupTabNavigation();
       wireActionLinks();
+      state.onboardingTemplates = getDefaultOnboardingTemplates();
       loadAll();
     });
   });
@@ -113,17 +242,8 @@
   // ─── Action links ─────────────────────────────────────────────────────────────
   function wireActionLinks() {
     var id = encodeURIComponent(state.athleteId);
-    var editUrl    = "profile.html?coachView=1&athleteId=" + id;
-    var metricsUrl = "metrics-editor.html?athleteId=" + id;
     var reportUrl  = "profile.html?coachView=1&athleteId=" + id + "&printMetricReport=1#profile-metrics-section";
-    var programUrl = "profile.html?coachView=1&athleteId=" + id + "#profile-training-program-section";
-
-    setLink("[data-insight-edit-link]",     editUrl);
-    setLink("[data-insight-metrics-link]",  metricsUrl);
-    setLink("[data-insight-metrics-link2]", metricsUrl);
     setLink("[data-insight-metrics-report-link]", reportUrl);
-    setLink("[data-insight-programs-link]", programUrl);
-    setLink("[data-insight-programs-link2]",programUrl);
   }
 
   function setLink(selector, href) {
@@ -143,15 +263,21 @@
       fetchProfile(),
       fetchMetrics(),
       fetchPrograms(),
-      fetchStrava()
+      fetchStrava(),
+      fetchFormsAndTasks(),
+      fetchTrainingTemplates()
     ]).then(function (results) {
       var authUser = results[0];
       var profile  = results[1];
+      var formsPayload = results[5] || {};
 
       state.profile  = profile;
       state.metrics  = results[2] || [];
       state.programs = results[3] || [];
       state.stravaRows = results[4] || [];
+      state.onboardingAssignments = Array.isArray(formsPayload.rows) ? formsPayload.rows : [];
+      state.onboardingAssignmentsError = String(formsPayload.error || "");
+      state.templates = Array.isArray(results[6]) ? results[6] : [];
 
       return fetchScheduleRows(state.programs).then(function (scheduleRows) {
         state.scheduleRows = scheduleRows || [];
@@ -160,6 +286,7 @@
         renderOverviewPanel(profile);
         renderMetricsPanel(state.metrics);
         renderTrainingPanel(state.programs, state.scheduleRows);
+        renderFormsAndTasksPanel(state.onboardingAssignments, state.onboardingAssignmentsError);
         renderLoadPanel(state.stravaRows);
       });
     }).catch(function (err) {
@@ -229,6 +356,83 @@
         return (result && !result.error && Array.isArray(result.data)) ? result.data : [];
       })
       .catch(function () { return []; });
+  }
+
+  function fetchFormsAndTasks() {
+    return state.client
+      .from("athlete_onboarding_intake_assignments")
+      .select("id,form_id,form_name,form_schema,response_data,status,assigned_at,due_date,submitted_at,updated_at")
+      .eq("athlete_user_id", state.athleteId)
+      .order("assigned_at", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(80)
+      .then(function (result) {
+        if (result && result.error) {
+          if (isMissingRelationError(result.error)) {
+            return {
+              rows: [],
+              error: "Task assignment tables are not installed yet. Run sql/create-athlete-onboarding-intake.sql in Supabase."
+            };
+          }
+          return {
+            rows: [],
+            error: String(result.error.message || "Unable to load forms and tasks.")
+          };
+        }
+
+        return {
+          rows: (result && Array.isArray(result.data) ? result.data : []).map(normalizeCompletedFormRow),
+          error: ""
+        };
+      })
+      .catch(function (error) {
+        return {
+          rows: [],
+          error: error && error.message ? String(error.message) : "Unable to load forms and tasks."
+        };
+      });
+  }
+
+  function fetchTrainingTemplates() {
+    return state.client
+      .from("training_programs")
+      .select("id,name,description,created_at,updated_at")
+      .order("updated_at", { ascending: false })
+      .then(function (result) {
+        if (result && result.error) {
+          if (isMissingRelationError(result.error)) {
+            return readTemplateLibrary();
+          }
+          return [];
+        }
+
+        return (result && Array.isArray(result.data) ? result.data : [])
+          .map(parseTrainingTemplateRow)
+          .filter(function (template) {
+            return !!template && !template.archived;
+          });
+      })
+      .catch(function () {
+        return readTemplateLibrary();
+      });
+  }
+
+  function normalizeCompletedFormRow(row) {
+    var schema = row && row.form_schema && typeof row.form_schema === "object" ? row.form_schema : {};
+    var response = row && row.response_data && typeof row.response_data === "object" ? row.response_data : {};
+    var status = String(row && row.status || "submitted").toLowerCase();
+    return {
+      id: String(row && row.id || ""),
+      form_id: String(row && row.form_id || ""),
+      form_name: String(row && row.form_name || "Task Form"),
+      form_schema: schema,
+      response_data: response,
+      status: status,
+      assigned_at: String(row && row.assigned_at || ""),
+      due_date: String(row && row.due_date || ""),
+      submitted_at: String(row && row.submitted_at || ""),
+      updated_at: String(row && row.updated_at || "")
+    };
   }
 
   function fetchScheduleRows(programs) {
@@ -388,9 +592,11 @@
     var gridEl  = document.querySelector("[data-metrics-grid]");
     if (!gridEl) return;
 
+    ensureMetricComposerWired();
+
     if (!metrics.length) {
       if (countEl) countEl.textContent = "No metrics recorded yet.";
-      gridEl.innerHTML = '<p class="insight-empty">No metrics have been recorded for this athlete. Use the Metrics Editor to add baseline tests.</p>';
+      gridEl.innerHTML = '<p class="insight-empty">No metrics have been recorded for this athlete yet. Use the controls above to log baseline tests.</p>';
       return;
     }
 
@@ -416,7 +622,7 @@
       grouped[cat].push(m);
     });
 
-    // Build history map (by metric name, sorted newest-first)
+    // Build history map (by metric key, sorted newest-first)
     var historyMap = buildHistoryMap(metrics);
 
     if (countEl) countEl.textContent = metrics.length + " metric" + (metrics.length === 1 ? "" : "s") + " across " + Object.keys(grouped).length + " categories";
@@ -432,8 +638,9 @@
       var seen = {};
       var unique = [];
       items.forEach(function (m) {
-        if (!seen[m.metric_name]) {
-          seen[m.metric_name] = true;
+        var metricKey = getMetricHistoryKey(m);
+        if (!seen[metricKey]) {
+          seen[metricKey] = true;
           unique.push(m);
         }
       });
@@ -443,28 +650,49 @@
       html += '<div class="insight-metric-cards">';
 
       unique.forEach(function (m) {
-        var history = historyMap[m.metric_name] || [];
+        var metricKey = getMetricHistoryKey(m);
+        var history = historyMap[metricKey] || [];
+        var latest = history[0] || m;
         var delta   = history.length > 1 ? computeDelta(history[0], history[1]) : null;
-        var tested  = formatDate(m.updated_at || m.created_at || "");
+        var tested  = formatDate(latest.updated_at || latest.created_at || "");
 
-        html += '<article class="insight-metric-card">';
-        html += '<div class="insight-metric-name">' + escapeHtml(m.metric_name) + '</div>';
+        var benchmark = getMetricBenchmarkReference(latest);
+        html += '<article class="insight-metric-card" data-metric-key="' + escapeAttribute(metricKey) + '">';
+        html += '<div class="insight-metric-card-inner">';
+        html += '<div class="insight-metric-face insight-metric-face-front">';
+        html += '<div class="insight-metric-name">' + escapeHtml(latest.metric_name) + '</div>';
         html += '<div class="insight-metric-value-row">';
-        html += '<strong class="insight-metric-value">' + escapeHtml(m.metric_value || "—") + (m.metric_unit ? ' <span class="insight-metric-unit">' + escapeHtml(m.metric_unit) + '</span>' : '') + '</strong>';
+        html += '<strong class="insight-metric-value">' + escapeHtml(latest.metric_value || "—") + (latest.metric_unit ? ' <span class="insight-metric-unit">' + escapeHtml(latest.metric_unit) + '</span>' : '') + '</strong>';
         if (delta !== null) {
           var deltaClass = delta.direction === "up" ? "insight-delta-up" : (delta.direction === "down" ? "insight-delta-down" : "insight-delta-neutral");
           html += '<span class="insight-delta ' + deltaClass + '">' + escapeHtml(delta.label) + '</span>';
         }
         html += '</div>';
         html += '<div class="insight-metric-meta">Last tested ' + escapeHtml(tested) + '</div>';
+        html += '<div class="insight-metric-actions">';
+        html += '<button type="button" class="insight-metric-action-btn" data-metric-flip-log="' + escapeAttribute(metricKey) + '">Log Test</button>';
         if (history.length > 1) {
-          html += '<button type="button" class="insight-metric-history-btn" data-metric-history="' + escapeAttribute(m.metric_name) + '">History (' + history.length + ')</button>';
-          html += '<div class="insight-metric-history-list" data-history-for="' + escapeAttribute(m.metric_name) + '" hidden>';
-          history.slice(1).forEach(function (entry) {
-            html += '<div class="insight-history-row"><span>' + escapeHtml(formatDate(entry.updated_at || entry.created_at || "")) + '</span><span>' + escapeHtml(entry.metric_value || "—") + (entry.metric_unit ? " " + escapeHtml(entry.metric_unit) : "") + '</span></div>';
-          });
-          html += '</div>';
+          html += '<button type="button" class="insight-metric-action-btn" data-metric-flip-history="' + escapeAttribute(metricKey) + '">History (' + history.length + ')</button>';
         }
+        html += '</div>';
+        html += '</div>';
+        html += '<div class="insight-metric-face insight-metric-face-back">';
+        html += '<p class="insight-metric-back-title" data-metric-back-title>Metric Details</p>';
+        html += '<div class="insight-metric-back-info" data-metric-back-info>';
+        html += '<p class="insight-metric-back-copy"><strong>Description:</strong> ' + escapeHtml(benchmark.description) + '</p>';
+        html += '<p class="insight-metric-back-copy"><strong>Normative:</strong> ' + escapeHtml(benchmark.normative) + '</p>';
+        html += '</div>';
+        html += '<div class="insight-metric-back-history" data-metric-back-history hidden></div>';
+        html += '<div class="insight-metric-back-form" data-metric-back-form hidden>';
+        html += '<input type="text" class="insight-metric-input" data-metric-back-value placeholder="Enter latest test value" />';
+        html += '<p class="insight-metric-back-copy">This creates a new test entry for trend tracking.</p>';
+        html += '</div>';
+        html += '<div class="insight-metric-actions">';
+        html += '<button type="button" class="insight-metric-action-btn" data-metric-flip-close>Close</button>';
+        html += '<button type="button" class="insight-metric-action-btn" data-metric-flip-save hidden>Submit Result</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
         html += '</article>';
       });
 
@@ -473,15 +701,80 @@
 
     gridEl.innerHTML = html;
 
-    // Wire history toggles
-    gridEl.querySelectorAll("[data-metric-history]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var name    = btn.getAttribute("data-metric-history");
-        var listEl  = gridEl.querySelector('[data-history-for="' + name + '"]');
-        if (!listEl) return;
-        var visible = !listEl.hidden;
-        listEl.hidden = visible;
-        btn.textContent = visible ? ("History (" + (historyMap[name] || []).length + ")") : "Hide History";
+    gridEl.querySelectorAll("[data-metric-flip-log]").forEach(function (btn) {
+      btn.addEventListener("click", function (event) {
+        if (event && typeof event.stopPropagation === "function") {
+          event.stopPropagation();
+        }
+
+        var key = String(btn.getAttribute("data-metric-flip-log") || "").trim();
+        var metric = getLatestMetricByHistoryKey(key);
+        if (!metric) {
+          setMetricComposerStatus("Metric details were not found.", "error");
+          return;
+        }
+        var card = btn.closest(".insight-metric-card");
+        openMetricCardBack(card, metric, "log");
+      });
+    });
+
+    gridEl.querySelectorAll("[data-metric-flip-history]").forEach(function (btn) {
+      btn.addEventListener("click", function (event) {
+        if (event && typeof event.stopPropagation === "function") {
+          event.stopPropagation();
+        }
+
+        var key = String(btn.getAttribute("data-metric-flip-history") || "").trim();
+        var metric = getLatestMetricByHistoryKey(key);
+        if (!metric) {
+          setMetricComposerStatus("Metric history was not found.", "error");
+          return;
+        }
+
+        var card = btn.closest(".insight-metric-card");
+        openMetricCardBack(card, metric, "history");
+      });
+    });
+
+    gridEl.querySelectorAll("[data-metric-flip-close]").forEach(function (btn) {
+      btn.addEventListener("click", function (event) {
+        if (event && typeof event.stopPropagation === "function") {
+          event.stopPropagation();
+        }
+        closeMetricCardBack(btn.closest(".insight-metric-card"));
+      });
+    });
+
+    gridEl.querySelectorAll("[data-metric-flip-save]").forEach(function (btn) {
+      btn.addEventListener("click", function (event) {
+        if (event && typeof event.stopPropagation === "function") {
+          event.stopPropagation();
+        }
+        saveMetricLogFromCard(btn.closest(".insight-metric-card"));
+      });
+    });
+
+    gridEl.querySelectorAll(".insight-metric-card").forEach(function (card) {
+      card.addEventListener("click", function (event) {
+        var isInteractive = event && event.target && event.target.closest("button, input, select, textarea, a, label");
+        if (isInteractive) {
+          return;
+        }
+
+        var isFlipped = card.classList.contains("is-flipped");
+        if (isFlipped) {
+          closeMetricCardBack(card);
+          return;
+        }
+
+        var key = String(card.getAttribute("data-metric-key") || "").trim();
+        var metric = getLatestMetricByHistoryKey(key);
+        if (!metric) {
+          setMetricComposerStatus("Metric details were not found.", "error");
+          return;
+        }
+
+        openMetricCardBack(card, metric, "benchmark");
       });
     });
   }
@@ -489,15 +782,489 @@
   function buildHistoryMap(metrics) {
     var map = {};
     metrics.forEach(function (m) {
-      if (!map[m.metric_name]) map[m.metric_name] = [];
-      map[m.metric_name].push(m);
+      var key = getMetricHistoryKey(m);
+      if (!map[key]) map[key] = [];
+      map[key].push(m);
     });
-    Object.keys(map).forEach(function (name) {
-      map[name].sort(function (a, b) {
+    Object.keys(map).forEach(function (key) {
+      map[key].sort(function (a, b) {
         return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
       });
     });
     return map;
+  }
+
+  function getMetricHistoryKey(metric) {
+    return [
+      String(metric && metric.metric_name || "").trim().toLowerCase(),
+      String(metric && metric.metric_unit || "").trim().toLowerCase(),
+      String(metric && metric.metric_category || "").trim().toLowerCase()
+    ].join("||");
+  }
+
+  function getMetricById(metricId) {
+    return (state.metrics || []).find(function (metric) {
+      return String(metric && metric.id || "") === String(metricId || "");
+    }) || null;
+  }
+
+  function getLatestMetricByHistoryKey(metricKey) {
+    var history = buildHistoryMap(state.metrics || []);
+    var rows = history[String(metricKey || "")] || [];
+    return rows.length ? rows[0] : null;
+  }
+
+  function openMetricCardBack(card, metric, mode) {
+    if (!card || !metric) {
+      return;
+    }
+
+    var nextMode = mode === "log" ? "log" : (mode === "history" ? "history" : "benchmark");
+    var titleEl = card.querySelector("[data-metric-back-title]");
+    var infoEl = card.querySelector("[data-metric-back-info]");
+    var historyEl = card.querySelector("[data-metric-back-history]");
+    var formEl = card.querySelector("[data-metric-back-form]");
+    var saveBtn = card.querySelector("[data-metric-flip-save]");
+    var valueInput = card.querySelector("[data-metric-back-value]");
+
+    card.classList.add("is-flipped");
+    card.setAttribute("data-metric-back-mode", nextMode);
+
+    if (titleEl) {
+      titleEl.textContent = nextMode === "log"
+        ? "Log Updated Test"
+        : (nextMode === "history" ? "Metric History" : "Metric Details");
+    }
+
+    if (infoEl) {
+      infoEl.hidden = nextMode !== "benchmark";
+    }
+
+    if (historyEl) {
+      historyEl.hidden = nextMode !== "history";
+      if (nextMode === "history") {
+        renderMetricHistoryForCard(card);
+      }
+    }
+
+    if (formEl) {
+      formEl.hidden = nextMode !== "log";
+    }
+
+    if (saveBtn) {
+      saveBtn.hidden = nextMode !== "log";
+      saveBtn.textContent = "Submit Result";
+    }
+
+    if (valueInput) {
+      valueInput.value = "";
+      if (nextMode === "log") {
+        valueInput.focus();
+      }
+    }
+  }
+
+  function closeMetricCardBack(card) {
+    if (!card) {
+      return;
+    }
+
+    card.classList.remove("is-flipped");
+    card.removeAttribute("data-metric-back-mode");
+  }
+
+  function renderMetricHistoryForCard(card) {
+    if (!card) {
+      return;
+    }
+
+    var historyEl = card.querySelector("[data-metric-back-history]");
+    if (!historyEl) {
+      return;
+    }
+
+    var metricKey = String(card.getAttribute("data-metric-key") || "").trim();
+    var historyMap = buildHistoryMap(state.metrics || []);
+    var rows = historyMap[metricKey] || [];
+
+    if (!rows.length) {
+      historyEl.innerHTML = '<p class="insight-empty">No history entries available.</p>';
+      return;
+    }
+
+    historyEl.innerHTML = rows.map(function (entry) {
+      var dateLabel = formatDate(entry.updated_at || entry.created_at || "");
+      var valueLabel = String(entry.metric_value || "—") + (entry.metric_unit ? " " + String(entry.metric_unit) : "");
+      return '<div class="insight-history-row"><span>' + escapeHtml(dateLabel) + '</span><span>' + escapeHtml(valueLabel) + '</span></div>';
+    }).join("");
+  }
+
+  function saveMetricLogFromCard(card) {
+    if (!card) {
+      return;
+    }
+
+    var metricKey = String(card.getAttribute("data-metric-key") || "").trim();
+    var metric = getLatestMetricByHistoryKey(metricKey);
+    var valueInput = card.querySelector("[data-metric-back-value]");
+    var nextValue = String(valueInput && valueInput.value || "").trim();
+
+    if (!metric) {
+      setMetricComposerStatus("Metric details were not found.", "error");
+      return;
+    }
+
+    if (!nextValue) {
+      setMetricComposerStatus("Enter a test value before saving.", "error");
+      if (valueInput) {
+        valueInput.focus();
+      }
+      return;
+    }
+
+    state.client
+      .from("athlete_metrics")
+      .insert({
+        user_id: state.athleteId,
+        metric_name: String(metric.metric_name || ""),
+        metric_value: nextValue,
+        metric_unit: String(metric.metric_unit || ""),
+        metric_category: String(metric.metric_category || "Performance"),
+        updated_at: new Date().toISOString()
+      })
+      .then(function (result) {
+        if (result.error) {
+          setMetricComposerStatus(result.error.message || "Failed to log test value.", "error");
+          return;
+        }
+
+        setMetricComposerStatus("New test value logged.", "success");
+        closeMetricCardBack(card);
+        refreshMetricsPanelData();
+      })
+      .catch(function (error) {
+        setMetricComposerStatus(error && error.message ? error.message : "Failed to log test value.", "error");
+      });
+  }
+
+  function getMetricBenchmarkReference(metric) {
+    var metricName = String(metric && metric.metric_name || "Metric");
+    var references = [
+      {
+        match: /single\s*leg\s*squat/i,
+        description: "Assesses unilateral lower-body control and movement quality under repeated reps.",
+        normative: "General quality range is often 12-20 controlled reps per side; large asymmetry may indicate imbalance."
+      },
+      {
+        match: /heel\s*raise/i,
+        description: "Measures calf endurance and ankle-foot strength through full-range heel raises.",
+        normative: "Many active adults fall around 20-30 reps per side; below ~15 can indicate reduced endurance."
+      },
+      {
+        match: /side\s*plank/i,
+        description: "Evaluates lateral core endurance and frontal-plane trunk/hip stability.",
+        normative: "Many active adults hold 45-90 seconds; notable side-to-side differences can flag deficits."
+      },
+      {
+        match: /vertical\s*jump|broad\s*jump|tripple\s*hop|triple\s*hop/i,
+        description: "Captures lower-body power and elastic performance.",
+        normative: "Use consistent setup and compare to personal baseline over time; absolute norms vary by sport and sex."
+      },
+      {
+        match: /y\s*balance|anterior\s*reach/i,
+        description: "Screens dynamic balance and single-leg control during reach tasks.",
+        normative: "Prioritize left-right symmetry; asymmetry around 4 cm or more may indicate elevated risk."
+      },
+      {
+        match: /vo2/i,
+        description: "Estimates aerobic capacity and endurance potential.",
+        normative: "General guide (ml/kg/min): recreational 35-45, trained 45-55, elite 55+."
+      },
+      {
+        match: /resting\s*hr/i,
+        description: "Tracks baseline cardiac recovery status.",
+        normative: "Many healthy adults sit around 60-80 bpm, while endurance-trained athletes are often 40-60 bpm."
+      },
+      {
+        match: /hrv/i,
+        description: "Reflects autonomic nervous system recovery readiness.",
+        normative: "HRV is highly individual; trend relative to personal baseline is more important than absolute values."
+      }
+    ];
+
+    var matched = references.find(function (entry) {
+      return entry.match.test(metricName);
+    });
+
+    if (matched) {
+      return {
+        description: matched.description,
+        normative: matched.normative
+      };
+    }
+
+    return {
+      description: "Use consistent testing conditions and movement standards so trend data remains reliable.",
+      normative: "Compare this metric to the athlete's own baseline and sport-specific goals over time."
+    };
+  }
+
+  function ensureMetricComposerWired() {
+    var assessmentSelect = document.querySelector("[data-insight-metric-assessment]");
+    var presetSelect = document.querySelector("[data-insight-metric-preset]");
+    var customBtn = document.querySelector("[data-insight-metric-custom]");
+    var saveBtn = document.querySelector("[data-insight-metric-save]");
+
+    if (assessmentSelect && assessmentSelect.getAttribute("data-wired") !== "1") {
+      assessmentSelect.setAttribute("data-wired", "1");
+      assessmentSelect.innerHTML = [
+        '<option value="">+ Add Assessment Set...</option>',
+        '<option value="climbing">Climbing Assessment Set</option>',
+        '<option value="running">Running Assessment Set</option>',
+        '<option value="readiness">Readiness & Recovery Set</option>'
+      ].join("");
+      assessmentSelect.addEventListener("change", onMetricAssessmentSetSelected);
+    }
+
+    if (presetSelect && presetSelect.getAttribute("data-wired") !== "1") {
+      presetSelect.setAttribute("data-wired", "1");
+      var options = ['<option value="">+ Add Preset Metric...</option>'];
+      PRESET_METRICS.forEach(function (metric) {
+        options.push('<option value="' + escapeAttribute(metric.name) + '">' + escapeHtml(metric.name) + '</option>');
+      });
+      presetSelect.innerHTML = options.join("");
+      presetSelect.addEventListener("change", onMetricPresetSelected);
+    }
+
+    if (customBtn && customBtn.getAttribute("data-wired") !== "1") {
+      customBtn.setAttribute("data-wired", "1");
+      customBtn.addEventListener("click", function () {
+        clearMetricComposer();
+        var nameInput = document.querySelector("[data-insight-metric-name]");
+        if (nameInput) {
+          nameInput.focus();
+        }
+      });
+    }
+
+    if (saveBtn && saveBtn.getAttribute("data-wired") !== "1") {
+      saveBtn.setAttribute("data-wired", "1");
+      saveBtn.addEventListener("click", onSaveMetricFromComposer);
+    }
+  }
+
+  function onMetricAssessmentSetSelected(event) {
+    var setKey = String(event && event.target && event.target.value || "").trim();
+    if (!setKey) {
+      return;
+    }
+
+    event.target.value = "";
+    var metricNames = ASSESSMENT_CLUSTERS[setKey] || [];
+    if (!metricNames.length) {
+      setMetricComposerStatus("Unknown assessment set.", "error");
+      return;
+    }
+
+    var rows = metricNames.map(function (name) {
+      var preset = PRESET_DEFAULTS[name] || { unit: "", category: "Performance" };
+      return {
+        user_id: state.athleteId,
+        metric_name: name,
+        metric_value: "",
+        metric_unit: preset.unit,
+        metric_category: preset.category,
+        updated_at: new Date().toISOString()
+      };
+    });
+
+    state.client
+      .from("athlete_metrics")
+      .insert(rows)
+      .then(function (result) {
+        if (result.error) {
+          setMetricComposerStatus(result.error.message || "Failed to add assessment set.", "error");
+          return;
+        }
+        setMetricComposerStatus(String(rows.length) + " assessment metrics added.", "success");
+        refreshMetricsPanelData();
+      })
+      .catch(function (error) {
+        setMetricComposerStatus(error && error.message ? error.message : "Failed to add assessment set.", "error");
+      });
+  }
+
+  function onMetricPresetSelected(event) {
+    var metricName = String(event && event.target && event.target.value || "").trim();
+    if (!metricName) {
+      return;
+    }
+
+    event.target.value = "";
+    var preset = PRESET_DEFAULTS[metricName] || { unit: "", category: "Performance" };
+    prefillMetricComposer({
+      metric_name: metricName,
+      metric_value: "",
+      metric_unit: preset.unit,
+      metric_category: preset.category
+    }, "insert");
+  }
+
+  function onSaveMetricFromComposer() {
+    var nameInput = document.querySelector("[data-insight-metric-name]");
+    var valueInput = document.querySelector("[data-insight-metric-value]");
+    var unitInput = document.querySelector("[data-insight-metric-unit]");
+    var categoryInput = document.querySelector("[data-insight-metric-category]");
+
+    var metricName = String(nameInput && nameInput.value || "").trim();
+    var metricValue = String(valueInput && valueInput.value || "").trim();
+    var metricUnit = String(unitInput && unitInput.value || "").trim();
+    var metricCategory = String(categoryInput && categoryInput.value || "Performance").trim() || "Performance";
+
+    if (!metricName) {
+      setMetricComposerStatus("Metric name is required.", "error");
+      return;
+    }
+
+    var payload = {
+      user_id: state.athleteId,
+      metric_name: metricName,
+      metric_value: metricValue,
+      metric_unit: metricUnit,
+      metric_category: metricCategory,
+      updated_at: new Date().toISOString()
+    };
+
+    var editId = String(document.body.getAttribute("data-metric-composer-edit-id") || "").trim();
+    var query = null;
+
+    if (editId) {
+      query = state.client
+        .from("athlete_metrics")
+        .update({
+          metric_name: payload.metric_name,
+          metric_value: payload.metric_value,
+          metric_unit: payload.metric_unit,
+          metric_category: payload.metric_category,
+          updated_at: payload.updated_at
+        })
+        .eq("id", editId)
+        .eq("user_id", state.athleteId);
+    } else {
+      query = state.client.from("athlete_metrics").insert(payload);
+    }
+
+    query.then(function (result) {
+      if (result.error) {
+        setMetricComposerStatus(result.error.message || "Failed to save metric.", "error");
+        return;
+      }
+
+      setMetricComposerStatus(editId ? "Metric updated." : "Metric logged.", "success");
+      clearMetricComposer();
+      refreshMetricsPanelData();
+    }).catch(function (error) {
+      setMetricComposerStatus(error && error.message ? error.message : "Failed to save metric.", "error");
+    });
+  }
+
+  function deleteMetricById(metricId) {
+    if (!metricId) {
+      return;
+    }
+
+    if (!window.confirm("Delete this latest metric entry?")) {
+      return;
+    }
+
+    state.client
+      .from("athlete_metrics")
+      .delete()
+      .eq("id", metricId)
+      .eq("user_id", state.athleteId)
+      .then(function (result) {
+        if (result.error) {
+          setMetricComposerStatus(result.error.message || "Failed to delete metric entry.", "error");
+          return;
+        }
+        setMetricComposerStatus("Metric entry deleted.", "success");
+        clearMetricComposer();
+        refreshMetricsPanelData();
+      })
+      .catch(function (error) {
+        setMetricComposerStatus(error && error.message ? error.message : "Failed to delete metric entry.", "error");
+      });
+  }
+
+  function prefillMetricComposer(metric, mode) {
+    var nameInput = document.querySelector("[data-insight-metric-name]");
+    var valueInput = document.querySelector("[data-insight-metric-value]");
+    var unitInput = document.querySelector("[data-insight-metric-unit]");
+    var categoryInput = document.querySelector("[data-insight-metric-category]");
+    var modeEl = document.querySelector("[data-insight-metric-form-mode]");
+
+    if (nameInput) {
+      nameInput.value = String(metric && metric.metric_name || "");
+    }
+    if (valueInput) {
+      valueInput.value = mode === "insert" ? "" : String(metric && metric.metric_value || "");
+      valueInput.focus();
+    }
+    if (unitInput) {
+      unitInput.value = String(metric && metric.metric_unit || "");
+    }
+    if (categoryInput) {
+      categoryInput.value = String(metric && metric.metric_category || "Performance");
+    }
+
+    var editId = mode === "update" ? String(metric && metric.id || "") : "";
+    if (editId) {
+      document.body.setAttribute("data-metric-composer-edit-id", editId);
+      if (modeEl) {
+        modeEl.textContent = "Editing latest metric entry.";
+      }
+    } else {
+      document.body.removeAttribute("data-metric-composer-edit-id");
+      if (modeEl) {
+        modeEl.textContent = "Logging a new metric entry.";
+      }
+    }
+
+    setMetricComposerStatus(mode === "update" ? "Editing latest entry." : "Log a new test value and save.", "info");
+  }
+
+  function clearMetricComposer() {
+    var nameInput = document.querySelector("[data-insight-metric-name]");
+    var valueInput = document.querySelector("[data-insight-metric-value]");
+    var unitInput = document.querySelector("[data-insight-metric-unit]");
+    var categoryInput = document.querySelector("[data-insight-metric-category]");
+    var modeEl = document.querySelector("[data-insight-metric-form-mode]");
+
+    if (nameInput) nameInput.value = "";
+    if (valueInput) valueInput.value = "";
+    if (unitInput) unitInput.value = "";
+    if (categoryInput) categoryInput.value = "Performance";
+    if (modeEl) modeEl.textContent = "Logging a new metric entry.";
+    document.body.removeAttribute("data-metric-composer-edit-id");
+  }
+
+  function setMetricComposerStatus(message, variant) {
+    var el = document.querySelector("[data-insight-metric-status]");
+    if (!el) {
+      return;
+    }
+    el.textContent = String(message || "");
+    el.className = "insight-status" + (variant ? " is-" + variant : "");
+  }
+
+  function refreshMetricsPanelData() {
+    fetchMetrics().then(function (rows) {
+      state.metrics = rows || [];
+      renderMetricsPanel(state.metrics);
+      setText("[data-stat-metrics]", state.metrics.length || "0");
+    }).catch(function (error) {
+      setMetricComposerStatus(error && error.message ? error.message : "Failed to refresh metrics.", "error");
+    });
   }
 
   function computeDelta(latest, previous) {
@@ -526,7 +1293,7 @@
     if (activeEl) {
       if (!active.length) {
         activeEl.innerHTML =
-          '<p class="insight-empty">No current training programs assigned. Use "Assign / Manage Programs" to add one.</p>' +
+          '<p class="insight-empty">No current programs are marked active yet. You can still schedule sessions below from any assigned program.</p>' +
           buildCalendarManagerHtml(programs, rows);
       } else {
         activeEl.innerHTML = active.map(function (program) {
@@ -574,11 +1341,18 @@
         return String(a && a.slot_key || "").localeCompare(String(b && b.slot_key || ""));
       });
 
-    var assignmentOptions = programs.map(function (program) {
-      var id = String(program && program.id || "");
-      var label = String(program && (program.program_name || program.name) || "Assigned Program");
-      return '<option value="' + escapeAttribute(id) + '">' + escapeHtml(label) + '</option>';
-    }).join("");
+    var assignmentOptions = programs.length
+      ? programs.map(function (program) {
+          var id = String(program && program.id || "");
+          var label = String(program && (program.program_name || program.name) || "Assigned Program");
+          var tone = program && program.is_active ? "Current" : "Past";
+          return '<option value="' + escapeAttribute(id) + '">' + escapeHtml(label + ' (' + tone + ')') + '</option>';
+        }).join("")
+      : '<option value="" disabled selected>No assigned programs available</option>';
+
+    if (!state.calendarDraftDate) {
+      state.calendarDraftDate = getTodayDateInputValue();
+    }
 
     if (!state.calendarMonthKey) {
       var firstDate = scopedRows.length ? String(scopedRows[0].scheduled_for || "") : "";
@@ -599,20 +1373,27 @@
     }
 
     var monthLabel = formatMonthLabel(state.calendarMonthKey);
-    var gridHtml = buildCalendarMonthGridHtml(state.calendarMonthKey, scopedRows, activeIdMap, state.selectedScheduleId);
+    var gridHtml = buildCalendarMonthGridHtml(
+      state.calendarMonthKey,
+      scopedRows,
+      activeIdMap,
+      state.selectedScheduleId,
+      assignmentOptions,
+      programs.length > 0
+    );
     var editorHtml = buildCalendarEditorHtml(scopedRows, activeIdMap, state.selectedScheduleId);
 
     return [
       '<section class="insight-section insight-calendar-manager">',
       '<h2 class="insight-section-title">Training Calendar Manager</h2>',
       '<p class="insight-calendar-help">Adjust dates, labels, and statuses directly from insights. Changes save automatically.</p>',
-      '<div class="insight-calendar-add-row">',
-      '<select class="insight-calendar-input" data-cal-new-assignment>' + assignmentOptions + '</select>',
-      '<input type="date" class="insight-calendar-input" data-cal-new-date value="' + escapeAttribute(getTodayDateInputValue()) + '" />',
-      '<input type="text" class="insight-calendar-input" data-cal-new-slot placeholder="w1d1" value="w1d1" />',
-      '<input type="text" class="insight-calendar-input" data-cal-new-label placeholder="Session label" />',
-      '<button type="button" class="btn insight-action-btn" data-cal-add>Add Session</button>',
+      '<div class="insight-calendar-actions">',
+      '<button type="button" class="btn insight-action-btn-sm" data-cal-assign-toggle>Assign Training Plan</button>',
+      '<span class="insight-calendar-tip">Tip: use + Add inside any day cell to add extra workouts.</span>',
       '</div>',
+      (state.pendingAssignTemplateId
+        ? '<p class="insight-calendar-pick-start">Select a start day on the calendar for <strong>' + escapeHtml(state.pendingAssignTemplateName || 'selected plan') + '</strong>.</p>'
+        : ''),
       '<div class="insight-calendar-nav">',
       '<button type="button" class="btn insight-back-btn" data-cal-month-prev>←</button>',
       '<strong class="insight-calendar-month-label" data-cal-month-label>' + escapeHtml(monthLabel) + '</strong>',
@@ -625,7 +1406,26 @@
     ].join("");
   }
 
-  function buildCalendarMonthGridHtml(monthKey, scopedRows, activeIdMap, selectedScheduleId) {
+  function buildTrainingTemplateOptions(templates, selectedId) {
+    var rows = Array.isArray(templates) ? templates : [];
+    if (!rows.length) {
+      return '<option value="" selected disabled>No built training plans available</option>';
+    }
+
+    var chosen = String(selectedId || "").trim();
+    var options = ['<option value="" disabled' + (chosen ? '' : ' selected') + '>Choose a training plan</option>'];
+    rows.forEach(function (template) {
+      var id = String(template && template.id || "").trim();
+      if (!id) {
+        return;
+      }
+      var label = String(template.name || "Training Plan");
+      options.push('<option value="' + escapeAttribute(id) + '"' + (id === chosen ? ' selected' : '') + '>' + escapeHtml(label) + '</option>');
+    });
+    return options.join("");
+  }
+
+  function buildCalendarMonthGridHtml(monthKey, scopedRows, activeIdMap, selectedScheduleId, assignmentOptionsMarkup, hasPrograms) {
     var monthStart = parseMonthKey(monthKey);
     if (!monthStart) {
       return '<p class="insight-empty">Could not render calendar month.</p>';
@@ -677,8 +1477,14 @@
       }).join("");
 
       cells.push(
-        '<div class="insight-cal-day' + (rows.length ? ' has-session' : '') + '" data-cal-day-date="' + escapeAttribute(dateKey) + '">' +
-          '<div class="insight-cal-day-number">' + day + '</div>' +
+        '<div class="insight-cal-day' + (rows.length ? ' has-session' : '') + (state.inlineAddDate === dateKey ? ' is-adding' : '') + (state.pendingAssignTemplateId ? ' is-pending-start' : '') + '" data-cal-day-date="' + escapeAttribute(dateKey) + '">' +
+          '<div class="insight-cal-day-head">' +
+            '<div class="insight-cal-day-number">' + day + '</div>' +
+            '<button type="button" class="insight-cal-day-add-btn" data-cal-add-open="' + escapeAttribute(dateKey) + '"' + (hasPrograms ? '' : ' disabled title="Assign a program before adding workouts."') + '>+ Add</button>' +
+          '</div>' +
+          (state.inlineAddDate === dateKey
+            ? buildInlineCalendarAddFormHtml(dateKey, assignmentOptionsMarkup, hasPrograms)
+            : '') +
           '<div class="insight-cal-day-content">' + cardsHtml + '</div>' +
         '</div>'
       );
@@ -690,6 +1496,26 @@
       }).join("") + '</div>',
       '<div class="insight-cal-grid" data-cal-grid>' + cells.join("") + '</div>'
     ].join("");
+  }
+
+  function buildInlineCalendarAddFormHtml(dateKey, assignmentOptionsMarkup, hasPrograms) {
+    if (!hasPrograms) {
+      return '<p class="insight-empty" style="margin:0.15rem 0 0;">No assigned programs available yet.</p>';
+    }
+
+    return [
+      '<div class="insight-cal-inline-add" data-cal-inline-form="' + escapeAttribute(dateKey) + '">',
+      '<select class="insight-calendar-input" data-cal-inline-assignment>',
+      assignmentOptionsMarkup,
+      '</select>',
+      '<input type="text" class="insight-calendar-input" data-cal-inline-slot value="w1d1" placeholder="w1d1" />',
+      '<input type="text" class="insight-calendar-input" data-cal-inline-label placeholder="Session label" />',
+      '<div class="insight-cal-inline-actions">',
+      '<button type="button" class="btn insight-action-btn-sm" data-cal-add-submit="' + escapeAttribute(dateKey) + '">Add</button>',
+      '<button type="button" class="btn insight-back-btn" data-cal-add-cancel>Cancel</button>',
+      '</div>',
+      '</div>'
+    ].join('');
   }
 
   function buildCalendarEditorHtml(scopedRows, activeIdMap, selectedScheduleId) {
@@ -742,11 +1568,15 @@
   }
 
   function wireCalendarManagerActions() {
-    var addBtn = document.querySelector("[data-cal-add]");
-    if (addBtn && addBtn.getAttribute("data-cal-add-wired") !== "1") {
-      addBtn.setAttribute("data-cal-add-wired", "1");
-      addBtn.addEventListener("click", onAddCalendarSession);
+    var toggleAssignBtn = document.querySelector("[data-cal-assign-toggle]");
+    if (toggleAssignBtn && toggleAssignBtn.getAttribute("data-cal-assign-toggle-wired") !== "1") {
+      toggleAssignBtn.setAttribute("data-cal-assign-toggle-wired", "1");
+      toggleAssignBtn.addEventListener("click", function () {
+        openAssignTrainingPlanModal();
+      });
     }
+
+    wireAssignTrainingPlanModal();
 
     var prevBtn = document.querySelector("[data-cal-month-prev]");
     if (prevBtn && prevBtn.getAttribute("data-cal-month-prev-wired") !== "1") {
@@ -811,7 +1641,356 @@
     bindCalendarAutoSave("[data-cal-slot]", "data-cal-slot", "slot_key");
     bindCalendarAutoSave("[data-cal-label]", "data-cal-label", "session_label");
     bindCalendarAutoSave("[data-cal-status]", "data-cal-status", "status");
+
+    document.querySelectorAll("[data-cal-add-open]").forEach(function (btn) {
+      if (btn.getAttribute("data-cal-add-open-wired") === "1") {
+        return;
+      }
+
+      btn.setAttribute("data-cal-add-open-wired", "1");
+      btn.addEventListener("click", function () {
+        if (state.pendingAssignTemplateId) {
+          setStatus("Pick a calendar start day for the selected plan before adding more sessions.", "info");
+          return;
+        }
+
+        var dateValue = String(btn.getAttribute("data-cal-add-open") || "").trim();
+        if (!dateValue) {
+          return;
+        }
+
+        state.inlineAddDate = dateValue;
+        renderTrainingPanel(state.programs, state.scheduleRows);
+      });
+    });
+
+    document.querySelectorAll("[data-cal-add-cancel]").forEach(function (btn) {
+      if (btn.getAttribute("data-cal-add-cancel-wired") === "1") {
+        return;
+      }
+
+      btn.setAttribute("data-cal-add-cancel-wired", "1");
+      btn.addEventListener("click", function () {
+        state.inlineAddDate = "";
+        renderTrainingPanel(state.programs, state.scheduleRows);
+      });
+    });
+
+    document.querySelectorAll("[data-cal-add-submit]").forEach(function (btn) {
+      if (btn.getAttribute("data-cal-add-submit-wired") === "1") {
+        return;
+      }
+
+      btn.setAttribute("data-cal-add-submit-wired", "1");
+      btn.addEventListener("click", function () {
+        var dateValue = String(btn.getAttribute("data-cal-add-submit") || "").trim();
+        if (!dateValue) {
+          return;
+        }
+
+        onInlineAddCalendarSession(dateValue);
+      });
+    });
+
+    document.querySelectorAll("[data-cal-day-date]").forEach(function (cell) {
+      if (cell.getAttribute("data-cal-day-wired") === "1") {
+        return;
+      }
+
+      cell.setAttribute("data-cal-day-wired", "1");
+      cell.addEventListener("click", function (event) {
+        if (!state.pendingAssignTemplateId) {
+          return;
+        }
+        if (event && event.target && event.target.closest("[data-cal-session], [data-cal-day-add-btn], [data-cal-inline-add], [data-cal-drag]")) {
+          return;
+        }
+
+        var startDate = String(cell.getAttribute("data-cal-day-date") || "").trim();
+        if (!isIsoDate(startDate)) {
+          return;
+        }
+
+        assignTrainingPlanToAthlete(state.pendingAssignTemplateId, startDate);
+      });
+    });
+
     bindCalendarDragAndDrop();
+  }
+
+  function wireAssignTrainingPlanModal() {
+    var modal = document.querySelector("[data-cal-assign-modal]");
+    if (!modal || modal.getAttribute("data-cal-assign-modal-wired") === "1") {
+      return;
+    }
+
+    modal.setAttribute("data-cal-assign-modal-wired", "1");
+
+    modal.querySelectorAll("[data-cal-assign-close]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        closeAssignTrainingPlanModal();
+      });
+    });
+
+    var submitBtn = modal.querySelector("[data-cal-assign-submit]");
+    if (submitBtn) {
+      submitBtn.addEventListener("click", function () {
+        beginAssignPlanStartSelection();
+      });
+    }
+
+    var templateInput = modal.querySelector("[data-cal-assign-template]");
+    if (templateInput) {
+      templateInput.addEventListener("change", function () {
+        state.assignTemplateId = String(templateInput.value || "").trim();
+      });
+    }
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && modal && !modal.hidden) {
+        closeAssignTrainingPlanModal();
+      }
+    });
+  }
+
+  function openAssignTrainingPlanModal() {
+    var modal = document.querySelector("[data-cal-assign-modal]");
+    if (!modal) {
+      return;
+    }
+
+    var templateInput = modal.querySelector("[data-cal-assign-template]");
+    if (templateInput) {
+      templateInput.innerHTML = buildTrainingTemplateOptions(state.templates, state.assignTemplateId);
+    }
+
+    var statusEl = modal.querySelector("[data-cal-assign-status]");
+    if (statusEl) {
+      statusEl.textContent = "";
+      statusEl.classList.remove("is-error", "is-success", "is-info");
+    }
+
+    modal.hidden = false;
+    document.body.classList.add("admin-modal-open");
+  }
+
+  function closeAssignTrainingPlanModal() {
+    var modal = document.querySelector("[data-cal-assign-modal]");
+    if (!modal) {
+      return;
+    }
+
+    modal.hidden = true;
+    document.body.classList.remove("admin-modal-open");
+  }
+
+  function setAssignPlanModalStatus(message, variant) {
+    var statusEl = document.querySelector("[data-cal-assign-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = String(message || "");
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
+  }
+
+  function beginAssignPlanStartSelection() {
+    var templateId = String(state.assignTemplateId || "").trim();
+    if (!templateId) {
+      setAssignPlanModalStatus("Choose a training plan first.", "error");
+      return;
+    }
+
+    var template = (state.templates || []).find(function (row) {
+      return String(row && row.id || "") === templateId;
+    });
+    if (!template) {
+      setAssignPlanModalStatus("The selected training plan could not be found.", "error");
+      return;
+    }
+
+    state.pendingAssignTemplateId = templateId;
+    state.pendingAssignTemplateName = String(template.name || "Training Plan");
+    closeAssignTrainingPlanModal();
+    setStatus("Click a day on the calendar to set the starting day for " + state.pendingAssignTemplateName + ".", "info");
+    renderTrainingPanel(state.programs, state.scheduleRows);
+  }
+
+  function assignTrainingPlanToAthlete(templateId, startDate) {
+    var chosenTemplateId = String(templateId || "").trim();
+    var chosenStartDate = String(startDate || "").trim();
+    if (!chosenTemplateId) {
+      setStatus("Choose a training plan to assign.", "error");
+      return;
+    }
+    if (!isIsoDate(chosenStartDate)) {
+      setStatus("Choose a valid plan start date.", "error");
+      return;
+    }
+
+    var template = (state.templates || []).find(function (row) {
+      return String(row && row.id || "") === chosenTemplateId;
+    });
+    if (!template) {
+      setStatus("The selected training plan could not be found.", "error");
+      return;
+    }
+
+    var scheduleBlueprint = buildTemplateScheduleBlueprint(template);
+    if (!scheduleBlueprint.length) {
+      setStatus("This training plan does not include workout days yet.", "error");
+      return;
+    }
+
+    var now = new Date().toISOString();
+    var assignmentRow = {
+      user_id: state.athleteId,
+      program_id: template.id,
+      program_name: template.name,
+      is_active: true,
+      assigned_at: now,
+      assigned_by: state.authUser && state.authUser.id ? state.authUser.id : null
+    };
+
+    setStatus("Assigning training plan and building athlete calendar...", "info");
+
+    state.client
+      .from("user_training_programs")
+      .insert(assignmentRow)
+      .select("id,user_id,program_id")
+      .single()
+      .then(function (assignmentResult) {
+        if (assignmentResult.error || !assignmentResult.data) {
+          setStatus(
+            assignmentResult && assignmentResult.error && assignmentResult.error.message
+              ? assignmentResult.error.message
+              : "Could not create athlete training assignment.",
+            "error"
+          );
+          return;
+        }
+
+        var assignmentId = String(assignmentResult.data.id || "").trim();
+        if (!assignmentId) {
+          setStatus("Training assignment was created but no assignment id was returned.", "error");
+          return;
+        }
+
+        var scheduleRows = scheduleBlueprint.map(function (entry) {
+          return {
+            athlete_user_id: state.athleteId,
+            user_training_program_id: assignmentId,
+            program_id: template.id,
+            slot_key: entry.slot_key,
+            session_label: entry.session_label,
+            scheduled_for: computeSlotScheduledDate(chosenStartDate, entry.slot_key),
+            status: "scheduled",
+            scheduled_by: state.authUser && state.authUser.id ? state.authUser.id : null,
+            notes: null
+          };
+        }).filter(function (row) {
+          return isIsoDate(row.scheduled_for);
+        });
+
+        if (!scheduleRows.length) {
+          setStatus("Plan assigned, but no calendar sessions could be generated.", "info");
+          state.pendingAssignTemplateId = "";
+          state.pendingAssignTemplateName = "";
+          refreshPrograms();
+          return;
+        }
+
+        state.client
+          .from("athlete_program_schedule")
+          .insert(scheduleRows)
+          .then(function (scheduleResult) {
+            if (scheduleResult.error) {
+              setStatus("Plan assigned, but schedule save failed: " + scheduleResult.error.message, "error");
+              refreshPrograms();
+              return;
+            }
+
+            state.pendingAssignTemplateId = "";
+            state.pendingAssignTemplateName = "";
+            state.assignTemplateId = "";
+            setStatus("Training plan assigned and workouts added to the athlete calendar.", "success");
+            refreshPrograms();
+          })
+          .catch(function (error) {
+            setStatus(error && error.message ? error.message : "Failed to save athlete calendar sessions.", "error");
+            refreshPrograms();
+          });
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to assign training plan.", "error");
+      });
+  }
+
+  function onInlineAddCalendarSession(dateValue) {
+    var form = document.querySelector('[data-cal-inline-form="' + dateValue + '"]');
+    if (!form) {
+      return;
+    }
+
+    var assignmentInput = form.querySelector("[data-cal-inline-assignment]");
+    var slotInput = form.querySelector("[data-cal-inline-slot]");
+    var labelInput = form.querySelector("[data-cal-inline-label]");
+
+    var assignmentId = String(assignmentInput && assignmentInput.value || "").trim();
+    var slotKey = String(slotInput && slotInput.value || "").trim();
+    var sessionLabel = String(labelInput && labelInput.value || "").trim() || "Workout";
+
+    if (!assignmentId) {
+      setStatus("Choose a training assignment for this session.", "error");
+      return;
+    }
+    if (!isIsoDate(dateValue)) {
+      setStatus("Choose a valid workout date.", "error");
+      return;
+    }
+    if (!slotKey) {
+      setStatus("Enter a slot key (for example: w1d1).", "error");
+      return;
+    }
+
+    var program = (state.programs || []).find(function (row) {
+      return String(row && row.id || "") === assignmentId;
+    }) || {};
+
+    state.client
+      .from("athlete_program_schedule")
+      .insert({
+        athlete_user_id: state.athleteId,
+        user_training_program_id: assignmentId,
+        program_id: program.program_id || null,
+        slot_key: slotKey,
+        session_label: sessionLabel,
+        scheduled_for: dateValue,
+        status: "scheduled",
+        scheduled_by: state.authUser && state.authUser.id ? state.authUser.id : null,
+        notes: null
+      })
+      .then(function (result) {
+        if (result.error) {
+          setStatus(result.error.message, "error");
+          return;
+        }
+
+        state.inlineAddDate = "";
+        setStatus("Session added to training calendar.", "success");
+        refreshPrograms();
+      })
+      .catch(function (err) {
+        setStatus(err && err.message ? err.message : "Failed to add training session.", "error");
+      });
   }
 
   function bindCalendarDragAndDrop() {
@@ -944,7 +2123,7 @@
     var sessionLabel = String(labelInput && labelInput.value || "").trim() || "Workout";
 
     if (!assignmentId) {
-      setStatus("Choose an active program for this session.", "error");
+      setStatus("Choose a training assignment for this session.", "error");
       return;
     }
     if (!scheduledFor) {
@@ -955,6 +2134,8 @@
       setStatus("Enter a slot key (for example: w1d1).", "error");
       return;
     }
+
+    state.calendarDraftDate = scheduledFor;
 
     var program = (state.programs || []).find(function (row) {
       return String(row && row.id || "") === assignmentId;
@@ -1086,6 +2267,157 @@
     return year + "-" + month + "-" + day;
   }
 
+  function isIsoDate(value) {
+    var text = String(value || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      return false;
+    }
+
+    var parsed = new Date(text + "T00:00:00Z");
+    return !isNaN(parsed.getTime());
+  }
+
+  function buildTemplateScheduleBlueprint(template) {
+    return getOrderedTemplateSlotKeys(template).map(function (slotKey) {
+      return {
+        slot_key: slotKey,
+        session_label: resolveTemplateSlotLabel(template, slotKey)
+      };
+    });
+  }
+
+  function getOrderedTemplateSlotKeys(template) {
+    var days = template && template.days ? template.days : {};
+    return Object.keys(days || {})
+      .filter(function (key) {
+        return /^w\d+d\d+$/i.test(String(key || ""));
+      })
+      .sort(function (a, b) {
+        var parsedA = parseTemplateSlotKey(a);
+        var parsedB = parseTemplateSlotKey(b);
+        if (!parsedA || !parsedB) {
+          return String(a || "").localeCompare(String(b || ""));
+        }
+        if (parsedA.week !== parsedB.week) {
+          return parsedA.week - parsedB.week;
+        }
+        return parsedA.workout - parsedB.workout;
+      });
+  }
+
+  function parseTemplateSlotKey(slotKey) {
+    var match = /^w(\d+)d(\d+)$/i.exec(String(slotKey || ""));
+    if (!match) {
+      return null;
+    }
+
+    return {
+      week: parseInt(match[1], 10),
+      workout: parseInt(match[2], 10)
+    };
+  }
+
+  function resolveTemplateSlotLabel(template, slotKey) {
+    var customNames = template && template.custom_day_names && typeof template.custom_day_names === "object"
+      ? template.custom_day_names
+      : {};
+
+    if (customNames[slotKey]) {
+      return String(customNames[slotKey]);
+    }
+
+    var parsed = parseTemplateSlotKey(slotKey);
+    if (!parsed) {
+      return "Workout";
+    }
+
+    return "Week " + parsed.week + " - Workout " + parsed.workout;
+  }
+
+  function computeSlotScheduledDate(startDate, slotKey) {
+    if (!isIsoDate(startDate)) {
+      return "";
+    }
+
+    var parsed = parseTemplateSlotKey(slotKey);
+    if (!parsed) {
+      return "";
+    }
+
+    var base = new Date(startDate + "T00:00:00");
+    if (isNaN(base.getTime())) {
+      return "";
+    }
+
+    var offsetDays = Math.max(0, (parsed.week - 1) * 7 + (parsed.workout - 1));
+    base.setDate(base.getDate() + offsetDays);
+    return formatDateInputFromDate(base);
+  }
+
+  function parseTrainingTemplateRow(row) {
+    if (!row || !row.id) {
+      return null;
+    }
+
+    var payload = parseTemplatePayload(row.description);
+    if (!payload) {
+      return null;
+    }
+
+    return {
+      id: String(row.id || ""),
+      name: String(row.name || "Untitled Plan"),
+      archived: !!payload.archived,
+      days: payload.days && typeof payload.days === "object" ? payload.days : {},
+      custom_day_names: payload.custom_day_names && typeof payload.custom_day_names === "object"
+        ? payload.custom_day_names
+        : {}
+    };
+  }
+
+  function parseTemplatePayload(description) {
+    var value = String(description || "");
+    if (value.indexOf(TEMPLATE_MARKER) !== 0) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(value.slice(TEMPLATE_MARKER.length));
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function readTemplateLibrary() {
+    try {
+      var raw = window.localStorage.getItem(TEMPLATE_LIBRARY_KEY);
+      if (!raw) {
+        return [];
+      }
+
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.map(function (item) {
+        return {
+          id: String(item && item.id || ""),
+          name: String(item && item.name || "Untitled Plan"),
+          archived: !!(item && item.archived),
+          days: item && item.days && typeof item.days === "object" ? item.days : {},
+          custom_day_names: item && item.custom_day_names && typeof item.custom_day_names === "object"
+            ? item.custom_day_names
+            : {}
+        };
+      }).filter(function (item) {
+        return !!item.id && !item.archived;
+      });
+    } catch (_error) {
+      return [];
+    }
+  }
+
   function buildProgramCard(program, isCurrent) {
     var name      = escapeHtml(program.program_name || program.name || "Unnamed Program");
     var assigned  = program.assigned_at ? formatDate(program.assigned_at) : "—";
@@ -1107,8 +2439,6 @@
       }
     }
 
-    var viewUrl = "profile.html?coachView=1&athleteId=" + encodeURIComponent(state.athleteId) + "#profile-training-program-section";
-
     return [
       '<article class="insight-program-card">',
       '<div class="insight-program-card-head">',
@@ -1120,7 +2450,6 @@
       !isCurrent
         ? '<div class="insight-program-past-actions"><button type="button" class="btn insight-action-btn-sm" data-training-make-current="' + escapeAttribute(program.id || "") + '">Make Current</button><button type="button" class="btn insight-program-delete-btn" data-training-delete="' + escapeAttribute(program.id || "") + '">Delete</button></div>'
         : '',
-      '<a href="' + viewUrl + '" class="btn insight-action-btn-sm" style="margin-top:0.6rem;">View &amp; Manage</a>',
       '</article>'
     ].join("");
   }
@@ -1242,6 +2571,461 @@
     renderLoadSummaryCards(data);
     renderLoadChart(data);
     renderRecoveryGrid(data);
+  }
+
+  // ─── Forms & tasks panel ────────────────────────────────────────────────────
+  function renderFormsAndTasksPanel(forms, errorMessage) {
+    var countEl = document.querySelector("[data-completed-forms-count]");
+    var listEl = document.querySelector("[data-completed-forms-list]");
+    if (!listEl) {
+      return;
+    }
+
+    var rows = Array.isArray(forms) ? forms.slice() : [];
+    rows.sort(function (a, b) {
+      var aTime = new Date(a && (a.submitted_at || a.updated_at || a.assigned_at) || 0).getTime();
+      var bTime = new Date(b && (b.submitted_at || b.updated_at || b.assigned_at) || 0).getTime();
+      return bTime - aTime;
+    });
+
+    if (errorMessage) {
+      if (countEl) {
+        countEl.textContent = "Forms & Tasks";
+      }
+      listEl.innerHTML = '<p class="insight-error">' + escapeHtml(errorMessage) + '</p>';
+      wireFormsAndTasksActions();
+      return;
+    }
+
+    var activeRows = rows.filter(function (assignment) {
+      return String(assignment && assignment.status || "").toLowerCase() === "assigned";
+    });
+    var completedRows = rows.filter(function (assignment) {
+      var status = String(assignment && assignment.status || "").toLowerCase();
+      return status === "submitted" || status === "archived";
+    });
+
+    if (countEl) {
+      countEl.textContent = String(activeRows.length) + " active • " + String(completedRows.length) + " completed";
+    }
+
+    listEl.innerHTML = [
+      '<section class="insight-section">',
+      '<h2 class="insight-section-title">Active Assignments</h2>',
+      activeRows.length
+        ? activeRows.map(function (assignment) {
+            var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
+            var description = String(assignment.form_schema && assignment.form_schema.description || "").trim();
+            return [
+              '<article class="insight-form-card">',
+              '<div class="insight-form-card-head">',
+              '<div>',
+              '<h3 class="insight-form-title">' + escapeHtml(assignment.form_name) + '</h3>',
+              '<p class="insight-form-meta">Assigned ' + escapeHtml(formatDate(assignment.assigned_at)) + ' • Due ' + escapeHtml(dueLabel) + '</p>',
+              '</div>',
+              '<span class="insight-badge insight-badge-active">Assigned</span>',
+              '</div>',
+              (description ? '<p class="insight-form-meta" style="margin-top:0.25rem;">' + escapeHtml(description) + '</p>' : ''),
+              '</article>'
+            ].join('');
+          }).join('')
+        : '<p class="insight-empty">No active task forms are assigned right now.</p>',
+      '</section>',
+      '<section class="insight-section">',
+      '<h2 class="insight-section-title">Completed History</h2>',
+      completedRows.length
+        ? completedRows.map(function (assignment) {
+      var statusLabel = assignment.status === "archived" ? "Archived" : "Submitted";
+      var submittedLabel = assignment.submitted_at
+        ? formatDate(assignment.submitted_at)
+        : (assignment.updated_at ? formatDate(assignment.updated_at) : "Not submitted");
+      var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
+
+      return [
+        '<article class="insight-form-card">',
+        '<div class="insight-form-card-head">',
+        '<div>',
+        '<h3 class="insight-form-title">' + escapeHtml(assignment.form_name) + '</h3>',
+        '<p class="insight-form-meta">Assigned ' + escapeHtml(formatDate(assignment.assigned_at)) + ' • Due ' + escapeHtml(dueLabel) + '</p>',
+        '</div>',
+        '<span class="insight-badge ' + (assignment.status === "archived" ? "insight-badge-inactive" : "insight-badge-active") + '">' + escapeHtml(statusLabel) + '</span>',
+        '</div>',
+        '<p class="insight-form-meta"><strong>Submitted:</strong> ' + escapeHtml(submittedLabel) + '</p>',
+        buildFormResponsePreviewHtml(assignment.response_data),
+        '</article>'
+      ].join("");
+          }).join("")
+        : '<p class="insight-empty">Completed and archived task forms will appear here once athletes submit them.</p>',
+      '</section>'
+    ].join('');
+
+    wireFormsAndTasksActions();
+  }
+
+  function wireFormsAndTasksActions() {
+    var openTemplateBtn = document.querySelector("[data-forms-assign-template]");
+    if (openTemplateBtn && openTemplateBtn.getAttribute("data-forms-assign-template-wired") !== "1") {
+      openTemplateBtn.setAttribute("data-forms-assign-template-wired", "1");
+      openTemplateBtn.addEventListener("click", openFormsAssignModal);
+    }
+
+    var modal = document.querySelector("[data-forms-assign-modal]");
+    if (!modal || modal.getAttribute("data-forms-assign-modal-wired") === "1") {
+      return;
+    }
+
+    modal.setAttribute("data-forms-assign-modal-wired", "1");
+    modal.querySelectorAll("[data-forms-assign-close]").forEach(function (btn) {
+      btn.addEventListener("click", closeFormsAssignModal);
+    });
+
+    var searchInput = modal.querySelector("[data-forms-assign-search]");
+    if (searchInput) {
+      searchInput.addEventListener("input", function () {
+        renderFormsAssignTemplateList(String(searchInput.value || ""));
+      });
+    }
+
+    var assignBtn = modal.querySelector("[data-forms-assign-submit]");
+    if (assignBtn) {
+      assignBtn.addEventListener("click", onAssignFormTemplateToAthlete);
+    }
+
+    var quickBtn = modal.querySelector("[data-forms-assign-quick-submit]");
+    if (quickBtn) {
+      quickBtn.addEventListener("click", onAssignQuickTaskToAthlete);
+    }
+  }
+
+  function openFormsAssignModal() {
+    var modal = document.querySelector("[data-forms-assign-modal]");
+    if (!modal) {
+      return;
+    }
+
+    var athleteLabel = modal.querySelector("[data-forms-assign-athlete-label]");
+    if (athleteLabel) {
+      athleteLabel.textContent = "Athlete: " + (((state.profile && state.profile.name) || "Selected athlete"));
+    }
+
+    var searchInput = modal.querySelector("[data-forms-assign-search]");
+    var dueDateInput = modal.querySelector("[data-forms-assign-due-date]");
+    var titleInput = modal.querySelector("[data-forms-quick-task-title]");
+    var descriptionInput = modal.querySelector("[data-forms-quick-task-description]");
+    if (searchInput) searchInput.value = "";
+    if (dueDateInput) dueDateInput.value = "";
+    if (titleInput) titleInput.value = "";
+    if (descriptionInput) descriptionInput.value = "";
+
+    state.selectedOnboardingTemplateId = "";
+    setFormsAssignButtonsDisabled(false);
+    setFormsAssignStatus("", "info");
+    renderFormsAssignTemplateList("");
+    modal.hidden = false;
+    document.body.classList.add("admin-modal-open");
+  }
+
+  function closeFormsAssignModal() {
+    var modal = document.querySelector("[data-forms-assign-modal]");
+    if (!modal || modal.hidden) {
+      return;
+    }
+
+    modal.hidden = true;
+    document.body.classList.remove("admin-modal-open");
+    state.selectedOnboardingTemplateId = "";
+    setFormsAssignStatus("", "info");
+  }
+
+  function renderFormsAssignTemplateList(searchTerm) {
+    var list = document.querySelector("[data-forms-assign-list]");
+    if (!list) {
+      return;
+    }
+
+    var query = String(searchTerm || "").trim().toLowerCase();
+    var filtered = (state.onboardingTemplates || []).filter(function (template) {
+      return !query || String(template && template.name || "").toLowerCase().indexOf(query) > -1;
+    });
+
+    if (!filtered.length) {
+      list.innerHTML = '<p class="admin-loading">No task forms match this search.</p>';
+      return;
+    }
+
+    list.innerHTML = filtered.map(function (template) {
+      var checked = state.selectedOnboardingTemplateId === template.id ? ' checked' : '';
+      return (
+        '<label class="admin-assign-item">' +
+        '<input type="radio" name="forms-assign-template" data-forms-assign-template-option value="' + escapeAttribute(template.id) + '"' + checked + ' />' +
+        '<span class="admin-assign-item-main">' +
+        '<strong>' + escapeHtml(template.name || 'Task Form') + '</strong>' +
+        '<small>' + escapeHtml(template.description || '') + '</small>' +
+        '</span>' +
+        '</label>'
+      );
+    }).join('');
+
+    list.querySelectorAll("[data-forms-assign-template-option]").forEach(function (radio) {
+      radio.addEventListener("change", function () {
+        state.selectedOnboardingTemplateId = String(radio.value || "");
+      });
+    });
+  }
+
+  function onAssignFormTemplateToAthlete() {
+    if (!state.client || !state.athleteId) {
+      setFormsAssignStatus("Unable to assign task form right now.", "error");
+      return;
+    }
+    if (!state.selectedOnboardingTemplateId) {
+      setFormsAssignStatus("Select a task form to assign.", "error");
+      return;
+    }
+    if (state.isAssigningCoachTask) {
+      return;
+    }
+
+    var template = (state.onboardingTemplates || []).find(function (item) {
+      return item.id === state.selectedOnboardingTemplateId;
+    });
+    if (!template) {
+      setFormsAssignStatus("Task form not found.", "error");
+      return;
+    }
+
+    var dueDateInput = document.querySelector("[data-forms-assign-due-date]");
+    var dueDate = String(dueDateInput && dueDateInput.value || "").trim();
+    var nowIso = new Date().toISOString();
+
+    state.isAssigningCoachTask = true;
+    setFormsAssignButtonsDisabled(true);
+    setFormsAssignStatus("Assigning task form...", "info");
+
+    state.client
+      .from("athlete_onboarding_intake_assignments")
+      .select("id")
+      .eq("athlete_user_id", state.athleteId)
+      .eq("form_id", template.id)
+      .eq("status", "assigned")
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .then(function (existingResult) {
+        if (existingResult.error) {
+          throw existingResult.error;
+        }
+
+        if (Array.isArray(existingResult.data) && existingResult.data.length) {
+          setFormsAssignStatus("This task is already assigned to the athlete.", "info");
+          setStatus("Task already assigned to athlete.", "info");
+          return null;
+        }
+
+        return state.client
+          .from("athlete_onboarding_intake_assignments")
+          .insert({
+            athlete_user_id: state.athleteId,
+            form_id: template.id,
+            form_name: template.name,
+            form_schema: buildCoachTemplateAssignmentSchema(template),
+            response_data: {},
+            status: "assigned",
+            assigned_at: nowIso,
+            assigned_by: state.authUser && state.authUser.id ? state.authUser.id : null,
+            due_date: dueDate || null,
+            updated_at: nowIso
+          });
+      })
+      .then(function (result) {
+        if (!result) {
+          return;
+        }
+        if (result.error) {
+          throw result.error;
+        }
+        setFormsAssignStatus("Task form assigned.", "success");
+        setStatus("Task form assigned to athlete.", "success");
+        setTimeout(function () {
+          closeFormsAssignModal();
+          refreshFormsAndTasks();
+        }, 350);
+      })
+      .catch(function (error) {
+        setFormsAssignStatus(error && error.message ? error.message : "Failed to assign task form.", "error");
+      })
+      .finally(function () {
+        state.isAssigningCoachTask = false;
+        setFormsAssignButtonsDisabled(false);
+      });
+  }
+
+  function onAssignQuickTaskToAthlete() {
+    if (!state.client || !state.athleteId) {
+      setFormsAssignStatus("Unable to assign quick task right now.", "error");
+      return;
+    }
+
+    var titleInput = document.querySelector("[data-forms-quick-task-title]");
+    var descriptionInput = document.querySelector("[data-forms-quick-task-description]");
+    var dueDateInput = document.querySelector("[data-forms-assign-due-date]");
+    var taskTitle = String(titleInput && titleInput.value || "").trim();
+    var taskDescription = String(descriptionInput && descriptionInput.value || "").trim();
+    var dueDate = String(dueDateInput && dueDateInput.value || "").trim();
+
+    if (!taskTitle) {
+      setFormsAssignStatus("Enter a quick task title.", "error");
+      return;
+    }
+    if (state.isAssigningQuickTask) {
+      return;
+    }
+
+    state.isAssigningQuickTask = true;
+    setFormsAssignButtonsDisabled(true);
+    setFormsAssignStatus("Assigning quick task...", "info");
+
+    state.client
+      .from("athlete_onboarding_intake_assignments")
+      .insert({
+        athlete_user_id: state.athleteId,
+        form_id: "coach-task-" + Date.now(),
+        form_name: taskTitle,
+        form_schema: {
+          task_type: "custom_task",
+          description: taskDescription,
+          questions: []
+        },
+        response_data: {},
+        status: "assigned",
+        assigned_at: new Date().toISOString(),
+        assigned_by: state.authUser && state.authUser.id ? state.authUser.id : null,
+        due_date: dueDate || null,
+        updated_at: new Date().toISOString()
+      })
+      .then(function (result) {
+        if (result.error) {
+          setFormsAssignStatus(result.error.message, "error");
+          return;
+        }
+        setFormsAssignStatus("Quick task assigned.", "success");
+        setStatus("Quick coach task assigned to athlete.", "success");
+        setTimeout(function () {
+          closeFormsAssignModal();
+          refreshFormsAndTasks();
+        }, 350);
+      })
+      .catch(function (error) {
+        setFormsAssignStatus(error && error.message ? error.message : "Failed to assign quick task.", "error");
+      })
+      .finally(function () {
+        state.isAssigningQuickTask = false;
+        setFormsAssignButtonsDisabled(false);
+      });
+  }
+
+  function buildCoachTemplateAssignmentSchema(template) {
+    var source = template && typeof template === "object" ? template : {};
+    var schema = {
+      description: String(source.description || ""),
+      questions: Array.isArray(source.questions) ? source.questions : []
+    };
+    if (source.task_type) schema.task_type = String(source.task_type);
+    if (source.action_label) schema.action_label = String(source.action_label);
+    if (source.action_url) schema.action_url = String(source.action_url);
+    if (source.action_target) schema.action_target = String(source.action_target);
+    return schema;
+  }
+
+  function setFormsAssignButtonsDisabled(disabled) {
+    var isDisabled = !!disabled;
+    var assignBtn = document.querySelector("[data-forms-assign-submit]");
+    var quickBtn = document.querySelector("[data-forms-assign-quick-submit]");
+    if (assignBtn) assignBtn.disabled = isDisabled;
+    if (quickBtn) quickBtn.disabled = isDisabled;
+  }
+
+  function setFormsAssignStatus(message, variant) {
+    var statusEl = document.querySelector("[data-forms-assign-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.classList.remove("is-error", "is-success", "is-info");
+    if (!message) {
+      return;
+    }
+    if (variant === "error") {
+      statusEl.classList.add("is-error");
+    } else if (variant === "success") {
+      statusEl.classList.add("is-success");
+    } else {
+      statusEl.classList.add("is-info");
+    }
+  }
+
+  function refreshFormsAndTasks() {
+    fetchFormsAndTasks().then(function (payload) {
+      state.onboardingAssignments = Array.isArray(payload && payload.rows) ? payload.rows : [];
+      state.onboardingAssignmentsError = String(payload && payload.error || "");
+      renderFormsAndTasksPanel(state.onboardingAssignments, state.onboardingAssignmentsError);
+    }).catch(function (error) {
+      setStatus(error && error.message ? error.message : "Failed to refresh forms and tasks.", "error");
+    });
+  }
+
+  function buildFormResponsePreviewHtml(responseData) {
+    var response = responseData && typeof responseData === "object" ? responseData : {};
+    var keys = Object.keys(response).filter(function (key) {
+      var value = response[key];
+      if (value == null) {
+        return false;
+      }
+      if (Array.isArray(value)) {
+        return value.length > 0;
+      }
+      return String(value).trim().length > 0;
+    });
+
+    if (!keys.length) {
+      return '<p class="insight-empty">No response details captured for this form.</p>';
+    }
+
+    return [
+      '<div class="insight-form-response-grid">',
+      keys.slice(0, 10).map(function (key) {
+        return (
+          '<div class="insight-form-response-row">' +
+            '<strong>' + escapeHtml(formatQuestionKeyLabel(key)) + '</strong>' +
+            '<span>' + escapeHtml(formatFormResponseValue(response[key])) + '</span>' +
+          '</div>'
+        );
+      }).join(""),
+      keys.length > 10 ? '<p class="insight-form-more">+' + String(keys.length - 10) + ' more response field' + (keys.length - 10 === 1 ? '' : 's') + ' recorded.</p>' : '',
+      '</div>'
+    ].join("");
+  }
+
+  function formatFormResponseValue(value) {
+    if (Array.isArray(value)) {
+      return value.map(function (entry) { return String(entry || "").trim(); }).filter(Boolean).join(", ");
+    }
+    if (value && typeof value === "object") {
+      try {
+        return JSON.stringify(value);
+      } catch (_error) {
+        return "[complex response]";
+      }
+    }
+    return String(value || "");
+  }
+
+  function formatQuestionKeyLabel(key) {
+    return String(key || "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, function (char) { return char.toUpperCase(); });
   }
 
   function renderLoadSummaryCards(data) {
@@ -1442,6 +3226,33 @@
   function tryParseJson(str) {
     if (typeof str !== "string") return str;
     try { return JSON.parse(str); } catch (e) { return null; }
+  }
+
+  function buildPresetDefaults() {
+    var defaults = {};
+    PRESET_METRICS.forEach(function (metric) {
+      defaults[metric.name] = {
+        unit: metric.unit,
+        category: metric.category
+      };
+    });
+    return defaults;
+  }
+
+  function isMissingRelationError(error) {
+    if (!error) {
+      return false;
+    }
+
+    var message = String(error.message || "").toLowerCase();
+    var details = String(error.details || "").toLowerCase();
+    var hint = String(error.hint || "").toLowerCase();
+    return (
+      message.indexOf("does not exist") > -1 ||
+      message.indexOf("relation") > -1 ||
+      details.indexOf("does not exist") > -1 ||
+      hint.indexOf("does not exist") > -1
+    );
   }
 
   function escapeHtml(str) {

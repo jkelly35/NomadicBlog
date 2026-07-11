@@ -11,11 +11,109 @@
   };
 
   document.addEventListener("DOMContentLoaded", function () {
+    syncHeaderNav();
     state.authButton = mountLoginButton();
     mountAuthModal();
     bindPreferredAuthModeTriggers();
     initializeAuth();
   });
+
+  function getCurrentPathName() {
+    var pathname = String(window.location.pathname || "").trim();
+    if (!pathname) {
+      return "index.html";
+    }
+
+    var parts = pathname.split("/").filter(Boolean);
+    var lastPart = parts.length ? parts[parts.length - 1] : "";
+    return lastPart || "index.html";
+  }
+
+  function isPostsPage() {
+    return /\/posts\//.test(String(window.location.pathname || ""));
+  }
+
+  function toSiteHref(fileName) {
+    return (isPostsPage() ? "../" : "") + String(fileName || "");
+  }
+
+  function findNavLinkByPage(nav, fileName) {
+    if (!nav) {
+      return null;
+    }
+
+    return Array.prototype.find.call(nav.querySelectorAll("a[href]"), function (link) {
+      var href = String(link.getAttribute("href") || "").split("?")[0].split("#")[0];
+      return href.slice(-fileName.length) === fileName;
+    }) || null;
+  }
+
+  function ensureHeaderNav() {
+    var header = document.querySelector("header");
+    if (!header) {
+      return null;
+    }
+
+    var nav = header.querySelector("nav");
+    if (!nav) {
+      nav = document.createElement("nav");
+      header.appendChild(nav);
+    }
+
+    var primaryLinks = [
+      { file: "index.html", label: "Home" },
+      { file: "services.html", label: "Services" },
+      { file: "blog.html", label: "Blog" },
+      { file: "about.html", label: "About Me" }
+    ];
+
+    primaryLinks.forEach(function (item) {
+      var link = findNavLinkByPage(nav, item.file);
+      if (!link) {
+        link = document.createElement("a");
+        nav.appendChild(link);
+      }
+
+      link.href = toSiteHref(item.file);
+      link.textContent = item.label;
+      link.removeAttribute("data-profile-link");
+      link.removeAttribute("data-admin-link");
+      link.classList.remove("auth-nav-button");
+    });
+
+    return nav;
+  }
+
+  function syncHeaderNav() {
+    var nav = ensureHeaderNav();
+    if (!nav) {
+      return;
+    }
+
+    var currentPath = getCurrentPathName();
+    var blogIsActive = isPostsPage() || currentPath === "blog-post.html" || currentPath === "blog.html";
+
+    Array.prototype.forEach.call(nav.querySelectorAll("a[href]"), function (link) {
+      var href = String(link.getAttribute("href") || "");
+      var cleanHref = href.split("?")[0].split("#")[0];
+      var fileName = cleanHref.split("/").pop() || "";
+      var isActive = false;
+
+      if (fileName === "blog.html") {
+        isActive = blogIsActive;
+      } else if (fileName) {
+        isActive = fileName === currentPath;
+      }
+
+      link.classList.toggle("active", isActive);
+      if (isActive) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+  }
+
   function mountLoginButton() {
     var header = document.querySelector("header");
     if (!header) {
@@ -131,10 +229,10 @@
   function setUser(user) {
     state.user = user;
     var header = document.querySelector("header");
-    var nav = document.querySelector("header nav");
+    var nav = ensureHeaderNav();
     if (header && nav) {
       var btn = header.querySelector("[data-auth-trigger]");
-      var profileLink = nav.querySelector("[data-profile-link]");
+      var profileLink = nav.querySelector("[data-profile-link]") || findNavLinkByPage(nav, "profile.html");
 
       if (!btn) {
         state.authButton = mountLoginButton();
@@ -146,8 +244,8 @@
         btn.setAttribute("aria-haspopup", user && user.email ? "false" : "dialog");
       }
 
-      var isCoachUser = !!(user && user.email && String(user.email).toLowerCase() === ADMIN_EMAIL);
-      var adminBtn = nav.querySelector("[data-admin-link]");
+        var isCoachUser = !!(user && user.email && String(user.email).toLowerCase() === ADMIN_EMAIL);
+        var adminBtn = nav.querySelector("[data-admin-link]") || findNavLinkByPage(nav, "admin.html");
 
       // Remove profile link if present
       if (profileLink) profileLink.remove();
@@ -160,7 +258,7 @@
       if (user && user.email && !isCoachUser) {
         if (!nav.querySelector("[data-profile-link]")) {
           var pBtn = document.createElement("a");
-          pBtn.href = "profile.html";
+          pBtn.href = toSiteHref("profile.html");
           pBtn.textContent = "Athlete Dashboard";
           pBtn.className = "auth-nav-button";
           pBtn.dataset.profileLink = "true";
@@ -171,12 +269,14 @@
       // Add Coaching Dashboard only for coach account
       if (user && user.email && isCoachUser && !nav.querySelector("[data-admin-link]")) {
         var aBtn = document.createElement("a");
-        aBtn.href = "admin.html";
+        aBtn.href = toSiteHref("admin.html");
         aBtn.textContent = "Coaching Dashboard";
         aBtn.className = "auth-nav-button";
         aBtn.dataset.adminLink = "true";
         nav.appendChild(aBtn);
       }
+
+      syncHeaderNav();
     }
 
     if (shouldForcePasswordUpdate(user)) {
