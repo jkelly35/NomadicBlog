@@ -14,6 +14,9 @@
     viewAnchorDate: null,
     activeDropDate: "",
     draggedRowId: "",
+    lastCardClickId: "",
+    lastCardClickAt: 0,
+    suppressDragUntil: 0,
     inlineAddDate: "",
     initialScope: {
       templateId: "",
@@ -128,6 +131,20 @@
     var list = document.querySelector("[data-schedule-list]");
     if (list) {
       list.addEventListener("click", function (event) {
+        var openLink = event.target && event.target.closest("[data-session-open-link]");
+        if (openLink) {
+          return;
+        }
+
+        if (!(event.target && event.target.closest("input, select, button, a, textarea, label"))) {
+          var openRow = event.target && event.target.closest("[data-session-row-open-url]");
+          if (openRow) {
+            event.preventDefault();
+            openScheduledSessionUrl(String(openRow.getAttribute("data-session-row-open-url") || "").trim());
+            return;
+          }
+        }
+
         var saveBtn = event.target && event.target.closest("[data-session-save]");
         if (saveBtn) {
           saveSessionRow(String(saveBtn.getAttribute("data-session-save") || ""));
@@ -139,11 +156,67 @@
           deleteSessionRow(String(deleteBtn.getAttribute("data-session-delete") || ""));
         }
       });
+
+      list.addEventListener("dblclick", function (event) {
+        if (event.target && event.target.closest("input, select, button, a, textarea, label")) {
+          return;
+        }
+
+        var row = event.target && event.target.closest("[data-session-row-open-url]");
+        if (!row) {
+          return;
+        }
+
+        event.preventDefault();
+        openScheduledSessionUrl(String(row.getAttribute("data-session-row-open-url") || "").trim());
+      });
     }
 
     var grid = document.querySelector("[data-calendar-grid]");
     if (grid) {
+      grid.addEventListener("mouseup", function (event) {
+        if (!event || event.button !== 0 || event.detail < 2) {
+          return;
+        }
+
+        if (event.target && event.target.closest("[data-session-select], [data-session-drag-handle], button, a, input, select, textarea, label")) {
+          return;
+        }
+
+        var sessionCard = event.target && event.target.closest("[data-session-card]");
+        if (!sessionCard) {
+          return;
+        }
+
+        event.preventDefault();
+        state.suppressDragUntil = Date.now() + 400;
+        state.lastCardClickId = "";
+        state.lastCardClickAt = 0;
+        openScheduledSessionUrl(getScheduledSessionUrl(sessionCard));
+      });
+
       grid.addEventListener("click", function (event) {
+        var sessionCheckbox = event.target && event.target.closest("[data-session-select]");
+        if (sessionCheckbox) {
+          return;
+        }
+
+        var dragHandle = event.target && event.target.closest("[data-session-drag-handle]");
+        if (dragHandle) {
+          return;
+        }
+
+        var sessionCard = event.target && event.target.closest("[data-session-card]");
+        if (sessionCard) {
+          var openedUrl = getScheduledSessionUrl(sessionCard);
+          if (openedUrl) {
+            state.lastCardClickId = "";
+            state.lastCardClickAt = 0;
+            openScheduledSessionUrl(openedUrl);
+            return;
+          }
+        }
+
         var openAddBtn = event.target && event.target.closest("[data-calendar-add-open]");
         if (openAddBtn) {
           state.inlineAddDate = String(openAddBtn.getAttribute("data-calendar-add-open") || "").trim();
@@ -164,6 +237,40 @@
           var dateValue = String(submitAddBtn.getAttribute("data-calendar-add-submit") || "").trim();
           addWorkoutFromInlineForm(form, dateValue);
         }
+      });
+
+      grid.addEventListener("dblclick", function (event) {
+        if (event.target && event.target.closest("[data-session-select], [data-session-drag-handle], button, a, input, select, textarea, label")) {
+          return;
+        }
+
+        var sessionCard = event.target && event.target.closest("[data-session-card]");
+        if (!sessionCard) {
+          return;
+        }
+
+        event.preventDefault();
+        state.lastCardClickId = "";
+        state.lastCardClickAt = 0;
+        openScheduledSessionUrl(getScheduledSessionUrl(sessionCard));
+      });
+
+      grid.addEventListener("keydown", function (event) {
+        if (!event || (event.key !== "Enter" && event.key !== " ")) {
+          return;
+        }
+
+        var sessionCard = event.target && event.target.closest("[data-session-card]");
+        if (!sessionCard) {
+          return;
+        }
+
+        if (event.target && event.target.closest("[data-session-drag-handle]")) {
+          return;
+        }
+
+        event.preventDefault();
+        openScheduledSessionUrl(getScheduledSessionUrl(sessionCard));
       });
 
       grid.addEventListener("change", function (event) {
@@ -189,6 +296,11 @@
       grid.addEventListener("dragstart", function (event) {
         var card = event.target && event.target.closest("[data-session-card]");
         if (!card) {
+          return;
+        }
+
+        if (Date.now() < Number(state.suppressDragUntil || 0)) {
+          event.preventDefault();
           return;
         }
 
@@ -516,15 +628,10 @@
       var sessionDate = String(row.scheduled_for || "");
       var noteValue = String(row.notes || "");
 
-      var workoutUrl =
-        "training-program-example.html?program=" + encodeURIComponent(programName) +
-        (programId ? "&templateId=" + encodeURIComponent(programId) : "") +
-        (assignmentId ? "&assignmentId=" + encodeURIComponent(assignmentId) : "") +
-        "&athleteName=" + encodeURIComponent(athleteName) +
-        (slotKey ? "&day=" + encodeURIComponent(slotKey) : "");
+      var workoutUrl = buildScheduledWorkoutUrl(row);
 
       return (
-        '<article class="calendar-editor-row" data-session-row="' + escapeAttribute(String(row.id || "")) + '">' +
+        '<article class="calendar-editor-row" data-session-row="' + escapeAttribute(String(row.id || "")) + '" data-session-row-open-url="' + escapeAttribute(workoutUrl) + '">' +
           '<div class="calendar-editor-row-main">' +
             '<p class="calendar-editor-row-title">' + escapeHtml(sessionLabel) + '</p>' +
             '<p class="calendar-editor-row-meta">' +
@@ -541,13 +648,47 @@
             '<label><span>Notes</span><input type="text" value="' + escapeAttribute(noteValue) + '" placeholder="Optional note" data-session-notes /></label>' +
           '</div>' +
           '<div class="calendar-editor-row-actions">' +
-            '<a class="btn admin-btn-small" href="' + workoutUrl + '">Open Workout</a>' +
+            '<a class="btn admin-btn-small" href="' + workoutUrl + '" data-session-open-link>Open Workout</a>' +
             '<button type="button" class="btn admin-btn-primary" data-session-save="' + escapeAttribute(String(row.id || "")) + '">Save</button>' +
             '<button type="button" class="btn admin-btn-delete-mini" data-session-delete="' + escapeAttribute(String(row.id || "")) + '">Delete</button>' +
           '</div>' +
         '</article>'
       );
     }).join("");
+  }
+
+  function buildScheduledWorkoutUrl(row) {
+    var assignment = state.assignmentsById[String(row && row.user_training_program_id || "")] || {};
+    var athlete = state.athletesById[String(row && row.athlete_user_id || "")] || {};
+    var athleteName = String(athlete.name || athlete.email || "Athlete");
+    var programName = String(assignment.program_name || "Program");
+    var assignmentId = String(row && row.user_training_program_id || "");
+    var programId = String(row && row.program_id || assignment.program_id || "");
+    var slotKey = String(row && row.slot_key || "");
+
+    return "training-program-example.html?program=" + encodeURIComponent(programName) +
+      (programId ? "&templateId=" + encodeURIComponent(programId) : "") +
+      (assignmentId ? "&assignmentId=" + encodeURIComponent(assignmentId) : "") +
+      "&coachEdit=1" +
+      "&athleteName=" + encodeURIComponent(athleteName) +
+      (slotKey ? "&day=" + encodeURIComponent(slotKey) : "");
+  }
+
+  function getScheduledSessionUrl(element) {
+    if (!element || !element.getAttribute) {
+      return "";
+    }
+
+    return String(element.getAttribute("data-session-open-url") || "").trim();
+  }
+
+  function openScheduledSessionUrl(url) {
+    var nextUrl = String(url || "").trim();
+    if (!nextUrl) {
+      return;
+    }
+
+    window.location.assign(nextUrl);
   }
 
   function renderCalendarGrid() {
@@ -675,6 +816,7 @@
 
   function renderCalendarSessionCard(row) {
     var rowId = String(row.id || "");
+    var openUrl = buildScheduledWorkoutUrl(row);
     var athlete = state.athletesById[String(row.athlete_user_id || "")] || {};
     var assignment = state.assignmentsById[String(row.user_training_program_id || "")] || {};
     var athleteName = String(athlete.name || athlete.email || "Athlete");
@@ -688,10 +830,11 @@
     }
 
     return (
-      '<article class="' + cardClasses.join(" ") + '" draggable="true" data-session-card="' + escapeAttribute(rowId) + '">' +
+      '<article class="' + cardClasses.join(" ") + '" tabindex="0" role="button" aria-label="Open ' + escapeAttribute(sessionLabel) + '" title="Double-click to open training day editor" data-session-card="' + escapeAttribute(rowId) + '" data-session-open-url="' + escapeAttribute(openUrl) + '">' +
         '<div class="calendar-session-top">' +
           '<input type="checkbox" aria-label="Select session" data-session-select="' + escapeAttribute(rowId) + '"' + (isSelected ? ' checked' : '') + ' />' +
           '<p class="calendar-session-title">' + escapeHtml(sessionLabel) + '</p>' +
+          '<span class="calendar-session-drag-handle" draggable="true" data-session-drag-handle title="Drag to reschedule" aria-label="Drag to reschedule">⋮⋮</span>' +
         '</div>' +
         '<p class="calendar-session-meta">' + escapeHtml(athleteName) + ' · ' + escapeHtml(programName) + '</p>' +
         '<span class="calendar-session-status status-' + escapeAttribute(status) + '">' + escapeHtml(capitalize(status)) + '</span>' +

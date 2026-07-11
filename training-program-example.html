@@ -199,10 +199,26 @@
       </div>
 
       <div class="program-demo-actions-section" data-template-daily-programming>
+        <button type="button" class="btn btn-secondary" data-print-full-plan>
+          <span>👁️</span> View Workout Program
+        </button>
         <button type="button" class="btn btn-secondary" data-save-workout>
           <span>💾</span> Save Daily Programming
         </button>
       </div>
+
+      <section class="program-builder-overview-panel" data-template-program-overview hidden>
+        <div class="program-builder-overview-head">
+          <div>
+            <h3>Workout Program Overview</h3>
+            <p>Browse the full program and make quick edits before saving the template.</p>
+          </div>
+          <button type="button" class="btn btn-secondary" data-template-program-overview-close>Close Overview</button>
+        </div>
+        <div class="program-builder-overview-list" data-template-program-overview-list>
+          <p class="admin-loading">No workout days yet.</p>
+        </div>
+      </section>
 
       <!-- Status Message -->
       <p class="profile-status" role="status" aria-live="polite" data-workout-status></p>

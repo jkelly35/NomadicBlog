@@ -105,6 +105,12 @@
         }
 
         if (action === "edit") {
+          if (String(templateId).indexOf("preset:") === 0) {
+            var presetKey = String(templateId).slice("preset:".length);
+            window.location.href =
+              "training-program-example.html?builder=1&preset=" + encodeURIComponent(presetKey);
+            return;
+          }
           window.location.href =
             "training-program-example.html?builder=1&templateId=" + encodeURIComponent(templateId);
           return;
@@ -263,7 +269,9 @@
       return;
     }
 
-    list.innerHTML = visible
+    var starterCards = state.filter === "archived" ? "" : renderBuiltInStarterTemplates();
+
+    list.innerHTML = starterCards + visible
       .map(function (template) {
         var archiveLabel = template.archived ? "Unarchive" : "Archive";
         var metaSummary = buildProgramMetaSummary(template);
@@ -287,6 +295,21 @@
         );
       })
       .join("");
+  }
+
+  function renderBuiltInStarterTemplates() {
+    return [
+      '<article class="admin-program-item">',
+      '<div class="admin-program-item-main">',
+      '<h3>12-Week Climbing Performance Starter</h3>',
+      '<p>Built-in starter template for testing the full program builder, overview, calendar, and scheduling workflow.</p>',
+      '<p>12 weeks · 4 workouts/week · climbing strength, hangboarding, intervals, EMOM, AMRAP</p>',
+      '</div>',
+      '<div class="admin-program-item-actions">',
+      '<button type="button" class="btn admin-btn-small" data-program-action="edit" data-program-id="preset:climbing-12-week">Use Starter</button>',
+      '</div>',
+      '</article>'
+    ].join('');
   }
 
   function onAssignTemplate(templateId) {

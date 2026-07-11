@@ -7,11 +7,13 @@
     storagePrefix: "nomadic_training_program_demo_",
     isTemplateBuilder: false,
     templateId: null,
+    templatePresetKey: null,
     templateName: "",
     client: null,
     assignedTemplateId: null,
     assignedProgramInstanceId: null,
     assignedTemplateDays: null,
+    isCoachAssignedProgramEdit: false,
     legacyStoragePrefix: null,
     athleteName: "",
     isAthleteLockedView: false,
@@ -168,10 +170,13 @@
     { value: "power", label: "Power" },
     { value: "main_strength", label: "Main Strength" },
     { value: "secondary_strength", label: "Secondary Strength" },
+    { value: "hangboarding", label: "Hangboarding" },
     { value: "accessory", label: "Accessory / Durability" },
     { value: "zone2", label: "Zone 2" },
     { value: "threshold", label: "Threshold" },
     { value: "intervals", label: "Intervals" },
+    { value: "emom", label: "EMOM" },
+    { value: "amrap", label: "AMRAP" },
     { value: "long_day", label: "Long Mountain Day" },
     { value: "mobility", label: "Mobility / Recovery" },
     { value: "cooldown", label: "Cooldown" },
@@ -183,7 +188,10 @@
     activation: { type: "activation", title: "Activation / Prep", prescription: "2-3 activation drills x 2 rounds", notes: "Target weak links or injury-management priorities." },
     main_strength: { type: "main_strength", title: "Main Strength", prescription: "4 x 5 @ RPE 7", notes: "Primary strength stimulus for the day." },
     secondary_strength: { type: "secondary_strength", title: "Secondary Strength", prescription: "3 x 8", notes: "Secondary lift or unilateral progression." },
+    hangboarding: { type: "hangboarding", title: "Hangboarding", prescription: "6 rounds of 10s hang / 50s rest", notes: "Select grip type and maintain strict form." },
     intervals: { type: "intervals", title: "Intervals", prescription: "4 x 5 min @ threshold with 3 min easy", notes: "Use terrain and sport context where relevant." },
+    emom: { type: "emom", title: "EMOM", prescription: "12-minute EMOM", notes: "Assign a repeatable minute-by-minute task with clean execution." },
+    amrap: { type: "amrap", title: "AMRAP", prescription: "15-minute AMRAP", notes: "Sustainable quality pace while accumulating rounds." },
     zone2: { type: "zone2", title: "Zone 2", prescription: "60-90 min Zone 2", notes: "Can include terrain / vertical targets." },
     long_day: { type: "long_day", title: "Long Mountain Day", prescription: "2-4 hr aerobic mountain session", notes: "Prescribe terrain, vertical gain, and fueling." },
     cooldown: { type: "cooldown", title: "Cooldown", prescription: "8-10 min easy cooldown", notes: "Restore range and downregulate." }
@@ -274,6 +282,7 @@
     bindTemplatePlannerEvents();
     bindDailyProgrammingDesignerEvents();
     bindDailyProgrammingNavigationEvents();
+    bindTemplateProgramOverviewEvents();
     bindTemplateKeyboardShortcuts();
 
     if (addExerciseBtn) {
@@ -293,8 +302,10 @@
 
     if (fullPlanPrintBtn) {
       fullPlanPrintBtn.addEventListener("click", function () {
-        if (!state.isTemplateBuilder) {
-          saveExercisesForDay(true);
+        saveExercisesForDay(true);
+        if (state.isTemplateBuilder) {
+          openTemplateProgramOverviewPage();
+          return;
         }
         openFullPlanPrintPreview();
       });
@@ -304,6 +315,12 @@
       saveBtn.addEventListener("click", function () {
         if (state.isTemplateBuilder) {
           saveTemplateProgram();
+          return;
+        }
+
+        if (state.isCoachAssignedProgramEdit) {
+          saveExercisesForDay();
+          renderDailyProgrammingDesigner();
           return;
         }
 
@@ -377,6 +394,260 @@
             if (removeBlockSlot === state.day) {
               renderSessionPlanBlocks(removeBlockPlan);
               renderDailyProgrammingSummary(removeBlockPlan);
+            }
+          }
+        }
+        return;
+      }
+
+      var addAxisExerciseBtn = event.target && event.target.closest("[data-axis-add-exercise]");
+      if (addAxisExerciseBtn) {
+        var addExerciseSlot = String(addAxisExerciseBtn.getAttribute("data-axis-slot") || "").trim();
+        var addExerciseBlockIndex = parseInt(String(addAxisExerciseBtn.getAttribute("data-axis-block-index") || "-1"), 10);
+        if (addExerciseSlot && Number.isFinite(addExerciseBlockIndex)) {
+          var addExercisePlan = getSessionPlanForSlot(addExerciseSlot);
+          if (addExerciseBlockIndex >= 0 && addExerciseBlockIndex < addExercisePlan.blocks.length) {
+            var addExerciseBlock = addExercisePlan.blocks[addExerciseBlockIndex];
+            var exerciseCount = clampNumber(parseInt(addExerciseBlock.exercise_count, 10), 1, 20, 1);
+            if (exerciseCount >= 20) {
+              setStatus("Max 20 exercises per block.", "info");
+              return;
+            }
+
+            var nextExerciseCount = exerciseCount + 1;
+            var exerciseNames = normalizeExerciseNames(addExerciseBlock.exercise_names, exerciseCount);
+            var exerciseSets = normalizeExerciseValues(addExerciseBlock.exercise_sets, exerciseCount, 3);
+            var exerciseIntensityTypes = normalizeExerciseValues(addExerciseBlock.exercise_intensity_types, exerciseCount, "rpe");
+            exerciseNames.push("");
+            exerciseSets.push("3");
+            exerciseIntensityTypes.push("rpe");
+
+            addExerciseBlock.exercise_count = nextExerciseCount;
+            addExerciseBlock.exercise_names = normalizeExerciseNames(exerciseNames, nextExerciseCount);
+            addExerciseBlock.exercise_sets = normalizeExerciseValues(exerciseSets, nextExerciseCount, 3);
+            addExerciseBlock.exercise_intensity_types = normalizeExerciseValues(exerciseIntensityTypes, nextExerciseCount, "rpe").map(normalizeIntensityTypeValue);
+            addExerciseBlock.exercise_set_reps = normalizeExerciseNestedValues(addExerciseBlock.exercise_set_reps, nextExerciseCount, "5", addExerciseBlock.exercise_sets);
+            addExerciseBlock.exercise_set_intensities = normalizeExerciseNestedValues(addExerciseBlock.exercise_set_intensities, nextExerciseCount, "7", addExerciseBlock.exercise_sets);
+            addExerciseBlock.exercise_set_rests = normalizeExerciseNestedValues(addExerciseBlock.exercise_set_rests, nextExerciseCount, "", addExerciseBlock.exercise_sets);
+            addExerciseBlock.exercise_set_rep_types = normalizeExerciseSetRepTypes(
+              addExerciseBlock.exercise_set_rep_types,
+              nextExerciseCount,
+              addExerciseBlock.exercise_sets,
+              addExerciseBlock.exercise_rep_types
+            );
+            addExerciseBlock.exercise_set_intensity_types = normalizeExerciseSetIntensityTypes(
+              addExerciseBlock.exercise_set_intensity_types,
+              nextExerciseCount,
+              addExerciseBlock.exercise_sets,
+              addExerciseBlock.exercise_intensity_types
+            );
+
+            state.sessionPlans[addExerciseSlot] = addExercisePlan;
+            saveExercisesForDay(true);
+            renderDailyAxisEditorCards();
+            if (addExerciseSlot === state.day) {
+              renderSessionPlanBlocks(addExercisePlan);
+              renderDailyProgrammingSummary(addExercisePlan);
+            }
+          }
+        }
+        return;
+      }
+
+      var removeAxisExerciseBtn = event.target && event.target.closest("[data-axis-remove-exercise]");
+      if (removeAxisExerciseBtn) {
+        var removeExerciseSlot = String(removeAxisExerciseBtn.getAttribute("data-axis-slot") || "").trim();
+        var removeExerciseBlockIndex = parseInt(String(removeAxisExerciseBtn.getAttribute("data-axis-block-index") || "-1"), 10);
+        var removeExerciseIndex = parseInt(String(removeAxisExerciseBtn.getAttribute("data-axis-remove-exercise") || "-1"), 10);
+        if (removeExerciseSlot && Number.isFinite(removeExerciseBlockIndex) && Number.isFinite(removeExerciseIndex)) {
+          var removeExercisePlan = getSessionPlanForSlot(removeExerciseSlot);
+          if (removeExerciseBlockIndex >= 0 && removeExerciseBlockIndex < removeExercisePlan.blocks.length) {
+            var removeExerciseBlock = removeExercisePlan.blocks[removeExerciseBlockIndex];
+            var removeExerciseCount = clampNumber(parseInt(removeExerciseBlock.exercise_count, 10), 1, 20, 1);
+            if (removeExerciseCount <= 1) {
+              setStatus("At least one exercise is required in a block.", "info");
+              return;
+            }
+
+            var removeNames = normalizeExerciseNames(removeExerciseBlock.exercise_names, removeExerciseCount);
+            var removeSets = normalizeExerciseValues(removeExerciseBlock.exercise_sets, removeExerciseCount, 3);
+            var removeIntensityTypes = normalizeExerciseValues(removeExerciseBlock.exercise_intensity_types, removeExerciseCount, "rpe");
+            var removeSetReps = normalizeExerciseNestedValues(removeExerciseBlock.exercise_set_reps, removeExerciseCount, "5", removeSets);
+            var removeSetIntensities = normalizeExerciseNestedValues(removeExerciseBlock.exercise_set_intensities, removeExerciseCount, "7", removeSets);
+            var removeSetRests = normalizeExerciseNestedValues(removeExerciseBlock.exercise_set_rests, removeExerciseCount, "", removeSets);
+
+            if (removeExerciseIndex >= 0 && removeExerciseIndex < removeNames.length) {
+              removeNames.splice(removeExerciseIndex, 1);
+              removeSets.splice(removeExerciseIndex, 1);
+              removeIntensityTypes.splice(removeExerciseIndex, 1);
+              removeSetReps.splice(removeExerciseIndex, 1);
+              removeSetIntensities.splice(removeExerciseIndex, 1);
+              removeSetRests.splice(removeExerciseIndex, 1);
+
+              var trimmedExerciseCount = removeExerciseCount - 1;
+              removeExerciseBlock.exercise_count = trimmedExerciseCount;
+              removeExerciseBlock.exercise_names = normalizeExerciseNames(removeNames, trimmedExerciseCount);
+              removeExerciseBlock.exercise_sets = normalizeExerciseValues(removeSets, trimmedExerciseCount, 3);
+              removeExerciseBlock.exercise_intensity_types = normalizeExerciseValues(removeIntensityTypes, trimmedExerciseCount, "rpe").map(normalizeIntensityTypeValue);
+              removeExerciseBlock.exercise_set_reps = normalizeExerciseNestedValues(removeSetReps, trimmedExerciseCount, "5", removeExerciseBlock.exercise_sets);
+              removeExerciseBlock.exercise_set_intensities = normalizeExerciseNestedValues(removeSetIntensities, trimmedExerciseCount, "7", removeExerciseBlock.exercise_sets);
+              removeExerciseBlock.exercise_set_rests = normalizeExerciseNestedValues(removeSetRests, trimmedExerciseCount, "", removeExerciseBlock.exercise_sets);
+              removeExerciseBlock.exercise_set_rep_types = normalizeExerciseSetRepTypes(
+                removeExerciseBlock.exercise_set_rep_types,
+                trimmedExerciseCount,
+                removeExerciseBlock.exercise_sets,
+                removeExerciseBlock.exercise_rep_types
+              );
+              removeExerciseBlock.exercise_set_intensity_types = normalizeExerciseSetIntensityTypes(
+                removeExerciseBlock.exercise_set_intensity_types,
+                trimmedExerciseCount,
+                removeExerciseBlock.exercise_sets,
+                removeExerciseBlock.exercise_intensity_types
+              );
+
+              state.sessionPlans[removeExerciseSlot] = removeExercisePlan;
+              saveExercisesForDay(true);
+              renderDailyAxisEditorCards();
+              if (removeExerciseSlot === state.day) {
+                renderSessionPlanBlocks(removeExercisePlan);
+                renderDailyProgrammingSummary(removeExercisePlan);
+              }
+            }
+          }
+        }
+        return;
+      }
+
+      var addAxisSetBtn = event.target && event.target.closest("[data-axis-add-set]");
+      if (addAxisSetBtn) {
+        var addSetSlot = String(addAxisSetBtn.getAttribute("data-axis-slot") || "").trim();
+        var addSetBlockIndex = parseInt(String(addAxisSetBtn.getAttribute("data-axis-block-index") || "-1"), 10);
+        var addSetExerciseIndex = parseInt(String(addAxisSetBtn.getAttribute("data-axis-exercise-index") || "-1"), 10);
+        if (addSetSlot && Number.isFinite(addSetBlockIndex) && Number.isFinite(addSetExerciseIndex)) {
+          var addSetPlan = getSessionPlanForSlot(addSetSlot);
+          if (addSetBlockIndex >= 0 && addSetBlockIndex < addSetPlan.blocks.length) {
+            var addSetBlock = addSetPlan.blocks[addSetBlockIndex];
+            var addSetExerciseCount = clampNumber(parseInt(addSetBlock.exercise_count, 10), 1, 20, 1);
+            var addSetCounts = normalizeExerciseValues(addSetBlock.exercise_sets, addSetExerciseCount, 3);
+            if (addSetExerciseIndex >= 0 && addSetExerciseIndex < addSetCounts.length) {
+              var currentSetCount = clampNumber(parseInt(addSetCounts[addSetExerciseIndex], 10), 1, 20, 1);
+              if (currentSetCount >= 20) {
+                setStatus("Max 20 sets per exercise.", "info");
+                return;
+              }
+
+              var existingSetReps = normalizeExerciseNestedValues(addSetBlock.exercise_set_reps, addSetExerciseCount, "5", addSetCounts);
+              var existingSetIntensities = normalizeExerciseNestedValues(addSetBlock.exercise_set_intensities, addSetExerciseCount, "7", addSetCounts);
+              var existingSetRests = normalizeExerciseNestedValues(addSetBlock.exercise_set_rests, addSetExerciseCount, "", addSetCounts);
+              var existingSetRepTypes = normalizeExerciseSetRepTypes(
+                addSetBlock.exercise_set_rep_types,
+                addSetExerciseCount,
+                addSetCounts,
+                addSetBlock.exercise_rep_types
+              );
+              var existingSetIntensityTypes = normalizeExerciseSetIntensityTypes(
+                addSetBlock.exercise_set_intensity_types,
+                addSetExerciseCount,
+                addSetCounts,
+                addSetBlock.exercise_intensity_types
+              );
+
+              addSetCounts[addSetExerciseIndex] = String(currentSetCount + 1);
+              addSetBlock.exercise_sets = addSetCounts;
+              addSetBlock.exercise_set_reps = normalizeExerciseNestedValues(addSetBlock.exercise_set_reps, addSetExerciseCount, "5", addSetCounts);
+              addSetBlock.exercise_set_intensities = normalizeExerciseNestedValues(addSetBlock.exercise_set_intensities, addSetExerciseCount, "7", addSetCounts);
+              addSetBlock.exercise_set_rests = normalizeExerciseNestedValues(addSetBlock.exercise_set_rests, addSetExerciseCount, "", addSetCounts);
+              addSetBlock.exercise_set_rep_types = normalizeExerciseSetRepTypes(
+                addSetBlock.exercise_set_rep_types,
+                addSetExerciseCount,
+                addSetCounts,
+                addSetBlock.exercise_rep_types
+              );
+              addSetBlock.exercise_set_intensity_types = normalizeExerciseSetIntensityTypes(
+                addSetBlock.exercise_set_intensity_types,
+                addSetExerciseCount,
+                addSetCounts,
+                addSetBlock.exercise_intensity_types
+              );
+
+              var lastSetIndex = Math.max(0, currentSetCount - 1);
+              addSetBlock.exercise_set_reps[addSetExerciseIndex][currentSetCount] = existingSetReps[addSetExerciseIndex][lastSetIndex] || "5";
+              addSetBlock.exercise_set_intensities[addSetExerciseIndex][currentSetCount] = existingSetIntensities[addSetExerciseIndex][lastSetIndex] || "7";
+              addSetBlock.exercise_set_rests[addSetExerciseIndex][currentSetCount] = existingSetRests[addSetExerciseIndex][lastSetIndex] || "";
+              addSetBlock.exercise_set_rep_types[addSetExerciseIndex][currentSetCount] = existingSetRepTypes[addSetExerciseIndex][lastSetIndex] || "reps";
+              addSetBlock.exercise_set_intensity_types[addSetExerciseIndex][currentSetCount] = existingSetIntensityTypes[addSetExerciseIndex][lastSetIndex] || "rpe";
+
+              state.sessionPlans[addSetSlot] = addSetPlan;
+              saveExercisesForDay(true);
+              renderDailyAxisEditorCards();
+              if (addSetSlot === state.day) {
+                renderSessionPlanBlocks(addSetPlan);
+                renderDailyProgrammingSummary(addSetPlan);
+              }
+            }
+          }
+        }
+        return;
+      }
+
+      var removeAxisSetBtn = event.target && event.target.closest("[data-axis-remove-set]");
+      if (removeAxisSetBtn) {
+        var removeSetSlot = String(removeAxisSetBtn.getAttribute("data-axis-slot") || "").trim();
+        var removeSetBlockIndex = parseInt(String(removeAxisSetBtn.getAttribute("data-axis-block-index") || "-1"), 10);
+        var removeSetExerciseIndex = parseInt(String(removeAxisSetBtn.getAttribute("data-axis-exercise-index") || "-1"), 10);
+        var removeSetIndex = parseInt(String(removeAxisSetBtn.getAttribute("data-axis-remove-set") || "-1"), 10);
+        if (removeSetSlot && Number.isFinite(removeSetBlockIndex) && Number.isFinite(removeSetExerciseIndex) && Number.isFinite(removeSetIndex)) {
+          var removeSetPlan = getSessionPlanForSlot(removeSetSlot);
+          if (removeSetBlockIndex >= 0 && removeSetBlockIndex < removeSetPlan.blocks.length) {
+            var removeSetBlock = removeSetPlan.blocks[removeSetBlockIndex];
+            var removeSetExerciseCount = clampNumber(parseInt(removeSetBlock.exercise_count, 10), 1, 20, 1);
+            var removeSetCounts = normalizeExerciseValues(removeSetBlock.exercise_sets, removeSetExerciseCount, 3);
+            if (removeSetExerciseIndex >= 0 && removeSetExerciseIndex < removeSetCounts.length) {
+              var totalSets = clampNumber(parseInt(removeSetCounts[removeSetExerciseIndex], 10), 1, 20, 1);
+              if (totalSets <= 1) {
+                setStatus("Each exercise needs at least one set.", "info");
+                return;
+              }
+
+              var removeReps = normalizeExerciseNestedValues(removeSetBlock.exercise_set_reps, removeSetExerciseCount, "5", removeSetCounts);
+              var removeIntensities = normalizeExerciseNestedValues(removeSetBlock.exercise_set_intensities, removeSetExerciseCount, "7", removeSetCounts);
+              var removeRests = normalizeExerciseNestedValues(removeSetBlock.exercise_set_rests, removeSetExerciseCount, "", removeSetCounts);
+
+              if (removeSetIndex >= 0 && removeSetIndex < removeReps[removeSetExerciseIndex].length) {
+                removeReps[removeSetExerciseIndex].splice(removeSetIndex, 1);
+              }
+              if (removeSetIndex >= 0 && removeSetIndex < removeIntensities[removeSetExerciseIndex].length) {
+                removeIntensities[removeSetExerciseIndex].splice(removeSetIndex, 1);
+              }
+              if (removeSetIndex >= 0 && removeSetIndex < removeRests[removeSetExerciseIndex].length) {
+                removeRests[removeSetExerciseIndex].splice(removeSetIndex, 1);
+              }
+
+              removeSetCounts[removeSetExerciseIndex] = String(totalSets - 1);
+              removeSetBlock.exercise_sets = removeSetCounts;
+              removeSetBlock.exercise_set_reps = normalizeExerciseNestedValues(removeReps, removeSetExerciseCount, "5", removeSetCounts);
+              removeSetBlock.exercise_set_intensities = normalizeExerciseNestedValues(removeIntensities, removeSetExerciseCount, "7", removeSetCounts);
+              removeSetBlock.exercise_set_rests = normalizeExerciseNestedValues(removeRests, removeSetExerciseCount, "", removeSetCounts);
+              removeSetBlock.exercise_set_rep_types = normalizeExerciseSetRepTypes(
+                removeSetBlock.exercise_set_rep_types,
+                removeSetExerciseCount,
+                removeSetCounts,
+                removeSetBlock.exercise_rep_types
+              );
+              removeSetBlock.exercise_set_intensity_types = normalizeExerciseSetIntensityTypes(
+                removeSetBlock.exercise_set_intensity_types,
+                removeSetExerciseCount,
+                removeSetCounts,
+                removeSetBlock.exercise_intensity_types
+              );
+
+              state.sessionPlans[removeSetSlot] = removeSetPlan;
+              saveExercisesForDay(true);
+              renderDailyAxisEditorCards();
+              if (removeSetSlot === state.day) {
+                renderSessionPlanBlocks(removeSetPlan);
+                renderDailyProgrammingSummary(removeSetPlan);
+              }
             }
           }
         }
@@ -654,7 +925,7 @@
   }
 
   function renderDailyProgrammingDesigner() {
-    if (!state.isTemplateBuilder || state.builderStep !== 3) {
+    if ((!state.isTemplateBuilder && !state.isCoachAssignedProgramEdit) || state.builderStep !== 3) {
       return;
     }
 
@@ -791,8 +1062,10 @@
     }
 
     return plan.blocks.map(function (block, index) {
+      var flowMeta = getExerciseFlowMeta(block);
       return [
-        '<div class="program-builder-axis-block">',
+        '<div class="program-builder-axis-block' + (flowMeta.className ? ' ' + flowMeta.className : '') + '">',
+        flowMeta.badge,
         '<div class="program-builder-axis-block-head">',
         '<label class="program-builder-structure-field">',
         '<span>Type</span>',
@@ -814,17 +1087,161 @@
     }).join('');
   }
 
+  function getExerciseFlowMeta(block) {
+    var blockType = normalizeSessionBlockType(block && block.type);
+    var isStrengthBlock = isExerciseConfiguredBlockType(blockType);
+    if (!isStrengthBlock) {
+      return { badge: '', className: '' };
+    }
+
+    var flow = normalizeExerciseFlow(block && block.exercise_flow);
+    var className = flow === 'superset'
+      ? 'is-flow-superset'
+      : flow === 'circuit'
+        ? 'is-flow-circuit'
+        : 'is-flow-straight';
+    var label = flow === 'superset'
+      ? 'Superset'
+      : flow === 'circuit'
+        ? 'Circuit'
+        : 'Straight Sets';
+
+    return {
+      badge: '<div class="program-builder-axis-flow-badge ' + className + '">' + escapeHtml(label) + '</div>',
+      className: className
+    };
+  }
+
   function renderAxisBlockDetails(slotKey, block, index) {
-    var type = normalizeWeeklySessionType(block && block.type);
+    var type = normalizeSessionBlockType(block && block.type);
     var detailMarkup = '';
 
-    if (type === 'strength_lower' || type === 'strength_upper' || type === 'strength_full') {
+    if (isExerciseConfiguredBlockType(type)) {
+      detailMarkup = renderAxisExerciseRows(slotKey, block, index);
+    } else if (type === 'hangboarding') {
       detailMarkup = [
+        '<div class="program-builder-axis-detail-grid">',
         '<label class="program-builder-structure-field">',
-        '<span>Exercises</span>',
-        '<input type="number" min="1" max="10" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_count" value="' + escapeAttribute(String(block.exercise_count || 1)) + '" />',
+        '<span>Protocol Name</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="hang_protocol_name" value="' + escapeAttribute(String(block && block.hang_protocol_name || '')) + '" placeholder="e.g. Repeaters" />',
         '</label>',
-      ].join('') + renderAxisExerciseRows(slotKey, block, index);
+        '<label class="program-builder-structure-field">',
+        '<span>Grip Type</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="hang_grip_type" value="' + escapeAttribute(String(block && block.hang_grip_type || '')) + '" placeholder="e.g. 20mm edge, half crimp" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Rounds</span>',
+        '<input type="number" min="1" max="20" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="hang_rounds" value="' + escapeAttribute(String(block && block.hang_rounds || 6)) + '" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Hang (sec)</span>',
+        '<input type="number" min="3" max="60" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="hang_hang_seconds" value="' + escapeAttribute(String(block && block.hang_hang_seconds || 10)) + '" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Rest (sec)</span>',
+        '<input type="number" min="5" max="180" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="hang_rest_seconds" value="' + escapeAttribute(String(block && block.hang_rest_seconds || 50)) + '" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Effort</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="hang_effort" value="' + escapeAttribute(String(block && block.hang_effort || 'RPE 8')) + '" placeholder="e.g. RPE 8, +10lb" />',
+        '</label>',
+        '</div>'
+      ].join('');
+    } else if (type === 'intervals') {
+      var intervalExerciseMode = normalizeIntervalExerciseMode(block && block.interval_exercise_mode);
+      var intervalWorkIntensityType = normalizeIntervalIntensityType(block && block.interval_work_intensity_type, false);
+      var intervalRestIntensityType = normalizeIntervalIntensityType(block && block.interval_rest_intensity_type, true);
+      var workIntensityPlaceholder = intervalIntensityPlaceholderForType(intervalWorkIntensityType, false);
+      var restIntensityPlaceholder = intervalIntensityPlaceholderForType(intervalRestIntensityType, true);
+      var isCompleteRest = intervalRestIntensityType === 'complete_rest';
+      detailMarkup = [
+        '<div class="program-builder-axis-detail-grid">',
+        '<label class="program-builder-structure-field">',
+        '<span>Exercise</span>',
+        '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="interval_exercise_mode">',
+        buildIntervalExerciseModeOptions(intervalExerciseMode),
+        '</select>',
+        (intervalExerciseMode === 'free_text'
+          ? '<span>Exercise Name</span><input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="interval_exercise_name" value="' + escapeAttribute(String(block && block.interval_exercise_name || '')) + '" placeholder="e.g. Rower, Assault Bike, Shuttle Runs" />'
+          : ''),
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Rounds</span>',
+        '<input type="number" min="1" max="50" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="interval_rounds" value="' + escapeAttribute(String(block && block.interval_rounds || 1)) + '" />',
+        '</label>',
+        '</div>'
+      ].join('') + [
+        '<label class="program-builder-structure-field program-builder-interval-row">',
+        '<span>Work Segment</span>',
+        '<div class="program-builder-interval-controls">',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="interval_work_time" value="' + escapeAttribute(String(block && block.interval_work_time || '60s')) + '" placeholder="work time" />',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="interval_work_intensity" value="' + escapeAttribute(String(block && block.interval_work_intensity || workIntensityPlaceholder)) + '" placeholder="work intensity" />',
+        '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="interval_work_intensity_type">',
+        buildIntervalIntensityTypeOptions(intervalWorkIntensityType, false),
+        '</select>',
+        '</div>',
+        '</label>',
+        '<label class="program-builder-structure-field program-builder-interval-row">',
+        '<span>Rest Segment</span>',
+        '<div class="program-builder-interval-controls">',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="interval_rest_time" value="' + escapeAttribute(String(block && block.interval_rest_time || '60s')) + '" placeholder="rest time" />',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="interval_rest_intensity" value="' + escapeAttribute(String(block && block.interval_rest_intensity || (isCompleteRest ? '' : restIntensityPlaceholder))) + '" placeholder="rest intensity"' + (isCompleteRest ? ' disabled' : '') + ' />',
+        '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="interval_rest_intensity_type">',
+        buildIntervalIntensityTypeOptions(intervalRestIntensityType, true),
+        '</select>',
+        '</div>',
+        '</label>'
+      ].join('');
+    } else if (type === 'emom') {
+      var emomIntensityType = normalizeIntervalIntensityType(block && block.emom_intensity_type, false);
+      var emomIntensityPlaceholder = intervalIntensityPlaceholderForType(emomIntensityType, false);
+      detailMarkup = [
+        '<div class="program-builder-axis-detail-grid">',
+        '<label class="program-builder-structure-field">',
+        '<span>Exercise</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="emom_exercise" value="' + escapeAttribute(String(block && block.emom_exercise || '')) + '" placeholder="e.g. 8 KB swings + 6 burpees" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Total Minutes</span>',
+        '<input type="number" min="1" max="60" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="emom_minutes" value="' + escapeAttribute(String(block && block.emom_minutes || 12)) + '" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Intensity Type</span>',
+        '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="emom_intensity_type">',
+        buildIntervalIntensityTypeOptions(emomIntensityType, false),
+        '</select>',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Intensity</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="emom_intensity" value="' + escapeAttribute(String(block && block.emom_intensity || emomIntensityPlaceholder)) + '" placeholder="' + escapeAttribute(emomIntensityPlaceholder) + '" />',
+        '</label>',
+        '</div>'
+      ].join('');
+    } else if (type === 'amrap') {
+      var amrapIntensityType = normalizeIntervalIntensityType(block && block.amrap_intensity_type, false);
+      var amrapIntensityPlaceholder = intervalIntensityPlaceholderForType(amrapIntensityType, false);
+      detailMarkup = [
+        '<div class="program-builder-axis-detail-grid">',
+        '<label class="program-builder-structure-field">',
+        '<span>Exercise / Circuit</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="amrap_exercise" value="' + escapeAttribute(String(block && block.amrap_exercise || '')) + '" placeholder="e.g. 5 pull-ups, 10 push-ups, 15 air squats" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Duration (min)</span>',
+        '<input type="number" min="1" max="60" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="amrap_minutes" value="' + escapeAttribute(String(block && block.amrap_minutes || 15)) + '" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Intensity Type</span>',
+        '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="amrap_intensity_type">',
+        buildIntervalIntensityTypeOptions(amrapIntensityType, false),
+        '</select>',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Intensity</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="amrap_intensity" value="' + escapeAttribute(String(block && block.amrap_intensity || amrapIntensityPlaceholder)) + '" placeholder="' + escapeAttribute(amrapIntensityPlaceholder) + '" />',
+        '</label>',
+        '</div>'
+      ].join('');
     } else if (type === 'zone2' || type === 'long_endurance' || type === 'threshold' || type === 'vo2' || type === 'uphill') {
       detailMarkup = [
         '<div class="program-builder-axis-detail-grid">',
@@ -874,54 +1291,110 @@
   }
 
   function renderAxisExerciseRows(slotKey, block, index) {
-    var count = clampNumber(parseInt(block && block.exercise_count, 10), 1, 20, 1);
+    var sourceNames = Array.isArray(block && block.exercise_names) ? block.exercise_names : [];
+    var sourceSets = Array.isArray(block && block.exercise_sets) ? block.exercise_sets : [];
+    var sourceIntensityTypes = Array.isArray(block && block.exercise_intensity_types) ? block.exercise_intensity_types : [];
+    var inferredCount = Math.max(
+      clampNumber(parseInt(block && block.exercise_count, 10), 1, 20, 1),
+      sourceNames.length,
+      sourceSets.length,
+      sourceIntensityTypes.length,
+      1
+    );
+    var count = clampNumber(inferredCount, 1, 20, 1);
     var names = normalizeExerciseNames(block && block.exercise_names, count);
     var sets = normalizeExerciseValues(block && block.exercise_sets, count, 3);
+    var intensityTypes = normalizeExerciseValues(block && block.exercise_intensity_types, count, "rpe").map(normalizeIntensityTypeValue);
     var setReps = normalizeExerciseNestedValues(block && block.exercise_set_reps, count, '5', sets);
-    var setIntensities = normalizeExerciseNestedValues(block && block.exercise_set_intensities, count, 'RPE 7', sets);
-    var fields = ['<div class="program-builder-axis-exercises">', '<div class="program-builder-axis-card-head"><h3>Exercise Details</h3><p>Each exercise can carry its own sets, and each set can vary by reps and intensity.</p></div>'];
+    var setIntensities = normalizeExerciseNestedValues(block && block.exercise_set_intensities, count, '7', sets);
+    var setRests = normalizeExerciseNestedValues(block && block.exercise_set_rests, count, '', sets);
+    var setRepTypes = normalizeExerciseSetRepTypes(block && block.exercise_set_rep_types, count, sets, block && block.exercise_rep_types);
+    var setIntensityTypes = normalizeExerciseSetIntensityTypes(block && block.exercise_set_intensity_types, count, sets, intensityTypes);
+    var flow = normalizeExerciseFlow(block && block.exercise_flow);
+    var restStrategy = normalizeExerciseRestStrategy(block && block.exercise_rest_strategy);
+    var restLabel = restStrategyLabel(flow, restStrategy);
+    var restPlaceholder = restPlaceholderForStrategy(flow, restStrategy);
+    var fields = [
+      '<div class="program-builder-axis-exercises">',
+      '<label class="program-builder-structure-field">',
+      '<span>Execution Style</span>',
+      '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_flow">',
+      buildExerciseFlowOptions(block && block.exercise_flow),
+      '</select>',
+      '</label>'
+    ];
 
-    for (var i = 0; i < count; i++) {
-      fields.push('<div class="program-builder-axis-exercise-row">');
+    if (flow !== 'straight') {
       fields.push(
-        '<div class="program-builder-axis-exercise-row-title">Exercise ' + String(i + 1) + '</div>',
-        '<label class="program-builder-structure-field">',
-        '<span>Exercise Name ' + String(i + 1) + '</span>',
-        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_names" data-axis-exercise-index="' + i + '" value="' + escapeAttribute(names[i] || '') + '" placeholder="e.g. Back Squat" />',
-        '</label>',
         '<div class="program-builder-axis-detail-grid">',
         '<label class="program-builder-structure-field">',
-        '<span>Sets</span>',
-        '<input type="number" min="1" max="20" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_sets" data-axis-exercise-index="' + i + '" value="' + escapeAttribute(String(sets[i] || 3)) + '" />',
+        '<span>Rest Focus</span>',
+        '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_rest_strategy">',
+        buildExerciseRestStrategyOptions(restStrategy),
+        '</select>',
         '</label>',
-        '</div>',
-        renderAxisExerciseSetRows(slotKey, block, index, i, sets[i] || 3, setReps[i] || [], setIntensities[i] || []),
+        '<label class="program-builder-structure-field">',
+        '<span>' + escapeHtml(restLabel) + '</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_rest_interval" value="' + escapeAttribute(String(block && block.exercise_rest_interval || '')) + '" placeholder="' + escapeAttribute(restPlaceholder) + '" />',
+        '</label>',
         '</div>'
       );
     }
 
+    for (var i = 0; i < count; i++) {
+      fields.push('<div class="program-builder-axis-exercise-row">');
+      fields.push(
+        '<div class="program-builder-axis-exercise-head">',
+        '<div class="program-builder-axis-exercise-row-title">Exercise ' + String(i + 1) + '</div>',
+        '<button type="button" class="btn admin-btn-delete-mini axis-btn-ghost" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-remove-exercise="' + i + '">Remove Exercise</button>',
+        '</div>',
+        '<label class="program-builder-structure-field">',
+        '<span>Exercise Name ' + String(i + 1) + '</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_names" data-axis-exercise-index="' + i + '" value="' + escapeAttribute(names[i] || '') + '" placeholder="e.g. Back Squat" />',
+        '</label>',
+        renderAxisExerciseSetRows(slotKey, block, index, i, sets[i] || 3, setReps[i] || [], setIntensities[i] || [], setRests[i] || [], setRepTypes[i] || [], setIntensityTypes[i] || [], flow),
+        '<div class="program-builder-axis-exercise-actions">',
+        '<button type="button" class="btn admin-btn-small axis-btn-compact" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-exercise-index="' + i + '" data-axis-add-set="1">+ Set</button>',
+        '</div>',
+        '</div>'
+      );
+    }
+
+    fields.push('<div class="program-builder-axis-exercise-actions"><button type="button" class="btn admin-btn-small axis-btn-compact" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-add-exercise="1">+ Exercise</button></div>');
     fields.push('</div>');
     return fields.join('');
   }
 
-  function renderAxisExerciseSetRows(slotKey, block, blockIndex, exerciseIndex, setCount, setReps, setIntensities) {
+  function renderAxisExerciseSetRows(slotKey, block, blockIndex, exerciseIndex, setCount, setReps, setIntensities, setRests, setRepTypes, setIntensityTypes, flow) {
     var totalSets = clampNumber(parseInt(setCount, 10), 1, 20, 1);
+    var isStraight = normalizeExerciseFlow(flow) === 'straight';
+    var repTypeRows = Array.isArray(setRepTypes) ? setRepTypes : [];
+    var typeRows = Array.isArray(setIntensityTypes) ? setIntensityTypes : [];
+    var restRows = Array.isArray(setRests) ? setRests : [];
     var fields = ['<div class="program-builder-axis-set-list">'];
 
     for (var i = 0; i < totalSets; i++) {
+      var selectedRepType = normalizeRepTypeValue(repTypeRows[i]);
+      var repsPlaceholder = repsPlaceholderForType(selectedRepType);
+      var selectedType = normalizeIntensityTypeValue(typeRows[i]);
+      var intensityPlaceholder = intensityPlaceholderForType(selectedType);
       fields.push(
         '<div class="program-builder-axis-set-row">',
-        '<div class="program-builder-axis-exercise-row-title">Set ' + String(i + 1) + '</div>',
-        '<div class="program-builder-axis-detail-grid">',
-        '<label class="program-builder-structure-field">',
-        '<span>Reps</span>',
-        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-block-field="exercise_set_reps" data-axis-exercise-index="' + exerciseIndex + '" data-axis-set-index="' + i + '" value="' + escapeAttribute(setReps[i] || '5') + '" placeholder="e.g. 5" />',
+        '<label class="program-builder-axis-inline-set' + (isStraight ? ' has-rest' : '') + '">',
+        '<span class="program-builder-axis-set-label">Set ' + String(i + 1) + ':</span>',
+        '<input type="text" class="program-builder-axis-inline-input" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-block-field="exercise_set_reps" data-axis-exercise-index="' + exerciseIndex + '" data-axis-set-index="' + i + '" value="' + escapeAttribute(setReps[i] || repsPlaceholder) + '" placeholder="' + escapeAttribute(repsPlaceholder) + '" />',
+        '<select class="program-builder-axis-inline-type" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-block-field="exercise_set_rep_types" data-axis-exercise-index="' + exerciseIndex + '" data-axis-set-index="' + i + '">',
+        buildRepTypeOptions(selectedRepType),
+        '</select>',
+        '<input type="text" class="program-builder-axis-inline-input" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-block-field="exercise_set_intensities" data-axis-exercise-index="' + exerciseIndex + '" data-axis-set-index="' + i + '" value="' + escapeAttribute(setIntensities[i] || intensityPlaceholder) + '" placeholder="' + escapeAttribute(intensityPlaceholder) + '" />',
+        '<select class="program-builder-axis-inline-type" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-block-field="exercise_set_intensity_types" data-axis-exercise-index="' + exerciseIndex + '" data-axis-set-index="' + i + '">',
+        buildIntensityTypeOptions(selectedType),
+        '</select>',
+        (isStraight
+          ? '<input type="text" class="program-builder-axis-inline-input program-builder-axis-rest-inline" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-block-field="exercise_set_rests" data-axis-exercise-index="' + exerciseIndex + '" data-axis-set-index="' + i + '" value="' + escapeAttribute(restRows[i] || '') + '" placeholder="rest" />'
+          : ''),
         '</label>',
-        '<label class="program-builder-structure-field">',
-        '<span>Intensity</span>',
-        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-block-field="exercise_set_intensities" data-axis-exercise-index="' + exerciseIndex + '" data-axis-set-index="' + i + '" value="' + escapeAttribute(setIntensities[i] || 'RPE 7') + '" placeholder="e.g. 80% RM, RPE 8, RIP 2" />',
-        '</label>',
-        '</div>',
+        '<button type="button" class="btn admin-btn-delete-mini axis-btn-ghost axis-btn-set-remove" aria-label="Remove set" title="Remove set" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-exercise-index="' + exerciseIndex + '" data-axis-remove-set="' + i + '">-</button>',
         '</div>'
       );
     }
@@ -944,6 +1417,218 @@
       var isSelected = option.value === selected ? ' selected' : '';
       return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
     }).join('');
+  }
+
+  function normalizeIntervalExerciseMode(value) {
+    var normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'running' || normalized === 'biking' || normalized === 'free_text') {
+      return normalized;
+    }
+    return 'running';
+  }
+
+  function buildIntervalExerciseModeOptions(selectedValue) {
+    var selected = normalizeIntervalExerciseMode(selectedValue);
+    var options = [
+      { value: 'running', label: 'Running' },
+      { value: 'biking', label: 'Biking' },
+      { value: 'free_text', label: 'Free Text' }
+    ];
+
+    return options.map(function (option) {
+      var isSelected = option.value === selected ? ' selected' : '';
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join('');
+  }
+
+  function normalizeIntervalIntensityType(value, allowCompleteRest) {
+    var normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'rpe' || normalized === 'hr' || normalized === 'zone' || normalized === 'pace' || normalized === 'power' || normalized === 'custom') {
+      return normalized;
+    }
+    if (allowCompleteRest && normalized === 'complete_rest') {
+      return 'complete_rest';
+    }
+    return allowCompleteRest ? 'zone' : 'rpe';
+  }
+
+  function buildIntervalIntensityTypeOptions(selectedValue, allowCompleteRest) {
+    var selected = normalizeIntervalIntensityType(selectedValue, allowCompleteRest);
+    var options = [
+      { value: 'rpe', label: 'RPE' },
+      { value: 'hr', label: 'HR' },
+      { value: 'zone', label: 'Zone' },
+      { value: 'pace', label: 'Pace' },
+      { value: 'power', label: 'Power' },
+      { value: 'custom', label: 'Free Text' }
+    ];
+
+    if (allowCompleteRest) {
+      options.push({ value: 'complete_rest', label: 'Complete Rest' });
+    }
+
+    return options.map(function (option) {
+      var isSelected = option.value === selected ? ' selected' : '';
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join('');
+  }
+
+  function intervalIntensityPlaceholderForType(type, isRest) {
+    var normalized = normalizeIntervalIntensityType(type, isRest);
+    if (normalized === 'rpe') {
+      return isRest ? 'e.g. RPE 2-3' : 'e.g. RPE 8';
+    }
+    if (normalized === 'hr') {
+      return isRest ? 'e.g. <140 bpm' : 'e.g. 170-180 bpm';
+    }
+    if (normalized === 'zone') {
+      return isRest ? 'e.g. Zone 1-2' : 'e.g. Zone 4-5';
+    }
+    if (normalized === 'pace') {
+      return isRest ? 'e.g. easy jog' : 'e.g. 5k pace';
+    }
+    if (normalized === 'power') {
+      return isRest ? 'e.g. 50% FTP' : 'e.g. 110% FTP';
+    }
+    if (normalized === 'complete_rest') {
+      return 'Complete rest';
+    }
+    return isRest ? 'e.g. easy spin or walk' : 'e.g. hard effort';
+  }
+
+  function normalizeIntensityTypeValue(value) {
+    var normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "percent_rm" || normalized === "%rm" || normalized === "rm") {
+      return "%rm";
+    }
+    if (normalized === "rir") {
+      return "rir";
+    }
+    return "rpe";
+  }
+
+  function normalizeRepTypeValue(value) {
+    var normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "sec" || normalized === "seconds" || normalized === "time") {
+      return "sec";
+    }
+    return "reps";
+  }
+
+  function repsPlaceholderForType(type) {
+    return normalizeRepTypeValue(type) === "sec" ? "45" : "5";
+  }
+
+  function buildRepTypeOptions(selectedType) {
+    var selected = normalizeRepTypeValue(selectedType);
+    var options = [
+      { value: "reps", label: "Reps" },
+      { value: "sec", label: "Sec" }
+    ];
+
+    return options.map(function (option) {
+      var isSelected = option.value === selected ? " selected" : "";
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join("");
+  }
+
+  function intensityPlaceholderForType(type) {
+    var normalized = normalizeIntensityTypeValue(type);
+    if (normalized === "%rm") {
+      return "80";
+    }
+    if (normalized === "rir") {
+      return "2";
+    }
+    return "7";
+  }
+
+  function buildIntensityTypeOptions(selectedType) {
+    var selected = normalizeIntensityTypeValue(selectedType);
+    var options = [
+      { value: "%rm", label: "%RM" },
+      { value: "rpe", label: "RPE" },
+      { value: "rir", label: "RIR" }
+    ];
+
+    return options.map(function (option) {
+      var isSelected = option.value === selected ? " selected" : "";
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join("");
+  }
+
+  function normalizeExerciseFlow(value) {
+    var normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "superset") {
+      return "superset";
+    }
+    if (normalized === "circuit") {
+      return "circuit";
+    }
+    return "straight";
+  }
+
+  function isExerciseConfiguredBlockType(blockType) {
+    var normalized = normalizeSessionBlockType(blockType);
+    return normalized === 'strength_lower'
+      || normalized === 'strength_upper'
+      || normalized === 'strength_full'
+      || normalized === 'main_strength'
+      || normalized === 'secondary_strength'
+      || normalized === 'power';
+  }
+
+  function buildExerciseFlowOptions(selectedValue) {
+    var selected = normalizeExerciseFlow(selectedValue);
+    var options = [
+      { value: "straight", label: "Straight Sets" },
+      { value: "superset", label: "Superset" },
+      { value: "circuit", label: "Circuit" }
+    ];
+
+    return options.map(function (option) {
+      var isSelected = option.value === selected ? " selected" : "";
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join("");
+  }
+
+  function normalizeExerciseRestStrategy(value) {
+    var normalized = String(value || "").trim().toLowerCase();
+    if (normalized === 'between_rounds') {
+      return 'between_rounds';
+    }
+    return 'between_exercises';
+  }
+
+  function buildExerciseRestStrategyOptions(selectedValue) {
+    var selected = normalizeExerciseRestStrategy(selectedValue);
+    var options = [
+      { value: 'between_exercises', label: 'Between Exercises' },
+      { value: 'between_rounds', label: 'Between Rounds' }
+    ];
+
+    return options.map(function (option) {
+      var isSelected = option.value === selected ? ' selected' : '';
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join('');
+  }
+
+  function restStrategyLabel(flow, strategy) {
+    if (normalizeExerciseFlow(flow) === 'straight') {
+      return 'Rest Between Sets';
+    }
+    return normalizeExerciseRestStrategy(strategy) === 'between_rounds'
+      ? 'Rest Between Rounds'
+      : 'Rest Between Exercises';
+  }
+
+  function restPlaceholderForStrategy(flow, strategy) {
+    if (normalizeExerciseFlow(flow) === 'straight') {
+      return 'e.g. 90 sec';
+    }
+    return normalizeExerciseRestStrategy(strategy) === 'between_rounds'
+      ? 'e.g. 90 sec between rounds'
+      : 'e.g. 20 sec between movements';
   }
 
   function getSessionTypeBlockSequence(sessionType) {
@@ -1014,7 +1699,7 @@
   }
 
   function syncDailyProgrammingInput(target) {
-    if (!state.isTemplateBuilder || state.builderStep !== 3 || !target || !target.getAttribute) {
+    if ((!state.isTemplateBuilder && !state.isCoachAssignedProgramEdit) || state.builderStep !== 3 || !target || !target.getAttribute) {
       return;
     }
 
@@ -1056,19 +1741,75 @@
           currentValues[exerciseIndex] = String(target.value || '').trim();
           axisBlock.exercise_sets = currentValues;
           axisBlock.exercise_set_reps = normalizeExerciseNestedValues(axisBlock.exercise_set_reps, axisBlock.exercise_count, '5', currentValues);
-          axisBlock.exercise_set_intensities = normalizeExerciseNestedValues(axisBlock.exercise_set_intensities, axisBlock.exercise_count, 'RPE 7', currentValues);
+          axisBlock.exercise_set_intensities = normalizeExerciseNestedValues(axisBlock.exercise_set_intensities, axisBlock.exercise_count, '7', currentValues);
+          axisBlock.exercise_set_rests = normalizeExerciseNestedValues(axisBlock.exercise_set_rests, axisBlock.exercise_count, '', currentValues);
+          axisBlock.exercise_set_rep_types = normalizeExerciseSetRepTypes(
+            axisBlock.exercise_set_rep_types,
+            axisBlock.exercise_count,
+            axisBlock.exercise_sets,
+            axisBlock.exercise_rep_types
+          );
+          axisBlock.exercise_set_intensity_types = normalizeExerciseSetIntensityTypes(
+            axisBlock.exercise_set_intensity_types,
+            axisBlock.exercise_count,
+            axisBlock.exercise_sets,
+            axisBlock.exercise_intensity_types
+          );
         }
-      } else if (axisBlockField === 'exercise_set_reps' || axisBlockField === 'exercise_set_intensities') {
+      } else if (axisBlockField === 'interval_rounds') {
+        axisBlock.interval_rounds = clampNumber(parseInt(target.value, 10), 1, 50, axisBlock.interval_rounds || 1);
+      } else if (axisBlockField === 'interval_exercise_mode') {
+        axisBlock.interval_exercise_mode = normalizeIntervalExerciseMode(target.value);
+      } else if (axisBlockField === 'hang_rounds') {
+        axisBlock.hang_rounds = clampNumber(parseInt(target.value, 10), 1, 20, axisBlock.hang_rounds || 6);
+      } else if (axisBlockField === 'hang_hang_seconds') {
+        axisBlock.hang_hang_seconds = clampNumber(parseInt(target.value, 10), 3, 60, axisBlock.hang_hang_seconds || 10);
+      } else if (axisBlockField === 'hang_rest_seconds') {
+        axisBlock.hang_rest_seconds = clampNumber(parseInt(target.value, 10), 5, 180, axisBlock.hang_rest_seconds || 50);
+      } else if (axisBlockField === 'emom_minutes') {
+        axisBlock.emom_minutes = clampNumber(parseInt(target.value, 10), 1, 60, axisBlock.emom_minutes || 12);
+      } else if (axisBlockField === 'amrap_minutes') {
+        axisBlock.amrap_minutes = clampNumber(parseInt(target.value, 10), 1, 60, axisBlock.amrap_minutes || 15);
+      } else if (axisBlockField === 'interval_work_intensity_type') {
+        axisBlock.interval_work_intensity_type = normalizeIntervalIntensityType(target.value, false);
+      } else if (axisBlockField === 'interval_rest_intensity_type') {
+        axisBlock.interval_rest_intensity_type = normalizeIntervalIntensityType(target.value, true);
+        if (axisBlock.interval_rest_intensity_type === 'complete_rest') {
+          axisBlock.interval_rest_intensity = '';
+        }
+      } else if (axisBlockField === 'emom_intensity_type') {
+        axisBlock.emom_intensity_type = normalizeIntervalIntensityType(target.value, false);
+      } else if (axisBlockField === 'amrap_intensity_type') {
+        axisBlock.amrap_intensity_type = normalizeIntervalIntensityType(target.value, false);
+      } else if (axisBlockField === 'exercise_set_reps' || axisBlockField === 'exercise_set_intensities' || axisBlockField === 'exercise_set_rests' || axisBlockField === 'exercise_set_intensity_types' || axisBlockField === 'exercise_set_rep_types') {
         var exerciseSetIndex = parseInt(String(target.getAttribute("data-axis-exercise-index") || "-1"), 10);
         var setIndex = parseInt(String(target.getAttribute("data-axis-set-index") || "-1"), 10);
         var setTotals = normalizeExerciseValues(axisBlock.exercise_sets, axisBlock.exercise_count, 3).map(function (value) {
           return clampNumber(parseInt(value, 10), 1, 20, 1);
         });
-        var nestedValues = normalizeExerciseNestedValues(axisBlock[axisBlockField], axisBlock.exercise_count, axisBlockField === 'exercise_set_reps' ? '5' : 'RPE 7', setTotals);
+        var nestedValues = axisBlockField === 'exercise_set_intensity_types'
+          ? normalizeExerciseSetIntensityTypes(axisBlock.exercise_set_intensity_types, axisBlock.exercise_count, setTotals, axisBlock.exercise_intensity_types)
+          : axisBlockField === 'exercise_set_rep_types'
+            ? normalizeExerciseSetRepTypes(axisBlock.exercise_set_rep_types, axisBlock.exercise_count, setTotals, axisBlock.exercise_rep_types)
+            : axisBlockField === 'exercise_set_rests'
+              ? normalizeExerciseNestedValues(axisBlock.exercise_set_rests, axisBlock.exercise_count, '', setTotals)
+            : normalizeExerciseNestedValues(axisBlock[axisBlockField], axisBlock.exercise_count, axisBlockField === 'exercise_set_reps' ? '5' : '7', setTotals);
         if (Number.isFinite(exerciseSetIndex) && exerciseSetIndex >= 0 && exerciseSetIndex < nestedValues.length) {
           if (Number.isFinite(setIndex) && setIndex >= 0 && setIndex < nestedValues[exerciseSetIndex].length) {
-            nestedValues[exerciseSetIndex][setIndex] = String(target.value || '').trim();
-            axisBlock[axisBlockField] = nestedValues;
+            nestedValues[exerciseSetIndex][setIndex] = axisBlockField === 'exercise_set_intensity_types'
+              ? normalizeIntensityTypeValue(target.value)
+              : axisBlockField === 'exercise_set_rep_types'
+                ? normalizeRepTypeValue(target.value)
+              : String(target.value || '').trim();
+            if (axisBlockField === 'exercise_set_intensity_types') {
+              axisBlock.exercise_set_intensity_types = nestedValues;
+            } else if (axisBlockField === 'exercise_set_rep_types') {
+              axisBlock.exercise_set_rep_types = nestedValues;
+            } else if (axisBlockField === 'exercise_set_rests') {
+              axisBlock.exercise_set_rests = nestedValues;
+            } else {
+              axisBlock[axisBlockField] = nestedValues;
+            }
           }
         }
       } else {
@@ -1080,8 +1821,26 @@
         axisBlock.exercise_count = nextCount;
         axisBlock.exercise_names = normalizeExerciseNames(axisBlock.exercise_names, nextCount);
         axisBlock.exercise_sets = normalizeExerciseValues(axisBlock.exercise_sets, nextCount, 3);
+        axisBlock.exercise_intensity_types = normalizeExerciseValues(axisBlock.exercise_intensity_types, nextCount, 'rpe').map(normalizeIntensityTypeValue);
         axisBlock.exercise_set_reps = normalizeExerciseNestedValues(axisBlock.exercise_set_reps, nextCount, '5', axisBlock.exercise_sets);
-        axisBlock.exercise_set_intensities = normalizeExerciseNestedValues(axisBlock.exercise_set_intensities, nextCount, 'RPE 7', axisBlock.exercise_sets);
+        axisBlock.exercise_set_intensities = normalizeExerciseNestedValues(axisBlock.exercise_set_intensities, nextCount, '7', axisBlock.exercise_sets);
+        axisBlock.exercise_set_rests = normalizeExerciseNestedValues(axisBlock.exercise_set_rests, nextCount, '', axisBlock.exercise_sets);
+        axisBlock.exercise_set_rep_types = normalizeExerciseSetRepTypes(
+          axisBlock.exercise_set_rep_types,
+          nextCount,
+          axisBlock.exercise_sets,
+          axisBlock.exercise_rep_types
+        );
+        axisBlock.exercise_set_intensity_types = normalizeExerciseSetIntensityTypes(
+          axisBlock.exercise_set_intensity_types,
+          nextCount,
+          axisBlock.exercise_sets,
+          axisBlock.exercise_intensity_types
+        );
+      }
+
+      if (axisBlockField === 'exercise_rest_strategy') {
+        axisBlock.exercise_rest_strategy = normalizeExerciseRestStrategy(axisBlock.exercise_rest_strategy);
       }
 
       if (axisBlockField === 'type') {
@@ -1209,16 +1968,67 @@
       var type = normalizeSessionBlockType(source.type);
       var defaults = getDefaultBlockFieldsForType(type);
       var exerciseCount = clampNumber(parseInt(source.exercise_count, 10), 1, 20, defaults.exercise_count || 1);
+      var legacyRatio = String(source.interval_work_rest_ratio || defaults.interval_work_rest_ratio || '').trim();
+      var ratioParts = legacyRatio.indexOf(':') > -1 ? legacyRatio.split(':') : [];
+      var normalizedWorkTime = String(source.interval_work_time || defaults.interval_work_time || '').trim();
+      var normalizedRestTime = String(source.interval_rest_time || defaults.interval_rest_time || '').trim();
+      if (!normalizedWorkTime && ratioParts[0]) {
+        normalizedWorkTime = String(ratioParts[0]).trim() + ' part';
+      }
+      if (!normalizedRestTime && ratioParts[1]) {
+        normalizedRestTime = String(ratioParts[1]).trim() + ' part';
+      }
       return {
         type: type,
         title: String(source.title || prettySessionBlockLabel(source.type)).trim(),
         prescription: String(source.prescription || defaults.prescription || '').trim(),
         notes: String(source.notes || defaults.notes || '').trim(),
+        interval_exercise_mode: normalizeIntervalExerciseMode(source.interval_exercise_mode || defaults.interval_exercise_mode),
+        interval_exercise_name: String(source.interval_exercise_name || defaults.interval_exercise_name || '').trim(),
+        interval_rounds: clampNumber(parseInt(source.interval_rounds, 10), 1, 50, defaults.interval_rounds || 1),
+        interval_work_time: normalizedWorkTime,
+        interval_rest_time: normalizedRestTime,
+        interval_work_rest_ratio: String(source.interval_work_rest_ratio || defaults.interval_work_rest_ratio || '').trim(),
+        interval_work_intensity_type: normalizeIntervalIntensityType(source.interval_work_intensity_type || defaults.interval_work_intensity_type, false),
+        interval_rest_intensity_type: normalizeIntervalIntensityType(source.interval_rest_intensity_type || defaults.interval_rest_intensity_type, true),
+        interval_work_intensity: String(source.interval_work_intensity || defaults.interval_work_intensity || '').trim(),
+        interval_rest_intensity: String(source.interval_rest_intensity || defaults.interval_rest_intensity || '').trim(),
+        hang_protocol_name: String(source.hang_protocol_name || defaults.hang_protocol_name || '').trim(),
+        hang_grip_type: String(source.hang_grip_type || defaults.hang_grip_type || '').trim(),
+        hang_rounds: clampNumber(parseInt(source.hang_rounds, 10), 1, 20, defaults.hang_rounds || 6),
+        hang_hang_seconds: clampNumber(parseInt(source.hang_hang_seconds, 10), 3, 60, defaults.hang_hang_seconds || 10),
+        hang_rest_seconds: clampNumber(parseInt(source.hang_rest_seconds, 10), 5, 180, defaults.hang_rest_seconds || 50),
+        hang_effort: String(source.hang_effort || defaults.hang_effort || '').trim(),
+        emom_exercise: String(source.emom_exercise || defaults.emom_exercise || '').trim(),
+        emom_minutes: clampNumber(parseInt(source.emom_minutes, 10), 1, 60, defaults.emom_minutes || 12),
+        emom_intensity_type: normalizeIntervalIntensityType(source.emom_intensity_type || defaults.emom_intensity_type, false),
+        emom_intensity: String(source.emom_intensity || defaults.emom_intensity || '').trim(),
+        amrap_exercise: String(source.amrap_exercise || defaults.amrap_exercise || '').trim(),
+        amrap_minutes: clampNumber(parseInt(source.amrap_minutes, 10), 1, 60, defaults.amrap_minutes || 15),
+        amrap_intensity_type: normalizeIntervalIntensityType(source.amrap_intensity_type || defaults.amrap_intensity_type, false),
+        amrap_intensity: String(source.amrap_intensity || defaults.amrap_intensity || '').trim(),
+        exercise_flow: normalizeExerciseFlow(source.exercise_flow || defaults.exercise_flow),
+        exercise_rest_strategy: normalizeExerciseRestStrategy(source.exercise_rest_strategy || defaults.exercise_rest_strategy),
+        exercise_rest_interval: String(source.exercise_rest_interval || defaults.exercise_rest_interval || '').trim(),
         exercise_count: exerciseCount,
         exercise_names: normalizeExerciseNames(source.exercise_names, exerciseCount),
         exercise_sets: normalizeExerciseValues(source.exercise_sets || source.sets_per_exercise, exerciseCount, defaults.sets_per_exercise || 1),
+        exercise_intensity_types: normalizeExerciseValues(source.exercise_intensity_types, exerciseCount, defaults.exercise_intensity_type || 'rpe').map(normalizeIntensityTypeValue),
         exercise_set_reps: normalizeExerciseNestedValues(source.exercise_set_reps || source.exercise_reps || source.reps_per_exercise, exerciseCount, defaults.reps_per_exercise || '5', source.exercise_sets || source.sets_per_exercise),
-        exercise_set_intensities: normalizeExerciseNestedValues(source.exercise_set_intensities || source.exercise_intensities || source.target_intensity, exerciseCount, defaults.target_intensity || 'RPE 7', source.exercise_sets || source.sets_per_exercise),
+        exercise_set_intensities: normalizeExerciseNestedValues(source.exercise_set_intensities || source.exercise_intensities || source.target_intensity, exerciseCount, defaults.target_intensity || '7', source.exercise_sets || source.sets_per_exercise),
+        exercise_set_rests: normalizeExerciseNestedValues(source.exercise_set_rests, exerciseCount, '', source.exercise_sets || source.sets_per_exercise),
+        exercise_set_rep_types: normalizeExerciseSetRepTypes(
+          source.exercise_set_rep_types,
+          exerciseCount,
+          source.exercise_sets || source.sets_per_exercise,
+          source.exercise_rep_types || defaults.exercise_rep_type || 'reps'
+        ),
+        exercise_set_intensity_types: normalizeExerciseSetIntensityTypes(
+          source.exercise_set_intensity_types,
+          exerciseCount,
+          source.exercise_sets || source.sets_per_exercise,
+          source.exercise_intensity_types || defaults.exercise_intensity_type || 'rpe'
+        ),
         exercise_form: String(source.exercise_form || defaults.exercise_form || '').trim(),
         duration_minutes: clampNumber(parseInt(source.duration_minutes, 10), 0, 1440, defaults.duration_minutes || 0),
       };
@@ -1286,6 +2096,64 @@
     return normalized;
   }
 
+  function normalizeExerciseSetIntensityTypes(sourceValues, exerciseCount, sourceSetCounts, fallbackTypes) {
+    var totalExercises = Math.max(1, parseInt(exerciseCount, 10) || 1);
+    var setCounts = normalizeExerciseValues(sourceSetCounts, totalExercises, 1).map(function (value) {
+      return clampNumber(parseInt(value, 10), 1, 20, 1);
+    });
+    var perExerciseFallback = normalizeExerciseValues(fallbackTypes, totalExercises, 'rpe').map(normalizeIntensityTypeValue);
+    var rows = Array.isArray(sourceValues) ? sourceValues.slice() : [];
+    var normalized = [];
+
+    for (var i = 0; i < totalExercises; i++) {
+      var setTotal = setCounts[i] || 1;
+      var row = Array.isArray(rows[i]) ? rows[i].slice() : [];
+      if (!row.length && rows[i] != null && !Array.isArray(rows[i])) {
+        row = [rows[i]];
+      }
+      while (row.length < setTotal) {
+        row.push(perExerciseFallback[i]);
+      }
+      if (row.length > setTotal) {
+        row = row.slice(0, setTotal);
+      }
+      normalized.push(row.map(function (value) {
+        return normalizeIntensityTypeValue(value);
+      }));
+    }
+
+    return normalized;
+  }
+
+  function normalizeExerciseSetRepTypes(sourceValues, exerciseCount, sourceSetCounts, fallbackTypes) {
+    var totalExercises = Math.max(1, parseInt(exerciseCount, 10) || 1);
+    var setCounts = normalizeExerciseValues(sourceSetCounts, totalExercises, 1).map(function (value) {
+      return clampNumber(parseInt(value, 10), 1, 20, 1);
+    });
+    var perExerciseFallback = normalizeExerciseValues(fallbackTypes, totalExercises, 'reps').map(normalizeRepTypeValue);
+    var rows = Array.isArray(sourceValues) ? sourceValues.slice() : [];
+    var normalized = [];
+
+    for (var i = 0; i < totalExercises; i++) {
+      var setTotal = setCounts[i] || 1;
+      var row = Array.isArray(rows[i]) ? rows[i].slice() : [];
+      if (!row.length && rows[i] != null && !Array.isArray(rows[i])) {
+        row = [rows[i]];
+      }
+      while (row.length < setTotal) {
+        row.push(perExerciseFallback[i]);
+      }
+      if (row.length > setTotal) {
+        row = row.slice(0, setTotal);
+      }
+      normalized.push(row.map(function (value) {
+        return normalizeRepTypeValue(value);
+      }));
+    }
+
+    return normalized;
+  }
+
   function normalizeSessionPlans(sessionPlans) {
     var source = sessionPlans && typeof sessionPlans === 'object' ? sessionPlans : {};
     var normalized = {};
@@ -1308,12 +2176,60 @@
     return blocks.map(function (block) {
       var section = mapSessionBlockToSection(block.type);
       var mode = mapSessionBlockToMode(block.type);
+      var flow = normalizeExerciseFlow(block.exercise_flow);
+      var flowNote = flow === 'superset' ? 'Execution: Superset' : flow === 'circuit' ? 'Execution: Circuit' : '';
+      var restStrategy = normalizeExerciseRestStrategy(block.exercise_rest_strategy);
+      var restInterval = String(block && block.exercise_rest_interval || '').trim();
+      var restLabel = restStrategyLabel(flow, restStrategy);
+      var restNote = restInterval ? (restLabel + ': ' + restInterval) : '';
+      var intervalNote = '';
+      if (normalizeSessionBlockType(block.type) === 'intervals') {
+        var intervalMode = normalizeIntervalExerciseMode(block.interval_exercise_mode);
+        var intervalWorkType = normalizeIntervalIntensityType(block.interval_work_intensity_type, false);
+        var intervalRestType = normalizeIntervalIntensityType(block.interval_rest_intensity_type, true);
+        var intervalExercise = intervalMode === 'free_text'
+          ? String(block.interval_exercise_name || '').trim()
+          : (intervalMode === 'biking' ? 'Biking' : 'Running');
+        intervalNote = [
+          intervalExercise ? ('Exercise: ' + intervalExercise) : '',
+          block.interval_rounds ? ('Rounds: ' + String(block.interval_rounds)) : '',
+          block.interval_work_time ? ('Work Time: ' + String(block.interval_work_time)) : '',
+          block.interval_rest_time ? ('Rest Time: ' + String(block.interval_rest_time)) : '',
+          block.interval_work_intensity ? ('Work Intensity (' + intervalWorkType.toUpperCase() + '): ' + String(block.interval_work_intensity)) : '',
+          intervalRestType === 'complete_rest'
+            ? 'Rest Intensity: Complete Rest'
+            : (block.interval_rest_intensity ? ('Rest Intensity (' + intervalRestType.toUpperCase() + '): ' + String(block.interval_rest_intensity)) : '')
+        ].filter(Boolean).join(' • ');
+      } else if (normalizeSessionBlockType(block.type) === 'hangboarding') {
+        intervalNote = [
+          block.hang_protocol_name ? ('Protocol: ' + String(block.hang_protocol_name)) : '',
+          block.hang_grip_type ? ('Grip: ' + String(block.hang_grip_type)) : '',
+          block.hang_rounds ? ('Rounds: ' + String(block.hang_rounds)) : '',
+          block.hang_hang_seconds ? ('Hang: ' + String(block.hang_hang_seconds) + 's') : '',
+          block.hang_rest_seconds ? ('Rest: ' + String(block.hang_rest_seconds) + 's') : '',
+          block.hang_effort ? ('Effort: ' + String(block.hang_effort)) : ''
+        ].filter(Boolean).join(' • ');
+      } else if (normalizeSessionBlockType(block.type) === 'emom') {
+        var emomIntensityType = normalizeIntervalIntensityType(block.emom_intensity_type, false);
+        intervalNote = [
+          block.emom_exercise ? ('Exercise: ' + String(block.emom_exercise)) : '',
+          block.emom_minutes ? ('Duration: ' + String(block.emom_minutes) + ' min') : '',
+          block.emom_intensity ? ('Intensity (' + emomIntensityType.toUpperCase() + '): ' + String(block.emom_intensity)) : ''
+        ].filter(Boolean).join(' • ');
+      } else if (normalizeSessionBlockType(block.type) === 'amrap') {
+        var amrapIntensityType = normalizeIntervalIntensityType(block.amrap_intensity_type, false);
+        intervalNote = [
+          block.amrap_exercise ? ('Circuit: ' + String(block.amrap_exercise)) : '',
+          block.amrap_minutes ? ('Duration: ' + String(block.amrap_minutes) + ' min') : '',
+          block.amrap_intensity ? ('Intensity (' + amrapIntensityType.toUpperCase() + '): ' + String(block.amrap_intensity)) : ''
+        ].filter(Boolean).join(' • ');
+      }
       var setData = {
         reps: mode === 'endurance' ? (block.prescription || sessionPlan.duration_minutes || '') : (block.prescription || ''),
         weight: mode === 'endurance' ? (sessionPlan.vertical_gain || sessionPlan.terrain || '') : '',
         rpe: mode === 'endurance' ? (sessionPlan.intensity_target || '') : '',
         rest: '',
-        notes: [sessionPlan.session_goal, block.notes, sessionPlan.coach_notes].filter(Boolean).join(' • '),
+        notes: [sessionPlan.session_goal, flowNote, restNote, intervalNote, block.notes, sessionPlan.coach_notes].filter(Boolean).join(' • '),
         done: false
       };
 
@@ -1340,7 +2256,10 @@
     if (type === 'main_strength' || type === 'power') {
       return 'A Block';
     }
-    if (type === 'secondary_strength' || type === 'intervals' || type === 'threshold' || type === 'zone2') {
+    if (type === 'hangboarding') {
+      return 'B Block';
+    }
+    if (type === 'secondary_strength' || type === 'intervals' || type === 'emom' || type === 'amrap' || type === 'threshold' || type === 'zone2') {
       return 'B Block';
     }
     return 'C Block';
@@ -1348,10 +2267,13 @@
 
   function mapSessionBlockToMode(blockType) {
     var type = normalizeSessionBlockType(blockType);
-    if (type === 'zone2' || type === 'threshold' || type === 'intervals' || type === 'long_day') {
+    if (type === 'zone2' || type === 'threshold' || type === 'intervals' || type === 'emom' || type === 'amrap' || type === 'long_day') {
       return 'endurance';
     }
     if (type === 'warmup' || type === 'cooldown' || type === 'mobility') {
+      return 'time';
+    }
+    if (type === 'hangboarding') {
       return 'time';
     }
     return 'reps';
@@ -1370,13 +2292,57 @@
 
   function getDefaultBlockFieldsForType(blockType) {
     var type = normalizeSessionBlockType(blockType);
-    if (type === 'strength_lower' || type === 'strength_upper' || type === 'strength_full') {
+    if (isExerciseConfiguredBlockType(type)) {
       return {
+        exercise_flow: 'straight',
+        exercise_rest_strategy: 'between_exercises',
+        exercise_rest_interval: '',
         exercise_count: 1,
         exercise_names: [''],
         exercise_sets: ['3'],
+        exercise_rep_type: 'reps',
+        exercise_intensity_type: 'rpe',
         exercise_reps: ['5'],
-        exercise_intensities: ['RPE 7']
+        exercise_intensities: ['7']
+      };
+    }
+    if (type === 'intervals') {
+      return {
+        interval_exercise_mode: 'running',
+        interval_exercise_name: '',
+        interval_rounds: 6,
+        interval_work_time: '60s',
+        interval_rest_time: '60s',
+        interval_work_intensity_type: 'rpe',
+        interval_rest_intensity_type: 'zone',
+        interval_work_intensity: 'RPE 8',
+        interval_rest_intensity: 'Easy'
+      };
+    }
+    if (type === 'hangboarding') {
+      return {
+        hang_protocol_name: 'Repeaters',
+        hang_grip_type: '20mm edge, half crimp',
+        hang_rounds: 6,
+        hang_hang_seconds: 10,
+        hang_rest_seconds: 50,
+        hang_effort: 'RPE 8'
+      };
+    }
+    if (type === 'emom') {
+      return {
+        emom_exercise: '5 burpees + 10 KB swings',
+        emom_minutes: 12,
+        emom_intensity_type: 'rpe',
+        emom_intensity: 'RPE 8'
+      };
+    }
+    if (type === 'amrap') {
+      return {
+        amrap_exercise: '5 pull-ups, 10 push-ups, 15 air squats',
+        amrap_minutes: 15,
+        amrap_intensity_type: 'rpe',
+        amrap_intensity: 'RPE 7'
       };
     }
     if (type === 'zone2' || type === 'long_endurance' || type === 'threshold' || type === 'vo2' || type === 'uphill') {
@@ -1525,6 +2491,7 @@
       var params = new URLSearchParams(window.location.search);
       var wantsTemplateBuilder = params.get("builder") === "1";
       state.templateId = params.get("templateId") || null;
+      state.templatePresetKey = String(params.get("preset") || "").trim() || null;
       var builderAthleteId = String(params.get("athleteId") || "").trim();
       state.targetAthleteId = isUuid(builderAthleteId) ? builderAthleteId : null;
 
@@ -1800,6 +2767,10 @@
 
     if (state.templateId) {
       hydrateDraftFromTemplate(state.templateId);
+    } else if (state.templatePresetKey) {
+      hydrateDraftFromPreset(state.templatePresetKey);
+    } else {
+      maybeRunPendingTemplateAutoSave();
     }
 
     applyBuilderModeUi();
@@ -1807,6 +2778,32 @@
     ensureDaySessionTypesForStructure();
     refreshTemplateDayTools();
     updateDayInfo();
+  }
+
+  function shouldAutoSaveTemplateToLibrary() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return params.get("autosaveTemplate") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function shouldRedirectToLibraryAfterSave() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return params.get("redirectToLibrary") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function maybeRunPendingTemplateAutoSave() {
+    if (!state.isTemplateBuilder || !shouldAutoSaveTemplateToLibrary() || state.templateAutoSaveTriggered) {
+      return;
+    }
+    state.templateAutoSaveTriggered = true;
+    saveTemplateProgram();
   }
 
   function configureAssignedTemplateMode() {
@@ -1819,29 +2816,135 @@
       if (params.get("builder") === "1") {
         return;
       }
+      state.isCoachAssignedProgramEdit = params.get("coachEdit") === "1";
       state.isProgramReadOnly = params.get("view") === "1";
+      var assignmentId = String(params.get("assignmentId") || "").trim();
       var templateId = params.get("templateId");
-      if (!templateId) {
+      if (!templateId && !assignmentId) {
         return;
       }
 
-      var assignmentId = String(params.get("assignmentId") || "").trim();
-      state.assignedTemplateId = templateId;
-      state.assignedProgramInstanceId = assignmentId || null;
-      state.legacyStoragePrefix = "nomadic_training_program_log_" + String(templateId) + "_";
-      state.storagePrefix = state.assignedProgramInstanceId
-        ? "nomadic_training_program_assignment_log_" + state.assignedProgramInstanceId + "_"
-        : state.legacyStoragePrefix;
-      state.isAthleteLockedView = true;
       if (!state.client) {
         state.client = createSupabaseClient();
       }
 
-      applyAthleteLockedUi();
-      hydrateAssignedTemplate(templateId);
+      if (templateId) {
+        activateAssignedTemplateMode(templateId, assignmentId);
+        return;
+      }
+
+      resolveAssignedTemplateIdFromAssignment(assignmentId)
+        .then(function (resolvedTemplateId) {
+          if (!resolvedTemplateId) {
+            setStatus("This scheduled workout is missing its template link, so the editor could not open.", "error");
+            return;
+          }
+
+          activateAssignedTemplateMode(resolvedTemplateId, assignmentId);
+        })
+        .catch(function () {
+          setStatus("Could not load the scheduled workout editor for this assignment.", "error");
+        });
     } catch (e) {
       // Ignore malformed query parameters.
     }
+  }
+
+  function activateAssignedTemplateMode(templateId, assignmentId) {
+    var normalizedTemplateId = String(templateId || "").trim();
+    if (!normalizedTemplateId) {
+      return;
+    }
+
+    state.assignedTemplateId = normalizedTemplateId;
+    state.assignedProgramInstanceId = assignmentId || null;
+    state.legacyStoragePrefix = "nomadic_training_program_log_" + normalizedTemplateId + "_";
+    state.storagePrefix = state.assignedProgramInstanceId
+      ? "nomadic_training_program_assignment_log_" + state.assignedProgramInstanceId + "_"
+      : state.legacyStoragePrefix;
+    state.isAthleteLockedView = !state.isCoachAssignedProgramEdit;
+
+    if (state.isCoachAssignedProgramEdit) {
+      applyCoachAssignedProgramEditUi();
+    } else {
+      applyAthleteLockedUi();
+    }
+
+    hydrateAssignedTemplate(normalizedTemplateId);
+  }
+
+  function resolveAssignedTemplateIdFromAssignment(assignmentId) {
+    var normalizedAssignmentId = String(assignmentId || "").trim();
+    if (!state.client || !normalizedAssignmentId) {
+      return Promise.resolve("");
+    }
+
+    return state.client
+      .from("user_training_programs")
+      .select("program_id")
+      .eq("id", normalizedAssignmentId)
+      .single()
+      .then(function (result) {
+        if (result.error) {
+          return "";
+        }
+
+        return String(result.data && result.data.program_id || "").trim();
+      })
+      .catch(function () {
+        return "";
+      });
+  }
+
+  function applyCoachAssignedProgramEditUi() {
+    stopWorkoutWalkthrough(true);
+
+    var addExerciseBtn = document.querySelector("[data-add-exercise]");
+    var printBtn = document.querySelector("[data-print-workout]");
+    var fullPlanPrintBtn = document.querySelector("[data-print-full-plan]");
+    var clearBtn = document.querySelector("[data-clear-workout]");
+    var saveBtn = document.querySelector("[data-save-workout]");
+    var startWorkoutBtn = document.querySelector("[data-start-workout]");
+    var backLink = document.querySelector("[data-program-back-link]");
+    var subtitle = document.querySelector(".program-demo-subtitle");
+
+    state.builderStep = 3;
+    state.isProgramReadOnly = false;
+    state.isAthleteLockedView = false;
+
+    if (document.body) {
+      document.body.classList.remove("athlete-locked-view");
+      document.body.classList.add("template-builder-mode");
+    }
+
+    if (addExerciseBtn) {
+      addExerciseBtn.style.display = "none";
+    }
+    if (printBtn) {
+      printBtn.style.display = "none";
+    }
+    if (fullPlanPrintBtn) {
+      fullPlanPrintBtn.style.display = "none";
+    }
+    if (clearBtn) {
+      clearBtn.style.display = "none";
+    }
+    if (saveBtn) {
+      saveBtn.style.display = "inline-flex";
+      saveBtn.innerHTML = "<span>💾</span> Save Program Day";
+    }
+    if (startWorkoutBtn) {
+      startWorkoutBtn.style.display = "none";
+    }
+    if (backLink) {
+      backLink.href = "coach-schedule-calendar.html";
+      backLink.textContent = "← Back to Coach Schedule";
+    }
+    if (subtitle) {
+      subtitle.textContent = "Coach edit mode: review and adjust this athlete's assigned workout day.";
+    }
+
+    setBuilderStep(3);
   }
 
   function getPreferredDayFromQuery() {
@@ -1990,7 +3093,8 @@
     }
 
     if (fullPlanPrintBtn) {
-      fullPlanPrintBtn.style.display = "none";
+      fullPlanPrintBtn.style.display = "inline-flex";
+      fullPlanPrintBtn.innerHTML = "<span>👁️</span> View Workout Program";
     }
 
     if (saveBtn) {
@@ -2169,6 +3273,11 @@
       element.hidden = nextStep !== 3;
     });
 
+    var overviewPanel = document.querySelector("[data-template-program-overview]");
+    if (overviewPanel && nextStep !== 3) {
+      overviewPanel.hidden = true;
+    }
+
     if (dayTools) {
       dayTools.hidden = nextStep !== 3;
     }
@@ -2189,6 +3298,538 @@
     if (daySelect) {
       refreshWorkoutDaySelect(daySelect);
     }
+  }
+
+  function bindTemplateProgramOverviewEvents() {
+    document.addEventListener("click", function (event) {
+      var closeBtn = event.target && event.target.closest("[data-template-program-overview-close]");
+      if (closeBtn) {
+        closeTemplateProgramOverview();
+      }
+    });
+
+    function handleOverviewInput(target) {
+      if (!target || !target.closest) {
+        return;
+      }
+      var row = target.closest("[data-overview-slot]");
+      if (!row) {
+        return;
+      }
+      var slotKey = String(row.getAttribute("data-overview-slot") || "").trim();
+      if (!slotKey) {
+        return;
+      }
+
+      var field = String(target.getAttribute("data-overview-field") || "").trim();
+      var blockField = String(target.getAttribute("data-overview-block-field") || "").trim();
+      var plan = getSessionPlanForSlot(slotKey);
+
+      if (field) {
+        plan[field] = field === "duration_minutes"
+          ? clampNumber(parseInt(target.value, 10), 0, 1440, plan.duration_minutes || 0)
+          : String(target.value || "").trim();
+      }
+
+      if (blockField) {
+        var blockIndex = parseInt(String(target.getAttribute("data-overview-block-index") || "-1"), 10);
+        if (Number.isFinite(blockIndex) && blockIndex >= 0 && blockIndex < plan.blocks.length) {
+          if (blockField === "type") {
+            var nextType = normalizeSessionBlockType(target.value);
+            var existingTitle = String(plan.blocks[blockIndex].title || "").trim();
+            var refreshedBlock = createEmptySessionBlock(nextType, blockIndex);
+            plan.blocks[blockIndex] = Object.assign({}, refreshedBlock, {
+              type: nextType,
+              title: existingTitle && existingTitle !== "New Block" ? existingTitle : prettySessionBlockLabel(nextType)
+            });
+          } else {
+            plan.blocks[blockIndex][blockField] = String(target.value || "").trim();
+          }
+        }
+      }
+
+      state.sessionPlans[slotKey] = normalizeSessionPlan(plan, slotKey);
+      persistSessionPlanForSlot(slotKey, state.sessionPlans[slotKey]);
+
+      if (slotKey === state.day) {
+        renderDailyProgrammingDesigner();
+        renderDailyProgrammingSummary(state.sessionPlans[slotKey]);
+      }
+
+      renderTemplateProgramOverview();
+    }
+
+    document.addEventListener("input", function (event) {
+      handleOverviewInput(event.target);
+    });
+
+    document.addEventListener("change", function (event) {
+      handleOverviewInput(event.target);
+    });
+  }
+
+  function persistSessionPlanForSlot(slotKey, plan) {
+    var key = String(slotKey || "").trim();
+    if (!key) {
+      return;
+    }
+
+    var storageKey = state.storagePrefix + key;
+    var existing = readFromStorage(storageKey) || {};
+    existing.session_plan = normalizeSessionPlan(plan, key);
+    existing.saved_at = new Date().toISOString();
+    writeToStorage(storageKey, existing);
+  }
+
+  function openTemplateProgramOverview() {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var panel = document.querySelector("[data-template-program-overview]");
+    if (!panel) {
+      return;
+    }
+
+    saveExercisesForDay(true);
+    renderTemplateProgramOverview();
+    panel.hidden = false;
+  }
+
+  function closeTemplateProgramOverview() {
+    var panel = document.querySelector("[data-template-program-overview]");
+    if (panel) {
+      panel.hidden = true;
+    }
+  }
+
+  function renderTemplateProgramOverview() {
+    var panel = document.querySelector("[data-template-program-overview]");
+    var list = document.querySelector("[data-template-program-overview-list]");
+    if (!panel || panel.hidden || !list) {
+      return;
+    }
+
+    var slotKeys = getAllSlotKeys();
+    if (!slotKeys.length) {
+      list.innerHTML = '<p class="admin-loading">No workout days yet.</p>';
+      return;
+    }
+
+    list.innerHTML = slotKeys.map(function (slotKey) {
+      var plan = getSessionPlanForSlot(slotKey);
+      var blockRows = (Array.isArray(plan.blocks) ? plan.blocks : []).map(function (block, index) {
+        return [
+          '<div class="program-builder-overview-block-row">',
+          '<select data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-block-index="' + index + '" data-overview-block-field="type">',
+          buildSessionBlockTypeOptions(block && block.type),
+          '</select>',
+          '<input type="text" data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-block-index="' + index + '" data-overview-block-field="title" value="' + escapeAttribute(String(block && block.title || "")) + '" placeholder="Block title" />',
+          '</div>'
+        ].join("");
+      }).join("");
+
+      return [
+        '<article class="program-builder-overview-card" data-overview-slot="' + escapeAttribute(slotKey) + '">',
+        '<div class="program-builder-overview-card-head">',
+        '<h4>' + escapeHtml(labelForSlot(slotKey)) + '</h4>',
+        '<span>' + String((plan.blocks && plan.blocks.length) || 0) + ' block' + (((plan.blocks && plan.blocks.length) || 0) === 1 ? '' : 's') + '</span>',
+        '</div>',
+        '<div class="program-builder-overview-fields">',
+        '<label class="program-builder-structure-field">',
+        '<span>Session Title</span>',
+        '<input type="text" data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-field="title" value="' + escapeAttribute(plan.title || "") + '" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Session Type</span>',
+        '<select data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-field="session_type">',
+        buildSessionTypeSelectOptions(plan.session_type),
+        '</select>',
+        '</label>',
+        '<label class="program-builder-structure-field program-builder-structure-field-wide">',
+        '<span>Coach Notes</span>',
+        '<input type="text" data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-field="coach_notes" value="' + escapeAttribute(plan.coach_notes || "") + '" />',
+        '</label>',
+        '</div>',
+        '<div class="program-builder-overview-block-list">',
+        (blockRows || '<p class="admin-loading">No blocks yet.</p>'),
+        '</div>',
+        '</article>'
+      ].join("");
+    }).join("");
+  }
+
+  function openTemplateProgramOverviewPage() {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var returnUrl = String(window.location.href || "training-program-example.html");
+    var previewWindow = window.open("", "_self");
+    if (!previewWindow) {
+      setStatus("Could not open program overview in this tab.", "error");
+      return;
+    }
+
+    previewWindow.document.open();
+    previewWindow.document.write(buildTemplateProgramOverviewDocument(returnUrl));
+    previewWindow.document.close();
+    previewWindow.focus();
+  }
+
+  function buildTemplateProgramOverviewDocument(returnUrl) {
+    var slotKeys = getAllSlotKeys();
+    var totalWeeks = clampNumber(parseInt(state.structure && state.structure.weeks, 10), 1, 52, 1);
+    var workoutsPerWeek = clampNumber(parseInt(state.structure && state.structure.workoutsPerWeek, 10), 1, 14, 1);
+    var phases = Array.isArray(state.programPhases) ? state.programPhases : [];
+    var calendarData = buildTemplateOverviewCalendarData(slotKeys, totalWeeks);
+    var serializedCalendarData = JSON.stringify(calendarData).replace(/</g, "\\u003c");
+    var safeReturnUrl = String(returnUrl || "training-program-example.html").replace(/"/g, "&quot;");
+    var phaseCards = phases.length
+      ? phases.map(function (phase) {
+          return buildTemplateOverviewPhaseCard(phase, slotKeys);
+        }).join("")
+      : '<article class="overview-phase-card"><h3>No phases yet</h3><p>Add program phases to see the high-level structure.</p></article>';
+
+    return [
+      "<!DOCTYPE html>",
+      "<html lang=\"en\">",
+      "<head>",
+      "<meta charset=\"UTF-8\" />",
+      "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />",
+      "<title>Program Overview</title>",
+      "<style>",
+      "* { box-sizing: border-box; }",
+      "body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(140deg,#f2ece3 0%,#e9e1d5 100%); color: #143737; }",
+      ".overview-wrap { max-width: 1320px; margin: 0 auto; padding: 28px 22px 36px; }",
+      ".overview-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }",
+      ".overview-head-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }",
+      ".overview-btn { border: 1px solid #c8b49e; background: #fff7ec; color: #184040; border-radius: 9px; padding: 9px 12px; font-size: 0.86rem; font-weight: 700; cursor: pointer; }",
+      ".overview-btn.is-primary { background: linear-gradient(135deg, #c56a2c 0%, #b86127 100%); border-color: #a95c24; color: #fff; }",
+      ".overview-btn[hidden] { display: none !important; }",
+      ".overview-head h1 { margin: 0; font-size: 1.8rem; color: #0f2d2d; }",
+      ".overview-head p { margin: 8px 0 0; color: #4d6464; max-width: 720px; }",
+      ".overview-panel[hidden] { display: none !important; }",
+      ".overview-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }",
+      ".overview-summary-card { background: #fffdf9; border: 1px solid #dfd2c0; border-radius: 12px; padding: 12px 13px; }",
+      ".overview-summary-card h2 { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #5f7373; }",
+      ".overview-summary-card p { margin: 8px 0 0; font-size: 1.25rem; font-weight: 800; color: #183d3d; }",
+      ".overview-phase-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }",
+      ".overview-phase-card { background: #fffdf9; border: 1px solid #dfd2c0; border-radius: 12px; padding: 14px; display: grid; gap: 10px; }",
+      ".overview-phase-card h3 { margin: 0; color: #123636; font-size: 1.02rem; }",
+      ".overview-phase-meta { color: #607575; font-size: 0.84rem; }",
+      ".overview-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }",
+      ".overview-chip { border: 1px solid #d6c9b6; background: #f9f3e8; color: #4f4436; border-radius: 999px; padding: 3px 9px; font-size: 0.76rem; font-weight: 700; }",
+      ".overview-section-title { margin: 2px 0 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #607575; }",
+      ".calendar-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }",
+      ".calendar-week-card { background: #fffdf9; border: 1px solid #dfd2c0; border-radius: 12px; padding: 13px; display: grid; gap: 10px; }",
+      ".calendar-week-card h3 { margin: 0; font-size: 1rem; color: #133737; }",
+      ".calendar-controls { display: grid; gap: 7px; }",
+      ".calendar-control-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(122px, 170px); gap: 8px; align-items: center; }",
+      ".calendar-control-row label { font-size: 0.83rem; color: #335252; font-weight: 700; }",
+      ".calendar-control-row select { border: 1px solid #ccbba6; border-radius: 8px; padding: 6px 8px; font-size: 0.85rem; background: #fff; }",
+      ".calendar-week-grid { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 7px; }",
+      ".calendar-day { border: 1px solid #e2d5c4; border-radius: 10px; background: #fffcf7; min-height: 100px; padding: 7px; display: grid; gap: 5px; align-content: start; }",
+      ".calendar-day h4 { margin: 0; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: #496262; }",
+      ".calendar-workout { border: 1px solid #d6c7b4; border-radius: 8px; background: #f9f1e4; color: #3f3427; padding: 4px 5px; font-size: 0.72rem; font-weight: 700; line-height: 1.2; cursor: grab; display: grid; gap: 2px; }",
+      ".calendar-workout-meta { font-size: 0.62rem; font-weight: 700; color: #6c6256; text-transform: uppercase; letter-spacing: 0.05em; }",
+      ".calendar-workout.is-dragging { opacity: 0.5; }",
+      ".calendar-day.is-drop-target { outline: 2px dashed #c56a2c; outline-offset: 2px; }",
+      ".calendar-empty { color: #95a2a3; font-size: 0.72rem; font-style: italic; }",
+      ".calendar-meta { color: #688080; font-size: 0.8rem; margin: 0; }",
+      ".calendar-note { margin: 0 0 10px; color: #5f7373; font-size: 0.84rem; }",
+      "@media (max-width: 980px) { .overview-summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } .overview-phase-grid { grid-template-columns: 1fr; } }",
+      "@media (max-width: 980px) { .calendar-grid { grid-template-columns: 1fr; } .calendar-week-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }",
+      "</style>",
+      "</head>",
+      "<body>",
+      "<main class=\"overview-wrap\">",
+      "<header class=\"overview-head\">",
+      "<div>",
+      "<h1>Workout Program Overview</h1>",
+      "<p>Birds-eye review of the full template structure before saving: program length, phases, and movement/session distribution.</p>",
+      "</div>",
+      "<div class=\"overview-head-actions\">",
+      "<button type=\"button\" class=\"overview-btn\" id=\"backToBuilderBtn\">Back to Daily Workout Programming</button>",
+      "<button type=\"button\" class=\"overview-btn is-primary\" id=\"saveTemplateFromOverviewBtn\">Save Template</button>",
+      "<button type=\"button\" class=\"overview-btn is-primary\" id=\"viewCalendarBtn\">View in Calendar</button>",
+      "<button type=\"button\" class=\"overview-btn\" id=\"backToOverviewBtn\" hidden>Back to Overview</button>",
+      "</div>",
+      "</header>",
+      "<section class=\"overview-panel\" id=\"overviewPanel\">",
+      "<section class=\"overview-summary-grid\">",
+      '<article class=\"overview-summary-card\"><h2>Program Length</h2><p>' + String(totalWeeks) + ' weeks</p></article>',
+      '<article class=\"overview-summary-card\"><h2>Workouts / Week</h2><p>' + String(workoutsPerWeek) + '</p></article>',
+      '<article class=\"overview-summary-card\"><h2>Total Session Slots</h2><p>' + String(slotKeys.length) + '</p></article>',
+      '<article class=\"overview-summary-card\"><h2>Phases</h2><p>' + String(phases.length) + '</p></article>',
+      "</section>",
+      "<section class=\"overview-phase-grid\">",
+      phaseCards,
+      "</section>",
+      "</section>",
+      "<section class=\"overview-panel\" id=\"calendarPanel\" hidden>",
+      "<p class=\"calendar-note\">Move workouts across Monday-Sunday by selecting weekdays. Layout saves locally for this template overview.</p>",
+      "<div class=\"calendar-grid\" id=\"calendarWeeks\"></div>",
+      "</section>",
+      "</main>",
+      '<script>window.__OVERVIEW_DATA__ = ' + serializedCalendarData + ';window.__RETURN_URL__ = "' + safeReturnUrl + '";<\/script>',
+      "<script>",
+      "(function () {",
+      "  var data = window.__OVERVIEW_DATA__ || { weeks: [] };",
+      "  var returnUrl = window.__RETURN_URL__ || 'training-program-example.html';",
+      "  var overviewPanel = document.getElementById('overviewPanel');",
+      "  var calendarPanel = document.getElementById('calendarPanel');",
+      "  var saveTemplateFromOverviewBtn = document.getElementById('saveTemplateFromOverviewBtn');",
+      "  var viewCalendarBtn = document.getElementById('viewCalendarBtn');",
+      "  var backToOverviewBtn = document.getElementById('backToOverviewBtn');",
+      "  var backToBuilderBtn = document.getElementById('backToBuilderBtn');",
+      "  var calendarWeeks = document.getElementById('calendarWeeks');",
+      "  var weekdays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];",
+      "  var sessionTypeOptions = Array.isArray(data.sessionTypeOptions) ? data.sessionTypeOptions : [];",
+      "  var defaultWeekdays = [1,3,5,2,4,6,7];",
+      "  var draggedSlotKey = '';",
+      "  var storageKey = data.layoutKey || 'nomadic_template_calendar_layout_draft';",
+      "  var draftStoragePrefix = data.storagePrefix || 'nomadic_training_program_template_builder_draft_';",
+      "  var layout = {};",
+      "  try { layout = JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch (e) { layout = {}; }",
+      "  function saveLayout() { try { localStorage.setItem(storageKey, JSON.stringify(layout)); } catch (e) {} }",
+      "  function getAssignedDay(slotKey, index) {",
+      "    var raw = parseInt(layout[slotKey], 10);",
+      "    if (raw >= 1 && raw <= 7) { return raw; }",
+      "    return defaultWeekdays[index % defaultWeekdays.length];",
+      "  }",
+      "  function persistWorkoutPlanMeta(slotKey, nextTitle, nextSessionType) {",
+      "    if (!slotKey) { return; }",
+      "    try {",
+      "      var draftKey = draftStoragePrefix + slotKey;",
+      "      var raw = localStorage.getItem(draftKey);",
+      "      var parsed = raw ? JSON.parse(raw) : {};",
+      "      parsed = parsed && typeof parsed === 'object' ? parsed : {};",
+      "      parsed.session_plan = parsed.session_plan && typeof parsed.session_plan === 'object' ? parsed.session_plan : {};",
+      "      parsed.session_plan.title = String(nextTitle || '').trim();",
+      "      if (nextSessionType) { parsed.session_plan.session_type = String(nextSessionType || '').trim(); }",
+      "      parsed.saved_at = new Date().toISOString();",
+      "      localStorage.setItem(draftKey, JSON.stringify(parsed));",
+      "    } catch (e) {}",
+      "  }",
+      "  function renderCalendar() {",
+      "    if (!calendarWeeks) { return; }",
+      "    var weekCards = (Array.isArray(data.weeks) ? data.weeks : []).map(function (week) {",
+      "      var controls = (Array.isArray(week.workouts) ? week.workouts : []).map(function (workout, idx) {",
+      "        var currentDay = getAssignedDay(workout.slotKey, idx);",
+      "        var options = weekdays.map(function (label, i) {",
+      "          var dayNum = i + 1;",
+      "          var selected = dayNum === currentDay ? ' selected' : '';",
+      "          return '<option value=\"' + String(dayNum) + '\"' + selected + '>' + label + '</option>';",
+      "        }).join('');",
+      "        return '<div class=\"calendar-control-row\"><label>' + workout.label + '</label><select data-slot-key=\"' + workout.slotKey + '\">' + options + '</select></div>';",
+      "      }).join('');",
+      "      var byDay = {};",
+      "      weekdays.forEach(function (_, i) { byDay[i + 1] = []; });",
+      "      (Array.isArray(week.workouts) ? week.workouts : []).forEach(function (workout, idx) {",
+      "        var assigned = getAssignedDay(workout.slotKey, idx);",
+      "        byDay[assigned].push(workout);",
+      "      });",
+      "      var cells = weekdays.map(function (label, i) {",
+      "        var dayNum = i + 1;",
+      "        var workouts = byDay[dayNum] || [];",
+      "        var items = workouts.length ? workouts.map(function (w) { return '<div class=\"calendar-workout\" draggable=\"true\" data-slot-key=\"' + w.slotKey + '\"><div>' + w.title + '</div><div class=\"calendar-workout-meta\">' + (w.sessionTypeLabel || '') + '</div></div>'; }).join('') : '<div class=\"calendar-empty\">No workout</div>';",
+      "        return '<article class=\"calendar-day\" data-day-num=\"' + String(dayNum) + '\"><h4>' + label + '</h4>' + items + '</article>';",
+      "      }).join('');",
+      "      return '<section class=\"calendar-week-card\"><h3>Week ' + String(week.week) + '</h3><p class=\"calendar-meta\">' + String((week.workouts || []).length) + ' planned workout' + (((week.workouts || []).length === 1) ? '' : 's') + '</p><div class=\"calendar-controls\">' + (controls || '<p class=\"calendar-empty\">No workouts in this week.</p>') + '</div><div class=\"calendar-week-grid\">' + cells + '</div></section>';",
+      "    }).join('');",
+      "    calendarWeeks.innerHTML = weekCards || '<p class=\"calendar-empty\">No weeks available.</p>';",
+      "    var selects = calendarWeeks.querySelectorAll('select[data-slot-key]');",
+      "    selects.forEach(function (selectEl) {",
+      "      selectEl.addEventListener('change', function () {",
+      "        var slotKey = String(selectEl.getAttribute('data-slot-key') || '');",
+      "        var dayNum = parseInt(selectEl.value, 10);",
+      "        if (!slotKey || !(dayNum >= 1 && dayNum <= 7)) { return; }",
+      "        layout[slotKey] = dayNum;",
+      "        saveLayout();",
+      "        renderCalendar();",
+      "      });",
+      "    });",
+      "    var workoutCards = calendarWeeks.querySelectorAll('.calendar-workout[data-slot-key]');",
+      "    var dayCells = calendarWeeks.querySelectorAll('.calendar-day[data-day-num]');",
+      "    workoutCards.forEach(function (card) {",
+      "      card.addEventListener('dragstart', function () {",
+      "        draggedSlotKey = String(card.getAttribute('data-slot-key') || '');",
+      "        card.classList.add('is-dragging');",
+      "      });",
+      "      card.addEventListener('dragend', function () {",
+      "        draggedSlotKey = '';",
+      "        card.classList.remove('is-dragging');",
+      "        dayCells.forEach(function (cell) { cell.classList.remove('is-drop-target'); });",
+      "      });",
+      "      card.addEventListener('dblclick', function () {",
+      "        var slotKey = String(card.getAttribute('data-slot-key') || '');",
+      "        var currentWorkout = null;",
+      "        (Array.isArray(data.weeks) ? data.weeks : []).forEach(function (week) {",
+      "          (Array.isArray(week.workouts) ? week.workouts : []).forEach(function (workout) {",
+      "            if (String(workout.slotKey || '') === slotKey) { currentWorkout = workout; }",
+      "          });",
+      "        });",
+      "        var currentTitle = currentWorkout && currentWorkout.title ? currentWorkout.title : '';",
+      "        var currentSessionType = currentWorkout && currentWorkout.sessionType ? currentWorkout.sessionType : '';",
+      "        var nextTitle = window.prompt('Edit workout title:', currentTitle);",
+      "        if (nextTitle == null) { return; }",
+      "        var typeHelp = sessionTypeOptions.map(function (opt) { return opt.value + ' (' + opt.label + ')'; }).join(', ');",
+      "        var nextSessionType = window.prompt('Edit session type value (' + typeHelp + '):', currentSessionType);",
+      "        if (nextSessionType == null) { return; }",
+      "        nextTitle = String(nextTitle || '').trim() || currentTitle;",
+      "        nextSessionType = String(nextSessionType || '').trim() || currentSessionType;",
+      "        (Array.isArray(data.weeks) ? data.weeks : []).forEach(function (week) {",
+      "          (Array.isArray(week.workouts) ? week.workouts : []).forEach(function (workout) {",
+      "            if (String(workout.slotKey || '') === slotKey) {",
+      "              workout.title = nextTitle;",
+      "              workout.sessionType = nextSessionType;",
+      "              var match = sessionTypeOptions.find(function (opt) { return opt.value === nextSessionType; });",
+      "              workout.sessionTypeLabel = match ? match.label : nextSessionType;",
+      "            }",
+      "          });",
+      "        });",
+      "        persistWorkoutPlanMeta(slotKey, nextTitle, nextSessionType);",
+      "        renderCalendar();",
+      "      });",
+      "    });",
+      "    dayCells.forEach(function (cell) {",
+      "      cell.addEventListener('dragover', function (event) { event.preventDefault(); cell.classList.add('is-drop-target'); });",
+      "      cell.addEventListener('dragleave', function () { cell.classList.remove('is-drop-target'); });",
+      "      cell.addEventListener('drop', function (event) {",
+      "        event.preventDefault();",
+      "        cell.classList.remove('is-drop-target');",
+      "        var dayNum = parseInt(String(cell.getAttribute('data-day-num') || ''), 10);",
+      "        if (!draggedSlotKey || !(dayNum >= 1 && dayNum <= 7)) { return; }",
+      "        layout[draggedSlotKey] = dayNum;",
+      "        saveLayout();",
+      "        renderCalendar();",
+      "      });",
+      "    });",
+      "  }",
+      "  if (viewCalendarBtn) {",
+      "    viewCalendarBtn.addEventListener('click', function () {",
+      "      if (overviewPanel) { overviewPanel.hidden = true; }",
+      "      if (calendarPanel) { calendarPanel.hidden = false; }",
+      "      viewCalendarBtn.hidden = true;",
+      "      if (backToOverviewBtn) { backToOverviewBtn.hidden = false; }",
+      "      renderCalendar();",
+      "    });",
+      "  }",
+      "  if (backToOverviewBtn) {",
+      "    backToOverviewBtn.addEventListener('click', function () {",
+      "      if (overviewPanel) { overviewPanel.hidden = false; }",
+      "      if (calendarPanel) { calendarPanel.hidden = true; }",
+      "      backToOverviewBtn.hidden = true;",
+      "      if (viewCalendarBtn) { viewCalendarBtn.hidden = false; }",
+      "    });",
+      "  }",
+      "  if (backToBuilderBtn) {",
+      "    backToBuilderBtn.addEventListener('click', function () {",
+      "      window.location.href = returnUrl;",
+      "    });",
+      "  }",
+      "  if (saveTemplateFromOverviewBtn) {",
+      "    saveTemplateFromOverviewBtn.addEventListener('click', function () {",
+      "      var nextUrl = new URL(returnUrl, window.location.origin);",
+      "      nextUrl.searchParams.set('autosaveTemplate', '1');",
+      "      nextUrl.searchParams.set('redirectToLibrary', '1');",
+      "      window.location.href = nextUrl.toString();",
+      "    });",
+      "  }",
+      "})();",
+      "<\/script>",
+      "</body>",
+      "</html>"
+    ].join("\n");
+  }
+
+  function buildTemplateOverviewCalendarData(slotKeys, totalWeeks) {
+    var weeks = [];
+    for (var week = 1; week <= totalWeeks; week++) {
+      weeks.push({ week: week, workouts: [] });
+    }
+
+    slotKeys.forEach(function (slotKey) {
+      var parsed = parseSlotKey(slotKey);
+      if (!parsed || parsed.week < 1 || parsed.week > totalWeeks) {
+        return;
+      }
+      var plan = getSessionPlanForSlot(slotKey);
+      weeks[parsed.week - 1].workouts.push({
+        slotKey: slotKey,
+        label: labelForSlot(slotKey),
+        title: String(plan && plan.title || labelForSlot(slotKey)).trim() || labelForSlot(slotKey),
+        sessionType: normalizeWeeklySessionType(plan && plan.session_type),
+        sessionTypeLabel: prettySessionTypeLabel(plan && plan.session_type)
+      });
+    });
+
+    weeks.forEach(function (week) {
+      week.workouts.sort(function (a, b) {
+        var aParsed = parseSlotKey(a.slotKey) || { workout: 0 };
+        var bParsed = parseSlotKey(b.slotKey) || { workout: 0 };
+        return aParsed.workout - bParsed.workout;
+      });
+    });
+
+    return {
+      weeks: weeks,
+      layoutKey: getTemplateCalendarLayoutKey(),
+      storagePrefix: TEMPLATE_DRAFT_PREFIX,
+      sessionTypeOptions: WEEKLY_SESSION_TYPE_OPTIONS
+    };
+  }
+
+  function buildTemplateOverviewPhaseCard(phase, slotKeys) {
+    var name = String(phase && phase.name || "Phase").trim() || "Phase";
+    var startWeek = clampNumber(parseInt(phase && phase.start_week, 10), 1, state.structure && state.structure.weeks || 1, 1);
+    var endWeek = clampNumber(parseInt(phase && phase.end_week, 10), startWeek, state.structure && state.structure.weeks || startWeek, startWeek);
+    var trainingDays = clampNumber(parseInt(phase && phase.training_days_per_week, 10), 1, 14, state.structure && state.structure.workoutsPerWeek || 1);
+    var phaseSlots = slotKeys.filter(function (slotKey) {
+      var parsed = parseSlotKey(slotKey);
+      if (!parsed) {
+        return false;
+      }
+      return parsed.week >= startWeek && parsed.week <= endWeek;
+    });
+
+    var sessionTypeCounts = {};
+    var blockTypeCounts = {};
+
+    phaseSlots.forEach(function (slotKey) {
+      var plan = getSessionPlanForSlot(slotKey);
+      var sessionType = normalizeWeeklySessionType(plan && plan.session_type);
+      sessionTypeCounts[sessionType] = (sessionTypeCounts[sessionType] || 0) + 1;
+
+      (Array.isArray(plan && plan.blocks) ? plan.blocks : []).forEach(function (block) {
+        var blockType = normalizeSessionBlockType(block && block.type);
+        blockTypeCounts[blockType] = (blockTypeCounts[blockType] || 0) + 1;
+      });
+    });
+
+    var sessionChips = Object.keys(sessionTypeCounts).sort().map(function (key) {
+      return '<span class="overview-chip">' + escapeHtml(prettySessionTypeLabel(key)) + ': ' + String(sessionTypeCounts[key]) + '</span>';
+    }).join('');
+
+    var blockChips = Object.keys(blockTypeCounts).sort().map(function (key) {
+      return '<span class="overview-chip">' + escapeHtml(prettySessionBlockLabel(key)) + ': ' + String(blockTypeCounts[key]) + '</span>';
+    }).join('');
+
+    return [
+      '<article class="overview-phase-card">',
+      '<h3>' + escapeHtml(name) + '</h3>',
+      '<p class="overview-phase-meta">Weeks ' + String(startWeek) + '-' + String(endWeek) + ' • ' + String(trainingDays) + ' training day' + (trainingDays === 1 ? '' : 's') + ' / week</p>',
+      '<div>',
+      '<p class="overview-section-title">Session Types In This Phase</p>',
+      '<div class="overview-chip-row">' + (sessionChips || '<span class="overview-chip">No session types yet</span>') + '</div>',
+      '</div>',
+      '<div>',
+      '<p class="overview-section-title">Block Type Distribution</p>',
+      '<div class="overview-chip-row">' + (blockChips || '<span class="overview-chip">No blocks yet</span>') + '</div>',
+      '</div>',
+      '</article>'
+    ].join('');
   }
 
   function setProgramTitleFromQuery() {
@@ -4313,7 +5954,7 @@
 
   function loadExercisesForDay() {
     var stored = readWorkoutLogForDay();
-    if (state.isTemplateBuilder) {
+    if (state.isTemplateBuilder || state.isCoachAssignedProgramEdit) {
       if (stored && stored.session_plan) {
         state.sessionPlans[state.day] = normalizeSessionPlan(stored.session_plan, state.day);
       } else if (!state.sessionPlans[state.day]) {
@@ -4321,9 +5962,14 @@
       }
     }
 
-    var assignedExercises = state.assignedTemplateDays && Array.isArray(state.assignedTemplateDays[state.day])
-      ? cloneExercises(state.assignedTemplateDays[state.day])
-      : null;
+    var assignedExercises = null;
+    if (stored && stored.session_plan && (state.isAthleteLockedView || state.isCoachAssignedProgramEdit)) {
+      assignedExercises = convertSessionPlanToExercises(normalizeSessionPlan(stored.session_plan, state.day));
+    } else {
+      assignedExercises = state.assignedTemplateDays && Array.isArray(state.assignedTemplateDays[state.day])
+        ? cloneExercises(state.assignedTemplateDays[state.day])
+        : null;
+    }
 
     if (state.isAthleteLockedView && assignedExercises) {
       state.exercises = assignedExercises;
@@ -4342,7 +5988,7 @@
       return;
     }
 
-    if (state.isTemplateBuilder) {
+    if (state.isTemplateBuilder || state.isCoachAssignedProgramEdit) {
       var currentPlan = getCurrentSessionPlan();
       state.exercises = convertSessionPlanToExercises(currentPlan);
       state.exercises = normalizeExercisesArray(state.exercises);
@@ -4360,7 +6006,7 @@
 
   function saveExercisesForDay(silent) {
     var slotSessionPlan = null;
-    if (state.isTemplateBuilder) {
+    if (state.isTemplateBuilder || state.isCoachAssignedProgramEdit) {
       slotSessionPlan = getCurrentSessionPlan();
       state.sessionPlans[state.day] = slotSessionPlan;
       state.exercises = convertSessionPlanToExercises(slotSessionPlan);
@@ -4371,15 +6017,18 @@
     }
 
     state.exercises = normalizeExercisesArray(state.exercises);
+    var existingStored = readWorkoutLogForDay() || {};
     var payload = {
-      exercises: state.exercises,
+      exercises: state.isCoachAssignedProgramEdit
+        ? (Array.isArray(existingStored.exercises) ? existingStored.exercises : [])
+        : state.exercises,
       session_plan: slotSessionPlan,
       saved_at: new Date().toISOString()
     };
 
     writeToStorage(storageKeyForDay(), payload);
     if (!silent) {
-      setStatus(state.isTemplateBuilder ? "Draft day saved." : "✓ Workout log saved successfully.", "success");
+      setStatus(state.isTemplateBuilder ? "Draft day saved." : state.isCoachAssignedProgramEdit ? "Program day saved." : "✓ Workout log saved successfully.", "success");
     }
   }
 
@@ -4447,14 +6096,21 @@
     saveTemplateToLibrary(saveData)
       .then(function () {
         setProgramTitleFromQuery();
-        setStatus("Template saved. Active athlete programs now use the latest template version.", "success");
+        setStatus("Template saved.", "success");
+
+        if (shouldRedirectToLibraryAfterSave()) {
+          window.location.href = "coach-training-programs.html";
+          return;
+        }
 
         if (state.templateId) {
           try {
-            var nextUrl =
-              window.location.pathname +
-              "?builder=1&templateId=" +
-              encodeURIComponent(state.templateId);
+            var nextParams = new URLSearchParams(window.location.search || "");
+            nextParams.set("builder", "1");
+            nextParams.set("templateId", state.templateId);
+            nextParams.delete("autosaveTemplate");
+            nextParams.delete("redirectToLibrary");
+            var nextUrl = window.location.pathname + "?" + nextParams.toString();
             window.history.replaceState({}, "", nextUrl);
           } catch (e) {
             // Ignore history update errors.
@@ -4556,31 +6212,11 @@
       }
 
       state.templateId = result.data && result.data.id ? result.data.id : state.templateId;
-
-      if (!isEditingExistingTemplate || !state.templateId) {
-        return {
-          templateId: state.templateId,
-          templateName: saveData.templateName
-        };
-      }
-
-      return state.client
-        .from("user_training_programs")
-        .update({ program_name: saveData.templateName })
-        .eq("program_id", state.templateId)
-        .eq("is_active", true)
-        .then(function () {
-          return {
-            templateId: state.templateId,
-            templateName: saveData.templateName
-          };
-        })
-        .catch(function () {
-          return {
-            templateId: state.templateId,
-            templateName: saveData.templateName
-          };
-        });
+      return {
+        templateId: state.templateId,
+        templateName: saveData.templateName,
+        isEditingExistingTemplate: isEditingExistingTemplate
+      };
     });
   }
 
@@ -4624,15 +6260,16 @@
         );
       })
       .then(function (result) {
-        var scheduledDates = generateScheduledDates(startDate, blueprint.length);
-        if (!scheduledDates.length) {
+        var layoutMap = readTemplateCalendarLayout();
+        var scheduledDatesBySlot = generateScheduledDatesFromBlueprint(startDate, blueprint, layoutMap);
+        if (!scheduledDatesBySlot || !Object.keys(scheduledDatesBySlot).length) {
           throw new Error("Could not generate scheduled dates.");
         }
 
         var rows = blueprint.map(function (slot, index) {
           return {
             user_training_program_id: result.assignment.id,
-            scheduled_for: scheduledDates[index],
+            scheduled_for: scheduledDatesBySlot[slot.slotKey] || scheduledDatesBySlot[slot.slotKey.toLowerCase()] || formatDateInputValue(new Date()),
             slot_key: slot.slotKey,
             session_label: slot.label,
             status: "scheduled",
@@ -4760,6 +6397,70 @@
     }
 
     return dates;
+  }
+
+  function getTemplateCalendarLayoutKey() {
+    return "nomadic_template_calendar_layout_" + String(state.templateId || state.templateName || "draft");
+  }
+
+  function readTemplateCalendarLayout() {
+    try {
+      var raw = window.localStorage.getItem(getTemplateCalendarLayoutKey());
+      if (!raw) {
+        return {};
+      }
+      var parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function defaultWeekdayForWorkout(workoutIndex) {
+    var idx = clampNumber(parseInt(workoutIndex, 10), 1, 14, 1);
+    var defaults = [1, 3, 5, 2, 4, 6, 7, 1, 2, 3, 4, 5, 6, 7];
+    return defaults[idx - 1] || 1;
+  }
+
+  function generateScheduledDatesFromBlueprint(startDate, blueprint, layoutMap) {
+    var slots = Array.isArray(blueprint) ? blueprint : [];
+    if (!slots.length) {
+      return {};
+    }
+
+    var parts = String(startDate || "").split("-");
+    if (parts.length !== 3) {
+      return {};
+    }
+
+    var year = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10);
+    var day = parseInt(parts[2], 10);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+      return {};
+    }
+
+    var anchor = new Date(year, month - 1, day);
+    if (isNaN(anchor.getTime())) {
+      return {};
+    }
+
+    var assignments = {};
+    slots.forEach(function (slot) {
+      var slotKey = String(slot && slot.slotKey || "").trim();
+      var parsed = parseSlotKey(slotKey);
+      if (!parsed) {
+        return;
+      }
+
+      var weekdayRaw = parseInt(String(layoutMap && layoutMap[slotKey] != null ? layoutMap[slotKey] : layoutMap && layoutMap[slotKey.toLowerCase()]), 10);
+      var weekday = weekdayRaw >= 1 && weekdayRaw <= 7 ? weekdayRaw : defaultWeekdayForWorkout(parsed.workout);
+      var scheduledDate = new Date(anchor.getTime());
+      scheduledDate.setDate(scheduledDate.getDate() + ((parsed.week - 1) * 7) + (weekday - 1));
+      assignments[slotKey] = formatDateInputValue(scheduledDate);
+    });
+
+    return assignments;
   }
 
   function formatDateInputValue(dateValue) {
@@ -4892,61 +6593,300 @@
           setStatus("Template content could not be parsed.", "error");
           return;
         }
-
-        state.structure = normalizeStructure(payload.structure || deriveStructureFromDays(payload.days));
-        state.templateFocus = normalizeTemplateFocus(payload.focus);
-        state.programMeta = normalizeProgramMeta(payload.program_meta, state.structure);
-        state.programPhases = normalizeProgramPhases(payload.program_phases, state.structure.weeks, state.programMeta.program_type);
-        state.weeklyStructure = normalizeWeeklyStructure(payload.weekly_structure, state.structure.workoutsPerWeek, state.templateFocus, state.programMeta.program_type);
-        state.sessionPlans = normalizeSessionPlans(payload.session_plans);
-        state.daySessionTypes = normalizeDaySessionTypes(payload.day_session_types);
-        state.customDayNames = normalizeCustomDayNames(payload.custom_day_names);
-        state.customDayNameMode = normalizeCustomDayNameMode(payload.custom_day_name_mode);
-        ensureDaySessionTypesForStructure();
-        var normalizedDays = normalizeTemplateDays(payload.days);
-        var daySelect = document.querySelector("[data-workout-day]");
-        if (daySelect) {
-          refreshWorkoutDaySelect(daySelect);
-          state.day = daySelect.value || getAllSlotKeys()[0] || "w1d1";
-        }
-
-        state.templateName = row.name || "";
-        var nameInput = document.querySelector("[data-template-name]");
-        if (nameInput) {
-          nameInput.value = state.templateName;
-        }
-        var weeksInput = document.querySelector("[data-template-weeks]");
-        var workoutsInput = document.querySelector("[data-template-workouts-per-week]");
-        if (weeksInput) {
-          weeksInput.value = String(state.structure.weeks);
-        }
-        if (workoutsInput) {
-          workoutsInput.value = String(state.structure.workoutsPerWeek);
-        }
-        var focusInput = document.querySelector("[data-template-focus]");
-        if (focusInput) {
-          focusInput.value = state.templateFocus;
-        }
-        refreshBuilderPlannerUi();
-        setProgramTitleFromQuery();
-
-        getAllSlotKeys().forEach(function (slotKey) {
-          var exercises = normalizedDays[slotKey] || [];
-          writeToStorage(TEMPLATE_DRAFT_PREFIX + slotKey, {
-            session_plan: state.sessionPlans[slotKey] || buildDefaultSessionPlan(slotKey),
-            exercises: Array.isArray(exercises) ? exercises : [],
-            saved_at: new Date().toISOString()
-          });
-        });
-
-        loadExercisesForDay();
-        renderRows();
-        updateDayInfo();
-        refreshTemplateDayTools();
+        loadTemplatePayloadIntoBuilder(row.name || "", payload);
       })
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Failed to load template.", "error");
       });
+  }
+
+  function hydrateDraftFromPreset(presetKey) {
+    var preset = getBuiltInTemplatePreset(presetKey);
+    if (!preset || !preset.payload) {
+      setStatus("Built-in template preset not found.", "error");
+      return;
+    }
+
+    loadTemplatePayloadIntoBuilder(preset.name || "Starter Template", preset.payload);
+    setStatus("Loaded built-in template starter.", "success");
+  }
+
+  function loadTemplatePayloadIntoBuilder(templateName, payload) {
+    state.structure = normalizeStructure(payload.structure || deriveStructureFromDays(payload.days));
+    state.templateFocus = normalizeTemplateFocus(payload.focus);
+    state.programMeta = normalizeProgramMeta(payload.program_meta, state.structure);
+    state.programPhases = normalizeProgramPhases(payload.program_phases, state.structure.weeks, state.programMeta.program_type);
+    state.weeklyStructure = normalizeWeeklyStructure(payload.weekly_structure, state.structure.workoutsPerWeek, state.templateFocus, state.programMeta.program_type);
+    state.sessionPlans = normalizeSessionPlans(payload.session_plans);
+    state.daySessionTypes = normalizeDaySessionTypes(payload.day_session_types);
+    state.customDayNames = normalizeCustomDayNames(payload.custom_day_names);
+    state.customDayNameMode = normalizeCustomDayNameMode(payload.custom_day_name_mode);
+    ensureDaySessionTypesForStructure();
+
+    var normalizedDays = normalizeTemplateDays(payload.days);
+    var daySelect = document.querySelector("[data-workout-day]");
+    if (daySelect) {
+      refreshWorkoutDaySelect(daySelect);
+      state.day = daySelect.value || getAllSlotKeys()[0] || "w1d1";
+    }
+
+    state.templateName = templateName || "";
+    var nameInput = document.querySelector("[data-template-name]");
+    if (nameInput) {
+      nameInput.value = state.templateName;
+    }
+    var weeksInput = document.querySelector("[data-template-weeks]");
+    var workoutsInput = document.querySelector("[data-template-workouts-per-week]");
+    if (weeksInput) {
+      weeksInput.value = String(state.structure.weeks);
+    }
+    if (workoutsInput) {
+      workoutsInput.value = String(state.structure.workoutsPerWeek);
+    }
+
+    refreshBuilderPlannerUi();
+    setProgramTitleFromQuery();
+
+    getAllSlotKeys().forEach(function (slotKey) {
+      var exercises = normalizedDays[slotKey] || convertSessionPlanToExercises(state.sessionPlans[slotKey] || buildDefaultSessionPlan(slotKey));
+      writeToStorage(TEMPLATE_DRAFT_PREFIX + slotKey, {
+        session_plan: state.sessionPlans[slotKey] || buildDefaultSessionPlan(slotKey),
+        exercises: Array.isArray(exercises) ? exercises : [],
+        saved_at: new Date().toISOString()
+      });
+    });
+
+    loadExercisesForDay();
+    renderRows();
+    updateDayInfo();
+    refreshTemplateDayTools();
+    maybeRunPendingTemplateAutoSave();
+  }
+
+  function getBuiltInTemplatePreset(presetKey) {
+    var key = String(presetKey || "").trim().toLowerCase();
+    if (key === "climbing-12-week") {
+      return {
+        key: key,
+        name: "12-Week Climbing Performance Build",
+        payload: buildClimbing12WeekTemplatePayload()
+      };
+    }
+    return null;
+  }
+
+  function buildClimbing12WeekTemplatePayload() {
+    var structure = { weeks: 12, workoutsPerWeek: 4 };
+    var programMeta = normalizeProgramMeta({
+      program_type: "individualized",
+      sport_focus: "Climbing",
+      athlete_level: "intermediate",
+      primary_goal: "Improve finger strength, pulling power, and power endurance for climbing.",
+      secondary_goal: "Maintain shoulder resilience and aerobic support.",
+      training_days_per_week: 4,
+      strength_days_per_week: 2,
+      endurance_days_per_week: 1,
+      mobility_days_per_week: 1,
+      deload_frequency: "every_4",
+      tags: ["climbing", "hangboarding", "power-endurance", "pull-strength"],
+      season_objectives: [
+        {
+          label: "Climbing Peak",
+          sport_focus: "Performance phase",
+          primary_goal: "Peak finger strength and route power-endurance by weeks 10-12.",
+          secondary_goal: "Maintain tissue health.",
+          phase_start_week: 10,
+          phase_end_week: 12,
+          priority: "primary",
+          notes: "Final 3-week peak block."
+        }
+      ]
+    }, structure);
+
+    var programPhases = normalizeProgramPhases([
+      { name: "Foundation", start_week: 1, end_week: 3, focus: "Movement quality, shoulder integrity, and base finger loading.", training_days_per_week: 4, strength_days_per_week: 2, cardio_days_per_week: 1, skill_days_per_week: 1, multi_focus_days_per_week: 0, endurance_days_per_week: 1, mobility_days_per_week: 1 },
+      { name: "Finger Strength Build", start_week: 4, end_week: 6, focus: "Progressive hangboarding and heavier pulling strength.", training_days_per_week: 4, strength_days_per_week: 2, cardio_days_per_week: 1, skill_days_per_week: 1, multi_focus_days_per_week: 0, endurance_days_per_week: 1, mobility_days_per_week: 1 },
+      { name: "Power Endurance", start_week: 7, end_week: 9, focus: "Convert strength to repeated hard climbing efforts.", training_days_per_week: 4, strength_days_per_week: 1, cardio_days_per_week: 1, skill_days_per_week: 1, multi_focus_days_per_week: 1, endurance_days_per_week: 1, mobility_days_per_week: 1 },
+      { name: "Peak + Taper", start_week: 10, end_week: 12, focus: "Maintain strength, sharpen power, and reduce fatigue.", training_days_per_week: 4, strength_days_per_week: 1, cardio_days_per_week: 1, skill_days_per_week: 1, multi_focus_days_per_week: 1, endurance_days_per_week: 1, mobility_days_per_week: 1 }
+    ], structure.weeks, programMeta.program_type);
+
+    var weeklyStructure = normalizeWeeklyStructure([
+      { workout: 1, name: "Finger Strength + Lower Body", session_type: "strength_full", note: "Primary max-strength and finger loading day." },
+      { workout: 2, name: "Aerobic Recovery + Mobility", session_type: "zone2", note: "Easy recovery support and mobility." },
+      { workout: 3, name: "Upper Pull Power", session_type: "strength_upper", note: "Explosive pulling and antagonist support." },
+      { workout: 4, name: "Climbing Capacity", session_type: "threshold", note: "Intervals, EMOM, or AMRAP depending on the phase." }
+    ], structure.workoutsPerWeek, "hybrid", programMeta.program_type);
+
+    var sessionPlans = {};
+    var daySessionTypes = {};
+    var customDayNames = {};
+
+    for (var week = 1; week <= 12; week++) {
+      var phaseKey = week <= 3 ? "foundation" : week <= 6 ? "strength" : week <= 9 ? "capacity" : "peak";
+      var wk = "w" + week;
+      sessionPlans[wk + "d1"] = buildClimbingPresetDayOne(week, phaseKey);
+      sessionPlans[wk + "d2"] = buildClimbingPresetDayTwo(week, phaseKey);
+      sessionPlans[wk + "d3"] = buildClimbingPresetDayThree(week, phaseKey);
+      sessionPlans[wk + "d4"] = buildClimbingPresetDayFour(week, phaseKey);
+      daySessionTypes[wk + "d1"] = "strength_full";
+      daySessionTypes[wk + "d2"] = phaseKey === "peak" ? "mobility" : "zone2";
+      daySessionTypes[wk + "d3"] = "strength_upper";
+      daySessionTypes[wk + "d4"] = phaseKey === "peak" && week === 12 ? "assessment" : "threshold";
+      customDayNames[wk + "d1"] = "Finger Strength + Lower Body";
+      customDayNames[wk + "d2"] = "Aerobic Recovery + Mobility";
+      customDayNames[wk + "d3"] = "Upper Pull Power";
+      customDayNames[wk + "d4"] = "Climbing Capacity";
+    }
+
+    return {
+      archived: false,
+      focus: "hybrid",
+      program_meta: programMeta,
+      program_phases: programPhases,
+      weekly_structure: weeklyStructure,
+      day_session_types: daySessionTypes,
+      custom_day_names: customDayNames,
+      custom_day_name_mode: "full-label",
+      structure: structure,
+      session_plans: sessionPlans,
+      days: buildTemplateDaysFromSessionPlans(sessionPlans)
+    };
+  }
+
+  function buildTemplateDaysFromSessionPlans(sessionPlans) {
+    var plans = sessionPlans && typeof sessionPlans === "object" ? sessionPlans : {};
+    var days = {};
+    Object.keys(plans).forEach(function (slotKey) {
+      days[slotKey] = convertSessionPlanToExercises(normalizeSessionPlan(plans[slotKey], slotKey));
+    });
+    return days;
+  }
+
+  function buildClimbingPresetExerciseBlock(type, title, flow, restInterval, exercises, options) {
+    var list = Array.isArray(exercises) ? exercises : [];
+    var config = options && typeof options === "object" ? options : {};
+    return {
+      type: type,
+      title: title,
+      exercise_flow: flow || "straight",
+      exercise_rest_strategy: config.restStrategy || "between_exercises",
+      exercise_rest_interval: restInterval || "",
+      notes: config.notes || "",
+      exercise_count: list.length,
+      exercise_names: list.map(function (exercise) { return exercise.name; }),
+      exercise_sets: list.map(function (exercise) { return String((exercise.reps || []).length || 1); }),
+      exercise_intensity_types: list.map(function (exercise) { return exercise.defaultIntensityType || "rpe"; }),
+      exercise_set_reps: list.map(function (exercise) { return (exercise.reps || [""]).slice(); }),
+      exercise_set_intensities: list.map(function (exercise) { return (exercise.intensities || [""]).slice(); }),
+      exercise_set_rests: list.map(function (exercise) { return (exercise.rests || [""]).slice(); }),
+      exercise_set_rep_types: list.map(function (exercise) { return (exercise.reps || [""]).map(function () { return exercise.repType || "reps"; }); }),
+      exercise_set_intensity_types: list.map(function (exercise) { return (exercise.reps || [""]).map(function () { return exercise.defaultIntensityType || "rpe"; }); })
+    };
+  }
+
+  function buildClimbingPresetDayOne(week, phaseKey) {
+    var hangboard = phaseKey === "foundation"
+      ? { protocol: "Repeaters", grip: "20mm edge, half crimp", rounds: 6, hang: 7, rest: 53, effort: "RPE 7" }
+      : phaseKey === "strength"
+        ? { protocol: "Max Hangs", grip: "18-20mm edge", rounds: 6, hang: 10, rest: 110, effort: "RPE 8-9" }
+        : phaseKey === "capacity"
+          ? { protocol: "Density Hangs", grip: "20mm edge", rounds: 8, hang: 10, rest: 50, effort: "RPE 8" }
+          : { protocol: "Taper Hangs", grip: "20mm edge", rounds: 4, hang: 8, rest: 70, effort: "RPE 6-7" };
+    return normalizeSessionPlan({
+      title: "Finger Strength + Lower Body",
+      session_type: "strength_full",
+      session_goal: phaseKey === "peak" ? "Maintain finger recruitment and full-body strength with low fatigue." : "Build foundational full-body strength and finger force for climbing.",
+      coach_notes: "Stop finger work early if skin, elbows, or pulleys feel off.",
+      blocks: [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 12, target_intensity: "Scap, hips, wrists, and finger prep" },
+        buildClimbingPresetExerciseBlock("main_strength", "Lower + Pull Strength", "straight", "120s", [
+          { name: "Front Squat", reps: phaseKey === "peak" ? ["3", "3", "3"] : ["5", "5", "5"], intensities: phaseKey === "strength" ? ["8", "8", "8.5"] : ["7", "7", "7.5"], rests: ["120s", "120s", "120s"], defaultIntensityType: "rpe" },
+          { name: "Weighted Pull-Up", reps: phaseKey === "peak" ? ["3", "3", "3"] : ["5", "5", "5"], intensities: phaseKey === "strength" ? ["8", "8", "8.5"] : ["7", "7", "7.5"], rests: ["120s", "120s", "120s"], defaultIntensityType: "rpe" }
+        ], { notes: "Primary strength pair." }),
+        { type: "hangboarding", title: "Hangboarding", hang_protocol_name: hangboard.protocol, hang_grip_type: hangboard.grip, hang_rounds: hangboard.rounds, hang_hang_seconds: hangboard.hang, hang_rest_seconds: hangboard.rest, hang_effort: hangboard.effort },
+        { type: "cooldown", title: "Cooldown", duration_minutes: 8, target_intensity: "Forearms, shoulders, hips" }
+      ]
+    }, "w" + week + "d1");
+  }
+
+  function buildClimbingPresetDayTwo(week, phaseKey) {
+    return normalizeSessionPlan({
+      title: "Aerobic Recovery + Mobility",
+      session_type: phaseKey === "peak" ? "mobility" : "zone2",
+      session_goal: "Support recovery and maintain aerobic base without adding finger fatigue.",
+      coach_notes: phaseKey === "peak" ? "Keep easy and restorative." : "Stay conversational and move well.",
+      blocks: phaseKey === "peak"
+        ? [
+            { type: "warmup", title: "Breathing Reset", duration_minutes: 6, target_intensity: "Downregulate" },
+            { type: "mobility", title: "Mobility Flow", duration_minutes: 25, target_intensity: "T-spine, shoulders, hips, wrists" },
+            { type: "cooldown", title: "Walk + Stretch", duration_minutes: 10, target_intensity: "Easy" }
+          ]
+        : [
+            { type: "warmup", title: "Easy Warm-Up", duration_minutes: 8, target_intensity: "Gradual ramp" },
+            { type: "zone2", title: "Zone 2 Aerobic", exercise_form: "running", duration_minutes: phaseKey === "foundation" ? 35 : phaseKey === "strength" ? 40 : 45, target_intensity: "Zone 2" },
+            { type: "mobility", title: "Mobility / Recovery", duration_minutes: 15, target_intensity: "Forearms, shoulders, hips" }
+          ]
+    }, "w" + week + "d2");
+  }
+
+  function buildClimbingPresetDayThree(week, phaseKey) {
+    return normalizeSessionPlan({
+      title: "Upper Pull Power",
+      session_type: "strength_upper",
+      session_goal: "Develop explosive pulling power and antagonist balance for climbing.",
+      coach_notes: "Keep explosive work fast and low-fatigue.",
+      blocks: [
+        { type: "warmup", title: "Upper Prep", duration_minutes: 10, target_intensity: "Scap, cuff, trunk" },
+        buildClimbingPresetExerciseBlock("power", "Explosive Pull + Coordination", phaseKey === "capacity" ? "circuit" : "straight", phaseKey === "capacity" ? "75s" : "90s", [
+          { name: "Explosive Pull-Up", reps: ["3", "3", "3"], intensities: [phaseKey === "peak" ? "RPE 7" : "RPE 8", phaseKey === "peak" ? "RPE 7" : "RPE 8", phaseKey === "peak" ? "RPE 7" : "RPE 8"], rests: ["90s", "90s", "90s"], defaultIntensityType: "custom" },
+          { name: phaseKey === "capacity" ? "Box Jump" : "Medicine Ball Slam", reps: ["4", "4", "4"], intensities: ["Fast", "Fast", "Fast"], rests: ["90s", "90s", "90s"], defaultIntensityType: "custom" }
+        ], { restStrategy: phaseKey === "capacity" ? "between_rounds" : "between_exercises" }),
+        buildClimbingPresetExerciseBlock("secondary_strength", "Antagonist + Scap Strength", "superset", "60s", [
+          { name: "Ring Push-Up", reps: ["8", "8", "8"], intensities: ["7", "7", "7"], rests: ["", "", ""], defaultIntensityType: "rpe" },
+          { name: "Prone Y/T Raise", reps: ["10", "10", "10"], intensities: ["Easy", "Easy", "Easy"], rests: ["", "", ""], defaultIntensityType: "custom" }
+        ], { restStrategy: "between_rounds" }),
+        { type: "cooldown", title: "Cooldown", duration_minutes: 8, target_intensity: "Forearms + shoulders" }
+      ]
+    }, "w" + week + "d3");
+  }
+
+  function buildClimbingPresetDayFour(week, phaseKey) {
+    var blocks;
+    if (phaseKey === "foundation") {
+      blocks = [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 10, target_intensity: "Progressive" },
+        { type: "intervals", title: "Climbing Capacity Intervals", interval_exercise_mode: "free_text", interval_exercise_name: "Treadwall / bike / uphill treadmill", interval_rounds: 6, interval_work_time: "2:00", interval_rest_time: "2:00", interval_work_intensity_type: "rpe", interval_rest_intensity_type: "zone", interval_work_intensity: "RPE 7", interval_rest_intensity: "Zone 1-2" },
+        { type: "cooldown", title: "Cooldown", duration_minutes: 8, target_intensity: "Easy" }
+      ];
+    } else if (phaseKey === "strength") {
+      blocks = [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 10, target_intensity: "Prep" },
+        { type: "emom", title: "Grip + Trunk EMOM", emom_exercise: "Minute 1: 20s hollow hold / Minute 2: 8 KB swings / Minute 3: 20s towel dead hang", emom_minutes: 12, emom_intensity_type: "rpe", emom_intensity: "RPE 7" },
+        { type: "cooldown", title: "Cooldown", duration_minutes: 8, target_intensity: "Easy" }
+      ];
+    } else if (phaseKey === "capacity") {
+      blocks = [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 10, target_intensity: "Prep" },
+        { type: "amrap", title: "Power Endurance AMRAP", amrap_exercise: "6 pull-ups, 8 push-ups, 10 step-ups, 30s plank", amrap_minutes: 16, amrap_intensity_type: "rpe", amrap_intensity: "RPE 8" },
+        { type: "cooldown", title: "Cooldown", duration_minutes: 8, target_intensity: "Easy" }
+      ];
+    } else {
+      blocks = [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 8, target_intensity: "Prep" },
+        week === 12
+          ? { type: "assessment", title: "Climbing Readiness Check", prescription: "Short quality movement and performance check", notes: "Keep volume low and confidence high." }
+          : { type: "intervals", title: "Sharpness Intervals", interval_exercise_mode: "free_text", interval_exercise_name: "Short route or treadwall efforts", interval_rounds: 4, interval_work_time: "90s", interval_rest_time: "2:30", interval_work_intensity_type: "rpe", interval_rest_intensity_type: "complete_rest", interval_work_intensity: "RPE 8" },
+        { type: "cooldown", title: "Cooldown", duration_minutes: 8, target_intensity: "Easy" }
+      ];
+    }
+
+    return normalizeSessionPlan({
+      title: "Climbing Capacity",
+      session_type: phaseKey === "peak" && week === 12 ? "assessment" : "threshold",
+      session_goal: phaseKey === "capacity" ? "Sustain high output across repeated efforts." : "Build or sharpen energy-system support for climbing.",
+      coach_notes: phaseKey === "peak" ? "Finish feeling fresh." : "Stay technical under fatigue.",
+      blocks: blocks
+    }, "w" + week + "d4");
   }
 
   function clearBuilderDrafts() {
