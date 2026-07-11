@@ -292,19 +292,16 @@
     list.innerHTML = '<p class="admin-loading">Loading workout completion notifications...</p>';
 
     state.client
-      .from("coach_athlete_messages")
-      .select("id,athlete_user_id,body,read_by_coach_at,created_at,delivery_label,sender_role")
-      .eq("coach_user_id", state.coachUser.id)
-      .eq("sender_role", "athlete")
-      .eq("delivery_label", "workout-complete")
-      .order("created_at", { ascending: false })
-      .limit(80)
+      .from("athlete_exercise_history")
+      .select("id,athlete_user_id,slot_key,workout_completed_at,exercise_name,total_sets,completed_sets,top_weight,volume_load")
+      .order("workout_completed_at", { ascending: false })
+      .limit(600)
       .then(function (result) {
         if (result && result.error) {
           throw result.error;
         }
 
-        state.workoutCompletionTodos = Array.isArray(result.data) ? result.data.slice() : [];
+        state.workoutCompletionTodos = groupWorkoutCompletionHistoryRows(result && Array.isArray(result.data) ? result.data : []);
         return hydrateWorkoutTodoAthleteNames(state.workoutCompletionTodos);
       })
       .then(function () {
@@ -313,6 +310,78 @@
       .catch(function (error) {
         list.innerHTML = '<p class="admin-loading">Could not load workout completion notifications: ' + escapeHtml(error && error.message ? error.message : "Unknown error") + '</p>';
       });
+  }
+
+  function groupWorkoutCompletionHistoryRows(rows) {
+    var grouped = {};
+
+    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      var completedAt = String(row && row.workout_completed_at || "").trim();
+      var slotKey = String(row && row.slot_key || "").trim();
+      if (!athleteId || !completedAt) {
+        return;
+      }
+
+      var key = athleteId + "|" + completedAt + "|" + slotKey;
+      if (!grouped[key]) {
+        grouped[key] = {
+          athlete_user_id: athleteId,
+          created_at: completedAt,
+          slot_key: slotKey || null,
+          exercises: [],
+          total_sets: 0,
+          completed_sets: 0,
+          volume_load: 0,
+          top_weight: null
+        };
+      }
+
+      var target = grouped[key];
+      var sets = Number(row && row.total_sets || 0);
+      var done = Number(row && row.completed_sets || 0);
+      var volume = Number(row && row.volume_load || 0);
+      var topWeight = row && row.top_weight != null ? Number(row.top_weight) : null;
+
+      target.total_sets += isNaN(sets) ? 0 : sets;
+      target.completed_sets += isNaN(done) ? 0 : done;
+      target.volume_load += isNaN(volume) ? 0 : volume;
+      if (topWeight != null && !isNaN(topWeight) && (target.top_weight == null || topWeight > target.top_weight)) {
+        target.top_weight = topWeight;
+      }
+
+      var exerciseName = String(row && row.exercise_name || "").trim();
+      if (exerciseName && target.exercises.indexOf(exerciseName) === -1) {
+        target.exercises.push(exerciseName);
+      }
+    });
+
+    return Object.keys(grouped).map(function (key) {
+      var item = grouped[key];
+      var exerciseCount = item.exercises.length;
+      var completionPct = item.total_sets > 0 ? Math.round((item.completed_sets / item.total_sets) * 100) : 0;
+      var summaryLines = [];
+      summaryLines.push("Workout complete");
+      if (item.slot_key) {
+        summaryLines.push("Slot: " + item.slot_key.toUpperCase());
+      }
+      summaryLines.push("Completion: " + String(completionPct) + "% (" + item.completed_sets + "/" + item.total_sets + " sets)");
+      summaryLines.push("Exercises logged: " + String(exerciseCount));
+      if (item.top_weight != null) {
+        summaryLines.push("Top load: " + item.top_weight);
+      }
+      if (item.volume_load > 0) {
+        summaryLines.push("Volume load: " + Math.round(item.volume_load * 100) / 100);
+      }
+      if (exerciseCount) {
+        summaryLines.push("Exercises: " + item.exercises.slice(0, 5).join(", ") + (exerciseCount > 5 ? "..." : ""));
+      }
+
+      item.body = summaryLines.join("\n");
+      return item;
+    }).sort(function (a, b) {
+      return String(b && b.created_at || "").localeCompare(String(a && a.created_at || ""));
+    });
   }
 
   function hydrateWorkoutTodoAthleteNames(rows) {
@@ -365,25 +434,18 @@
     }
 
     rows.sort(function (a, b) {
-      var aUnread = !a || !a.read_by_coach_at ? 1 : 0;
-      var bUnread = !b || !b.read_by_coach_at ? 1 : 0;
-      if (aUnread !== bUnread) {
-        return bUnread - aUnread;
-      }
       return String(b && b.created_at || "").localeCompare(String(a && a.created_at || ""));
     });
 
     list.innerHTML = rows.map(function (row) {
       var athleteId = String(row && row.athlete_user_id || "").trim();
       var athleteName = state.athleteNamesById[athleteId] || "Athlete";
-      var isUnread = !row || !row.read_by_coach_at;
       var body = String(row && row.body || "").trim();
       return (
-        '<details class="admin-overview-item"' + (isUnread ? ' open' : '') + '>' +
+        '<details class="admin-overview-item" open>' +
           '<summary class="admin-overview-item-title" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">' +
             '<span>' + escapeHtml(athleteName) + ' • Workout Complete</span>' +
             '<span class="admin-overview-item-meta">' +
-              (isUnread ? '<strong>Unread</strong> • ' : '') +
               escapeHtml(formatDateTime(row && row.created_at)) +
             '</span>' +
           '</summary>' +

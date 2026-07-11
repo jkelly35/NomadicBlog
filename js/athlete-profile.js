@@ -1325,16 +1325,30 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     return !!assignedBy && !!viewedUserId && assignedBy !== viewedUserId;
   }
 
-  function resolveAthleteAccountTier() {
-    var activePrograms = (state.trainingProgramsCache || []).filter(function (program) {
-      return !!(program && program.is_active);
-    });
+  function normalizeCoachAccessTierOverride(value) {
+    var raw = String(value == null ? "" : value).trim().toLowerCase();
+    if (!raw || raw === "auto" || raw === "none" || raw === "system") {
+      return "";
+    }
 
-    var hasActiveProgram = activePrograms.length > 0;
-    var hasIndividualizedProgramming = activePrograms.some(isLikelyIndividualizedProgram);
-    var hasMembership = hasCompletedMembershipPayment(state.foundingOnboardingRow);
+    if (raw === "athlete" || raw === "athlete_account") {
+      return "athlete";
+    }
+    if (raw === "active_member" || raw === "active_membership" || raw === "member") {
+      return "active_member";
+    }
+    if (raw === "active_program" || raw === "program") {
+      return "active_program";
+    }
+    if (raw === "individualized" || raw === "individualized_programming" || raw === "custom_program") {
+      return "individualized";
+    }
 
-    if (hasIndividualizedProgramming) {
+    return "";
+  }
+
+  function resolveAccountTierDescriptor(tierKey) {
+    if (tierKey === "individualized") {
       return {
         key: "individualized",
         label: "Individualized Programming",
@@ -1342,7 +1356,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       };
     }
 
-    if (hasActiveProgram) {
+    if (tierKey === "active_program") {
       return {
         key: "active_program",
         label: "Active Program",
@@ -1350,7 +1364,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       };
     }
 
-    if (hasMembership) {
+    if (tierKey === "active_member") {
       return {
         key: "active_member",
         label: "Active Membership",
@@ -1363,6 +1377,95 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       label: "Athlete Account",
       toneClass: "is-tier-athlete"
     };
+  }
+
+  function resolveCoachAccessTierOverrideKey() {
+    return normalizeCoachAccessTierOverride(state.profile && state.profile.coach_access_tier_override);
+  }
+
+  function buildDashboardAccessContextForTier(tierKey) {
+    if (tierKey === "individualized") {
+      return {
+        mode: "full",
+        fullFeatureAccess: true,
+        features: {
+          compass: false,
+          workoutCalendar: true,
+          messaging: true,
+          browsePrograms: true
+        },
+        reason: "Coach override: Individualized programming access (Compass hidden)."
+      };
+    }
+
+    if (tierKey === "active_program") {
+      return {
+        mode: "premade_program_only",
+        fullFeatureAccess: false,
+        features: {
+          compass: false,
+          workoutCalendar: false,
+          messaging: false,
+          browsePrograms: true
+        },
+        reason: "Coach override: Active Program access."
+      };
+    }
+
+    if (tierKey === "active_member") {
+      return {
+        mode: "full",
+        fullFeatureAccess: true,
+        features: {
+          compass: true,
+          workoutCalendar: true,
+          messaging: true,
+          browsePrograms: true
+        },
+        reason: "Coach override: Active Membership access."
+      };
+    }
+
+    return {
+      mode: "limited",
+      fullFeatureAccess: false,
+      features: {
+        compass: false,
+        workoutCalendar: false,
+        messaging: false,
+        browsePrograms: true
+      },
+      reason: "Coach override: Athlete Account access."
+    };
+  }
+
+  function resolveAthleteAccountTier() {
+    var coachOverrideTier = resolveCoachAccessTierOverrideKey();
+    if (coachOverrideTier) {
+      return resolveAccountTierDescriptor(coachOverrideTier);
+    }
+
+    var activePrograms = (state.trainingProgramsCache || []).filter(function (program) {
+      return !!(program && program.is_active);
+    });
+    var hasIndividualizedProgramming = activePrograms.some(isLikelyIndividualizedProgram);
+
+    var hasActiveProgram = activePrograms.length > 0;
+    var hasMembership = hasCompletedMembershipPayment(state.foundingOnboardingRow);
+
+    if (hasIndividualizedProgramming) {
+      return resolveAccountTierDescriptor("individualized");
+    }
+
+    if (hasActiveProgram) {
+      return resolveAccountTierDescriptor("active_program");
+    }
+
+    if (hasMembership) {
+      return resolveAccountTierDescriptor("active_member");
+    }
+
+    return resolveAccountTierDescriptor("athlete");
   }
 
   function renderProfileTierBadge() {
@@ -1402,9 +1505,16 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       };
     }
 
+    var coachOverrideTier = resolveCoachAccessTierOverrideKey();
+    if (coachOverrideTier) {
+      return buildDashboardAccessContextForTier(coachOverrideTier);
+    }
+
     var activePrograms = (state.trainingProgramsCache || []).filter(function (program) {
       return !!(program && program.is_active);
     });
+    var hasIndividualizedProgramming = activePrograms.some(isLikelyIndividualizedProgram);
+    var individualizedCompassAccess = !hasIndividualizedProgramming;
 
     var assignments = (state.onboardingAssignments || []).filter(function (assignment) {
       return !!assignment && String(assignment.status || "").toLowerCase() !== "archived";
@@ -1454,12 +1564,14 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         mode: "full",
         fullFeatureAccess: true,
         features: {
-          compass: true,
+          compass: individualizedCompassAccess,
           workoutCalendar: true,
           messaging: true,
           browsePrograms: true
         },
-        reason: ""
+        reason: hasIndividualizedProgramming
+          ? "Compass is disabled for individualized programming accounts."
+          : ""
       };
     }
 
@@ -1496,12 +1608,14 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         mode: "full",
         fullFeatureAccess: true,
         features: {
-          compass: true,
+          compass: individualizedCompassAccess,
           workoutCalendar: true,
           messaging: true,
           browsePrograms: true
         },
-        reason: ""
+        reason: hasIndividualizedProgramming
+          ? "Compass is disabled for individualized programming accounts."
+          : ""
       };
     }
 
@@ -8308,6 +8422,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     renderDashboardCoachTasks();
 
     updateQuickGlanceTraining(activePrograms.length, pastPrograms.length, upcomingScheduledItems);
+    var browseProgramsEnabled = state.isCoachView || !!(accessContext && accessContext.features && accessContext.features.browsePrograms);
 
     var html = '';
 
@@ -8315,7 +8430,9 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     html += '<p class="training-note">Browse the program library to find a plan that fits your goals. Your plan will appear here once your coach assigns it to you.</p>';
     html += (state.isCoachView
       ? '<div class="training-coach-actions"><button type="button" class="btn profile-btn-edit-profile training-change-btn" data-assign-active-program>Assign Program to Athlete</button><button type="button" class="btn profile-btn-edit-profile training-change-btn" data-change-active-program>Edit Program for Athlete</button></div>'
-      : '');
+      : (browseProgramsEnabled
+          ? '<div class="training-coach-actions"><a class="btn profile-btn-cancel training-change-btn" href="training-programs.html">Browse Program Library</a></div>'
+          : ''));
     html += '</div>';
 
     if (workoutCalendarEnabled && calendarScheduledItems.length) {
@@ -8342,7 +8459,6 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         '</article>';
     }
 
-    var browseProgramsEnabled = state.isCoachView || !!(accessContext && accessContext.features && accessContext.features.browsePrograms);
     var trainingEmptyStateActionsHtml = "";
     var hasActiveMembership = hasCompletedMembershipPayment(state.foundingOnboardingRow);
 

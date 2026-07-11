@@ -613,6 +613,7 @@
     setText("[data-ov-email]",   p.email     || (state.profile && state.profile.email) || "—");
     setText("[data-ov-age]",     p.age       ? p.age + " years" : "—");
     setText("[data-ov-sex]",     formatSex(p.sex));
+    setText("[data-ov-membership-level]", resolveInsightMembershipLevelLabel(p));
     setText("[data-ov-location]",p.location  || "—");
     setText("[data-ov-height]",  p.height_cm ? p.height_cm + " cm" : "—");
     setText("[data-ov-weight]",  p.weight_kg ? p.weight_kg + " kg" : "—");
@@ -634,6 +635,113 @@
         overviewEl.innerHTML = buildSportOverviewHtml(sport_overview, sports);
       }
     }
+  }
+
+  function normalizeCoachAccessTierOverride(value) {
+    var raw = String(value == null ? "" : value).trim().toLowerCase();
+    if (!raw || raw === "auto" || raw === "none" || raw === "system") {
+      return "";
+    }
+
+    if (raw === "athlete" || raw === "athlete_account") {
+      return "athlete";
+    }
+    if (raw === "active_member" || raw === "active_membership" || raw === "member") {
+      return "active_member";
+    }
+    if (raw === "active_program" || raw === "program") {
+      return "active_program";
+    }
+    if (raw === "individualized" || raw === "individualized_programming" || raw === "custom_program") {
+      return "individualized";
+    }
+
+    return "";
+  }
+
+  function resolveTierLabelFromKey(tierKey) {
+    if (tierKey === "individualized") {
+      return "Individualized Programming";
+    }
+    if (tierKey === "active_program") {
+      return "Active Program";
+    }
+    if (tierKey === "active_member") {
+      return "Active Membership";
+    }
+    return "Athlete Account";
+  }
+
+  function isLikelyIndividualizedProgram(program) {
+    if (!program || !program.is_active) {
+      return false;
+    }
+
+    var name = String(program.program_name || program.name || "").toLowerCase();
+    if (
+      name.indexOf("custom") > -1 ||
+      name.indexOf("individualized") > -1 ||
+      name.indexOf("1:1") > -1 ||
+      name.indexOf("1-1") > -1
+    ) {
+      return true;
+    }
+
+    var assignedBy = String(program.assigned_by || "").trim();
+    return !!assignedBy && assignedBy !== String(state.athleteId || "").trim();
+  }
+
+  function hasCompletedMembershipPaymentForInsight() {
+    var completedPaymentTask = (state.onboardingAssignments || []).some(function (assignment) {
+      var status = String(assignment && assignment.status || "").toLowerCase();
+      return isMembershipPaymentAssignment(assignment) && (status === "submitted" || status === "archived");
+    });
+    if (completedPaymentTask) {
+      return true;
+    }
+
+    var rows = Array.isArray(state.foundingSubscriptionRows) ? state.foundingSubscriptionRows : [];
+    return rows.some(function (row) {
+      var subscriptionStatus = String(row && row.status || "").toLowerCase();
+      if (
+        subscriptionStatus === "active" ||
+        subscriptionStatus === "trialing" ||
+        subscriptionStatus === "paid" ||
+        subscriptionStatus === "completed" ||
+        subscriptionStatus === "succeeded"
+      ) {
+        return true;
+      }
+
+      var eventType = String(row && row.last_event_type || "").toLowerCase();
+      return (
+        eventType === "invoice.payment_succeeded" ||
+        eventType === "checkout.session.completed" ||
+        eventType === "checkout.session.async_payment_succeeded"
+      );
+    });
+  }
+
+  function resolveInsightMembershipLevelLabel(profile) {
+    var overrideTier = normalizeCoachAccessTierOverride(profile && profile.coach_access_tier_override);
+    if (overrideTier) {
+      return resolveTierLabelFromKey(overrideTier);
+    }
+
+    var activePrograms = (state.programs || []).filter(function (program) {
+      return !!(program && program.is_active);
+    });
+    if (activePrograms.some(isLikelyIndividualizedProgram)) {
+      return resolveTierLabelFromKey("individualized");
+    }
+    if (activePrograms.length) {
+      return resolveTierLabelFromKey("active_program");
+    }
+    if (hasCompletedMembershipPaymentForInsight()) {
+      return resolveTierLabelFromKey("active_member");
+    }
+
+    return resolveTierLabelFromKey("athlete");
   }
 
   function getSportOverview(profile) {

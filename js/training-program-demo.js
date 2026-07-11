@@ -53,6 +53,9 @@
     workoutWalkthroughStartedAt: null,
     workoutCompletionSummary: null,
     workoutSessionStartedAt: null,
+    cloudExerciseHistoryBestByName: {},
+    cloudExerciseHistoryLoaded: false,
+    lastWorkoutCompletionCloudSyncPromise: null,
     currentUserId: null,
     assignmentAthleteUserId: null,
     assignmentCoachUserId: null
@@ -63,6 +66,8 @@
   var WORKOUT_BLOCK_LIBRARY_KEY = "nomadic_template_workout_blocks_v1";
   var EXERCISE_LIBRARY_KEY = "nomadic_exercise_library_v1";
   var EXERCISE_LIBRARY_TABLE = "exercise_library";
+  var EXERCISE_PERFORMANCE_HISTORY_PREFIX = "nomadic_exercise_performance_history_";
+  var workoutWalkthroughTimerInterval = null;
 
   var dayLabels = {
     "w1d1": "Lower Body Power",
@@ -3242,6 +3247,7 @@
     }
 
     ensureAssignmentMessagingContext();
+    loadCloudExerciseHistoryBestWeights();
 
     hydrateAssignedTemplate(normalizedTemplateId);
   }
@@ -3617,11 +3623,17 @@
       return;
     }
 
-    var feedback = getWorkoutFeedbackValues();
-    if (!feedback.intensityRating) {
-      setStatus("Please rate workout intensity (1-10) before marking this session complete.", "info");
-      return;
+    if (isCurrentWorkoutCompletionRecorded()) {
+      var completeAgain = confirm("This workout is already marked complete.\n\nPress OK to update completion again, or Cancel to return to Workout Overview.");
+      if (!completeAgain) {
+        closeWorkoutCompletionModal();
+        activateAthleteWorkoutOverviewMode();
+        setStatus("Workout already completed. Returned to Workout Overview.", "info");
+        return;
+      }
     }
+
+    var feedback = getWorkoutFeedbackValues();
 
     if (state.workoutWalkthroughActive) {
       finalizeWorkoutCompletion(state.workoutWalkthroughStartedAt || Date.now(), Date.now(), feedback, true);
@@ -3709,7 +3721,7 @@
     if (fullPlanPrintBtn) {
       fullPlanPrintBtn.style.display = "inline-flex";
       if (state.isAthleteLockedView && !state.isProgramReadOnly && !isAthleteWorkoutOverviewMode()) {
-        fullPlanPrintBtn.innerHTML = "Workout Overview";
+        fullPlanPrintBtn.innerHTML = "View Workout";
       } else {
         fullPlanPrintBtn.innerHTML = isAthleteWorkoutOverviewMode()
           ? "View Workout"
@@ -3738,9 +3750,7 @@
 
     if (startWorkoutBtn) {
       startWorkoutBtn.style.display = state.isProgramReadOnly ? "none" : "inline-flex";
-      startWorkoutBtn.innerHTML = isAthleteWorkoutOverviewMode()
-        ? "Start Workout"
-        : "<span>▶</span> Start Guided Workout";
+      startWorkoutBtn.innerHTML = "Start Workout";
       startWorkoutBtn.disabled = false;
       startWorkoutBtn.setAttribute("aria-disabled", "false");
       wireStartWorkoutButton(startWorkoutBtn);
@@ -6972,6 +6982,14 @@
         ? (Array.isArray(existingStored.exercises) ? existingStored.exercises : [])
         : state.exercises,
       session_plan: slotSessionPlan,
+      workout_completed_at: existingStored.workout_completed_at || null,
+      workout_completion_recorded: !!existingStored.workout_completion_recorded,
+      workout_completed_started_at: existingStored.workout_completed_started_at || null,
+      workout_completed_feedback: existingStored.workout_completed_feedback || null,
+      workout_performance_entries: existingStored.workout_performance_entries || null,
+      workout_total_volume_load: existingStored.workout_total_volume_load || null,
+      workout_volume_by_movement_pattern: existingStored.workout_volume_by_movement_pattern || null,
+      workout_volume_by_primary_muscle: existingStored.workout_volume_by_primary_muscle || null,
       saved_at: new Date().toISOString()
     };
 
@@ -6992,10 +7010,7 @@
       return;
     }
 
-    var snapshot = getWorkoutCompletionSnapshot(state.exercises || []);
-    var nextStatus = snapshot.totalSets > 0 && snapshot.doneSets === snapshot.totalSets
-      ? "completed"
-      : "scheduled";
+    var nextStatus = isCurrentWorkoutMarkedComplete() ? "completed" : "scheduled";
 
     state.client
       .from("athlete_program_schedule")
@@ -7029,6 +7044,73 @@
       totalSets: totalSets,
       doneSets: doneSets
     };
+  }
+
+  function isCurrentWorkoutMarkedComplete() {
+    var stored = readWorkoutLogForDay() || {};
+    if (stored.workout_completed_at || stored.workout_completion_recorded) {
+      return true;
+    }
+
+    var snapshot = getWorkoutCompletionSnapshot(state.exercises || []);
+    return snapshot.totalSets > 0 && snapshot.doneSets === snapshot.totalSets;
+  }
+
+  function isCurrentWorkoutCompletionRecorded() {
+    var stored = readWorkoutLogForDay() || {};
+    return !!(stored.workout_completed_at || stored.workout_completion_recorded);
+  }
+
+  function markCurrentWorkoutCompleted(startedAt, finishedAt, feedback) {
+    var existingStored = readWorkoutLogForDay() || {};
+    var finishedIso = new Date(finishedAt || Date.now()).toISOString();
+    var startedIso = startedAt ? new Date(startedAt).toISOString() : null;
+    var safeFeedback = feedback && typeof feedback === "object" ? feedback : {};
+    var performance = buildWorkoutPerformanceSnapshot(state.exercises || []);
+
+    var payload = {
+      exercises: state.isCoachAssignedProgramEdit
+        ? (Array.isArray(existingStored.exercises) ? existingStored.exercises : [])
+        : normalizeExercisesArray(state.exercises || []),
+      session_plan: existingStored.session_plan || null,
+      workout_completed_at: finishedIso,
+      workout_completion_recorded: true,
+      workout_completed_started_at: startedIso,
+      workout_completed_feedback: {
+        intensityRating: safeFeedback.intensityRating == null ? null : safeFeedback.intensityRating,
+        comments: String(safeFeedback.comments || "").trim()
+      },
+      workout_performance_entries: performance.entries,
+      workout_total_volume_load: performance.totalVolumeLoad,
+      workout_volume_by_movement_pattern: performance.volumeByMovementPattern,
+      workout_volume_by_primary_muscle: performance.volumeByPrimaryMuscle,
+      saved_at: new Date().toISOString()
+    };
+
+    writeToStorage(storageKeyForDay(), payload);
+    persistExercisePerformanceHistory(startedAt, finishedAt, performance.entries);
+    state.lastWorkoutCompletionCloudSyncPromise = syncWorkoutPerformanceToCloud(startedAt, finishedAt, performance.entries);
+  }
+
+  function clearCurrentWorkoutCompletedMarker() {
+    var existingStored = readWorkoutLogForDay() || {};
+    var payload = {
+      exercises: state.isCoachAssignedProgramEdit
+        ? (Array.isArray(existingStored.exercises) ? existingStored.exercises : [])
+        : normalizeExercisesArray(state.exercises || []),
+      session_plan: existingStored.session_plan || null,
+      workout_completed_at: null,
+      workout_completion_recorded: false,
+      workout_completed_started_at: null,
+      workout_completed_feedback: null,
+      workout_performance_entries: null,
+      workout_total_volume_load: null,
+      workout_volume_by_movement_pattern: null,
+      workout_volume_by_primary_muscle: null,
+      saved_at: new Date().toISOString()
+    };
+
+    writeToStorage(storageKeyForDay(), payload);
   }
 
   function saveTemplateProgram() {
@@ -10539,7 +10621,8 @@
   }
 
   function startWorkoutWalkthrough() {
-    if (state.isProgramReadOnly || state.isTemplateBuilder || state.isCoachAssignedProgramEdit) {
+    var isActiveAthleteMode = state.isAthleteLockedView && !state.isProgramReadOnly;
+    if (state.isTemplateBuilder || (!isActiveAthleteMode && state.isCoachAssignedProgramEdit) || state.isProgramReadOnly) {
       setStatus("Start Workout is only available in active athlete workout mode.", "info");
       return;
     }
@@ -10555,10 +10638,23 @@
       return;
     }
 
+    if (isCurrentWorkoutMarkedComplete()) {
+      var performAgain = confirm("This workout is already marked complete.\n\nPress OK to perform the workout again, or Cancel to return to Workout Overview.");
+      if (!performAgain) {
+        activateAthleteWorkoutOverviewMode();
+        setStatus("Workout already completed. Returned to Workout Overview.", "info");
+        return;
+      }
+
+      clearCurrentWorkoutCompletedMarker();
+      syncScheduledSessionStatusForCurrentDay();
+    }
+
     state.workoutWalkthroughSteps = steps;
     state.workoutWalkthroughStepIndex = 0;
     state.workoutWalkthroughActive = true;
-    state.workoutWalkthroughStartedAt = Date.now();
+    state.workoutWalkthroughStartedAt = null;
+    stopWorkoutWalkthroughTimer();
     state.workoutCompletionSummary = null;
     renderRows();
     setStatus("Workout walkthrough started.", "info");
@@ -10569,6 +10665,7 @@
     state.workoutWalkthroughStepIndex = 0;
     state.workoutWalkthroughSteps = [];
     state.workoutWalkthroughStartedAt = null;
+    stopWorkoutWalkthroughTimer();
     renderWorkoutWalkthrough();
     renderRows();
 
@@ -10609,8 +10706,68 @@
       return;
     }
 
+    var currentStep = state.workoutWalkthroughSteps[state.workoutWalkthroughStepIndex];
+    if (!state.workoutWalkthroughStartedAt && currentStep && currentStep.type === "section_intro" && state.workoutWalkthroughStepIndex === 0) {
+      state.workoutWalkthroughStartedAt = Date.now();
+      startWorkoutWalkthroughTimer();
+    }
+
     state.workoutWalkthroughStepIndex += 1;
     renderWorkoutWalkthrough();
+  }
+
+  function formatWorkoutWalkthroughTimer(milliseconds) {
+    var totalSeconds = Math.max(0, Math.floor((Number(milliseconds) || 0) / 1000));
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+    }
+
+    return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+  }
+
+  function updateWorkoutWalkthroughTimerUi() {
+    if (!state.workoutWalkthroughStartedAt) {
+      return;
+    }
+
+    var label = formatWorkoutWalkthroughTimer(Date.now() - state.workoutWalkthroughStartedAt);
+    document.querySelectorAll("[data-workout-live-timer]").forEach(function (node) {
+      node.textContent = label;
+    });
+  }
+
+  function startWorkoutWalkthroughTimer() {
+    if (!state.workoutWalkthroughStartedAt) {
+      return;
+    }
+
+    updateWorkoutWalkthroughTimerUi();
+
+    if (workoutWalkthroughTimerInterval) {
+      return;
+    }
+
+    workoutWalkthroughTimerInterval = setInterval(function () {
+      if (!state.workoutWalkthroughActive || !state.workoutWalkthroughStartedAt) {
+        stopWorkoutWalkthroughTimer();
+        return;
+      }
+
+      updateWorkoutWalkthroughTimerUi();
+    }, 1000);
+  }
+
+  function stopWorkoutWalkthroughTimer() {
+    if (!workoutWalkthroughTimerInterval) {
+      return;
+    }
+
+    clearInterval(workoutWalkthroughTimerInterval);
+    workoutWalkthroughTimerInterval = null;
   }
 
   function completeWorkoutFromWalkthrough() {
@@ -10627,12 +10784,14 @@
     saveExercisesForDay(true);
 
     state.workoutCompletionSummary = buildWorkoutCompletionSummary(startedAt, finishedAt, safeFeedback);
+    markCurrentWorkoutCompleted(startedAt, finishedAt, safeFeedback);
     renderWorkoutCompletionSummary();
 
     syncScheduledSessionStatusForCurrentDay();
     updateStats();
     state.workoutSessionStartedAt = null;
     setWorkoutIntensityValue("");
+    setStatus("Workout completed. Progress has been saved.", "success");
     var commentsInput = document.querySelector("[data-workout-complete-modal] [data-workout-feedback]");
     if (commentsInput) {
       commentsInput.value = "";
@@ -10642,7 +10801,7 @@
       sendWorkoutCompletionNotification(state.workoutCompletionSummary)
         .then(function (sent) {
           if (sent) {
-            setStatus("Workout completed and coach notified.", "success");
+            setStatus("Workout completed. Coach To-Do notification updated.", "success");
             return;
           }
           setStatus("Workout completed. Progress has been saved.", "success");
@@ -10713,6 +10872,130 @@
       athleteComments: safeFeedback.comments,
       comments: buildWorkoutCompletionComments(completionPercent, prItems.length)
     };
+  }
+
+  function exercisePerformanceHistoryKey() {
+    return EXERCISE_PERFORMANCE_HISTORY_PREFIX + encodeURIComponent(String(state.storagePrefix || "default"));
+  }
+
+  function readExercisePerformanceHistory() {
+    var raw = readFromStorage(exercisePerformanceHistoryKey());
+    if (!raw || !Array.isArray(raw.sessions)) {
+      return [];
+    }
+    return raw.sessions;
+  }
+
+  function writeExercisePerformanceHistory(sessions) {
+    var safeSessions = Array.isArray(sessions) ? sessions.slice(-300) : [];
+    writeToStorage(exercisePerformanceHistoryKey(), {
+      sessions: safeSessions,
+      updated_at: new Date().toISOString()
+    });
+  }
+
+  function parseNumericReps(value) {
+    var text = String(value == null ? "" : value).replace(/,/g, "").trim();
+    if (!text) {
+      return null;
+    }
+
+    var match = text.match(/-?\d+(?:\.\d+)?/);
+    if (!match) {
+      return null;
+    }
+
+    var numeric = parseFloat(match[0]);
+    return isNaN(numeric) ? null : numeric;
+  }
+
+  function buildWorkoutPerformanceSnapshot(exercises) {
+    var entries = [];
+    var totalVolumeLoad = 0;
+    var volumeByMovementPattern = {};
+    var volumeByPrimaryMuscle = {};
+
+    (Array.isArray(exercises) ? exercises : []).forEach(function (exercise) {
+      var name = String(exercise && exercise.name || "Exercise").trim() || "Exercise";
+      var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
+      var libraryItem = findExerciseLibraryItemById(exercise && exercise.library_id) || findExerciseLibraryItemByName(name);
+      var movementPattern = String(exercise && exercise.movement_pattern || (libraryItem && libraryItem.movement_pattern) || "").trim();
+      var primaryMuscle = String(exercise && exercise.primary_muscle || (libraryItem && libraryItem.primary_muscle) || "").trim();
+      var trainingGoal = String(exercise && exercise.training_goal || (libraryItem && libraryItem.training_goal) || "").trim();
+      var topWeight = null;
+      var entryVolume = 0;
+      var completedSets = 0;
+
+      var loggedSets = sets.map(function (set, setIdx) {
+        var repsValue = String(set && set.reps || "").trim();
+        var weightValue = String(set && set.weight || "").trim();
+        var numericWeight = parseNumericWeight(weightValue);
+        var numericReps = parseNumericReps(repsValue);
+        var done = !!(set && set.done);
+
+        if (done) {
+          completedSets += 1;
+        }
+
+        if (numericWeight != null && (topWeight == null || numericWeight > topWeight)) {
+          topWeight = numericWeight;
+        }
+
+        if (numericWeight != null && numericReps != null) {
+          var setVolume = numericWeight * numericReps;
+          entryVolume += setVolume;
+          totalVolumeLoad += setVolume;
+        }
+
+        return {
+          setNumber: setIdx + 1,
+          reps: repsValue,
+          weight: weightValue,
+          rpe: String(set && set.rpe || "").trim(),
+          rest: String(set && set.rest || "").trim(),
+          notes: String(set && set.notes || "").trim(),
+          done: done
+        };
+      });
+
+      var movementKey = movementPattern || "unclassified";
+      var muscleKey = primaryMuscle || "unclassified";
+      volumeByMovementPattern[movementKey] = (volumeByMovementPattern[movementKey] || 0) + entryVolume;
+      volumeByPrimaryMuscle[muscleKey] = (volumeByPrimaryMuscle[muscleKey] || 0) + entryVolume;
+
+      entries.push({
+        exerciseName: name,
+        libraryId: String(exercise && exercise.library_id || "").trim() || null,
+        section: String(exercise && exercise.section || "").trim() || null,
+        movementPattern: movementPattern || null,
+        primaryMuscle: primaryMuscle || null,
+        trainingGoal: trainingGoal || null,
+        totalSets: sets.length,
+        completedSets: completedSets,
+        topWeight: topWeight,
+        volumeLoad: entryVolume,
+        sets: loggedSets
+      });
+    });
+
+    return {
+      entries: entries,
+      totalVolumeLoad: Math.round(totalVolumeLoad * 100) / 100,
+      volumeByMovementPattern: volumeByMovementPattern,
+      volumeByPrimaryMuscle: volumeByPrimaryMuscle
+    };
+  }
+
+  function persistExercisePerformanceHistory(startedAt, finishedAt, entries) {
+    var sessions = readExercisePerformanceHistory();
+    sessions.push({
+      completed_at: new Date(finishedAt || Date.now()).toISOString(),
+      started_at: startedAt ? new Date(startedAt).toISOString() : null,
+      assignment_id: state.assignedProgramInstanceId || null,
+      day: String(state.day || ""),
+      entries: Array.isArray(entries) ? entries : []
+    });
+    writeExercisePerformanceHistory(sessions);
   }
 
   function buildWorkoutBadges(context) {
@@ -10822,7 +11105,59 @@
       });
     });
 
+    readExercisePerformanceHistory().forEach(function (session) {
+      var items = Array.isArray(session && session.entries) ? session.entries : [];
+      items.forEach(function (item) {
+        var key = String(item && item.exerciseName || "").trim().toLowerCase();
+        var topWeight = parseNumericWeight(item && item.topWeight);
+        if (!key || topWeight == null) {
+          return;
+        }
+
+        if (!bestByName[key] || topWeight > bestByName[key].maxWeight) {
+          bestByName[key] = {
+            exerciseName: String(item.exerciseName || "Exercise"),
+            maxWeight: topWeight
+          };
+        }
+      });
+    });
+
+    Object.keys(state.cloudExerciseHistoryBestByName || {}).forEach(function (key) {
+      var item = state.cloudExerciseHistoryBestByName[key];
+      if (!item || typeof item.maxWeight !== "number") {
+        return;
+      }
+
+      if (!bestByName[key] || item.maxWeight > bestByName[key].maxWeight) {
+        bestByName[key] = {
+          exerciseName: String(item.exerciseName || "Exercise"),
+          maxWeight: item.maxWeight
+        };
+      }
+    });
+
     return bestByName;
+  }
+
+  function resolvePreviousWeightPlaceholder(exercise, targetWeight, fallbackValue) {
+    var explicitTarget = String(targetWeight || "").trim();
+    if (explicitTarget) {
+      return explicitTarget;
+    }
+
+    var key = String(exercise && exercise.name || "").trim().toLowerCase();
+    if (!key) {
+      return fallbackValue;
+    }
+
+    var priorBest = collectHistoricalBestExerciseWeightsForCurrentAthlete();
+    var best = priorBest[key];
+    if (!best || typeof best.maxWeight !== "number") {
+      return fallbackValue;
+    }
+
+    return "Prev " + String(best.maxWeight);
   }
 
   function parseNumericWeight(value) {
@@ -10936,6 +11271,149 @@
       });
   }
 
+  function resolveHistoryAthleteUserId() {
+    var assignmentAthleteId = String(state.assignmentAthleteUserId || "").trim();
+    if (isUuid(assignmentAthleteId)) {
+      return Promise.resolve(assignmentAthleteId);
+    }
+
+    return resolveCurrentUserId().then(function (userId) {
+      return isUuid(userId) ? userId : "";
+    });
+  }
+
+  function loadCloudExerciseHistoryBestWeights() {
+    if (!state.client || !state.isAthleteLockedView || state.isProgramReadOnly) {
+      return Promise.resolve(false);
+    }
+
+    return ensureAssignmentMessagingContext()
+      .then(resolveHistoryAthleteUserId)
+      .then(function (athleteUserId) {
+        if (!isUuid(athleteUserId)) {
+          return false;
+        }
+
+        return state.client
+          .from("athlete_exercise_history")
+          .select("exercise_name,top_weight")
+          .eq("athlete_user_id", athleteUserId)
+          .not("top_weight", "is", null)
+          .order("workout_completed_at", { ascending: false })
+          .limit(1200)
+          .then(function (result) {
+            if (result && result.error) {
+              return false;
+            }
+
+            var bestByName = {};
+            (result && Array.isArray(result.data) ? result.data : []).forEach(function (row) {
+              var key = String(row && row.exercise_name || "").trim().toLowerCase();
+              var topWeight = parseNumericWeight(row && row.top_weight);
+              if (!key || topWeight == null) {
+                return;
+              }
+
+              if (!bestByName[key] || topWeight > bestByName[key].maxWeight) {
+                bestByName[key] = {
+                  exerciseName: String(row.exercise_name || "Exercise"),
+                  maxWeight: topWeight
+                };
+              }
+            });
+
+            state.cloudExerciseHistoryBestByName = bestByName;
+            state.cloudExerciseHistoryLoaded = true;
+            renderRows();
+            return true;
+          })
+          .catch(function () {
+            return false;
+          });
+      })
+      .catch(function () {
+        return false;
+      });
+  }
+
+  function syncWorkoutPerformanceToCloud(startedAt, finishedAt, entries) {
+    if (!state.client || !state.isAthleteLockedView || state.isProgramReadOnly) {
+      return Promise.resolve(false);
+    }
+
+    var safeEntries = Array.isArray(entries) ? entries : [];
+    if (!safeEntries.length) {
+      return Promise.resolve(false);
+    }
+
+    return ensureAssignmentMessagingContext()
+      .then(resolveHistoryAthleteUserId)
+      .then(function (athleteUserId) {
+        if (!isUuid(athleteUserId)) {
+          return false;
+        }
+
+        var coachIdRaw = String(state.assignmentCoachUserId || "").trim();
+        var coachUserId = isUuid(coachIdRaw) ? coachIdRaw : null;
+        var completedAtIso = new Date(finishedAt || Date.now()).toISOString();
+        var startedAtIso = startedAt ? new Date(startedAt).toISOString() : null;
+
+        var rows = safeEntries.map(function (entry) {
+          return {
+            athlete_user_id: athleteUserId,
+            coach_user_id: coachUserId,
+            user_training_program_id: state.assignedProgramInstanceId || null,
+            slot_key: String(state.day || ""),
+            workout_started_at: startedAtIso,
+            workout_completed_at: completedAtIso,
+            exercise_library_id: entry && entry.libraryId ? String(entry.libraryId) : null,
+            exercise_name: String(entry && entry.exerciseName || "Exercise"),
+            section: entry && entry.section ? String(entry.section) : null,
+            movement_pattern: entry && entry.movementPattern ? String(entry.movementPattern) : null,
+            primary_muscle: entry && entry.primaryMuscle ? String(entry.primaryMuscle) : null,
+            training_goal: entry && entry.trainingGoal ? String(entry.trainingGoal) : null,
+            total_sets: Number(entry && entry.totalSets || 0),
+            completed_sets: Number(entry && entry.completedSets || 0),
+            top_weight: entry && entry.topWeight != null ? Number(entry.topWeight) : null,
+            volume_load: entry && entry.volumeLoad != null ? Number(entry.volumeLoad) : 0,
+            set_logs: entry && Array.isArray(entry.sets) ? entry.sets : []
+          };
+        });
+
+        return state.client
+          .from("athlete_exercise_history")
+          .insert(rows)
+          .then(function (result) {
+            if (result && result.error) {
+              return false;
+            }
+
+            safeEntries.forEach(function (entry) {
+              var key = String(entry && entry.exerciseName || "").trim().toLowerCase();
+              var topWeight = parseNumericWeight(entry && entry.topWeight);
+              if (!key || topWeight == null) {
+                return;
+              }
+
+              if (!state.cloudExerciseHistoryBestByName[key] || topWeight > state.cloudExerciseHistoryBestByName[key].maxWeight) {
+                state.cloudExerciseHistoryBestByName[key] = {
+                  exerciseName: String(entry.exerciseName || "Exercise"),
+                  maxWeight: topWeight
+                };
+              }
+            });
+            state.cloudExerciseHistoryLoaded = true;
+            return true;
+          })
+          .catch(function () {
+            return false;
+          });
+      })
+      .catch(function () {
+        return false;
+      });
+  }
+
   function collectWorkoutExerciseNotes(exercises) {
     var items = [];
 
@@ -10969,71 +11447,20 @@
   }
 
   function sendWorkoutCompletionNotification(summary) {
-    if (!state.client || !state.assignedProgramInstanceId) {
-      return Promise.resolve(false);
+    var pending = state.lastWorkoutCompletionCloudSyncPromise;
+    if (!pending || typeof pending.then !== "function") {
+      return Promise.resolve(true);
     }
 
-    var completion = summary && typeof summary === "object" ? summary : null;
-    return ensureAssignmentMessagingContext()
-      .then(function () {
-        var coachId = String(state.assignmentCoachUserId || "").trim();
-        var athleteId = String(state.assignmentAthleteUserId || "").trim();
-        if (!isUuid(coachId) || !isUuid(athleteId)) {
-          return false;
-        }
+    var timeoutGuard = new Promise(function (resolve) {
+      setTimeout(function () {
+        resolve(false);
+      }, 4500);
+    });
 
-        return resolveCurrentUserId().then(function (senderUserId) {
-          var senderId = isUuid(senderUserId) ? senderUserId : athleteId;
-          var prCount = completion && Array.isArray(completion.prItems) ? completion.prItems.length : 0;
-          var badges = completion && Array.isArray(completion.badges) ? completion.badges.join(", ") : "Session Complete";
-          var intensity = completion && completion.intensityRating ? String(completion.intensityRating) + "/10" : "not provided";
-          var note = completion && completion.athleteComments ? completion.athleteComments : "No additional comments.";
-          var exerciseNotes = collectWorkoutExerciseNotes(state.exercises || []);
-          var noteLines = exerciseNotes.length
-            ? exerciseNotes.map(function (item) {
-                var context = [
-                  item.reps ? "reps " + item.reps : "",
-                  item.weight ? "load " + item.weight : "",
-                  item.rpe ? "rpe " + item.rpe : ""
-                ].filter(Boolean).join(", ");
-                return "- " + item.exerciseName + " (Set " + item.setNumber + ")" + (context ? " [" + context + "]" : "") + ": " + item.note;
-              }).join("\n")
-            : "- None logged during this session.";
-
-          var body = [
-            "WORKOUT COMPLETE",
-            "Day: " + labelForSlot(state.day),
-            "Completion: " + String(completion && completion.completionPercent || 0) + "% (" + String(completion && completion.doneSets || 0) + "/" + String(completion && completion.totalSets || 0) + " sets)",
-            "Intensity: " + intensity,
-            "PRs: " + String(prCount),
-            "Badges: " + badges,
-            "Workout summary: " + String(completion && completion.comments || ""),
-            "Athlete end-of-workout comment: " + note,
-            "",
-            "Exercise notes logged during workout:",
-            noteLines
-          ].join("\n");
-
-          return state.client
-            .from("coach_athlete_messages")
-            .insert([{
-              coach_user_id: coachId,
-              athlete_user_id: athleteId,
-              sender_user_id: senderId,
-              sender_role: "athlete",
-              delivery_scope: "direct",
-              delivery_label: "workout-complete",
-              body: body,
-              read_by_athlete_at: new Date().toISOString(),
-              read_by_coach_at: null
-            }])
-            .then(function (result) {
-              return !(result && result.error);
-            })
-            .catch(function () {
-              return false;
-            });
-        });
+    return Promise.race([pending, timeoutGuard])
+      .then(function (ok) {
+        return ok !== false;
       })
       .catch(function () {
         return false;
@@ -11200,6 +11627,24 @@
     return "";
   }
 
+  function resolveWorkoutWalkthroughThumbnailUrl(videoUrl) {
+    var value = String(videoUrl || "").trim();
+    if (!value) {
+      return "";
+    }
+
+    if (/\.(png|jpe?g|gif|webp|avif)(\?.*)?$/i.test(value)) {
+      return value;
+    }
+
+    var youtubeMatch = value.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,})/i);
+    if (youtubeMatch && youtubeMatch[1]) {
+      return "https://img.youtube.com/vi/" + youtubeMatch[1] + "/hqdefault.jpg";
+    }
+
+    return "";
+  }
+
   function renderWorkoutWalkthrough() {
     var section = document.querySelector(".program-demo-section");
     var container = document.querySelector("[data-workout-walkthrough]");
@@ -11214,6 +11659,7 @@
     if (!state.workoutWalkthroughActive) {
       container.hidden = true;
       container.innerHTML = "";
+      stopWorkoutWalkthroughTimer();
       if (section) {
         section.classList.remove("is-walkthrough-active");
       }
@@ -11237,6 +11683,14 @@
     var step = steps[state.workoutWalkthroughStepIndex];
     var nextStep = steps[state.workoutWalkthroughStepIndex + 1] || null;
     var progressLabel = "Step " + (state.workoutWalkthroughStepIndex + 1) + " of " + state.workoutWalkthroughSteps.length;
+    var progressPercent = Math.max(0, Math.min(100, Math.round(((state.workoutWalkthroughStepIndex + 1) / state.workoutWalkthroughSteps.length) * 100)));
+    var timerMarkup = state.workoutWalkthroughStartedAt
+      ? '<p class="workout-walkthrough-live-timer" data-workout-live-timer>' + escapeHtml(formatWorkoutWalkthroughTimer(Date.now() - state.workoutWalkthroughStartedAt)) + '</p>'
+      : '<span class="workout-walkthrough-live-timer-spacer" aria-hidden="true"></span>';
+
+    if (state.workoutWalkthroughStartedAt) {
+      startWorkoutWalkthroughTimer();
+    }
 
     if (section) {
       section.classList.add("is-walkthrough-active");
@@ -11262,6 +11716,7 @@
     if (step && step.type === "section_intro") {
       var sectionName = String(step.section || "Section");
       var sectionOverview = getWorkoutWalkthroughSectionOverview(sectionName);
+      var showIntroPrevious = state.workoutWalkthroughStepIndex > 0;
       var sectionExercisesHtml = Array.isArray(step.sectionExerciseNames) && step.sectionExerciseNames.length
         ? '<ul class="workout-walkthrough-section-list">' + step.sectionExerciseNames.map(function (name) {
             return '<li>' + escapeHtml(name) + '</li>';
@@ -11272,15 +11727,22 @@
         '<div class="workout-walkthrough-card is-section-intro">' +
           '<div class="workout-walkthrough-top">' +
             '<p class="workout-walkthrough-step">' + escapeHtml(progressLabel) + '</p>' +
+            timerMarkup +
             '<button type="button" class="btn btn-secondary workout-walkthrough-exit" data-workout-walkthrough-exit>Return to Workout Overview</button>' +
           '</div>' +
-          '<p class="workout-walkthrough-meta">Section ' + escapeHtml(String((step.sectionIndex || 0) + 1) + ' of ' + String(step.totalSections || 1)) + '</p>' +
+          '<div class="workout-walkthrough-progress" aria-hidden="true"><span style="width:' + String(progressPercent) + '%"></span></div>' +
+          '<div class="workout-walkthrough-meta-row">' +
+            '<p class="workout-walkthrough-meta-chip">Section ' + escapeHtml(String((step.sectionIndex || 0) + 1) + ' of ' + String(step.totalSections || 1)) + '</p>' +
+            '<p class="workout-walkthrough-meta-chip">Focus Block</p>' +
+          '</div>' +
           '<h3 class="workout-walkthrough-title">' + escapeHtml(sectionName) + '</h3>' +
           '<p class="workout-walkthrough-mode">' + escapeHtml(sectionOverview) + '</p>' +
           '<p class="workout-walkthrough-meta">' + escapeHtml(String(step.sectionExerciseCount || 0) + ' exercises • ' + String(step.sectionSetCount || 0) + ' total sets') + '</p>' +
           sectionExercisesHtml +
-          '<div class="workout-walkthrough-actions">' +
-            '<button type="button" class="btn btn-secondary" data-workout-walkthrough-prev ' + (state.workoutWalkthroughStepIndex === 0 ? "disabled" : "") + '>Previous</button>' +
+          '<div class="workout-walkthrough-actions' + (showIntroPrevious ? '' : ' is-single-action') + '">' +
+            (showIntroPrevious
+              ? '<button type="button" class="btn btn-secondary" data-workout-walkthrough-prev>Previous</button>'
+              : '') +
             '<button type="button" class="btn btn-primary" data-workout-walkthrough-next>' +
               (state.workoutWalkthroughStepIndex === 0 ? 'Start Workout' : 'Start Section') +
             '</button>' +
@@ -11302,7 +11764,11 @@
       }
 
       var fieldToggles = normalizeExerciseFieldToggles(exercise.field_toggles, exercise.mode);
-      var demoUrl = resolveWorkoutWalkthroughDemoUrl(exercise);
+      var quickData = buildExerciseQuickData(exercise);
+      var demoUrl = quickData.videoUrl || resolveWorkoutWalkthroughDemoUrl(exercise);
+      var demoThumbnailUrl = resolveWorkoutWalkthroughThumbnailUrl(demoUrl);
+      var descriptionCopy = String(quickData.description || "").trim();
+      var cuesCopy = String(quickData.coachingCues || "").trim();
       var supersetMeta = step.isSuperset
         ? "Superset " + step.supersetPosition + " of " + step.supersetSize + " • Round " + step.supersetRound + " of " + step.supersetRounds
         : "Set " + (step.setIdx + 1) + " of " + ((exercise.sets && exercise.sets.length) || 1);
@@ -11318,18 +11784,40 @@
         '<div class="workout-walkthrough-card">' +
           '<div class="workout-walkthrough-top">' +
             '<p class="workout-walkthrough-step">' + escapeHtml(progressLabel) + '</p>' +
+            timerMarkup +
             '<button type="button" class="btn btn-secondary workout-walkthrough-exit" data-workout-walkthrough-exit>Return to Workout Overview</button>' +
           '</div>' +
-          '<p class="workout-walkthrough-meta">' + escapeHtml((exercise.section || "A Block") + " • " + supersetMeta) + '</p>' +
+          '<div class="workout-walkthrough-progress" aria-hidden="true"><span style="width:' + String(progressPercent) + '%"></span></div>' +
+          '<div class="workout-walkthrough-meta-row">' +
+            '<p class="workout-walkthrough-meta-chip">' + escapeHtml(exercise.section || "A Block") + '</p>' +
+            '<p class="workout-walkthrough-meta-chip">' + escapeHtml(supersetMeta) + '</p>' +
+          '</div>' +
           '<h3 class="workout-walkthrough-title">' + escapeHtml(exercise.name || "Exercise") + '</h3>' +
-          '<p class="workout-walkthrough-mode">' + escapeHtml(modeLabel(exercise.mode)) + '</p>' +
-          (demoUrl
-            ? '<a class="workout-walkthrough-demo" href="' + escapeAttribute(demoUrl) + '" target="_blank" rel="noopener"><span class="workout-walkthrough-demo-thumb">▶</span><span>View Exercise Demo</span></a>'
-            : '<p class="workout-walkthrough-demo-none">No demo available for this exercise.</p>') +
+          '<div class="workout-walkthrough-education">' +
+            (demoUrl
+              ? '<button type="button" class="workout-walkthrough-demo-card" data-workout-walkthrough-demo-open data-exercise="' + step.exerciseIdx + '" data-demo-url="' + escapeAttribute(demoUrl) + '">' +
+                  (demoThumbnailUrl
+                    ? '<img class="workout-walkthrough-demo-image" src="' + escapeAttribute(demoThumbnailUrl) + '" alt="Video demo thumbnail for ' + escapeAttribute(exercise.name || "exercise") + '" loading="lazy" />'
+                    : '<span class="workout-walkthrough-demo-image workout-walkthrough-demo-image-fallback" aria-hidden="true">▶</span>') +
+                  '<span class="workout-walkthrough-demo-card-label">Play Exercise Demo</span>' +
+                '</button>'
+              : '<p class="workout-walkthrough-demo-none">No demo available for this exercise.</p>') +
+            '<div class="workout-walkthrough-howto">' +
+              (descriptionCopy
+                ? '<p class="workout-walkthrough-howto-block"><strong>How to perform:</strong> ' + escapeHtml(descriptionCopy) + '</p>'
+                : '') +
+              (cuesCopy
+                ? '<p class="workout-walkthrough-howto-block"><strong>Coaching cues:</strong> ' + escapeHtml(cuesCopy) + '</p>'
+                : '') +
+              (!descriptionCopy && !cuesCopy
+                ? '<p class="workout-walkthrough-howto-empty">No exercise instructions are available yet.</p>'
+                : '') +
+            '</div>' +
+          '</div>' +
           '<div class="workout-walkthrough-fields">' +
             '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "Duration" : "Reps") + '</span><input type="text" data-field="reps" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.reps, set.target_reps, set.done)) + '" placeholder="' + escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) + '" /></label>' +
             (fieldToggles.showWeight
-              ? '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "Weight / Time / Distance" : "Weight / Time") + '</span><input type="text" data-field="weight" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) + '" placeholder="' + escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) + '" /></label>'
+              ? '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "Weight / Time / Distance" : "Weight / Time") + '</span><input type="text" data-field="weight" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) + '" placeholder="' + escapeAttribute(resolvePreviousWeightPlaceholder(exercise, set.target_weight, modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric))) + '" /></label>'
               : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>Weight / Time</span><em>Off</em></div>') +
             (fieldToggles.showRpe
               ? '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "RPE / Zone / Effort" : "RPE / Zone") + '</span><input type="text" data-field="rpe" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.rpe, set.target_rpe, set.done)) + '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" /></label>'
@@ -11374,6 +11862,26 @@
     container.querySelectorAll("[data-workout-walkthrough-exit]").forEach(function (btn) {
       bindPress(btn, function () {
         stopWorkoutWalkthrough();
+      });
+    });
+
+    container.querySelectorAll("[data-workout-walkthrough-demo-open]").forEach(function (btn) {
+      bindPress(btn, function (event) {
+        if (event && typeof event.preventDefault === "function") {
+          event.preventDefault();
+        }
+
+        var exerciseIdx = parseInt(btn.getAttribute("data-exercise"), 10);
+        var demoUrl = String(btn.getAttribute("data-demo-url") || "").trim();
+
+        if (Number.isFinite(exerciseIdx)) {
+          openExerciseQuickModal(exerciseIdx, "video");
+          return;
+        }
+
+        if (demoUrl && typeof window !== "undefined" && typeof window.open === "function") {
+          window.open(demoUrl, "_blank", "noopener");
+        }
       });
     });
   }
@@ -11504,7 +12012,7 @@
                   '" value="' +
                   escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) +
                   '" placeholder="' +
-                  escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
+                  escapeAttribute(resolvePreviousWeightPlaceholder(exercise, set.target_weight, modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric))) +
                   '" />' +
                   buildPrintTargetMarkup(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
                   '</label>'
@@ -11700,7 +12208,7 @@
             '" value="' +
             escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) +
             '" placeholder="' +
-            escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
+            escapeAttribute(resolvePreviousWeightPlaceholder(exercise, set.target_weight, modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric))) +
             '" />' +
             buildPrintTargetMarkup(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric))
           : '') +

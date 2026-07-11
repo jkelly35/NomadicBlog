@@ -6910,33 +6910,94 @@ body.athlete-locked-view .program-demo-day-selector {
 }
 
 .workout-walkthrough-card {
-  border: 1px solid #ded4c8;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #fffcf7 0%, #f8f3ea 100%);
-  padding: 0.95rem;
+  border: 1px solid #d4cbbb;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 88% -10%, rgba(203, 112, 43, 0.14) 0%, rgba(203, 112, 43, 0) 44%),
+    linear-gradient(180deg, #fffdf8 0%, #f6efe5 100%);
+  box-shadow: 0 14px 36px rgba(19, 46, 46, 0.12);
+  padding: 1.05rem;
   display: grid;
-  gap: 0.72rem;
+  gap: 0.78rem;
 }
 
 .workout-walkthrough-card.is-section-intro {
-  background: linear-gradient(180deg, #f9fdfb 0%, #edf6f2 100%);
-  border-color: #c9ddd6;
+  background:
+    radial-gradient(circle at 85% -14%, rgba(26, 110, 91, 0.15) 0%, rgba(26, 110, 91, 0) 48%),
+    linear-gradient(180deg, #f8fcfb 0%, #eaf4f1 100%);
+  border-color: #bfd7d0;
 }
 
 .workout-walkthrough-top {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
   gap: 0.65rem;
 }
 
 .workout-walkthrough-step {
   margin: 0;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #48615c;
+  color: #3f5a55;
+}
+
+.workout-walkthrough-live-timer,
+.workout-walkthrough-live-timer-spacer {
+  justify-self: center;
+  min-width: 96px;
+}
+
+.workout-walkthrough-live-timer {
+  margin: 0;
+  border: 1px solid #cfd8d3;
+  border-radius: 999px;
+  padding: 0.26rem 0.72rem;
+  background: rgba(255, 255, 255, 0.8);
+  color: #183d3d;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.workout-walkthrough-progress {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(25, 62, 62, 0.12);
+  overflow: hidden;
+}
+
+.workout-walkthrough-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f3131 0%, #1f6662 52%, #2c7c76 100%);
+  box-shadow: 0 0 0 1px rgba(20, 66, 66, 0.1);
+  transition: width 0.24s ease;
+}
+
+.workout-walkthrough-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.workout-walkthrough-meta-chip {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d8cdbd;
+  border-radius: 999px;
+  padding: 0.22rem 0.56rem;
+  background: rgba(255, 255, 255, 0.75);
+  color: #375351;
+  font-size: 0.73rem;
+  font-weight: 700;
 }
 
 .workout-walkthrough-meta {
@@ -6948,22 +7009,41 @@ body.athlete-locked-view .program-demo-day-selector {
 .workout-walkthrough-title {
   margin: 0;
   color: #143434;
-  font-size: 1.2rem;
+  font-size: 1.26rem;
+  line-height: 1.2;
 }
 
 .workout-walkthrough-mode {
   margin: 0;
-  color: #405e58;
-  font-size: 0.82rem;
+  color: #395752;
+  font-size: 0.86rem;
   font-weight: 700;
+  line-height: 1.45;
 }
 
 .workout-walkthrough-section-list {
   margin: 0;
-  padding-left: 1.1rem;
+  padding: 0;
+  list-style: none;
   color: #1f4a48;
   display: grid;
-  gap: 0.25rem;
+  gap: 0.36rem;
+}
+
+.workout-walkthrough-section-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.workout-walkthrough-section-list li::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 7px;
+  background: #2a6d68;
+  box-shadow: 0 0 0 2px rgba(42, 109, 104, 0.16);
 }
 
 .workout-walkthrough-demo {
@@ -6993,10 +7073,95 @@ body.athlete-locked-view .program-demo-day-selector {
   font-size: 0.78rem;
 }
 
+.workout-walkthrough-education {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 0.7rem;
+  align-items: stretch;
+}
+
+.workout-walkthrough-demo-card {
+  appearance: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  border: 1px solid #d4c8b7;
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  background: #fff;
+  min-height: 170px;
+}
+
+.workout-walkthrough-demo-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(16, 50, 49, 0.18);
+}
+
+.workout-walkthrough-demo-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(197, 106, 44, 0.3);
+}
+
+.workout-walkthrough-demo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: linear-gradient(145deg, #153f3f 0%, #2a7872 100%);
+}
+
+.workout-walkthrough-demo-image-fallback {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.workout-walkthrough-demo-card-label {
+  display: block;
+  border-top: 1px solid #ebdfcf;
+  padding: 0.58rem 0.7rem;
+  color: #1b4444;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.workout-walkthrough-howto {
+  border: 1px solid #ddcfbd;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.62rem 0.7rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.workout-walkthrough-howto-block {
+  margin: 0;
+  color: #254746;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.workout-walkthrough-howto-block strong {
+  color: #153a3a;
+}
+
+.workout-walkthrough-howto-empty {
+  margin: 0;
+  color: #6b7d79;
+  font-size: 0.82rem;
+}
+
 .workout-walkthrough-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.58rem;
+  gap: 0.62rem;
 }
 
 .workout-walkthrough-done {
@@ -7006,7 +7171,40 @@ body.athlete-locked-view .program-demo-day-selector {
 .workout-walkthrough-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
+  gap: 0.6rem;
+  margin-top: 0.22rem;
+}
+
+.workout-walkthrough-actions.is-single-action {
+  grid-template-columns: 1fr;
+}
+
+.workout-walkthrough-actions .btn {
+  min-height: 54px;
+  border-radius: 13px;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.workout-walkthrough-actions .btn.btn-primary {
+  border-color: #0f3131;
+  background: linear-gradient(90deg, #0c2f2f 0%, #16514f 55%, #246f6a 100%);
+  box-shadow: 0 8px 20px rgba(12, 47, 47, 0.28);
+}
+
+.workout-walkthrough-actions .btn.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(12, 47, 47, 0.3);
+}
+
+.workout-walkthrough-actions .btn.btn-secondary {
+  border-color: #c96d2e;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.workout-walkthrough-exit {
+  border-radius: 11px;
+  font-weight: 700;
 }
 
 .program-demo-section.is-walkthrough-active .program-demo-table-wrap,
@@ -8001,6 +8199,28 @@ body.athlete-locked-view .program-demo-day-selector {
   .workout-walkthrough-fields,
   .workout-walkthrough-actions {
     grid-template-columns: 1fr;
+  }
+
+  .workout-walkthrough-top {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .workout-walkthrough-live-timer,
+  .workout-walkthrough-live-timer-spacer {
+    justify-self: start;
+  }
+
+  .workout-walkthrough-exit {
+    width: 100%;
+  }
+
+  .workout-walkthrough-education {
+    grid-template-columns: 1fr;
+  }
+
+  .workout-walkthrough-demo-card {
+    min-height: 150px;
   }
 
   .workout-summary-stats {

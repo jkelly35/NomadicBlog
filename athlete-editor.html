@@ -53,6 +53,26 @@
             </div>
           </div>
 
+          <div class="metrics-editor-section" data-athlete-editor-access-tier-section>
+            <div class="metrics-editor-section-header">
+              <h2>Membership / Access Tier</h2>
+            </div>
+            <p class="athlete-editor-help">Coach override: choose the athlete account tier used for dashboard permissions and feature access.</p>
+
+            <div class="athlete-editor-grid">
+              <div class="athlete-editor-info-row">
+                <label for="athlete-access-tier-override">Access Tier Override</label>
+                <select id="athlete-access-tier-override" name="coach_access_tier_override" data-athlete-editor-input="coach_access_tier_override">
+                  <option value="">Auto (System Managed)</option>
+                  <option value="athlete">Athlete Account</option>
+                  <option value="active_member">Active Membership</option>
+                  <option value="active_program">Active Program</option>
+                  <option value="individualized">Individualized Programming</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div class="metrics-editor-section">
             <div class="metrics-editor-section-header">
               <h2>Core Profile</h2>

@@ -37,6 +37,7 @@
     whoopManualUserId: null,
     whoopManualCancelBtn: null,
     coachCompassSection: null,
+    accessTierSection: null,
     sportOverviewTemplates: {
       climbing: [
         {
@@ -161,6 +162,7 @@
     state.whoopManualUserId = document.querySelector("[data-athlete-editor-whoop-user-id]");
     state.whoopManualCancelBtn = document.querySelector("[data-athlete-editor-whoop-manual-cancel]");
     state.coachCompassSection = document.querySelector("[data-athlete-editor-compass-section]");
+    state.accessTierSection = document.querySelector("[data-athlete-editor-access-tier-section]");
 
     if (!window.supabase || !window.supabase.createClient) {
       showError("Supabase client library failed to load.");
@@ -313,6 +315,9 @@
     if (state.coachCompassSection) {
       state.coachCompassSection.hidden = !!state.isPersonal;
     }
+    if (state.accessTierSection) {
+      state.accessTierSection.hidden = !!state.isPersonal;
+    }
     if (state.wearablesSection) {
       state.wearablesSection.hidden = !state.isPersonal;
     }
@@ -366,6 +371,7 @@
     setInputValue("height_cm", athlete.height_cm);
     setInputValue("weight_kg", athlete.weight_kg);
     setInputValue("sex", getProfileSexForFormValue(athlete));
+    setInputValue("coach_access_tier_override", normalizeCoachAccessTierOverrideValue(athlete && athlete.coach_access_tier_override));
     setInputValue("compass_training_status", athlete.compass_training_status);
     setInputValue("compass_current_phase", athlete.compass_current_phase);
     setInputValue("compass_next_objective", athlete.compass_next_objective);
@@ -443,6 +449,12 @@
       updated_at: new Date().toISOString()
     };
 
+    if (!state.isPersonal) {
+      var overrideTier = normalizeCoachAccessTierOverrideValue(formData.get("coach_access_tier_override"));
+      profileData.coach_access_tier_override = overrideTier;
+      profileData.coach_access_tier_override_updated_at = overrideTier ? new Date().toISOString() : null;
+    }
+
     setStatus("Saving profile...", "info");
 
     saveProfileWithFallback(profileData)
@@ -465,6 +477,8 @@
     var payload = Object.assign({}, profileData);
     var droppedColumns = {};
     var optionalColumnsFallbackOrder = [
+      "coach_access_tier_override_updated_at",
+      "coach_access_tier_override",
       "compass_coach_note",
       "compass_next_objective",
       "compass_current_phase",
@@ -517,7 +531,29 @@
       });
     }
 
-    return runSave(payload, 6);
+    return runSave(payload, 8);
+  }
+
+  function normalizeCoachAccessTierOverrideValue(value) {
+    var raw = String(value == null ? "" : value).trim().toLowerCase();
+    if (!raw || raw === "auto" || raw === "none" || raw === "system") {
+      return "";
+    }
+
+    if (raw === "athlete" || raw === "athlete_account") {
+      return "athlete";
+    }
+    if (raw === "active_member" || raw === "active_membership" || raw === "member") {
+      return "active_member";
+    }
+    if (raw === "active_program" || raw === "program") {
+      return "active_program";
+    }
+    if (raw === "individualized" || raw === "individualized_programming" || raw === "custom_program") {
+      return "individualized";
+    }
+
+    return "";
   }
 
   function getSelectedSportsFromForm() {

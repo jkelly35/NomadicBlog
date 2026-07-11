@@ -170,6 +170,7 @@
     foundingSignatureSummaryByAthlete: {},
     foundingSubscriptionRows: [],
     foundingIntakeAssignmentRows: [],
+    workoutCompletionHistoryRows: [],
     climbingComparisonRows: [],
     athleteProfilesById: {},
     latestMetricRowsByAthlete: {}
@@ -2934,6 +2935,7 @@
       state.foundingSignatureSummaryByAthlete = {};
       state.foundingSubscriptionRows = [];
       state.foundingIntakeAssignmentRows = [];
+      state.workoutCompletionHistoryRows = [];
       state.climbingComparisonRows = [];
       state.athleteProfilesById = {};
       state.latestMetricRowsByAthlete = {};
@@ -3009,6 +3011,12 @@
       .order("updated_at", { ascending: false })
       .limit(5000);
 
+    var workoutCompletionHistoryRequest = state.client
+      .from("athlete_exercise_history")
+      .select("athlete_user_id,slot_key,workout_completed_at,total_sets,completed_sets")
+      .order("workout_completed_at", { ascending: false })
+      .limit(4000);
+
     Promise.all([
       activeProgramsRequest,
       goalEventsRequest,
@@ -3020,7 +3028,8 @@
       membershipInquiriesRequest,
       customPlanInquiriesRequest,
       foundingSubscriptionsRequest,
-      foundingIntakeAssignmentsRequest
+      foundingIntakeAssignmentsRequest,
+      workoutCompletionHistoryRequest
     ])
       .then(function (results) {
         var programsResult = results[0];
@@ -3034,6 +3043,7 @@
         var customPlanInquiriesResult = results[8];
         var foundingSubscriptionsResult = results[9];
         var foundingIntakeAssignmentsResult = results[10];
+        var workoutCompletionHistoryResult = results[11];
 
         if (programsResult && !programsResult.error) {
           state.activePrograms = programsResult.data || [];
@@ -3236,6 +3246,27 @@
           }
         }
 
+        if (workoutCompletionHistoryResult && !workoutCompletionHistoryResult.error) {
+          state.workoutCompletionHistoryRows = Array.isArray(workoutCompletionHistoryResult.data)
+            ? workoutCompletionHistoryResult.data.map(function (row) {
+                return {
+                  athlete_user_id: String(row && row.athlete_user_id || ""),
+                  slot_key: String(row && row.slot_key || ""),
+                  workout_completed_at: String(row && row.workout_completed_at || ""),
+                  total_sets: row && row.total_sets != null ? Number(row.total_sets) : 0,
+                  completed_sets: row && row.completed_sets != null ? Number(row.completed_sets) : 0
+                };
+              }).filter(function (row) {
+                return !!row.athlete_user_id && !!row.workout_completed_at;
+              })
+            : [];
+        } else {
+          state.workoutCompletionHistoryRows = [];
+          if (workoutCompletionHistoryResult && workoutCompletionHistoryResult.error && !isMissingTableError(workoutCompletionHistoryResult.error)) {
+            console.warn("Workout completion history load failed:", workoutCompletionHistoryResult.error);
+          }
+        }
+
         state.coachReadinessByAthlete = buildCoachReadinessByAthlete(
           state.athletes,
           state.activePrograms,
@@ -3263,6 +3294,7 @@
         state.foundingSignatureSummaryByAthlete = {};
         state.foundingSubscriptionRows = [];
         state.foundingIntakeAssignmentRows = [];
+        state.workoutCompletionHistoryRows = [];
         state.climbingComparisonRows = [];
         state.athleteProfilesById = {};
         state.latestMetricRowsByAthlete = {};
@@ -3578,11 +3610,67 @@
       });
     });
 
+    var completionGroupMap = {};
+    (state.workoutCompletionHistoryRows || []).forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      var completedAt = String(row && row.workout_completed_at || "").trim();
+      if (!athleteId || !completedAt || !athleteById[athleteId]) {
+        return;
+      }
+
+      var slotKey = String(row && row.slot_key || "").trim();
+      var mapKey = athleteId + "|" + completedAt + "|" + slotKey;
+      if (!completionGroupMap[mapKey]) {
+        completionGroupMap[mapKey] = {
+          athleteId: athleteId,
+          completedAt: completedAt,
+          slotKey: slotKey,
+          totalSets: 0,
+          completedSets: 0
+        };
+      }
+
+      var item = completionGroupMap[mapKey];
+      item.totalSets += Number(row && row.total_sets || 0);
+      item.completedSets += Number(row && row.completed_sets || 0);
+    });
+
+    Object.keys(completionGroupMap).forEach(function (mapKey) {
+      var entry = completionGroupMap[mapKey];
+      var completedMs = Date.parse(entry.completedAt);
+      if (!Number.isFinite(completedMs)) {
+        return;
+      }
+
+      var requestKey = "workout:" + entry.athleteId + ":" + entry.completedAt + ":" + entry.slotKey;
+      if (dismissedLookup[requestKey]) {
+        return;
+      }
+
+      var athlete = athleteById[entry.athleteId] || {};
+      var athleteLabel = String(athlete.name || athlete.email || "Athlete").trim();
+      var completionPct = entry.totalSets > 0 ? Math.round((entry.completedSets / entry.totalSets) * 100) : 0;
+      var meta = "Completed " + formatDate(entry.completedAt) + " • " + formatRelativeDaysLabel(entry.completedAt);
+      if (entry.slotKey) {
+        meta += " • " + entry.slotKey.toUpperCase();
+      }
+      meta += " • " + String(completionPct) + "% (" + entry.completedSets + "/" + entry.totalSets + " sets)";
+
+      items.push({
+        key: requestKey,
+        title: athleteLabel + " completed a workout",
+        meta: meta,
+        chip: "Workout",
+        href: "athlete-insight.html?athleteId=" + encodeURIComponent(entry.athleteId),
+        sortMs: completedMs
+      });
+    });
+
     if (!items.length) {
       return (
         '<div class="admin-overview-item admin-widget-summary">' +
           '<p class="admin-overview-item-title">Open Coach Notifications</p>' +
-          '<p class="admin-overview-item-meta">No open waiver, payment, or task notifications.</p>' +
+          '<p class="admin-overview-item-meta">No open waiver, payment, task, or workout notifications.</p>' +
         '</div>'
       );
     }
