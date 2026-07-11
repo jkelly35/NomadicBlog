@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Training Program Example - Nomadic Performance</title>
-  <link rel="stylesheet" href="css/style.css?v=20260711l" />
+  <link rel="stylesheet" href="css/style.css?v=20260711o" />
   <script defer src="js/analytics.js?v=20260711e"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js?v=20260711e"></script>
   <script defer src="js/auth-ui.js?v=20260711e"></script>
-  <script defer src="js/training-program-demo.js?v=20260711u"></script>
+  <script defer src="js/training-program-demo.js?v=20260711ag"></script>
 </head>
 <body>
   <header>
@@ -328,6 +328,17 @@
         <button type="button" class="btn btn-secondary" data-workout-complete-close>Cancel</button>
         <button type="button" class="btn btn-primary" data-workout-complete-submit>Complete Workout</button>
       </div>
+    </div>
+  </div>
+
+  <div class="exercise-quick-modal" data-exercise-quick-modal hidden>
+    <div class="exercise-quick-modal-overlay" data-exercise-quick-modal-close></div>
+    <div class="exercise-quick-modal-dialog" role="dialog" aria-modal="true" aria-label="Exercise details">
+      <div class="exercise-quick-modal-head">
+        <h3 data-exercise-quick-modal-title>Exercise Details</h3>
+        <button type="button" class="exercise-quick-modal-close" data-exercise-quick-modal-close aria-label="Close">×</button>
+      </div>
+      <div class="exercise-quick-modal-body" data-exercise-quick-modal-body></div>
     </div>
   </div>
 

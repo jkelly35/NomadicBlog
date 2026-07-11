@@ -505,6 +505,7 @@
     }
 
     setupExerciseEditorModal();
+    setupExerciseQuickModal();
     loadExerciseLibraryForEditor();
     bindTemplateWorkspaceEvents();
     bindTemplatePlannerEvents();
@@ -576,6 +577,7 @@
     if (startWorkoutBtn) {
       wireStartWorkoutButton(startWorkoutBtn);
     }
+    setupStartWorkoutFallbackListener();
 
     if (footerSaveBtn) {
       footerSaveBtn.addEventListener("click", function () {
@@ -2808,14 +2810,46 @@
   }
 
   function wireStartWorkoutButton(button) {
-    if (!button || button.getAttribute("data-start-workout-wired") === "1") {
+    if (!button) {
       return;
     }
 
-    button.setAttribute("data-start-workout-wired", "1");
-    bindPress(button, function () {
+    button.onclick = function (event) {
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      if (event && typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
       startWorkoutWalkthrough();
-    });
+    };
+  }
+
+  function setupStartWorkoutFallbackListener() {
+    if (document.body && document.body.getAttribute("data-start-workout-fallback-wired") === "1") {
+      return;
+    }
+
+    if (document.body) {
+      document.body.setAttribute("data-start-workout-fallback-wired", "1");
+    }
+
+    document.addEventListener("click", function (event) {
+      if (!event) {
+        return;
+      }
+
+      var button = event.target && event.target.closest
+        ? event.target.closest("[data-start-workout]")
+        : null;
+
+      if (!button) {
+        return;
+      }
+
+      event.preventDefault();
+      startWorkoutWalkthrough();
+    }, true);
   }
 
   function configureBuilderMode() {
@@ -3513,6 +3547,18 @@
     };
   }
 
+  function getWorkoutCompletionStartTime() {
+    if (state.workoutWalkthroughActive && state.workoutWalkthroughStartedAt) {
+      return state.workoutWalkthroughStartedAt;
+    }
+
+    if (state.workoutSessionStartedAt) {
+      return state.workoutSessionStartedAt;
+    }
+
+    return Date.now();
+  }
+
   function setWorkoutIntensityValue(value) {
     var next = parseInt(String(value || "").trim(), 10);
     var select = document.querySelector("[data-workout-complete-modal] [data-workout-intensity]");
@@ -3577,6 +3623,13 @@
       return;
     }
 
+    if (state.workoutWalkthroughActive) {
+      finalizeWorkoutCompletion(state.workoutWalkthroughStartedAt || Date.now(), Date.now(), feedback, true);
+      closeWorkoutCompletionModal();
+      stopWorkoutWalkthrough(true);
+      return;
+    }
+
     finalizeWorkoutCompletion(state.workoutSessionStartedAt || Date.now(), Date.now(), feedback, true);
     closeWorkoutCompletionModal();
   }
@@ -3589,7 +3642,7 @@
     }
 
     var feedback = getWorkoutFeedbackValues();
-    var preview = buildWorkoutCompletionSummary(state.workoutSessionStartedAt || Date.now(), Date.now(), feedback);
+    var preview = buildWorkoutCompletionSummary(getWorkoutCompletionStartTime(), Date.now(), feedback);
     var prItems = Array.isArray(preview.prItems) ? preview.prItems : [];
     var badges = Array.isArray(preview.badges) ? preview.badges : [];
 
@@ -3597,6 +3650,7 @@
       '<article class="workout-summary-card">' +
         '<h3 class="workout-summary-title">Workout Snapshot</h3>' +
         '<ul class="workout-summary-stats">' +
+          '<li class="workout-summary-stat"><span class="workout-summary-stat-label">Time Spent</span><span class="workout-summary-stat-value">' + escapeHtml(preview.elapsedLabel) + '</span></li>' +
           '<li class="workout-summary-stat"><span class="workout-summary-stat-label">Sets Completed</span><span class="workout-summary-stat-value">' + escapeHtml(String(preview.doneSets) + ' / ' + String(preview.totalSets)) + '</span></li>' +
           '<li class="workout-summary-stat"><span class="workout-summary-stat-label">Completion</span><span class="workout-summary-stat-value">' + escapeHtml(String(preview.completionPercent) + '%') + '</span></li>' +
           '<li class="workout-summary-stat"><span class="workout-summary-stat-label">Intensity</span><span class="workout-summary-stat-value">' + escapeHtml(preview.intensityRating ? String(preview.intensityRating) + '/10' : '--') + '</span></li>' +
@@ -3672,7 +3726,9 @@
         saveBtn.style.display = "none";
       } else {
         saveBtn.style.display = "inline-flex";
-        if (isAthleteWorkoutOverviewMode()) {
+        if (state.isAthleteLockedView) {
+          saveBtn.innerHTML = "Log Workout";
+        } else if (isAthleteWorkoutOverviewMode()) {
           saveBtn.innerHTML = "Log Workout";
         } else {
           saveBtn.innerHTML = "<span>💾</span> Save Workout Log";
@@ -3685,6 +3741,9 @@
       startWorkoutBtn.innerHTML = isAthleteWorkoutOverviewMode()
         ? "Start Workout"
         : "<span>▶</span> Start Guided Workout";
+      startWorkoutBtn.disabled = false;
+      startWorkoutBtn.setAttribute("aria-disabled", "false");
+      wireStartWorkoutButton(startWorkoutBtn);
     }
 
     if (subtitle) {
@@ -6217,7 +6276,9 @@
       exercise.field_toggles = fieldToggles;
       exercise.notes = notes;
       exercise.library_id = libraryItem ? libraryItem.id : null;
-      exercise.video_demo_url = libraryItem ? libraryItem.video_demo_url || "" : "";
+      exercise.video_demo_url = libraryItem ? libraryItem.video_demo_url || "" : String(exercise.video_demo_url || "");
+      exercise.description = libraryItem ? libraryItem.description || "" : String(exercise.description || "");
+      exercise.coaching_cues = libraryItem ? libraryItem.coaching_cues || "" : String(exercise.coaching_cues || "");
       // Keep existing sets, just update metadata
 
       setStatus("Updated " + name + ".", "success");
@@ -6230,6 +6291,8 @@
         superset_group: null,
         library_id: libraryItem ? libraryItem.id : null,
         video_demo_url: libraryItem ? libraryItem.video_demo_url || "" : "",
+        description: libraryItem ? libraryItem.description || "" : "",
+        coaching_cues: libraryItem ? libraryItem.coaching_cues || "" : "",
         field_toggles: fieldToggles,
         notes: notes,
         sets: []
@@ -7919,6 +7982,9 @@
         superset_group: exercise ? exercise.superset_group || null : null,
         library_id: exercise ? exercise.library_id || null : null,
         video_demo_url: exercise ? exercise.video_demo_url || "" : "",
+        description: exercise ? exercise.description || "" : "",
+        coaching_cues: exercise ? exercise.coaching_cues || "" : "",
+        notes: exercise ? exercise.notes || "" : "",
         field_toggles: normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode),
         sets: sets.map(function (set) {
           var source = set || {};
@@ -7974,6 +8040,9 @@
         superset_group: templateExercise ? templateExercise.superset_group || null : null,
         library_id: templateExercise ? templateExercise.library_id || null : null,
         video_demo_url: templateExercise ? templateExercise.video_demo_url || "" : "",
+        description: templateExercise ? templateExercise.description || "" : "",
+        coaching_cues: templateExercise ? templateExercise.coaching_cues || "" : "",
+        notes: templateExercise ? templateExercise.notes || "" : "",
         field_toggles: normalizeExerciseFieldToggles(templateExercise && templateExercise.field_toggles, templateExercise && templateExercise.mode),
         sets: templateSets.map(function (templateSet, setIdx) {
           var storedSet = storedSets[setIdx] && typeof storedSets[setIdx] === "object" ? storedSets[setIdx] : {};
@@ -8015,6 +8084,9 @@
         superset_group: exercise ? exercise.superset_group || null : null,
         library_id: exercise ? exercise.library_id || null : null,
         video_demo_url: exercise ? exercise.video_demo_url || "" : "",
+        description: exercise ? exercise.description || "" : "",
+        coaching_cues: exercise ? exercise.coaching_cues || "" : "",
+        notes: exercise ? exercise.notes || "" : "",
         field_toggles: normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode),
         sets: sets.map(function (set) {
           var source = set || {};
@@ -10442,29 +10514,33 @@
     renderCompletionSummary();
     renderWorkoutCompletionSummary();
     syncWorkoutLogFooterState();
+    renderWorkoutWalkthrough();
   }
 
   function shouldShowStartWorkoutButton() {
-    return state.isAthleteLockedView && !state.isProgramReadOnly && !state.isTemplateBuilder;
+    return state.isAthleteLockedView && !state.isProgramReadOnly;
   }
 
   function syncStartWorkoutButtonState() {
     var startBtn = document.querySelector("[data-start-workout]");
-    var hasExercises = Array.isArray(state.exercises) && state.exercises.length > 0;
     var shouldShow = shouldShowStartWorkoutButton() && !state.workoutWalkthroughActive;
 
     if (!startBtn) {
       return;
     }
 
+    wireStartWorkoutButton(startBtn);
+
     startBtn.hidden = !shouldShow;
     startBtn.style.display = shouldShow ? "inline-flex" : "none";
-    startBtn.disabled = !hasExercises;
-    startBtn.setAttribute("aria-disabled", startBtn.disabled ? "true" : "false");
+    // Keep clickable so we can show clear in-app feedback if no sets are available yet.
+    startBtn.disabled = false;
+    startBtn.setAttribute("aria-disabled", "false");
   }
 
   function startWorkoutWalkthrough() {
-    if (!shouldShowStartWorkoutButton()) {
+    if (state.isProgramReadOnly || state.isTemplateBuilder || state.isCoachAssignedProgramEdit) {
+      setStatus("Start Workout is only available in active athlete workout mode.", "info");
       return;
     }
 
@@ -10538,9 +10614,11 @@
   }
 
   function completeWorkoutFromWalkthrough() {
-    var feedback = getWorkoutFeedbackValues();
-    finalizeWorkoutCompletion(state.workoutWalkthroughStartedAt || Date.now(), Date.now(), feedback, false);
-    stopWorkoutWalkthrough(true);
+    if (!state.workoutWalkthroughActive) {
+      return;
+    }
+
+    openWorkoutCompletionModal();
   }
 
   function finalizeWorkoutCompletion(startedAt, finishedAt, feedback, notifyCoach) {
@@ -10858,6 +10936,38 @@
       });
   }
 
+  function collectWorkoutExerciseNotes(exercises) {
+    var items = [];
+
+    (Array.isArray(exercises) ? exercises : []).forEach(function (exercise) {
+      var exerciseName = String(exercise && exercise.name || "Exercise").trim() || "Exercise";
+      var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
+
+      sets.forEach(function (set, index) {
+        var note = String(set && set.notes || "").trim();
+        if (!note) {
+          return;
+        }
+
+        var setNumber = index + 1;
+        var reps = String(set && set.reps || "").trim();
+        var weight = String(set && set.weight || "").trim();
+        var rpe = String(set && set.rpe || "").trim();
+
+        items.push({
+          exerciseName: exerciseName,
+          setNumber: setNumber,
+          note: note,
+          reps: reps,
+          weight: weight,
+          rpe: rpe
+        });
+      });
+    });
+
+    return items;
+  }
+
   function sendWorkoutCompletionNotification(summary) {
     if (!state.client || !state.assignedProgramInstanceId) {
       return Promise.resolve(false);
@@ -10878,14 +10988,31 @@
           var badges = completion && Array.isArray(completion.badges) ? completion.badges.join(", ") : "Session Complete";
           var intensity = completion && completion.intensityRating ? String(completion.intensityRating) + "/10" : "not provided";
           var note = completion && completion.athleteComments ? completion.athleteComments : "No additional comments.";
+          var exerciseNotes = collectWorkoutExerciseNotes(state.exercises || []);
+          var noteLines = exerciseNotes.length
+            ? exerciseNotes.map(function (item) {
+                var context = [
+                  item.reps ? "reps " + item.reps : "",
+                  item.weight ? "load " + item.weight : "",
+                  item.rpe ? "rpe " + item.rpe : ""
+                ].filter(Boolean).join(", ");
+                return "- " + item.exerciseName + " (Set " + item.setNumber + ")" + (context ? " [" + context + "]" : "") + ": " + item.note;
+              }).join("\n")
+            : "- None logged during this session.";
+
           var body = [
-            "Workout completed: " + labelForSlot(state.day),
-            "Completion: " + String(completion && completion.completionPercent || 0) + "%",
+            "WORKOUT COMPLETE",
+            "Day: " + labelForSlot(state.day),
+            "Completion: " + String(completion && completion.completionPercent || 0) + "% (" + String(completion && completion.doneSets || 0) + "/" + String(completion && completion.totalSets || 0) + " sets)",
             "Intensity: " + intensity,
             "PRs: " + String(prCount),
             "Badges: " + badges,
-            "Athlete note: " + note
-          ].join(" | ");
+            "Workout summary: " + String(completion && completion.comments || ""),
+            "Athlete end-of-workout comment: " + note,
+            "",
+            "Exercise notes logged during workout:",
+            noteLines
+          ].join("\n");
 
           return state.client
             .from("coach_athlete_messages")
@@ -10937,9 +11064,17 @@
       });
     });
 
+    var sectionOrder = [];
     orderedSections.forEach(function (section) {
+      if ((exercisesBySection[section] || []).length) {
+        sectionOrder.push(section);
+      }
+    });
+
+    sectionOrder.forEach(function (section, sectionIndex) {
       var sectionItems = exercisesBySection[section] || [];
       var seenSectionSupersets = {};
+      var sectionStepStart = steps.length;
 
       sectionItems.forEach(function (item) {
         var exercise = item.exercise || {};
@@ -10953,6 +11088,8 @@
         if (!supersetId) {
           for (var setIdx = 0; setIdx < sets.length; setIdx++) {
             steps.push({
+              type: "set",
+              section: section,
               exerciseIdx: item.exerciseIdx,
               setIdx: setIdx,
               isSuperset: false,
@@ -10993,6 +11130,8 @@
             }
 
             steps.push({
+              type: "set",
+              section: section,
               exerciseIdx: member.exerciseIdx,
               setIdx: round,
               isSuperset: true,
@@ -11004,9 +11143,42 @@
           });
         }
       });
+
+      var sectionSetCount = steps.length - sectionStepStart;
+      if (sectionSetCount > 0) {
+        var sectionExercises = sectionItems.filter(function (item) {
+          var sets = Array.isArray(item && item.exercise && item.exercise.sets) ? item.exercise.sets : [];
+          return sets.length > 0;
+        });
+
+        steps.splice(sectionStepStart, 0, {
+          type: "section_intro",
+          section: section,
+          sectionIndex: sectionIndex,
+          totalSections: sectionOrder.length,
+          sectionSetCount: sectionSetCount,
+          sectionExerciseCount: sectionExercises.length,
+          sectionExerciseNames: sectionExercises.map(function (entry) {
+            return String(entry && entry.exercise && entry.exercise.name || "Exercise");
+          })
+        });
+      }
     });
 
     return steps;
+  }
+
+  function getWorkoutWalkthroughSectionOverview(section) {
+    var key = String(section || "").trim().toLowerCase();
+    var copyBySection = {
+      "warm up": "Prime your movement quality, elevate temperature gradually, and prepare your joints for the main work.",
+      "a block": "Primary performance work. Focus on intent, strong positions, and quality output each set.",
+      "b block": "Secondary training stimulus. Stay crisp on technique and keep transitions efficient.",
+      "c block": "Accessory and support work. Build capacity without sacrificing control and form.",
+      "cool down": "Bring your effort down, restore breathing, and finish with quality recovery work."
+    };
+
+    return copyBySection[key] || "Review this section and complete each set with quality reps before moving on.";
   }
 
   function resolveWorkoutWalkthroughDemoUrl(exercise) {
@@ -11063,31 +11235,8 @@
     state.workoutWalkthroughStepIndex = Math.min(state.workoutWalkthroughStepIndex, steps.length - 1);
 
     var step = steps[state.workoutWalkthroughStepIndex];
-    var exercise = state.exercises[step.exerciseIdx];
-    var set = exercise && Array.isArray(exercise.sets) ? exercise.sets[step.setIdx] : null;
-
-    if (!exercise || !set) {
-      state.workoutWalkthroughSteps = buildWorkoutWalkthroughSteps();
-      if (!state.workoutWalkthroughSteps.length) {
-        stopWorkoutWalkthrough(true);
-        return;
-      }
-      state.workoutWalkthroughStepIndex = Math.min(state.workoutWalkthroughStepIndex, state.workoutWalkthroughSteps.length - 1);
-      step = state.workoutWalkthroughSteps[state.workoutWalkthroughStepIndex];
-      exercise = state.exercises[step.exerciseIdx];
-      set = exercise && Array.isArray(exercise.sets) ? exercise.sets[step.setIdx] : null;
-      if (!exercise || !set) {
-        stopWorkoutWalkthrough(true);
-        return;
-      }
-    }
-
-    var fieldToggles = normalizeExerciseFieldToggles(exercise.field_toggles, exercise.mode);
-    var demoUrl = resolveWorkoutWalkthroughDemoUrl(exercise);
+    var nextStep = steps[state.workoutWalkthroughStepIndex + 1] || null;
     var progressLabel = "Step " + (state.workoutWalkthroughStepIndex + 1) + " of " + state.workoutWalkthroughSteps.length;
-    var supersetMeta = step.isSuperset
-      ? "Superset " + step.supersetPosition + " of " + step.supersetSize + " • Round " + step.supersetRound + " of " + step.supersetRounds
-      : "Set " + (step.setIdx + 1) + " of " + ((exercise.sets && exercise.sets.length) || 1);
 
     if (section) {
       section.classList.add("is-walkthrough-active");
@@ -11109,39 +11258,96 @@
     }
 
     container.hidden = false;
-    container.innerHTML =
-      '<div class="workout-walkthrough-card">' +
-        '<div class="workout-walkthrough-top">' +
-          '<p class="workout-walkthrough-step">' + escapeHtml(progressLabel) + '</p>' +
-          '<button type="button" class="btn btn-secondary workout-walkthrough-exit" data-workout-walkthrough-exit>Return to Workout Overview</button>' +
-        '</div>' +
-        '<p class="workout-walkthrough-meta">' + escapeHtml((exercise.section || "A Block") + " • " + supersetMeta) + '</p>' +
-        '<h3 class="workout-walkthrough-title">' + escapeHtml(exercise.name || "Exercise") + '</h3>' +
-        '<p class="workout-walkthrough-mode">' + escapeHtml(modeLabel(exercise.mode)) + '</p>' +
-        (demoUrl
-          ? '<a class="workout-walkthrough-demo" href="' + escapeAttribute(demoUrl) + '" target="_blank" rel="noopener"><span class="workout-walkthrough-demo-thumb">▶</span><span>View Exercise Demo</span></a>'
-          : '<p class="workout-walkthrough-demo-none">No demo available for this exercise.</p>') +
-        '<div class="workout-walkthrough-fields">' +
-          '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "Duration" : "Reps") + '</span><input type="text" data-field="reps" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.reps, set.target_reps, set.done)) + '" placeholder="' + escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) + '" /></label>' +
-          (fieldToggles.showWeight
-            ? '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "Weight / Time / Distance" : "Weight / Time") + '</span><input type="text" data-field="weight" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) + '" placeholder="' + escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) + '" /></label>'
-            : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>Weight / Time</span><em>Off</em></div>') +
-          (fieldToggles.showRpe
-            ? '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "RPE / Zone / Effort" : "RPE / Zone") + '</span><input type="text" data-field="rpe" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.rpe, set.target_rpe, set.done)) + '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" /></label>'
-            : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>RPE / Zone</span><em>Off</em></div>') +
-          (fieldToggles.showRest
-            ? '<label class="athlete-mobile-input"><span>Rest</span><input type="text" data-field="rest" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.rest, set.target_rest, set.done)) + '" placeholder="' + escapeAttribute(set.target_rest || "e.g. 90s") + '" /></label>'
-            : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>Rest</span><em>Off</em></div>') +
-          '<label class="athlete-mobile-input athlete-mobile-input-notes"><span>Notes</span><input type="text" data-field="notes" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.notes, set.target_notes, set.done)) + '" placeholder="' + escapeAttribute(set.target_notes || "Notes") + '" /></label>' +
-          '<label class="athlete-mobile-done-toggle workout-walkthrough-done"><input type="checkbox" data-field="done" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" ' + (set.done ? "checked" : "") + ' /> Mark Set Done</label>' +
-        '</div>' +
-        '<div class="workout-walkthrough-actions">' +
-          '<button type="button" class="btn btn-secondary" data-workout-walkthrough-prev ' + (state.workoutWalkthroughStepIndex === 0 ? "disabled" : "") + '>Previous</button>' +
-          (state.workoutWalkthroughStepIndex === state.workoutWalkthroughSteps.length - 1
-            ? '<button type="button" class="btn btn-primary" data-workout-walkthrough-complete>Complete Workout</button>'
-            : '<button type="button" class="btn btn-primary" data-workout-walkthrough-next>Next</button>') +
-        '</div>' +
-      '</div>';
+
+    if (step && step.type === "section_intro") {
+      var sectionName = String(step.section || "Section");
+      var sectionOverview = getWorkoutWalkthroughSectionOverview(sectionName);
+      var sectionExercisesHtml = Array.isArray(step.sectionExerciseNames) && step.sectionExerciseNames.length
+        ? '<ul class="workout-walkthrough-section-list">' + step.sectionExerciseNames.map(function (name) {
+            return '<li>' + escapeHtml(name) + '</li>';
+          }).join("") + '</ul>'
+        : '';
+
+      container.innerHTML =
+        '<div class="workout-walkthrough-card is-section-intro">' +
+          '<div class="workout-walkthrough-top">' +
+            '<p class="workout-walkthrough-step">' + escapeHtml(progressLabel) + '</p>' +
+            '<button type="button" class="btn btn-secondary workout-walkthrough-exit" data-workout-walkthrough-exit>Return to Workout Overview</button>' +
+          '</div>' +
+          '<p class="workout-walkthrough-meta">Section ' + escapeHtml(String((step.sectionIndex || 0) + 1) + ' of ' + String(step.totalSections || 1)) + '</p>' +
+          '<h3 class="workout-walkthrough-title">' + escapeHtml(sectionName) + '</h3>' +
+          '<p class="workout-walkthrough-mode">' + escapeHtml(sectionOverview) + '</p>' +
+          '<p class="workout-walkthrough-meta">' + escapeHtml(String(step.sectionExerciseCount || 0) + ' exercises • ' + String(step.sectionSetCount || 0) + ' total sets') + '</p>' +
+          sectionExercisesHtml +
+          '<div class="workout-walkthrough-actions">' +
+            '<button type="button" class="btn btn-secondary" data-workout-walkthrough-prev ' + (state.workoutWalkthroughStepIndex === 0 ? "disabled" : "") + '>Previous</button>' +
+            '<button type="button" class="btn btn-primary" data-workout-walkthrough-next>' +
+              (state.workoutWalkthroughStepIndex === 0 ? 'Start Workout' : 'Start Section') +
+            '</button>' +
+          '</div>' +
+        '</div>';
+    } else {
+      var exercise = state.exercises[step.exerciseIdx];
+      var set = exercise && Array.isArray(exercise.sets) ? exercise.sets[step.setIdx] : null;
+
+      if (!exercise || !set) {
+        state.workoutWalkthroughSteps = buildWorkoutWalkthroughSteps();
+        if (!state.workoutWalkthroughSteps.length) {
+          stopWorkoutWalkthrough(true);
+          return;
+        }
+        state.workoutWalkthroughStepIndex = Math.min(state.workoutWalkthroughStepIndex, state.workoutWalkthroughSteps.length - 1);
+        renderWorkoutWalkthrough();
+        return;
+      }
+
+      var fieldToggles = normalizeExerciseFieldToggles(exercise.field_toggles, exercise.mode);
+      var demoUrl = resolveWorkoutWalkthroughDemoUrl(exercise);
+      var supersetMeta = step.isSuperset
+        ? "Superset " + step.supersetPosition + " of " + step.supersetSize + " • Round " + step.supersetRound + " of " + step.supersetRounds
+        : "Set " + (step.setIdx + 1) + " of " + ((exercise.sets && exercise.sets.length) || 1);
+      var isLastStep = state.workoutWalkthroughStepIndex === state.workoutWalkthroughSteps.length - 1;
+      var nextActionLabel = "Next";
+      if (isLastStep) {
+        nextActionLabel = "Complete Workout";
+      } else if (nextStep && nextStep.type === "section_intro") {
+        nextActionLabel = "Complete Section";
+      }
+
+      container.innerHTML =
+        '<div class="workout-walkthrough-card">' +
+          '<div class="workout-walkthrough-top">' +
+            '<p class="workout-walkthrough-step">' + escapeHtml(progressLabel) + '</p>' +
+            '<button type="button" class="btn btn-secondary workout-walkthrough-exit" data-workout-walkthrough-exit>Return to Workout Overview</button>' +
+          '</div>' +
+          '<p class="workout-walkthrough-meta">' + escapeHtml((exercise.section || "A Block") + " • " + supersetMeta) + '</p>' +
+          '<h3 class="workout-walkthrough-title">' + escapeHtml(exercise.name || "Exercise") + '</h3>' +
+          '<p class="workout-walkthrough-mode">' + escapeHtml(modeLabel(exercise.mode)) + '</p>' +
+          (demoUrl
+            ? '<a class="workout-walkthrough-demo" href="' + escapeAttribute(demoUrl) + '" target="_blank" rel="noopener"><span class="workout-walkthrough-demo-thumb">▶</span><span>View Exercise Demo</span></a>'
+            : '<p class="workout-walkthrough-demo-none">No demo available for this exercise.</p>') +
+          '<div class="workout-walkthrough-fields">' +
+            '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "Duration" : "Reps") + '</span><input type="text" data-field="reps" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.reps, set.target_reps, set.done)) + '" placeholder="' + escapeAttribute(set.target_reps || modePrimaryPlaceholder(exercise.mode)) + '" /></label>' +
+            (fieldToggles.showWeight
+              ? '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "Weight / Time / Distance" : "Weight / Time") + '</span><input type="text" data-field="weight" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.weight, set.target_weight, set.done)) + '" placeholder="' + escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) + '" /></label>'
+              : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>Weight / Time</span><em>Off</em></div>') +
+            (fieldToggles.showRpe
+              ? '<label class="athlete-mobile-input"><span>' + escapeHtml(exercise.mode === "endurance" ? "RPE / Zone / Effort" : "RPE / Zone") + '</span><input type="text" data-field="rpe" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.rpe, set.target_rpe, set.done)) + '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" /></label>'
+              : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>RPE / Zone</span><em>Off</em></div>') +
+            (fieldToggles.showRest
+              ? '<label class="athlete-mobile-input"><span>Rest</span><input type="text" data-field="rest" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.rest, set.target_rest, set.done)) + '" placeholder="' + escapeAttribute(set.target_rest || "e.g. 90s") + '" /></label>'
+              : '<div class="athlete-mobile-input athlete-mobile-input-off"><span>Rest</span><em>Off</em></div>') +
+            '<label class="athlete-mobile-input athlete-mobile-input-notes"><span>Notes</span><input type="text" data-field="notes" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" value="' + escapeAttribute(displayAthleteInputValue(set.notes, set.target_notes, set.done)) + '" placeholder="' + escapeAttribute(set.target_notes || "Notes") + '" /></label>' +
+            '<label class="athlete-mobile-done-toggle workout-walkthrough-done"><input type="checkbox" data-field="done" data-exercise="' + step.exerciseIdx + '" data-set="' + step.setIdx + '" ' + (set.done ? "checked" : "") + ' /> Mark Set Done</label>' +
+          '</div>' +
+          '<div class="workout-walkthrough-actions">' +
+            '<button type="button" class="btn btn-secondary" data-workout-walkthrough-prev ' + (state.workoutWalkthroughStepIndex === 0 ? "disabled" : "") + '>Previous</button>' +
+            (isLastStep
+              ? '<button type="button" class="btn btn-primary" data-workout-walkthrough-complete>' + escapeHtml(nextActionLabel) + '</button>'
+              : '<button type="button" class="btn btn-primary" data-workout-walkthrough-next>' + escapeHtml(nextActionLabel) + '</button>') +
+          '</div>' +
+        '</div>';
+    }
 
     bindWorkoutWalkthroughListeners(container);
   }
@@ -11348,11 +11554,25 @@
 
         details.innerHTML =
           '<summary class="athlete-mobile-summary">' +
-          '<div><div class="athlete-mobile-name">' +
+          '<div><div class="athlete-mobile-name-row">' +
+          '<button type="button" class="exercise-quick-icon is-video is-mobile" data-exercise-quick="video" data-exercise="' +
+          exerciseIdx +
+          '" aria-label="Open exercise video demo" title="Exercise Video"><span class="exercise-quick-glyph exercise-quick-glyph-video" aria-hidden="true"></span><span class="sr-only">Open exercise video demo</span></button>' +
+          '<div class="athlete-mobile-name">' +
           escapeHtml(exercise.name || "Exercise") +
+          '</div>' +
+          '<button type="button" class="exercise-quick-icon is-how is-mobile" data-exercise-quick="description" data-exercise="' +
+          exerciseIdx +
+          '" aria-label="Open exercise instructions" title="How To"><span class="exercise-quick-glyph exercise-quick-glyph-how" aria-hidden="true"></span><span class="sr-only">Open exercise instructions</span></button>' +
           '</div><div class="athlete-mobile-mode">' +
           escapeHtml(modeLabel(exercise.mode)) +
-          "</div></div>" +
+          "</div>" +
+          (String(exercise && exercise.notes || "").trim()
+            ? ('<button type="button" class="exercise-quick-icon is-note is-mobile-note" data-exercise-quick="note" data-exercise="' +
+              exerciseIdx +
+              '" aria-label="Open coach note" title="Coach Note"><span class="exercise-quick-glyph exercise-quick-glyph-note" aria-hidden="true"></span><span class="sr-only">Open coach note</span></button>')
+            : "") +
+          "</div>" +
           '<div class="athlete-mobile-progress">' +
           completed +
           " / " +
@@ -11382,6 +11602,7 @@
     if (!tbody) return;
 
     var fieldToggles = normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode);
+    var columnVisibility = getWorkoutLogColumnVisibility();
     var useAthleteRowLayout =
       state.isAthleteLockedView &&
       typeof window !== "undefined" &&
@@ -11429,10 +11650,24 @@
           cells += '<div class="superset-label">' + supersetLabel + " - Set " + (groupPosition + 1) + '</div>';
         }
 
+        var hasCoachNote = String(exercise && exercise.notes || "").trim() !== "";
         cells +=
+          '<div class="exercise-name-row">' +
+          '<button type="button" class="exercise-quick-icon is-video" data-exercise-quick="video" data-exercise="' +
+          exerciseIdx +
+          '" aria-label="Open exercise video demo" title="Exercise Video"><span class="exercise-quick-glyph exercise-quick-glyph-video" aria-hidden="true"></span><span class="sr-only">Open exercise video demo</span></button>' +
           '<div class="exercise-name">' +
           escapeHtml(exercise.name) +
-          '</div><div class="exercise-mode-label">' + modeLabel(exercise.mode) + '</div>' +
+          '</div>' +
+          '<button type="button" class="exercise-quick-icon is-how" data-exercise-quick="description" data-exercise="' +
+          exerciseIdx +
+          '" aria-label="Open exercise instructions" title="How To"><span class="exercise-quick-glyph exercise-quick-glyph-how" aria-hidden="true"></span><span class="sr-only">Open exercise instructions</span></button>' +
+          '</div>' +
+          (hasCoachNote
+            ? ('<div class="exercise-note-row"><button type="button" class="exercise-quick-icon is-note" data-exercise-quick="note" data-exercise="' +
+              exerciseIdx +
+              '" aria-label="Open coach note" title="Coach Note"><span class="exercise-quick-glyph exercise-quick-glyph-note" aria-hidden="true"></span><span class="sr-only">Open coach note</span></button></div>')
+            : "") +
           actionsHtml +
           '</div></td>';
       }
@@ -11468,32 +11703,36 @@
             escapeAttribute(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric)) +
             '" />' +
             buildPrintTargetMarkup(set.target_weight || modeSecondaryPlaceholder(exercise.mode, fieldToggles.secondaryMetric))
-          : '<span class="program-field-off">Off</span>') +
+          : '') +
         '</td>' +
-        '<td data-mobile-label="RPE / Zone">' +
-        (fieldToggles.showRpe
-          ? '<input type="text" data-field="rpe" data-exercise="' +
-            exerciseIdx +
-            '" data-set="' +
-            setIdx +
-            '" value="' +
-            escapeAttribute(displayAthleteInputValue(set.rpe, set.target_rpe, set.done)) +
-            '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" />' +
-            buildPrintTargetMarkup(set.target_rpe || modeTertiaryPlaceholder(exercise.mode))
-          : '<span class="program-field-off">Off</span>') +
-        '</td>' +
-        '<td data-mobile-label="Rest">' +
-        (fieldToggles.showRest
-          ? '<input type="text" data-field="rest" data-exercise="' +
-            exerciseIdx +
-            '" data-set="' +
-            setIdx +
-            '" value="' +
-            escapeAttribute(displayAthleteInputValue(set.rest, set.target_rest, set.done)) +
-            '" placeholder="' + escapeAttribute(set.target_rest || "e.g. 90s") + '" />' +
-            buildPrintTargetMarkup(set.target_rest || "e.g. 90s")
-          : '<span class="program-field-off">Off</span>') +
-        '</td>' +
+        (columnVisibility.showRpe
+          ? ('<td data-mobile-label="RPE / Zone">' +
+            (fieldToggles.showRpe
+              ? '<input type="text" data-field="rpe" data-exercise="' +
+                exerciseIdx +
+                '" data-set="' +
+                setIdx +
+                '" value="' +
+                escapeAttribute(displayAthleteInputValue(set.rpe, set.target_rpe, set.done)) +
+                '" placeholder="' + escapeAttribute(set.target_rpe || modeTertiaryPlaceholder(exercise.mode)) + '" />' +
+                buildPrintTargetMarkup(set.target_rpe || modeTertiaryPlaceholder(exercise.mode))
+              : '') +
+            '</td>')
+          : '') +
+        (columnVisibility.showRest
+          ? ('<td data-mobile-label="Rest">' +
+            (fieldToggles.showRest
+              ? '<input type="text" data-field="rest" data-exercise="' +
+                exerciseIdx +
+                '" data-set="' +
+                setIdx +
+                '" value="' +
+                escapeAttribute(displayAthleteInputValue(set.rest, set.target_rest, set.done)) +
+                '" placeholder="' + escapeAttribute(set.target_rest || "e.g. 90s") + '" />' +
+                buildPrintTargetMarkup(set.target_rest || "e.g. 90s")
+              : '') +
+            '</td>')
+          : '') +
         '<td data-mobile-label="Notes"><input type="text" data-field="notes" data-exercise="' +
         exerciseIdx +
         '" data-set="' +
@@ -11536,11 +11775,17 @@
 
     if (tbody) {
       bindSetInputListeners(tbody);
+      tbody.querySelectorAll("[data-exercise-quick]").forEach(function (btn) {
+        btn.addEventListener("click", onExerciseQuickAction);
+      });
     }
 
     if (mobileLog) {
       bindSetInputListeners(mobileLog);
       bindAthleteMobileDisclosureListeners(mobileLog);
+      mobileLog.querySelectorAll("[data-exercise-quick]").forEach(function (btn) {
+        btn.addEventListener("click", onExerciseQuickAction);
+      });
     }
 
     if (!state.isAthleteLockedView && tbody) {
@@ -11600,6 +11845,142 @@
         persistAthleteMobileOpenState(container);
       });
     });
+  }
+
+  function onExerciseQuickAction(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    var button = event && event.currentTarget ? event.currentTarget : null;
+    if (!button) {
+      return;
+    }
+
+    var type = String(button.getAttribute("data-exercise-quick") || "").trim().toLowerCase();
+    var exerciseIdx = parseInt(String(button.getAttribute("data-exercise") || "-1"), 10);
+    if (!Number.isFinite(exerciseIdx) || exerciseIdx < 0 || !type) {
+      return;
+    }
+
+    openExerciseQuickModal(exerciseIdx, type);
+  }
+
+  function setupExerciseQuickModal() {
+    document.querySelectorAll("[data-exercise-quick-modal-close]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        closeExerciseQuickModal();
+      });
+    });
+  }
+
+  function openExerciseQuickModal(exerciseIdx, type) {
+    var modal = document.querySelector("[data-exercise-quick-modal]");
+    var title = document.querySelector("[data-exercise-quick-modal-title]");
+    var body = document.querySelector("[data-exercise-quick-modal-body]");
+    var exercise = Array.isArray(state.exercises) ? state.exercises[exerciseIdx] : null;
+
+    if (!modal || !title || !body || !exercise) {
+      return;
+    }
+
+    var quickData = buildExerciseQuickData(exercise);
+    var exerciseName = String(exercise.name || "Exercise");
+
+    if (type === "video") {
+      title.textContent = exerciseName + " - Video Demo";
+      body.innerHTML = buildExerciseQuickVideoMarkup(quickData.videoUrl);
+    } else if (type === "description") {
+      title.textContent = exerciseName + " - How To";
+      body.innerHTML = buildExerciseQuickDescriptionMarkup(quickData.description, quickData.coachingCues);
+    } else {
+      title.textContent = exerciseName + " - Coach Note";
+      body.innerHTML = buildExerciseQuickNoteMarkup(quickData.coachNote);
+    }
+
+    modal.hidden = false;
+  }
+
+  function closeExerciseQuickModal() {
+    var modal = document.querySelector("[data-exercise-quick-modal]");
+    if (!modal) {
+      return;
+    }
+    modal.hidden = true;
+  }
+
+  function buildExerciseQuickData(exercise) {
+    var libraryItem = findExerciseLibraryItemById(exercise && exercise.library_id) || findExerciseLibraryItemByName(exercise && exercise.name);
+
+    return {
+      videoUrl: String(exercise && exercise.video_demo_url || (libraryItem && libraryItem.video_demo_url) || "").trim(),
+      description: String(exercise && exercise.description || (libraryItem && libraryItem.description) || "").trim(),
+      coachingCues: String(exercise && exercise.coaching_cues || (libraryItem && libraryItem.coaching_cues) || "").trim(),
+      coachNote: String(exercise && exercise.notes || "").trim()
+    };
+  }
+
+  function buildExerciseQuickVideoMarkup(videoUrl) {
+    var url = String(videoUrl || "").trim();
+    if (!url) {
+      return '<p class="exercise-quick-empty">No video demo is linked for this exercise yet.</p>';
+    }
+
+    var embedUrl = toEmbedVideoUrl(url);
+    if (embedUrl) {
+      return '<div class="exercise-quick-video-wrap"><iframe src="' + escapeAttribute(embedUrl) + '" title="Exercise video demo" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>';
+    }
+
+    if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(url)) {
+      return '<div class="exercise-quick-video-wrap"><video controls preload="metadata" src="' + escapeAttribute(url) + '"></video></div>';
+    }
+
+    return '<p class="exercise-quick-empty">Video demo link available:</p><p><a class="exercise-quick-link" href="' + escapeAttribute(url) + '" target="_blank" rel="noopener">Open Video Demo</a></p>';
+  }
+
+  function toEmbedVideoUrl(url) {
+    var value = String(url || "").trim();
+    if (!value) {
+      return "";
+    }
+
+    var youtubeMatch = value.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,})/i);
+    if (youtubeMatch && youtubeMatch[1]) {
+      return "https://www.youtube.com/embed/" + youtubeMatch[1];
+    }
+
+    var vimeoMatch = value.match(/vimeo\.com\/(\d+)/i);
+    if (vimeoMatch && vimeoMatch[1]) {
+      return "https://player.vimeo.com/video/" + vimeoMatch[1];
+    }
+
+    return "";
+  }
+
+  function buildExerciseQuickDescriptionMarkup(description, coachingCues) {
+    var desc = String(description || "").trim();
+    var cues = String(coachingCues || "").trim();
+    if (!desc && !cues) {
+      return '<p class="exercise-quick-empty">No exercise instructions are available yet.</p>';
+    }
+
+    var html = "";
+    if (desc) {
+      html += '<div class="exercise-quick-copy-block"><h4>Overview</h4><p>' + escapeHtml(desc) + '</p></div>';
+    }
+    if (cues) {
+      html += '<div class="exercise-quick-copy-block"><h4>Coaching Cues</h4><p>' + escapeHtml(cues) + '</p></div>';
+    }
+    return html;
+  }
+
+  function buildExerciseQuickNoteMarkup(note) {
+    var text = String(note || "").trim();
+    if (!text) {
+      return '<p class="exercise-quick-empty">No coach note is attached to this exercise.</p>';
+    }
+    return '<div class="exercise-quick-copy-block"><h4>Coach Note</h4><p>' + escapeHtml(text) + '</p></div>';
   }
 
   function getAthleteMobileOpenForDay() {
@@ -12575,6 +12956,10 @@
       return;
     }
 
+    var visibility = getWorkoutLogColumnVisibility();
+    tertiary.style.display = visibility.showRpe ? "table-cell" : "none";
+    rest.style.display = visibility.showRest ? "table-cell" : "none";
+
     var hasEndurance = (state.exercises || []).some(function (exercise) {
       return exercise && exercise.mode === "endurance";
     });
@@ -12596,6 +12981,28 @@
     secondary.textContent = "Weight / Time";
     tertiary.textContent = "RPE";
     rest.textContent = "Rest";
+  }
+
+  function getWorkoutLogColumnVisibility() {
+    var exercises = Array.isArray(state.exercises) ? state.exercises : [];
+    if (!exercises.length) {
+      return { showRpe: true, showRest: true };
+    }
+
+    var showRpe = exercises.some(function (exercise) {
+      var toggles = normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode);
+      return !!toggles.showRpe;
+    });
+
+    var showRest = exercises.some(function (exercise) {
+      var toggles = normalizeExerciseFieldToggles(exercise && exercise.field_toggles, exercise && exercise.mode);
+      return !!toggles.showRest;
+    });
+
+    return {
+      showRpe: showRpe,
+      showRest: showRest
+    };
   }
 
   function normalizeExerciseFieldToggles(toggles, mode) {

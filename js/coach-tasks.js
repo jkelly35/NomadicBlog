@@ -15,7 +15,9 @@
     forms: [],
     editingTemplateId: "",
     templateSearchTerm: "",
-    questionDrafts: []
+    questionDrafts: [],
+    athleteNamesById: {},
+    workoutCompletionTodos: []
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -60,6 +62,7 @@
       renderTemplateList();
       renderAttachedFormOptions("");
       updateCreateActionButtons();
+      loadWorkoutCompletionTodos();
     });
 
     state.client.auth.onAuthStateChange(function (_event, session) {
@@ -271,6 +274,144 @@
         renderAttachedFormOptions(attachedFormSelect.value || "");
       });
     }
+
+    var refreshWorkoutTodoBtn = document.querySelector("[data-coach-workout-todo-refresh]");
+    if (refreshWorkoutTodoBtn) {
+      refreshWorkoutTodoBtn.addEventListener("click", function () {
+        loadWorkoutCompletionTodos();
+      });
+    }
+  }
+
+  function loadWorkoutCompletionTodos() {
+    var list = document.querySelector("[data-coach-workout-todo-list]");
+    if (!state.client || !state.coachUser || !list) {
+      return;
+    }
+
+    list.innerHTML = '<p class="admin-loading">Loading workout completion notifications...</p>';
+
+    state.client
+      .from("coach_athlete_messages")
+      .select("id,athlete_user_id,body,read_by_coach_at,created_at,delivery_label,sender_role")
+      .eq("coach_user_id", state.coachUser.id)
+      .eq("sender_role", "athlete")
+      .eq("delivery_label", "workout-complete")
+      .order("created_at", { ascending: false })
+      .limit(80)
+      .then(function (result) {
+        if (result && result.error) {
+          throw result.error;
+        }
+
+        state.workoutCompletionTodos = Array.isArray(result.data) ? result.data.slice() : [];
+        return hydrateWorkoutTodoAthleteNames(state.workoutCompletionTodos);
+      })
+      .then(function () {
+        renderWorkoutCompletionTodos();
+      })
+      .catch(function (error) {
+        list.innerHTML = '<p class="admin-loading">Could not load workout completion notifications: ' + escapeHtml(error && error.message ? error.message : "Unknown error") + '</p>';
+      });
+  }
+
+  function hydrateWorkoutTodoAthleteNames(rows) {
+    var ids = (Array.isArray(rows) ? rows : []).map(function (row) {
+      return String(row && row.athlete_user_id || "").trim();
+    }).filter(Boolean);
+
+    if (!ids.length || !state.client) {
+      return Promise.resolve();
+    }
+
+    var uniqueIds = ids.filter(function (id, index, all) {
+      return all.indexOf(id) === index;
+    });
+
+    return state.client
+      .from("athlete_profiles")
+      .select("user_id,name")
+      .in("user_id", uniqueIds)
+      .then(function (result) {
+        if (result && result.error) {
+          return;
+        }
+
+        var map = {};
+        (result && Array.isArray(result.data) ? result.data : []).forEach(function (profile) {
+          var id = String(profile && profile.user_id || "").trim();
+          if (!id) {
+            return;
+          }
+          map[id] = String(profile && profile.name || "").trim();
+        });
+        state.athleteNamesById = map;
+      })
+      .catch(function () {
+        // Keep rendering with fallback athlete labels.
+      });
+  }
+
+  function renderWorkoutCompletionTodos() {
+    var list = document.querySelector("[data-coach-workout-todo-list]");
+    if (!list) {
+      return;
+    }
+
+    var rows = Array.isArray(state.workoutCompletionTodos) ? state.workoutCompletionTodos.slice() : [];
+    if (!rows.length) {
+      list.innerHTML = '<p class="admin-loading">No workout completion notifications yet.</p>';
+      return;
+    }
+
+    rows.sort(function (a, b) {
+      var aUnread = !a || !a.read_by_coach_at ? 1 : 0;
+      var bUnread = !b || !b.read_by_coach_at ? 1 : 0;
+      if (aUnread !== bUnread) {
+        return bUnread - aUnread;
+      }
+      return String(b && b.created_at || "").localeCompare(String(a && a.created_at || ""));
+    });
+
+    list.innerHTML = rows.map(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      var athleteName = state.athleteNamesById[athleteId] || "Athlete";
+      var isUnread = !row || !row.read_by_coach_at;
+      var body = String(row && row.body || "").trim();
+      return (
+        '<details class="admin-overview-item"' + (isUnread ? ' open' : '') + '>' +
+          '<summary class="admin-overview-item-title" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">' +
+            '<span>' + escapeHtml(athleteName) + ' • Workout Complete</span>' +
+            '<span class="admin-overview-item-meta">' +
+              (isUnread ? '<strong>Unread</strong> • ' : '') +
+              escapeHtml(formatDateTime(row && row.created_at)) +
+            '</span>' +
+          '</summary>' +
+          '<p class="admin-overview-item-meta" style="white-space: pre-wrap; margin-top: 0.5rem;">' + escapeHtml(body) + '</p>' +
+          '<div class="admin-controls-actions" style="margin-top:0.5rem;">' +
+            '<a class="btn admin-btn-small" href="coach-inbox.html?athlete=' + encodeURIComponent(athleteId) + '">Open Thread</a>' +
+          '</div>' +
+        '</details>'
+      );
+    }).join("");
+  }
+
+  function formatDateTime(value) {
+    if (!value) {
+      return "-";
+    }
+
+    var date = new Date(value);
+    if (isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    return date.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
   }
 
   function showGuardError(message) {

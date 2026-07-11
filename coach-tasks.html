@@ -9,7 +9,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js"></script>
   <script defer src="js/auth-ui.js"></script>
-  <script defer src="js/coach-tasks.js"></script>
+  <script defer src="js/coach-tasks.js?v=20260711a"></script>
 </head>
 <body>
   <header>
@@ -97,6 +97,20 @@
               <button class="btn admin-btn-refresh" type="button" data-coach-task-create>Save Task Template</button>
               <button class="btn admin-btn-small" type="button" data-coach-task-cancel-edit hidden>Cancel Edit</button>
               <button class="btn admin-btn-small" type="button" data-coach-task-clear-form>Clear</button>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Workout Completion To-Do</h2>
+              <p>Review newly completed workouts with summary, intensity, end comments, and per-exercise notes.</p>
+            </div>
+            <div class="admin-controls-actions" style="margin: 0 0 0.65rem 0;">
+              <button class="btn admin-btn-small" type="button" data-coach-workout-todo-refresh>Refresh</button>
+              <a class="btn admin-btn-small" href="coach-inbox.html">Open Inbox</a>
+            </div>
+            <div class="admin-overview-list" data-coach-workout-todo-list>
+              <p class="admin-loading">Loading workout completion notifications...</p>
             </div>
           </article>
         </section>

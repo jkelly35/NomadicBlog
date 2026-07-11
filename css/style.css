@@ -6918,6 +6918,11 @@ body.athlete-locked-view .program-demo-day-selector {
   gap: 0.72rem;
 }
 
+.workout-walkthrough-card.is-section-intro {
+  background: linear-gradient(180deg, #f9fdfb 0%, #edf6f2 100%);
+  border-color: #c9ddd6;
+}
+
 .workout-walkthrough-top {
   display: flex;
   align-items: center;
@@ -6951,6 +6956,14 @@ body.athlete-locked-view .program-demo-day-selector {
   color: #405e58;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.workout-walkthrough-section-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #1f4a48;
+  display: grid;
+  gap: 0.25rem;
 }
 
 .workout-walkthrough-demo {
@@ -7060,6 +7073,18 @@ body.athlete-locked-view .program-demo-day-selector {
   gap: 0.5rem;
 }
 
+.exercise-name-row {
+  position: relative;
+  display: block;
+  padding: 0.05rem 0.2rem 0.05rem 2.45rem;
+  min-height: 3.45rem;
+}
+
+.exercise-note-row {
+  margin-top: 0.25rem;
+  text-align: right;
+}
+
 .superset-label {
   font-size: 0.7rem;
   font-weight: 700;
@@ -7077,7 +7102,120 @@ body.athlete-locked-view .program-demo-day-selector {
   font-weight: 700;
   color: #0f2d2d;
   font-size: 1rem;
-  margin-bottom: 0.75rem;
+  line-height: 1.3;
+}
+
+.exercise-quick-icon {
+  border: 1px solid #d2c4b5;
+  background: #fffefb;
+  color: #1f4a4a;
+  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  box-shadow: 0 2px 8px rgba(14, 31, 30, 0.09);
+}
+
+.exercise-quick-icon:hover {
+  border-color: #c56a2c;
+  background: #fff4e7;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(15, 45, 45, 0.2);
+}
+
+.exercise-name-row .exercise-quick-icon.is-video {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.exercise-name-row .exercise-quick-icon.is-how {
+  position: absolute;
+  left: 0;
+  top: 2.05rem;
+}
+
+.exercise-quick-icon.is-video {
+  background: linear-gradient(160deg, #eef9f7 0%, #e0f2ee 100%);
+  border-color: #b6d8d2;
+}
+
+.exercise-quick-icon.is-video:hover {
+  background: linear-gradient(160deg, #e1f4ef 0%, #d2ede7 100%);
+}
+
+.exercise-quick-icon.is-how {
+  background: linear-gradient(160deg, #f4f7ff 0%, #e8efff 100%);
+  border-color: #c8d5f5;
+}
+
+.exercise-quick-icon.is-how:hover {
+  background: linear-gradient(160deg, #e9efff 0%, #dce7ff 100%);
+}
+
+.exercise-quick-icon.is-note,
+.exercise-quick-icon.is-mobile-note {
+  color: #73401b;
+  background: linear-gradient(160deg, #fff8ef 0%, #ffefdd 100%);
+  border-color: #e7c8a7;
+}
+
+.exercise-quick-glyph {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.exercise-quick-glyph-video::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid #205e5e;
+}
+
+.exercise-quick-glyph-how::before {
+  content: "i";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.82rem;
+  color: #3b568f;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.exercise-quick-glyph-note::before {
+  content: "";
+  position: absolute;
+  inset: 1px 2px 1px 2px;
+  border: 2px solid #86502a;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #fffaf3 0%, #fff4e5 100%);
+}
+
+.exercise-quick-glyph-note::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 5px;
+  height: 1px;
+  background: #b68761;
+  box-shadow: 0 3px 0 #b68761;
 }
 
 .exercise-mode-label {
@@ -7314,6 +7452,34 @@ body.athlete-locked-view .program-demo-day-selector {
   font-size: 1.02rem;
   font-weight: 800;
   color: #163636;
+}
+
+.athlete-mobile-name-row {
+  position: relative;
+  display: block;
+  padding: 0.05rem 0.2rem 0.05rem 2.25rem;
+  min-height: 3.25rem;
+}
+
+.exercise-quick-icon.is-mobile {
+  width: 28px;
+  height: 28px;
+}
+
+.athlete-mobile-name-row .exercise-quick-icon.is-video {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.athlete-mobile-name-row .exercise-quick-icon.is-how {
+  position: absolute;
+  left: 0;
+  top: 1.9rem;
+}
+
+.exercise-quick-icon.is-mobile-note {
+  margin-top: 0.35rem;
 }
 
 .athlete-mobile-mode {

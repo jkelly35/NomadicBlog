@@ -494,13 +494,17 @@
               '<time>' + escapeHtml(formatDateTime(msg.created_at)) + '</time>' +
               deleteAction +
             '</div>' +
-            '<p>' + escapeHtml(String(msg.body || "")) + '</p>' +
+                '<p>' + formatMessageBodyHtml(msg.body) + '</p>' +
           '</article>'
         );
       })
       .join('');
 
     state.threadEl.scrollTop = state.threadEl.scrollHeight;
+
+  function formatMessageBodyHtml(value) {
+    return escapeHtml(String(value || "")).replace(/\n/g, "<br>");
+  }
   }
 
   function updateComposeMode() {
