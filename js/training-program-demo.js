@@ -351,7 +351,7 @@
         var addBlockSlot = String(addAxisBlockBtn.getAttribute("data-axis-plan-add-block") || "").trim();
         if (addBlockSlot) {
           var addBlockPlan = getSessionPlanForSlot(addBlockSlot);
-          addBlockPlan.blocks.push(createEmptySessionBlock());
+          addBlockPlan.blocks.push(createEmptySessionBlock(addBlockPlan.session_type, addBlockPlan.blocks.length));
           state.sessionPlans[addBlockSlot] = addBlockPlan;
           saveExercisesForDay(true);
           renderDailyAxisEditorCards();
@@ -386,7 +386,7 @@
       var addBlockBtn = event.target && event.target.closest("[data-session-plan-add-block]");
       if (addBlockBtn) {
         var plan = getCurrentSessionPlan();
-        plan.blocks.push(createEmptySessionBlock());
+        plan.blocks.push(createEmptySessionBlock(plan.session_type, plan.blocks.length));
         state.sessionPlans[state.day] = plan;
         renderDailyProgrammingDesigner();
         return;
@@ -749,10 +749,6 @@
         '<span>Session Goal</span>',
         '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="session_goal" value="' + escapeAttribute(plan.session_goal || "") + '" />',
         '</label>',
-        '<label class="program-builder-structure-field">',
-        '<span>Sport Focus</span>',
-        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="sport_focus" value="' + escapeAttribute(plan.sport_focus || "") + '" />',
-        '</label>',
         '<div class="program-builder-phase-grid">',
         '<label class="program-builder-structure-field">',
         '<span>Duration (min)</span>',
@@ -762,14 +758,6 @@
         '<span>Intensity Target</span>',
         '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="intensity_target" value="' + escapeAttribute(plan.intensity_target || "") + '" />',
         '</label>',
-        '<label class="program-builder-structure-field">',
-        '<span>Terrain</span>',
-        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="terrain" value="' + escapeAttribute(plan.terrain || "") + '" />',
-        '</label>',
-        '<label class="program-builder-structure-field">',
-        '<span>Vertical Gain</span>',
-        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="vertical_gain" value="' + escapeAttribute(plan.vertical_gain || "") + '" />',
-        '</label>',
         '</div>',
         '<label class="program-builder-structure-field">',
         '<span>Coach Notes</span>',
@@ -778,7 +766,7 @@
         '<div class="program-builder-axis-blocks">',
         '<div class="program-builder-axis-card-head">',
         '<h3>Session Blocks</h3>',
-        '<p>Add and edit blocks directly here.</p>',
+        '<p>Add and edit blocks directly here. The session type determines the block preset sequence.</p>',
         '</div>',
         renderAxisSessionPlanBlocks(slotKey, plan),
         '<button type="button" class="btn admin-btn-small" data-axis-plan-add-block="' + escapeAttribute(slotKey) + '">Add Block</button>',
@@ -805,18 +793,72 @@
     return plan.blocks.map(function (block, index) {
       return [
         '<div class="program-builder-axis-block">',
-        '<div class="program-builder-phase-grid">',
+        '<div class="program-builder-axis-block-head">',
         '<label class="program-builder-structure-field">',
         '<span>Type</span>',
         '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="type">',
         buildSessionBlockTypeOptions(block.type),
         '</select>',
         '</label>',
-        '<label class="program-builder-structure-field program-builder-structure-field-wide">',
+        '<label class="program-builder-structure-field">',
         '<span>Title</span>',
         '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="title" value="' + escapeAttribute(block.title || '') + '" />',
         '</label>',
         '</div>',
+        renderAxisBlockDetails(slotKey, block, index),
+        '<div class="program-builder-phase-actions">',
+        '<button type="button" class="btn admin-btn-small" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-plan-remove-block="' + index + '">Remove Block</button>',
+        '</div>',
+        '</div>'
+      ].join('');
+    }).join('');
+  }
+
+  function renderAxisBlockDetails(slotKey, block, index) {
+    var type = normalizeWeeklySessionType(block && block.type);
+    var detailMarkup = '';
+
+    if (type === 'strength_lower' || type === 'strength_upper' || type === 'strength_full') {
+      detailMarkup = [
+        '<label class="program-builder-structure-field">',
+        '<span>Exercises</span>',
+        '<input type="number" min="1" max="10" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_count" value="' + escapeAttribute(String(block.exercise_count || 1)) + '" />',
+        '</label>',
+      ].join('') + renderAxisExerciseRows(slotKey, block, index);
+    } else if (type === 'zone2' || type === 'long_endurance' || type === 'threshold' || type === 'vo2' || type === 'uphill') {
+      detailMarkup = [
+        '<div class="program-builder-axis-detail-grid">',
+        '<label class="program-builder-structure-field">',
+        '<span>Form</span>',
+        '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_form">',
+        buildSessionFormOptions(block.exercise_form),
+        '</select>',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Duration (min)</span>',
+        '<input type="number" min="5" max="360" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="duration_minutes" value="' + escapeAttribute(String(block.duration_minutes || 0)) + '" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Target Intensity</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="target_intensity" value="' + escapeAttribute(block.target_intensity || '') + '" placeholder="e.g. Zone 2" />',
+        '</label>',
+        '</div>'
+      ].join('');
+    } else if (type === 'mobility' || type === 'cooldown' || type === 'warmup' || type === 'activation' || type === 'assessment') {
+      detailMarkup = [
+        '<div class="program-builder-axis-detail-grid">',
+        '<label class="program-builder-structure-field">',
+        '<span>Duration (min)</span>',
+        '<input type="number" min="5" max="180" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="duration_minutes" value="' + escapeAttribute(String(block.duration_minutes || 0)) + '" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Focus</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="target_intensity" value="' + escapeAttribute(block.target_intensity || '') + '" placeholder="e.g. Mobility, reset, assessment" />',
+        '</label>',
+        '</div>'
+      ].join('');
+    } else {
+      detailMarkup = [
         '<label class="program-builder-structure-field">',
         '<span>Prescription</span>',
         '<textarea rows="2" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="prescription">' + escapeHtml(block.prescription || '') + '</textarea>',
@@ -824,13 +866,103 @@
         '<label class="program-builder-structure-field">',
         '<span>Notes</span>',
         '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="notes" value="' + escapeAttribute(block.notes || '') + '" />',
+        '</label>'
+      ].join('');
+    }
+
+    return detailMarkup;
+  }
+
+  function renderAxisExerciseRows(slotKey, block, index) {
+    var count = clampNumber(parseInt(block && block.exercise_count, 10), 1, 20, 1);
+    var names = normalizeExerciseNames(block && block.exercise_names, count);
+    var sets = normalizeExerciseValues(block && block.exercise_sets, count, 3);
+    var setReps = normalizeExerciseNestedValues(block && block.exercise_set_reps, count, '5', sets);
+    var setIntensities = normalizeExerciseNestedValues(block && block.exercise_set_intensities, count, 'RPE 7', sets);
+    var fields = ['<div class="program-builder-axis-exercises">', '<div class="program-builder-axis-card-head"><h3>Exercise Details</h3><p>Each exercise can carry its own sets, and each set can vary by reps and intensity.</p></div>'];
+
+    for (var i = 0; i < count; i++) {
+      fields.push('<div class="program-builder-axis-exercise-row">');
+      fields.push(
+        '<div class="program-builder-axis-exercise-row-title">Exercise ' + String(i + 1) + '</div>',
+        '<label class="program-builder-structure-field">',
+        '<span>Exercise Name ' + String(i + 1) + '</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_names" data-axis-exercise-index="' + i + '" value="' + escapeAttribute(names[i] || '') + '" placeholder="e.g. Back Squat" />',
         '</label>',
-        '<div class="program-builder-phase-actions">',
-        '<button type="button" class="btn admin-btn-small" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-plan-remove-block="' + index + '">Remove Block</button>',
+        '<div class="program-builder-axis-detail-grid">',
+        '<label class="program-builder-structure-field">',
+        '<span>Sets</span>',
+        '<input type="number" min="1" max="20" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-block-field="exercise_sets" data-axis-exercise-index="' + i + '" value="' + escapeAttribute(String(sets[i] || 3)) + '" />',
+        '</label>',
+        '</div>',
+        renderAxisExerciseSetRows(slotKey, block, index, i, sets[i] || 3, setReps[i] || [], setIntensities[i] || []),
+        '</div>'
+      );
+    }
+
+    fields.push('</div>');
+    return fields.join('');
+  }
+
+  function renderAxisExerciseSetRows(slotKey, block, blockIndex, exerciseIndex, setCount, setReps, setIntensities) {
+    var totalSets = clampNumber(parseInt(setCount, 10), 1, 20, 1);
+    var fields = ['<div class="program-builder-axis-set-list">'];
+
+    for (var i = 0; i < totalSets; i++) {
+      fields.push(
+        '<div class="program-builder-axis-set-row">',
+        '<div class="program-builder-axis-exercise-row-title">Set ' + String(i + 1) + '</div>',
+        '<div class="program-builder-axis-detail-grid">',
+        '<label class="program-builder-structure-field">',
+        '<span>Reps</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-block-field="exercise_set_reps" data-axis-exercise-index="' + exerciseIndex + '" data-axis-set-index="' + i + '" value="' + escapeAttribute(setReps[i] || '5') + '" placeholder="e.g. 5" />',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Intensity</span>',
+        '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + blockIndex + '" data-axis-block-field="exercise_set_intensities" data-axis-exercise-index="' + exerciseIndex + '" data-axis-set-index="' + i + '" value="' + escapeAttribute(setIntensities[i] || 'RPE 7') + '" placeholder="e.g. 80% RM, RPE 8, RIP 2" />',
+        '</label>',
         '</div>',
         '</div>'
-      ].join('');
+      );
+    }
+
+    fields.push('</div>');
+    return fields.join('');
+  }
+
+  function buildSessionFormOptions(selectedValue) {
+    var selected = String(selectedValue || '').trim().toLowerCase();
+    var forms = [
+      { value: 'running', label: 'Running' },
+      { value: 'biking', label: 'Biking' },
+      { value: 'ski', label: 'Ski / Snow' },
+      { value: 'strength', label: 'Strength' },
+      { value: 'mixed', label: 'Mixed / Combo' }
+    ];
+
+    return forms.map(function (option) {
+      var isSelected = option.value === selected ? ' selected' : '';
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
     }).join('');
+  }
+
+  function getSessionTypeBlockSequence(sessionType) {
+    var type = normalizeWeeklySessionType(sessionType);
+    var sequences = {
+      strength_lower: ['warmup', 'main_strength', 'secondary_strength', 'cooldown'],
+      strength_upper: ['warmup', 'main_strength', 'secondary_strength', 'cooldown'],
+      strength_full: ['warmup', 'activation', 'main_strength', 'cooldown'],
+      zone2: ['warmup', 'zone2', 'cooldown'],
+      threshold: ['warmup', 'activation', 'intervals', 'cooldown'],
+      vo2: ['warmup', 'activation', 'intervals', 'cooldown'],
+      uphill: ['warmup', 'activation', 'intervals', 'cooldown'],
+      long_endurance: ['warmup', 'zone2', 'long_day', 'cooldown'],
+      mobility: ['warmup', 'mobility', 'cooldown'],
+      assessment: ['warmup', 'assessment', 'cooldown'],
+      rest: ['cooldown']
+    };
+
+    return sequences[type] || ['warmup', 'main_strength', 'cooldown'];
   }
 
   function renderSessionPlanBlocks(plan) {
@@ -908,15 +1040,62 @@
       if (!Number.isFinite(axisBlockIndex) || axisBlockIndex < 0 || axisBlockIndex >= axisBlockPlan.blocks.length) {
         return;
       }
-      axisBlockPlan.blocks[axisBlockIndex][axisBlockField] = String(target.value || '').trim();
-      if (axisBlockField === 'type' && (!axisBlockPlan.blocks[axisBlockIndex].title || axisBlockPlan.blocks[axisBlockIndex].title === 'New Block')) {
-        axisBlockPlan.blocks[axisBlockIndex].title = prettySessionBlockLabel(axisBlockPlan.blocks[axisBlockIndex].type);
+      var axisBlock = axisBlockPlan.blocks[axisBlockIndex];
+      if (axisBlockField === 'exercise_names') {
+        var exerciseNameIndex = parseInt(String(target.getAttribute("data-axis-exercise-index") || "-1"), 10);
+        var currentNames = normalizeExerciseNames(axisBlock.exercise_names, axisBlock.exercise_count);
+        if (Number.isFinite(exerciseNameIndex) && exerciseNameIndex >= 0 && exerciseNameIndex < currentNames.length) {
+          currentNames[exerciseNameIndex] = String(target.value || '').trim();
+          axisBlock.exercise_names = currentNames;
+        }
+      } else if (axisBlockField === 'exercise_sets') {
+        var exerciseIndex = parseInt(String(target.getAttribute("data-axis-exercise-index") || "-1"), 10);
+        var nextCountForArrays = clampNumber(parseInt(axisBlock.exercise_count, 10), 1, 20, 1);
+        var currentValues = normalizeExerciseValues(axisBlock.exercise_sets, nextCountForArrays, 3);
+        if (Number.isFinite(exerciseIndex) && exerciseIndex >= 0 && exerciseIndex < currentValues.length) {
+          currentValues[exerciseIndex] = String(target.value || '').trim();
+          axisBlock.exercise_sets = currentValues;
+          axisBlock.exercise_set_reps = normalizeExerciseNestedValues(axisBlock.exercise_set_reps, axisBlock.exercise_count, '5', currentValues);
+          axisBlock.exercise_set_intensities = normalizeExerciseNestedValues(axisBlock.exercise_set_intensities, axisBlock.exercise_count, 'RPE 7', currentValues);
+        }
+      } else if (axisBlockField === 'exercise_set_reps' || axisBlockField === 'exercise_set_intensities') {
+        var exerciseSetIndex = parseInt(String(target.getAttribute("data-axis-exercise-index") || "-1"), 10);
+        var setIndex = parseInt(String(target.getAttribute("data-axis-set-index") || "-1"), 10);
+        var setTotals = normalizeExerciseValues(axisBlock.exercise_sets, axisBlock.exercise_count, 3).map(function (value) {
+          return clampNumber(parseInt(value, 10), 1, 20, 1);
+        });
+        var nestedValues = normalizeExerciseNestedValues(axisBlock[axisBlockField], axisBlock.exercise_count, axisBlockField === 'exercise_set_reps' ? '5' : 'RPE 7', setTotals);
+        if (Number.isFinite(exerciseSetIndex) && exerciseSetIndex >= 0 && exerciseSetIndex < nestedValues.length) {
+          if (Number.isFinite(setIndex) && setIndex >= 0 && setIndex < nestedValues[exerciseSetIndex].length) {
+            nestedValues[exerciseSetIndex][setIndex] = String(target.value || '').trim();
+            axisBlock[axisBlockField] = nestedValues;
+          }
+        }
+      } else {
+        axisBlock[axisBlockField] = String(target.value || '').trim();
+      }
+
+      if (axisBlockField === 'exercise_count') {
+        var nextCount = clampNumber(parseInt(target.value, 10), 1, 20, axisBlock.exercise_count || 1);
+        axisBlock.exercise_count = nextCount;
+        axisBlock.exercise_names = normalizeExerciseNames(axisBlock.exercise_names, nextCount);
+        axisBlock.exercise_sets = normalizeExerciseValues(axisBlock.exercise_sets, nextCount, 3);
+        axisBlock.exercise_set_reps = normalizeExerciseNestedValues(axisBlock.exercise_set_reps, nextCount, '5', axisBlock.exercise_sets);
+        axisBlock.exercise_set_intensities = normalizeExerciseNestedValues(axisBlock.exercise_set_intensities, nextCount, 'RPE 7', axisBlock.exercise_sets);
+      }
+
+      if (axisBlockField === 'type') {
+        var nextType = normalizeSessionBlockType(axisBlock.type);
+        var existingTitle = String(axisBlock.title || '').trim();
+        var refreshedBlock = createEmptySessionBlock(nextType, axisBlockIndex);
+        axisBlockPlan.blocks[axisBlockIndex] = Object.assign({}, refreshedBlock, {
+          type: nextType,
+          title: existingTitle && existingTitle !== 'New Block' ? existingTitle : prettySessionBlockLabel(nextType)
+        });
       }
       state.sessionPlans[axisSlot] = axisBlockPlan;
       saveExercisesForDay(true);
-      if (axisSlot === state.day) {
-        renderSessionPlanBlocks(axisBlockPlan);
-      }
+      renderDailyAxisEditorCards();
       return;
     }
 
@@ -1027,15 +1206,84 @@
   function normalizeSessionBlocks(blocks) {
     return (Array.isArray(blocks) ? blocks : []).map(function (block) {
       var source = block && typeof block === 'object' ? block : {};
+      var type = normalizeSessionBlockType(source.type);
+      var defaults = getDefaultBlockFieldsForType(type);
+      var exerciseCount = clampNumber(parseInt(source.exercise_count, 10), 1, 20, defaults.exercise_count || 1);
       return {
-        type: normalizeSessionBlockType(source.type),
+        type: type,
         title: String(source.title || prettySessionBlockLabel(source.type)).trim(),
-        prescription: String(source.prescription || '').trim(),
-        notes: String(source.notes || '').trim()
+        prescription: String(source.prescription || defaults.prescription || '').trim(),
+        notes: String(source.notes || defaults.notes || '').trim(),
+        exercise_count: exerciseCount,
+        exercise_names: normalizeExerciseNames(source.exercise_names, exerciseCount),
+        exercise_sets: normalizeExerciseValues(source.exercise_sets || source.sets_per_exercise, exerciseCount, defaults.sets_per_exercise || 1),
+        exercise_set_reps: normalizeExerciseNestedValues(source.exercise_set_reps || source.exercise_reps || source.reps_per_exercise, exerciseCount, defaults.reps_per_exercise || '5', source.exercise_sets || source.sets_per_exercise),
+        exercise_set_intensities: normalizeExerciseNestedValues(source.exercise_set_intensities || source.exercise_intensities || source.target_intensity, exerciseCount, defaults.target_intensity || 'RPE 7', source.exercise_sets || source.sets_per_exercise),
+        exercise_form: String(source.exercise_form || defaults.exercise_form || '').trim(),
+        duration_minutes: clampNumber(parseInt(source.duration_minutes, 10), 0, 1440, defaults.duration_minutes || 0),
       };
     }).filter(function (block) {
       return !!block.title || !!block.prescription || !!block.notes;
     });
+  }
+
+  function normalizeExerciseNames(sourceNames, count) {
+    var total = Math.max(1, parseInt(count, 10) || 1);
+    var names = Array.isArray(sourceNames) ? sourceNames.slice() : [];
+
+    while (names.length < total) {
+      names.push('');
+    }
+
+    if (names.length > total) {
+      names = names.slice(0, total);
+    }
+
+    return names.map(function (name) {
+      return String(name || '').trim();
+    });
+  }
+
+  function normalizeExerciseValues(sourceValues, count, fallbackValue) {
+    var total = Math.max(1, parseInt(count, 10) || 1);
+    var values = Array.isArray(sourceValues) ? sourceValues.slice() : [];
+
+    while (values.length < total) {
+      values.push(fallbackValue);
+    }
+
+    if (values.length > total) {
+      values = values.slice(0, total);
+    }
+
+    return values.map(function (value) {
+      return String(value || '').trim();
+    });
+  }
+
+  function normalizeExerciseNestedValues(sourceValues, exerciseCount, fallbackValue, sourceSetCounts) {
+    var totalExercises = Math.max(1, parseInt(exerciseCount, 10) || 1);
+    var setCounts = normalizeExerciseValues(sourceSetCounts, totalExercises, 1).map(function (value) {
+      return clampNumber(parseInt(value, 10), 1, 20, 1);
+    });
+    var rows = Array.isArray(sourceValues) ? sourceValues.slice() : [];
+    var normalized = [];
+
+    for (var i = 0; i < totalExercises; i++) {
+      var setTotal = setCounts[i] || 1;
+      var row = Array.isArray(rows[i]) ? rows[i].slice() : [];
+      while (row.length < setTotal) {
+        row.push(fallbackValue);
+      }
+      if (row.length > setTotal) {
+        row = row.slice(0, setTotal);
+      }
+      normalized.push(row.map(function (value) {
+        return String(value || '').trim();
+      }));
+    }
+
+    return normalized;
   }
 
   function normalizeSessionPlans(sessionPlans) {
@@ -1109,8 +1357,35 @@
     return 'reps';
   }
 
-  function createEmptySessionBlock() {
-    return { type: 'main_strength', title: 'New Block', prescription: '', notes: '' };
+  function createEmptySessionBlock(sessionType, blockIndex) {
+    var sequence = getSessionTypeBlockSequence(sessionType);
+    var presetKey = sequence[Math.max(0, parseInt(blockIndex, 10) || 0)] || sequence[sequence.length - 1] || 'main_strength';
+    var preset = SESSION_BLOCK_PRESETS[presetKey];
+    if (preset) {
+      return Object.assign({ type: preset.type, title: preset.title, prescription: preset.prescription, notes: preset.notes }, getDefaultBlockFieldsForType(preset.type));
+    }
+
+    return Object.assign({ type: presetKey, title: prettySessionBlockLabel(presetKey), prescription: '', notes: '' }, getDefaultBlockFieldsForType(presetKey));
+  }
+
+  function getDefaultBlockFieldsForType(blockType) {
+    var type = normalizeSessionBlockType(blockType);
+    if (type === 'strength_lower' || type === 'strength_upper' || type === 'strength_full') {
+      return {
+        exercise_count: 1,
+        exercise_names: [''],
+        exercise_sets: ['3'],
+        exercise_reps: ['5'],
+        exercise_intensities: ['RPE 7']
+      };
+    }
+    if (type === 'zone2' || type === 'long_endurance' || type === 'threshold' || type === 'vo2' || type === 'uphill') {
+      return { exercise_form: 'running', duration_minutes: 60, target_intensity: 'Zone 2' };
+    }
+    if (type === 'mobility' || type === 'cooldown' || type === 'warmup' || type === 'activation' || type === 'assessment') {
+      return { duration_minutes: 15, target_intensity: '' };
+    }
+    return { prescription: '', notes: '' };
   }
 
   function addQuickSessionBlock(presetKey) {
@@ -1119,7 +1394,7 @@
       return;
     }
     var plan = getCurrentSessionPlan();
-    plan.blocks.push({ type: preset.type, title: preset.title, prescription: preset.prescription, notes: preset.notes });
+    plan.blocks.push(Object.assign({ type: preset.type, title: preset.title, prescription: preset.prescription, notes: preset.notes }, getDefaultBlockFieldsForType(preset.type)));
     state.sessionPlans[state.day] = plan;
     renderDailyProgrammingDesigner();
     saveExercisesForDay(true);
@@ -1252,11 +1527,6 @@
       state.templateId = params.get("templateId") || null;
       var builderAthleteId = String(params.get("athleteId") || "").trim();
       state.targetAthleteId = isUuid(builderAthleteId) ? builderAthleteId : null;
-
-      if (state.templateId && !isUuid(state.templateId)) {
-        // Legacy local-storage template IDs (e.g. tpl_123) are not valid Supabase UUIDs.
-        state.templateId = null;
-      }
 
       if (!wantsTemplateBuilder) {
         return;

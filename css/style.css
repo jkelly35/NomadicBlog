@@ -5136,6 +5136,72 @@ footer a:hover {
   gap: 0.5rem;
 }
 
+.program-builder-axis-block-head {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.program-builder-axis-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.program-builder-axis-exercises {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.program-builder-axis-exercise-row {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(192, 171, 142, 0.34);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.program-builder-axis-exercise-row-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink);
+}
+
+.program-builder-axis-set-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.program-builder-axis-set-row {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px dashed rgba(192, 171, 142, 0.42);
+}
+
+.program-builder-axis-exercises .program-builder-axis-card-head {
+  margin-top: 0.15rem;
+}
+
+.program-builder-axis-block .program-builder-structure-field textarea,
+.program-builder-axis-block .program-builder-structure-field input,
+.program-builder-axis-block .program-builder-structure-field select {
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .program-builder-axis-block-head,
+  .program-builder-axis-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   .program-builder-daily-nav-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
