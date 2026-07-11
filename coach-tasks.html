@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coach Tasks - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="js/analytics.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js"></script>
+  <script defer src="js/auth-ui.js"></script>
+  <script defer src="js/coach-tasks.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="blog.html">Blog</a>
+      <a href="about.html">About Me</a>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+      <div class="admin-overview-card" data-coach-tasks-guard>
+        <p class="admin-loading">Verifying coach access...</p>
+      </div>
+
+      <div class="admin-content" hidden data-coach-tasks-content>
+        <div class="admin-header">
+          <div class="admin-header-top">
+            <div>
+              <h1>Coach Task Center</h1>
+              <p class="admin-subtitle">Create reusable tasks, assign them to athletes, and track recent assignment activity.</p>
+            </div>
+            <a class="btn admin-btn-refresh" href="admin.html">Back to Dashboard</a>
+          </div>
+          <div class="admin-quick-nav" aria-label="Coach Task Navigation">
+            <a class="btn admin-btn-refresh" href="admin.html#admin-athletes">Athletes</a>
+            <a class="btn admin-btn-refresh" href="coach-training-programs.html">Programming</a>
+            <a class="btn admin-btn-refresh" href="coach-blog-manager.html">Blog</a>
+            <a class="btn admin-btn-refresh" href="coach-tasks.html">Tasks</a>
+          </div>
+        </div>
+
+        <section class="admin-overview-grid" aria-label="Coach Tasks Workspace">
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Available Tasks</h2>
+              <p>Reusable task templates your coaching team can assign to athletes.</p>
+            </div>
+            <input type="text" class="admin-search" placeholder="Search available tasks..." data-coach-task-search />
+            <div class="admin-overview-list" data-coach-task-template-list>
+              <p class="admin-loading">Loading task templates...</p>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Create New Task</h2>
+              <p>Save a reusable task template for future assignment.</p>
+            </div>
+            <div class="admin-modal-info-row">
+              <label for="coach-task-create-title">Task Title</label>
+              <input id="coach-task-create-title" class="admin-search" type="text" placeholder="e.g. Upload Weekly Training Reflection" data-coach-task-create-title />
+            </div>
+            <div class="admin-modal-info-row">
+              <label for="coach-task-create-description">Task Details</label>
+              <textarea id="coach-task-create-description" class="admin-search" rows="4" placeholder="What should the athlete complete and how should they respond?" data-coach-task-create-description></textarea>
+            </div>
+            <div class="admin-modal-info-row">
+              <label for="coach-task-create-action-label">Action Button Label (optional)</label>
+              <input id="coach-task-create-action-label" class="admin-search" type="text" placeholder="e.g. Open Payment" data-coach-task-create-action-label />
+            </div>
+            <div class="admin-modal-info-row">
+              <label for="coach-task-create-action-url">Action URL (optional)</label>
+              <input id="coach-task-create-action-url" class="admin-search" type="url" placeholder="https://..." data-coach-task-create-action-url />
+            </div>
+            <div class="admin-modal-info-row">
+              <label>Form Questions (optional)</label>
+              <p class="admin-overview-item-meta">Build a form athletes will complete when this task is assigned.</p>
+              <div class="admin-overview-list" data-coach-task-question-list>
+                <p class="admin-loading">No form questions yet.</p>
+              </div>
+              <div class="admin-controls-actions" style="margin-top:0.5rem;">
+                <button class="btn admin-btn-small" type="button" data-coach-task-add-question>Add Question</button>
+              </div>
+            </div>
+            <div class="admin-controls-actions">
+              <button class="btn admin-btn-refresh" type="button" data-coach-task-create>Save Task Template</button>
+              <button class="btn admin-btn-small" type="button" data-coach-task-cancel-edit hidden>Cancel Edit</button>
+              <button class="btn admin-btn-small" type="button" data-coach-task-clear-form>Clear</button>
+            </div>
+          </article>
+        </section>
+
+        <p class="admin-status" role="status" aria-live="polite" data-coach-task-status></p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

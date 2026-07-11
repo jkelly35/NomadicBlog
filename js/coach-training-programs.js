@@ -266,6 +266,7 @@
     list.innerHTML = visible
       .map(function (template) {
         var archiveLabel = template.archived ? "Unarchive" : "Archive";
+        var metaSummary = buildProgramMetaSummary(template);
         return (
           '<article class="admin-program-item">' +
           '<div class="admin-program-item-main">' +
@@ -273,6 +274,7 @@
           '<p>Last updated: ' + escapeHtml(formatDate(template.updated_at || template.created_at)) +
           (template.archived ? " · Archived" : "") +
           '</p>' +
+          (metaSummary ? '<p>' + escapeHtml(metaSummary) + '</p>' : '') +
           '</div>' +
           '<div class="admin-program-item-actions">' +
           '<button type="button" class="btn admin-btn-small" data-program-action="edit" data-program-id="' + escapeAttribute(template.id) + '">Edit</button>' +
@@ -685,7 +687,14 @@
 
     var payload = {
       archived: false,
+      focus: template.focus || "strength",
+      program_meta: template.program_meta || {},
+      program_phases: template.program_phases || [],
+      weekly_structure: template.weekly_structure || [],
+      day_session_types: template.day_session_types || {},
+      custom_day_name_mode: template.custom_day_name_mode || "legacy-suffix",
       structure: template.structure || { weeks: 1, workoutsPerWeek: 3 },
+      session_plans: template.session_plans || {},
       days: template.days || { "day-1": [], "day-2": [], "day-3": [] }
     };
 
@@ -808,7 +817,14 @@
       created_at: row.created_at,
       updated_at: row.updated_at,
       archived: !!payload.archived,
+      focus: payload.focus || "strength",
+      program_meta: payload.program_meta || {},
+      program_phases: Array.isArray(payload.program_phases) ? payload.program_phases : [],
+      weekly_structure: Array.isArray(payload.weekly_structure) ? payload.weekly_structure : [],
+      day_session_types: payload.day_session_types || {},
+      custom_day_name_mode: payload.custom_day_name_mode || "legacy-suffix",
       structure: payload.structure || { weeks: 1, workoutsPerWeek: 3 },
+      session_plans: payload.session_plans || {},
       days: payload.days || { "day-1": [], "day-2": [], "day-3": [] },
       custom_day_names: payload.custom_day_names || {}
     };
@@ -830,7 +846,14 @@
   function serializeTemplatePayload(payload) {
     var safePayload = {
       archived: !!(payload && payload.archived),
+      focus: payload && payload.focus ? payload.focus : "strength",
+      program_meta: payload && payload.program_meta ? payload.program_meta : {},
+      program_phases: payload && payload.program_phases ? payload.program_phases : [],
+      weekly_structure: payload && payload.weekly_structure ? payload.weekly_structure : [],
+      day_session_types: payload && payload.day_session_types ? payload.day_session_types : {},
+      custom_day_name_mode: payload && payload.custom_day_name_mode ? payload.custom_day_name_mode : "legacy-suffix",
       structure: payload && payload.structure ? payload.structure : { weeks: 1, workoutsPerWeek: 3 },
+      session_plans: payload && payload.session_plans ? payload.session_plans : {},
       days: payload && payload.days ? payload.days : { "day-1": [], "day-2": [], "day-3": [] },
       custom_day_names: payload && payload.custom_day_names ? payload.custom_day_names : {}
     };
@@ -855,7 +878,14 @@
           created_at: item.created_at,
           updated_at: item.updated_at,
           archived: !!item.archived,
+          focus: item.focus || "strength",
+          program_meta: item.program_meta || {},
+          program_phases: item.program_phases || [],
+          weekly_structure: item.weekly_structure || [],
+          day_session_types: item.day_session_types || {},
+          custom_day_name_mode: item.custom_day_name_mode || "legacy-suffix",
           structure: item.structure || { weeks: 1, workoutsPerWeek: 3 },
+          session_plans: item.session_plans || {},
           days: item.days || {},
           custom_day_names: item.custom_day_names || {}
         };
@@ -868,6 +898,35 @@
   function isMissingTableError(error) {
     var msg = error && error.message ? error.message.toLowerCase() : "";
     return !!(error && error.code === "42P01") || msg.indexOf("does not exist") > -1;
+  }
+
+  function buildProgramMetaSummary(template) {
+    var meta = template && template.program_meta && typeof template.program_meta === "object"
+      ? template.program_meta
+      : {};
+    var parts = [];
+    if (meta.program_type) {
+      parts.push(prettyLabel(meta.program_type));
+    }
+    if (meta.sport_focus) {
+      parts.push(String(meta.sport_focus));
+    }
+    if (template && template.structure && template.structure.weeks) {
+      parts.push(String(template.structure.weeks) + " wk");
+    }
+    if (meta.athlete_level) {
+      parts.push(prettyLabel(meta.athlete_level));
+    }
+    if (Array.isArray(template && template.program_phases) && template.program_phases.length) {
+      parts.push(String(template.program_phases.length) + " phases");
+    }
+    return parts.join(" • ");
+  }
+
+  function prettyLabel(value) {
+    return String(value || "")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, function (char) { return char.toUpperCase(); });
   }
 
   function setStatus(message, variant) {

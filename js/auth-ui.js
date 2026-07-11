@@ -583,18 +583,23 @@
       return;
     }
 
+    setStatus("Logging out...", "info");
+
     state.client.auth
       .signOut()
       .then(function (result) {
         if (result.error) {
-          setStatus(result.error.message, "error");
+          setStatus(result.error.message + " Redirecting to home...", "error");
           return;
         }
 
-        setStatus("You are now logged out.", "success");
+        setStatus("You are now logged out. Redirecting...", "success");
       })
       .catch(function (error) {
-        setStatus(error && error.message ? error.message : "Could not log out.", "error");
+        setStatus((error && error.message ? error.message : "Could not log out.") + " Redirecting to home...", "error");
+      })
+      .finally(function () {
+        window.location.replace("index.html");
       });
   }
 

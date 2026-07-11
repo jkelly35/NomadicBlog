@@ -10498,17 +10498,20 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       .signOut()
       .then(function (result) {
         if (result.error) {
-          setPasswordStatus(result.error.message, "error");
+          setPasswordStatus(result.error.message + " Redirecting...", "error");
           return;
         }
 
-        window.location.href = "index.html";
+        setPasswordStatus("Logged out. Redirecting...", "success");
       })
       .catch(function (error) {
         setPasswordStatus(
-          error && error.message ? error.message : "Failed to log out.",
+          (error && error.message ? error.message : "Failed to log out.") + " Redirecting...",
           "error"
         );
+      })
+      .finally(function () {
+        redirectToHome();
       });
   }
 
@@ -10581,7 +10584,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   }
 
   function redirectToHome() {
-    window.location.href = "index.html";
+    window.location.replace("index.html");
   }
 
   function setStatus(message, variant) {

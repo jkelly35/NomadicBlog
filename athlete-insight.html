@@ -343,12 +343,26 @@
         </div>
         <div class="admin-modal-section">
           <div class="admin-modal-actions">
-            <button type="button" class="btn admin-btn-primary" data-forms-assign-submit>Assign Selected Task</button>
-            <button type="button" class="btn profile-btn-cancel" data-forms-assign-quick-submit>Assign Quick Task</button>
+            <button type="button" class="btn admin-btn-primary" data-forms-assign-submit>Assign Task</button>
             <button type="button" class="btn admin-btn-reset-password" data-forms-assign-close>Cancel</button>
           </div>
         </div>
         <p class="admin-modal-status" role="status" aria-live="polite" data-forms-assign-status></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-modal" data-completed-form-modal hidden>
+    <div class="admin-modal-backdrop" data-completed-form-close></div>
+    <div class="admin-modal-panel" role="dialog" aria-modal="true" aria-labelledby="completed-form-title">
+      <button type="button" class="admin-modal-close" data-completed-form-close aria-label="Close">&times;</button>
+      <h2 id="completed-form-title" data-completed-form-title>Completed Form</h2>
+      <p class="admin-modal-status is-info" data-completed-form-meta></p>
+      <div class="admin-modal-content" data-completed-form-body>
+        <p class="insight-loading">Loading completed form details...</p>
+      </div>
+      <div class="admin-modal-actions" style="margin-top:0.75rem;">
+        <button type="button" class="btn admin-btn-reset-password" data-completed-form-close>Close</button>
       </div>
     </div>
   </div>

@@ -1643,14 +1643,17 @@
       .signOut()
       .then(function (result) {
         if (result.error) {
-          setAccountStatus(result.error.message, "error");
+          setAccountStatus(result.error.message + " Redirecting...", "error");
           return;
         }
 
-        window.location.href = "index.html";
+        setAccountStatus("Logged out. Redirecting...", "success");
       })
       .catch(function (error) {
-        setAccountStatus(error && error.message ? error.message : "Failed to log out.", "error");
+        setAccountStatus((error && error.message ? error.message : "Failed to log out.") + " Redirecting...", "error");
+      })
+      .finally(function () {
+        redirectToHome();
       });
   }
 
@@ -1799,7 +1802,7 @@
   }
 
   function redirectToHome() {
-    window.location.href = "index.html";
+    window.location.replace("index.html");
   }
 
   function escapeHtml(str) {

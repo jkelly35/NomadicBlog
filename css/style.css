@@ -5050,6 +5050,13 @@ footer a:hover {
   flex-wrap: wrap;
 }
 
+.program-builder-daily-nav-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
 .day-select-dropdown {
   flex: 1;
   min-width: 280px;
@@ -5078,6 +5085,67 @@ footer a:hover {
   color: #555;
   font-size: 0.9rem;
   font-style: italic;
+}
+
+.program-builder-axis-grid {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(340px, 1fr);
+  gap: 0.75rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.25rem;
+}
+
+.program-builder-axis-card {
+  border: 1px solid #eadfce;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+}
+
+.program-builder-axis-card-head h3 {
+  margin: 0;
+  color: #0f2d2d;
+  font-size: 0.95rem;
+}
+
+.program-builder-axis-card-head p {
+  margin: 0.2rem 0 0;
+  color: #5f7373;
+  font-size: 0.8rem;
+}
+
+.program-builder-axis-blocks {
+  margin-top: 0.35rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.program-builder-axis-block {
+  border: 1px solid #eadfce;
+  border-radius: 10px;
+  background: #fffdf9;
+  padding: 0.6rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .program-builder-daily-nav-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .program-builder-daily-nav-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .program-day-tools {
@@ -9374,7 +9442,7 @@ body.template-builder-mode .program-demo-progress-card,
 body.template-builder-mode .program-demo-section,
 body.template-builder-mode .program-demo-actions-section,
 body.template-builder-mode [data-workout-status] {
-  margin-left: 300px;
+  margin-left: 0;
 }
 
 body.template-builder-mode .program-demo-actions-section {
@@ -9383,6 +9451,19 @@ body.template-builder-mode .program-demo-actions-section {
 
 body.template-builder-mode .program-demo-actions-section .btn {
   width: auto;
+}
+
+body.template-builder-mode .program-demo-main {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 1.5rem 1.25rem 2rem;
+}
+
+body.template-builder-mode .program-demo-container {
+  width: 100%;
+  max-width: none;
+  padding: 2rem 1.5rem;
 }
 
 @media (max-width: 1100px) {
@@ -9448,6 +9529,36 @@ body.template-builder-mode .program-demo-actions-section .btn {
   font-size: 0.86rem;
 }
 
+.program-builder-step-actions {
+  margin-top: 0.9rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.program-builder-step-banner {
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid #dfd3c4;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffdf9 0%, #fff8ef 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.program-builder-step-banner h2 {
+  margin: 0;
+  color: #0f2d2d;
+  font-size: 1.1rem;
+}
+
+.program-builder-step-banner p {
+  margin: 0.25rem 0 0;
+  color: #5f7373;
+  font-size: 0.86rem;
+}
+
 .program-builder-structure-row .btn {
   white-space: nowrap;
 }
@@ -9473,10 +9584,170 @@ body.template-builder-mode .program-demo-actions-section .btn {
   background: #fff;
 }
 
+.program-builder-structure-field select,
+.program-builder-structure-field textarea {
+  border: 1px solid #c9beb0;
+  border-radius: 8px;
+  padding: 0.65rem 0.7rem;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
 .program-builder-structure-field input:focus {
   outline: 2px solid rgba(197, 106, 44, 0.33);
   outline-offset: 1px;
   border-color: #c56a2c;
+}
+
+.program-builder-structure-field select:focus,
+.program-builder-structure-field textarea:focus {
+  outline: 2px solid rgba(197, 106, 44, 0.33);
+  outline-offset: 1px;
+  border-color: #c56a2c;
+}
+
+.program-builder-meta-grid {
+  margin-top: 0.85rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.program-builder-structure-field-wide {
+  grid-column: span 2;
+}
+
+.program-builder-planner-grid {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.program-builder-planner-card {
+  border: 1px solid #dfd3c4;
+  border-radius: 14px;
+  background: #fffdf9;
+  padding: 0.9rem;
+}
+
+.program-builder-planner-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.program-builder-planner-head h3 {
+  margin: 0;
+  color: #0f2d2d;
+  font-size: 1rem;
+}
+
+.program-builder-planner-head p {
+  margin: 0.2rem 0 0;
+  color: #5f7373;
+  font-size: 0.84rem;
+}
+
+.program-builder-phase-list,
+.program-builder-week-list,
+.program-builder-alert-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.program-builder-phase-item,
+.program-builder-week-item {
+  border: 1px solid #eadfce;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.75rem;
+}
+
+.program-builder-phase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 0.55rem;
+}
+
+.program-builder-phase-actions {
+  margin-top: 0.65rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.program-builder-phase-warning {
+  margin: 0.7rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  border: 1px solid transparent;
+}
+
+.program-builder-phase-warning.is-warning {
+  color: #6e4318;
+  background: #fff4e7;
+  border-color: #efd3b1;
+}
+
+.program-builder-phase-warning.is-ok {
+  color: #1f5e3b;
+  background: #eef8f1;
+  border-color: #c5e6d3;
+}
+
+.program-builder-week-kicker {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #7a5e42;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.program-builder-alert-card {
+  margin-top: 0.9rem;
+}
+
+.program-builder-alert-item {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: #fff4e7;
+  border: 1px solid #efd3b1;
+  color: #6e4318;
+  font-size: 0.86rem;
+}
+
+.program-builder-daily-summary {
+  margin: 1rem 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.program-builder-daily-summary .program-builder-planner-card {
+  padding: 0.9rem;
+}
+
+.program-builder-daily-summary h3 {
+  margin: 0 0 0.35rem;
+  color: #0f2d2d;
+  font-size: 0.95rem;
+}
+
+.program-builder-daily-summary p {
+  margin: 0;
+  color: #5f7373;
+  font-size: 0.86rem;
+}
+
+.program-builder-daily-editor {
+  display: grid;
+  gap: 0.9rem;
 }
 
 @media (max-width: 700px) {
@@ -9485,8 +9756,24 @@ body.template-builder-mode .program-demo-actions-section .btn {
     align-items: stretch;
   }
 
+  .program-builder-meta-grid,
+  .program-builder-planner-grid,
+  .program-builder-phase-grid,
+  .program-builder-daily-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .program-builder-structure-field-wide {
+    grid-column: span 1;
+  }
+
   .program-builder-schedule-row {
     grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .program-builder-step-banner {
+    flex-direction: column;
     align-items: stretch;
   }
 
@@ -12058,6 +12345,22 @@ body.template-builder-mode .program-demo-actions-section .btn {
   font-size: 0.8rem;
 }
 
+.insight-form-actions {
+  margin-top: 0.55rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.insight-invoice-btn {
+  background: linear-gradient(120deg, #0f4f52, #166165);
+  color: #fff;
+}
+
+.insight-invoice-btn:hover {
+  background: linear-gradient(120deg, #0c4447, #125457);
+}
+
 .insight-form-response-grid {
   margin-top: 0.55rem;
   border-top: 1px dashed #e2d8ca;
@@ -12088,6 +12391,16 @@ body.template-builder-mode .program-demo-actions-section .btn {
   margin: 0.2rem 0 0;
   font-size: 0.75rem;
   color: #7a8d8d;
+}
+
+.insight-form-detail-description {
+  margin: 0;
+  color: #345050;
+  font-size: 0.85rem;
+}
+
+.insight-form-detail-actions {
+  margin: 0.7rem 0 0;
 }
 
 /* ---- Responsive ---- */

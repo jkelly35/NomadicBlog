@@ -30,6 +30,9 @@ type NormalizedEvent = {
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
+  invoiceId: string | null;
+  hostedInvoiceUrl: string | null;
+  invoicePdfUrl: string | null;
   metadata: Record<string, unknown>;
   shouldActivateMember: boolean;
   foundingSignal: boolean;
@@ -52,6 +55,11 @@ function getRequiredEnv(name: string): string {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+function getOptionalEnv(name: string): string | null {
+  const value = String(Deno.env.get(name) || "").trim();
+  return value || null;
 }
 
 function createServiceClient() {
@@ -231,6 +239,191 @@ function getInvoicePriceId(object: Record<string, unknown>): string | null {
   return null;
 }
 
+function getEventInvoiceDetails(eventType: string, object: Record<string, unknown>) {
+  let invoiceId: string | null = null;
+  let hostedInvoiceUrl: string | null = null;
+  let invoicePdfUrl: string | null = null;
+
+  if (eventType.indexOf("invoice.") === 0) {
+    invoiceId = getString(object.id);
+    hostedInvoiceUrl = getString(object.hosted_invoice_url);
+    invoicePdfUrl = getString(object.invoice_pdf);
+  }
+
+  if (!invoiceId) {
+    const checkoutInvoice = object.invoice;
+    if (checkoutInvoice && typeof checkoutInvoice === "object") {
+      invoiceId = getString((checkoutInvoice as { id?: unknown }).id);
+      hostedInvoiceUrl = hostedInvoiceUrl || getString((checkoutInvoice as { hosted_invoice_url?: unknown }).hosted_invoice_url);
+      invoicePdfUrl = invoicePdfUrl || getString((checkoutInvoice as { invoice_pdf?: unknown }).invoice_pdf);
+    } else {
+      invoiceId = getString(checkoutInvoice);
+    }
+  }
+
+  if (!invoiceId) {
+    const latestInvoice = object.latest_invoice;
+    if (latestInvoice && typeof latestInvoice === "object") {
+      invoiceId = getString((latestInvoice as { id?: unknown }).id);
+      hostedInvoiceUrl = hostedInvoiceUrl || getString((latestInvoice as { hosted_invoice_url?: unknown }).hosted_invoice_url);
+      invoicePdfUrl = invoicePdfUrl || getString((latestInvoice as { invoice_pdf?: unknown }).invoice_pdf);
+    } else {
+      invoiceId = getString(latestInvoice);
+    }
+  }
+
+  if (!hostedInvoiceUrl) {
+    hostedInvoiceUrl = getString(object.hosted_invoice_url);
+  }
+  if (!invoicePdfUrl) {
+    invoicePdfUrl = getString(object.invoice_pdf);
+  }
+
+  return {
+    invoiceId,
+    hostedInvoiceUrl,
+    invoicePdfUrl
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeMetadataForUpsert(
+  existingMetadata: unknown,
+  normalizedMetadata: Record<string, unknown>,
+  normalized: NormalizedEvent
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = {
+    ...(isRecord(existingMetadata) ? existingMetadata : {}),
+    ...(isRecord(normalizedMetadata) ? normalizedMetadata : {})
+  };
+
+  const invoiceId = getString(normalized.invoiceId) || getString(merged.invoice_id);
+  const hostedInvoiceUrl = getString(normalized.hostedInvoiceUrl) || getString(merged.hosted_invoice_url);
+  const invoicePdfUrl = getString(normalized.invoicePdfUrl) || getString(merged.invoice_pdf);
+
+  if (invoiceId) {
+    merged.invoice_id = invoiceId;
+  }
+  if (hostedInvoiceUrl) {
+    merged.hosted_invoice_url = hostedInvoiceUrl;
+  }
+  if (invoicePdfUrl) {
+    merged.invoice_pdf = invoicePdfUrl;
+  }
+
+  if (invoiceId || hostedInvoiceUrl || invoicePdfUrl) {
+    const currentHistory = Array.isArray((isRecord(existingMetadata) ? existingMetadata : {}).invoice_history)
+      ? ((isRecord(existingMetadata) ? existingMetadata : {}).invoice_history as unknown[])
+      : [];
+
+    const history = currentHistory
+      .filter(function (entry) { return isRecord(entry); })
+      .map(function (entry) {
+        return {
+          invoice_id: getString(entry.invoice_id),
+          hosted_invoice_url: getString(entry.hosted_invoice_url),
+          invoice_pdf: getString(entry.invoice_pdf),
+          event_type: getString(entry.event_type),
+          event_created_at: getString(entry.event_created_at)
+        };
+      })
+      .filter(function (entry) {
+        return !!entry.invoice_id || !!entry.hosted_invoice_url || !!entry.invoice_pdf;
+      });
+
+    const duplicateIndex = history.findIndex(function (entry) {
+      return (
+        (!!invoiceId && entry.invoice_id === invoiceId) ||
+        (!!hostedInvoiceUrl && entry.hosted_invoice_url === hostedInvoiceUrl) ||
+        (!!invoicePdfUrl && entry.invoice_pdf === invoicePdfUrl)
+      );
+    });
+
+    const latestEntry = {
+      invoice_id: invoiceId,
+      hosted_invoice_url: hostedInvoiceUrl,
+      invoice_pdf: invoicePdfUrl,
+      event_type: normalized.eventType,
+      event_created_at: normalized.eventCreatedAt
+    };
+
+    if (duplicateIndex >= 0) {
+      history.splice(duplicateIndex, 1);
+    }
+    history.unshift(latestEntry);
+    merged.invoice_history = history.slice(0, 24);
+  }
+
+  return merged;
+}
+
+async function fetchStripeInvoiceById(
+  stripeSecretKey: string,
+  invoiceId: string
+): Promise<{ invoiceId: string | null; hostedInvoiceUrl: string | null; invoicePdfUrl: string | null }> {
+  const trimmedId = String(invoiceId || "").trim();
+  if (!trimmedId) {
+    return { invoiceId: null, hostedInvoiceUrl: null, invoicePdfUrl: null };
+  }
+
+  const response = await fetch(`https://api.stripe.com/v1/invoices/${encodeURIComponent(trimmedId)}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${stripeSecretKey}`
+    }
+  });
+
+  if (!response.ok) {
+    return { invoiceId: trimmedId, hostedInvoiceUrl: null, invoicePdfUrl: null };
+  }
+
+  const payload = await response.json() as Record<string, unknown>;
+  return {
+    invoiceId: getString(payload.id) || trimmedId,
+    hostedInvoiceUrl: getString(payload.hosted_invoice_url),
+    invoicePdfUrl: getString(payload.invoice_pdf)
+  };
+}
+
+async function fetchLatestStripeInvoiceForSubscription(
+  stripeSecretKey: string,
+  subscriptionId: string
+): Promise<{ invoiceId: string | null; hostedInvoiceUrl: string | null; invoicePdfUrl: string | null }> {
+  const trimmedSubscriptionId = String(subscriptionId || "").trim();
+  if (!trimmedSubscriptionId) {
+    return { invoiceId: null, hostedInvoiceUrl: null, invoicePdfUrl: null };
+  }
+
+  const params = new URLSearchParams();
+  params.set("subscription", trimmedSubscriptionId);
+  params.set("limit", "1");
+  params.set("status", "paid");
+
+  const response = await fetch(`https://api.stripe.com/v1/invoices?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${stripeSecretKey}`
+    }
+  });
+
+  if (!response.ok) {
+    return { invoiceId: null, hostedInvoiceUrl: null, invoicePdfUrl: null };
+  }
+
+  const payload = await response.json() as { data?: unknown };
+  const rows = Array.isArray(payload.data) ? payload.data : [];
+  const first = rows.length && isRecord(rows[0]) ? rows[0] : {};
+
+  return {
+    invoiceId: getString(first.id),
+    hostedInvoiceUrl: getString(first.hosted_invoice_url),
+    invoicePdfUrl: getString(first.invoice_pdf)
+  };
+}
+
 function normalizeEvent(event: StripeEvent, foundingMemberPriceId: string): NormalizedEvent | null {
   const eventId = getString(event.id);
   const eventType = getString(event.type);
@@ -257,7 +450,15 @@ function normalizeEvent(event: StripeEvent, foundingMemberPriceId: string): Norm
   let currentPeriodStart: string | null = null;
   let currentPeriodEnd: string | null = null;
   let cancelAtPeriodEnd = false;
+  let invoiceId: string | null = null;
+  let hostedInvoiceUrl: string | null = null;
+  let invoicePdfUrl: string | null = null;
   let shouldActivateMember = false;
+
+  const invoiceDetails = getEventInvoiceDetails(eventType, object);
+  invoiceId = invoiceDetails.invoiceId;
+  hostedInvoiceUrl = invoiceDetails.hostedInvoiceUrl;
+  invoicePdfUrl = invoiceDetails.invoicePdfUrl;
 
   if (eventType === "checkout.session.completed" || eventType === "checkout.session.async_payment_succeeded") {
     stripeCheckoutSessionId = getString(object.id);
@@ -314,6 +515,9 @@ function normalizeEvent(event: StripeEvent, foundingMemberPriceId: string): Norm
     currentPeriodStart,
     currentPeriodEnd,
     cancelAtPeriodEnd,
+    invoiceId,
+    hostedInvoiceUrl,
+    invoicePdfUrl,
     metadata,
     shouldActivateMember,
     foundingSignal,
@@ -342,23 +546,62 @@ function getOnboardingStageRank(stage: string | null): number {
 async function completeMembershipPaymentTasks(
   admin: ReturnType<typeof createServiceClient>,
   userId: string,
-  completedAtIso: string
+  completedAtIso: string,
+  invoice: { invoiceId: string | null; hostedInvoiceUrl: string | null; invoicePdfUrl: string | null }
 ): Promise<void> {
-  const completionPayload = {
-    status: "submitted",
-    submitted_at: completedAtIso,
-    updated_at: completedAtIso
-  };
-
-  const { error } = await admin
+  const { data, error: selectError } = await admin
     .from("athlete_onboarding_intake_assignments")
-    .update(completionPayload)
+    .select("id,response_data")
     .eq("athlete_user_id", userId)
     .neq("status", "archived")
     .or("form_id.eq.membership-payment-task-v1,form_name.ilike.%membership%payment%");
 
-  if (error) {
-    throw new Error(error.message);
+  if (selectError) {
+    throw new Error(selectError.message);
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  for (const row of rows) {
+    const rowId = getString((row as { id?: unknown }).id);
+    if (!rowId) {
+      continue;
+    }
+
+    const existingResponse = isRecord((row as { response_data?: unknown }).response_data)
+      ? ((row as { response_data?: Record<string, unknown> }).response_data as Record<string, unknown>)
+      : {};
+
+    const nextResponse: Record<string, unknown> = {
+      ...existingResponse,
+      payment_completed_at: completedAtIso
+    };
+
+    if (invoice.invoiceId) {
+      nextResponse.invoice_id = invoice.invoiceId;
+    }
+    if (invoice.hostedInvoiceUrl) {
+      nextResponse.invoice_url = invoice.hostedInvoiceUrl;
+      nextResponse.hosted_invoice_url = invoice.hostedInvoiceUrl;
+    }
+    if (invoice.invoicePdfUrl) {
+      nextResponse.invoice_pdf = invoice.invoicePdfUrl;
+    }
+
+    const completionPayload = {
+      status: "submitted",
+      submitted_at: completedAtIso,
+      updated_at: completedAtIso,
+      response_data: nextResponse
+    };
+
+    const { error: updateError } = await admin
+      .from("athlete_onboarding_intake_assignments")
+      .update(completionPayload)
+      .eq("id", rowId);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
   }
 }
 
@@ -452,6 +695,52 @@ Deno.serve(async (req) => {
     const admin = createServiceClient();
     const userId = getString(normalized.metadataUserId) || await lookupUserIdByEmail(admin, normalized.customerEmail);
 
+    const stripeSecretKey = getOptionalEnv("STRIPE_SECRET_KEY");
+    if (stripeSecretKey) {
+      if (normalized.invoiceId && (!normalized.hostedInvoiceUrl || !normalized.invoicePdfUrl)) {
+        const fetchedInvoice = await fetchStripeInvoiceById(stripeSecretKey, normalized.invoiceId);
+        normalized.invoiceId = normalized.invoiceId || fetchedInvoice.invoiceId;
+        normalized.hostedInvoiceUrl = normalized.hostedInvoiceUrl || fetchedInvoice.hostedInvoiceUrl;
+        normalized.invoicePdfUrl = normalized.invoicePdfUrl || fetchedInvoice.invoicePdfUrl;
+      }
+
+      if ((!normalized.invoiceId || !normalized.hostedInvoiceUrl || !normalized.invoicePdfUrl) && normalized.stripeSubscriptionId) {
+        const latestInvoice = await fetchLatestStripeInvoiceForSubscription(stripeSecretKey, normalized.stripeSubscriptionId);
+        normalized.invoiceId = normalized.invoiceId || latestInvoice.invoiceId;
+        normalized.hostedInvoiceUrl = normalized.hostedInvoiceUrl || latestInvoice.hostedInvoiceUrl;
+        normalized.invoicePdfUrl = normalized.invoicePdfUrl || latestInvoice.invoicePdfUrl;
+      }
+    }
+
+    let existingSubscriptionRow: Record<string, unknown> = {};
+    if (normalized.stripeSubscriptionId) {
+      const existingResult = await admin
+        .from("founding_member_subscriptions")
+        .select("metadata")
+        .eq("stripe_subscription_id", normalized.stripeSubscriptionId)
+        .maybeSingle();
+      if (existingResult.error) {
+        throw new Error(existingResult.error.message);
+      }
+      existingSubscriptionRow = isRecord(existingResult.data) ? existingResult.data : {};
+    } else if (normalized.stripeCheckoutSessionId) {
+      const existingResult = await admin
+        .from("founding_member_subscriptions")
+        .select("metadata")
+        .eq("stripe_checkout_session_id", normalized.stripeCheckoutSessionId)
+        .maybeSingle();
+      if (existingResult.error) {
+        throw new Error(existingResult.error.message);
+      }
+      existingSubscriptionRow = isRecord(existingResult.data) ? existingResult.data : {};
+    }
+
+    const mergedMetadata = mergeMetadataForUpsert(
+      existingSubscriptionRow.metadata,
+      normalized.metadata,
+      normalized
+    );
+
     const upsertPayload = {
       stripe_customer_id: normalized.stripeCustomerId,
       stripe_subscription_id: normalized.stripeSubscriptionId,
@@ -468,7 +757,7 @@ Deno.serve(async (req) => {
       last_event_type: normalized.eventType,
       last_event_id: normalized.eventId,
       last_event_created_at: normalized.eventCreatedAt,
-      metadata: normalized.metadata,
+      metadata: mergedMetadata,
       raw_event: event
     };
 
@@ -505,7 +794,11 @@ Deno.serve(async (req) => {
       }
 
       await advanceFoundingOnboardingAfterPayment(admin, userId);
-      await completeMembershipPaymentTasks(admin, userId, completionIso);
+      await completeMembershipPaymentTasks(admin, userId, completionIso, {
+        invoiceId: normalized.invoiceId,
+        hostedInvoiceUrl: normalized.hostedInvoiceUrl,
+        invoicePdfUrl: normalized.invoicePdfUrl
+      });
     }
 
     return jsonResponse({

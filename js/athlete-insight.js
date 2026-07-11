@@ -18,7 +18,10 @@
     templates: [],
     onboardingAssignments: [],
     onboardingAssignmentsError: "",
+    completedAssignmentLookup: {},
+    athleteAccountEmail: "",
     onboardingTemplates: [],
+    foundingSubscriptionRows: [],
     scheduleRows: [],
     stravaRows: [],
     trainingTab: "current",
@@ -272,6 +275,7 @@
       var formsPayload = results[5] || {};
 
       state.profile  = profile;
+      state.athleteAccountEmail = String(authUser && authUser.email || "").trim().toLowerCase();
       state.metrics  = results[2] || [];
       state.programs = results[3] || [];
       state.stravaRows = results[4] || [];
@@ -279,8 +283,14 @@
       state.onboardingAssignmentsError = String(formsPayload.error || "");
       state.templates = Array.isArray(results[6]) ? results[6] : [];
 
-      return fetchScheduleRows(state.programs).then(function (scheduleRows) {
+      return Promise.all([
+        fetchScheduleRows(state.programs),
+        fetchFoundingSubscriptionPayments()
+      ]).then(function (nextResults) {
+        var scheduleRows = nextResults[0] || [];
+        var subscriptionRows = nextResults[1] || [];
         state.scheduleRows = scheduleRows || [];
+        state.foundingSubscriptionRows = Array.isArray(subscriptionRows) ? subscriptionRows : [];
 
         renderHero(authUser, profile);
         renderOverviewPanel(profile);
@@ -391,6 +401,90 @@
           error: error && error.message ? String(error.message) : "Unable to load forms and tasks."
         };
       });
+  }
+
+  function fetchFoundingSubscriptionPayments() {
+    var selectFields = "user_id,customer_email,stripe_subscription_id,stripe_checkout_session_id,last_event_id,status,last_event_type,last_event_created_at,updated_at,metadata,raw_event";
+
+    function normalizeRows(data) {
+      return (Array.isArray(data) ? data : []).map(function (row) {
+        return {
+          user_id: String(row && row.user_id || ""),
+          customer_email: String(row && row.customer_email || "").trim().toLowerCase(),
+          stripe_subscription_id: String(row && row.stripe_subscription_id || ""),
+          stripe_checkout_session_id: String(row && row.stripe_checkout_session_id || ""),
+          last_event_id: String(row && row.last_event_id || ""),
+          status: String(row && row.status || "").toLowerCase(),
+          last_event_type: String(row && row.last_event_type || "").toLowerCase(),
+          last_event_created_at: String(row && row.last_event_created_at || ""),
+          updated_at: String(row && row.updated_at || ""),
+          metadata: row && row.metadata && typeof row.metadata === "object" ? row.metadata : {},
+          raw_event: row && row.raw_event && typeof row.raw_event === "object" ? row.raw_event : {}
+        };
+      });
+    }
+
+    function dedupeRows(rows) {
+      var seen = {};
+      return rows.filter(function (row) {
+        var key = String(
+          row && row.stripe_subscription_id ||
+          row && row.stripe_checkout_session_id ||
+          row && row.last_event_id ||
+          row && row.updated_at ||
+          ""
+        ).trim();
+        if (!key) {
+          return true;
+        }
+        if (seen[key]) {
+          return false;
+        }
+        seen[key] = true;
+        return true;
+      });
+    }
+
+    var byUserRequest = state.client
+      .from("founding_member_subscriptions")
+      .select(selectFields)
+      .eq("user_id", state.athleteId)
+      .order("updated_at", { ascending: false })
+      .limit(30);
+
+    return byUserRequest
+      .then(function (userResult) {
+        if (userResult && userResult.error) {
+          if (isMissingRelationError(userResult.error)) {
+            return [];
+          }
+          return [];
+        }
+
+        var byUserRows = normalizeRows(userResult && userResult.data);
+        var athleteEmail = String(state.athleteAccountEmail || "").trim().toLowerCase();
+        if (!athleteEmail) {
+          return byUserRows;
+        }
+
+        return state.client
+          .from("founding_member_subscriptions")
+          .select(selectFields)
+          .eq("customer_email", athleteEmail)
+          .order("updated_at", { ascending: false })
+          .limit(30)
+          .then(function (emailResult) {
+            if (emailResult && emailResult.error) {
+              return byUserRows;
+            }
+            var byEmailRows = normalizeRows(emailResult && emailResult.data);
+            return dedupeRows(byUserRows.concat(byEmailRows));
+          })
+          .catch(function () {
+            return byUserRows;
+          });
+      })
+      .catch(function () { return []; });
   }
 
   function fetchTrainingTemplates() {
@@ -2604,6 +2698,7 @@
       var status = String(assignment && assignment.status || "").toLowerCase();
       return status === "submitted" || status === "archived";
     });
+    state.completedAssignmentLookup = {};
 
     if (countEl) {
       countEl.textContent = String(activeRows.length) + " active • " + String(completedRows.length) + " completed";
@@ -2634,26 +2729,36 @@
       '<section class="insight-section">',
       '<h2 class="insight-section-title">Completed History</h2>',
       completedRows.length
-        ? completedRows.map(function (assignment) {
-      var statusLabel = assignment.status === "archived" ? "Archived" : "Submitted";
-      var submittedLabel = assignment.submitted_at
-        ? formatDate(assignment.submitted_at)
-        : (assignment.updated_at ? formatDate(assignment.updated_at) : "Not submitted");
-      var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
+        ? completedRows.map(function (assignment, index) {
+            var statusLabel = assignment.status === "archived" ? "Archived" : "Submitted";
+            var submittedLabel = assignment.submitted_at
+              ? formatDate(assignment.submitted_at)
+              : (assignment.updated_at ? formatDate(assignment.updated_at) : "Not submitted");
+            var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
+            var key = getCompletedAssignmentKey(assignment, index);
+            var isPayment = isMembershipPaymentAssignment(assignment);
+            var invoiceUrl = isPayment ? getInvoiceUrlForAssignment(assignment) : "";
 
-      return [
-        '<article class="insight-form-card">',
-        '<div class="insight-form-card-head">',
-        '<div>',
-        '<h3 class="insight-form-title">' + escapeHtml(assignment.form_name) + '</h3>',
-        '<p class="insight-form-meta">Assigned ' + escapeHtml(formatDate(assignment.assigned_at)) + ' • Due ' + escapeHtml(dueLabel) + '</p>',
-        '</div>',
-        '<span class="insight-badge ' + (assignment.status === "archived" ? "insight-badge-inactive" : "insight-badge-active") + '">' + escapeHtml(statusLabel) + '</span>',
-        '</div>',
-        '<p class="insight-form-meta"><strong>Submitted:</strong> ' + escapeHtml(submittedLabel) + '</p>',
-        buildFormResponsePreviewHtml(assignment.response_data),
-        '</article>'
-      ].join("");
+            state.completedAssignmentLookup[key] = assignment;
+
+            return [
+              '<article class="insight-form-card">',
+              '<div class="insight-form-card-head">',
+              '<div>',
+              '<h3 class="insight-form-title">' + escapeHtml(assignment.form_name) + '</h3>',
+              '<p class="insight-form-meta">Assigned ' + escapeHtml(formatDate(assignment.assigned_at)) + ' • Due ' + escapeHtml(dueLabel) + '</p>',
+              '<p class="insight-form-meta"><strong>Submitted:</strong> ' + escapeHtml(submittedLabel) + '</p>',
+              '</div>',
+              '<span class="insight-badge ' + (assignment.status === "archived" ? "insight-badge-inactive" : "insight-badge-active") + '">' + escapeHtml(statusLabel) + '</span>',
+              '</div>',
+              '<div class="insight-form-actions">',
+              '<button type="button" class="btn insight-action-btn-sm" data-form-view-details="' + escapeAttribute(key) + '">View Details</button>',
+              (isPayment
+                ? '<button type="button" class="btn insight-action-btn-sm insight-invoice-btn" data-form-view-invoice="' + escapeAttribute(key) + '">' + (invoiceUrl ? 'View Invoice' : 'Invoice Unavailable') + '</button>'
+                : ''),
+              '</div>',
+              '</article>'
+            ].join("");
           }).join("")
         : '<p class="insight-empty">Completed and archived task forms will appear here once athletes submit them.</p>',
       '</section>'
@@ -2688,13 +2793,217 @@
 
     var assignBtn = modal.querySelector("[data-forms-assign-submit]");
     if (assignBtn) {
-      assignBtn.addEventListener("click", onAssignFormTemplateToAthlete);
+      assignBtn.addEventListener("click", onAssignTaskToAthlete);
     }
 
-    var quickBtn = modal.querySelector("[data-forms-assign-quick-submit]");
-    if (quickBtn) {
-      quickBtn.addEventListener("click", onAssignQuickTaskToAthlete);
+    wireCompletedFormsListActions();
+    wireCompletedDetailsModal();
+  }
+
+  function wireCompletedFormsListActions() {
+    var list = document.querySelector("[data-completed-forms-list]");
+    if (!list || list.getAttribute("data-completed-list-wired") === "1") {
+      return;
     }
+
+    list.setAttribute("data-completed-list-wired", "1");
+    list.addEventListener("click", function (event) {
+      var detailsBtn = event.target && event.target.closest("[data-form-view-details]");
+      if (detailsBtn) {
+        var detailKey = String(detailsBtn.getAttribute("data-form-view-details") || "").trim();
+        if (detailKey) {
+          openCompletedFormDetails(detailKey);
+        }
+        return;
+      }
+
+      var invoiceBtn = event.target && event.target.closest("[data-form-view-invoice]");
+      if (invoiceBtn) {
+        var invoiceKey = String(invoiceBtn.getAttribute("data-form-view-invoice") || "").trim();
+        if (invoiceKey) {
+          openCompletedPaymentInvoice(invoiceKey);
+        }
+      }
+    });
+  }
+
+  function wireCompletedDetailsModal() {
+    var modal = document.querySelector("[data-completed-form-modal]");
+    if (!modal || modal.getAttribute("data-completed-form-modal-wired") === "1") {
+      return;
+    }
+
+    modal.setAttribute("data-completed-form-modal-wired", "1");
+    modal.querySelectorAll("[data-completed-form-close]").forEach(function (btn) {
+      btn.addEventListener("click", closeCompletedFormDetails);
+    });
+  }
+
+  function openCompletedFormDetails(assignmentKey) {
+    var assignment = state.completedAssignmentLookup[assignmentKey];
+    var modal = document.querySelector("[data-completed-form-modal]");
+    var titleEl = modal ? modal.querySelector("[data-completed-form-title]") : null;
+    var metaEl = modal ? modal.querySelector("[data-completed-form-meta]") : null;
+    var bodyEl = modal ? modal.querySelector("[data-completed-form-body]") : null;
+
+    if (!assignment || !modal || !titleEl || !metaEl || !bodyEl) {
+      return;
+    }
+
+    var submittedLabel = assignment.submitted_at
+      ? formatDate(assignment.submitted_at)
+      : (assignment.updated_at ? formatDate(assignment.updated_at) : "Not submitted");
+    var assignedLabel = assignment.assigned_at ? formatDate(assignment.assigned_at) : "Unknown";
+    var dueLabel = assignment.due_date ? formatDate(assignment.due_date) : "No due date";
+
+    titleEl.textContent = assignment.form_name || "Completed Form";
+    metaEl.textContent = "Assigned " + assignedLabel + " • Due " + dueLabel + " • Submitted " + submittedLabel;
+    bodyEl.innerHTML = buildFormResponseDetailsHtml(assignment);
+
+    modal.hidden = false;
+    document.body.classList.add("admin-modal-open");
+  }
+
+  function closeCompletedFormDetails() {
+    var modal = document.querySelector("[data-completed-form-modal]");
+    if (!modal || modal.hidden) {
+      return;
+    }
+
+    modal.hidden = true;
+    document.body.classList.remove("admin-modal-open");
+  }
+
+  function openCompletedPaymentInvoice(assignmentKey) {
+    var assignment = state.completedAssignmentLookup[assignmentKey];
+    var invoiceUrl = getInvoiceUrlForAssignment(assignment);
+
+    if (!invoiceUrl) {
+      setStatus("No invoice link is available for this completed payment yet.", "info");
+      return;
+    }
+
+    window.open(invoiceUrl, "_blank", "noopener");
+  }
+
+  function getCompletedAssignmentKey(assignment, index) {
+    var id = String(assignment && assignment.id || "").trim();
+    if (id) {
+      return id;
+    }
+
+    return [
+      String(assignment && assignment.form_id || ""),
+      String(assignment && assignment.submitted_at || assignment && assignment.updated_at || ""),
+      String(index)
+    ].join(":");
+  }
+
+  function isMembershipPaymentAssignment(assignment) {
+    var formId = String(assignment && assignment.form_id || "").trim().toLowerCase();
+    var name = String(assignment && assignment.form_name || "").trim().toLowerCase();
+    return formId === MEMBERSHIP_PAYMENT_TASK_FORM_ID || name.indexOf("membership payment") > -1;
+  }
+
+  function getInvoiceUrlForAssignment(assignment) {
+    if (!assignment || !isMembershipPaymentAssignment(assignment)) {
+      return "";
+    }
+
+    var response = assignment && assignment.response_data && typeof assignment.response_data === "object"
+      ? assignment.response_data
+      : {};
+
+    var responseUrl = firstValidUrl([
+      response.invoice_url,
+      response.hosted_invoice_url,
+      response.invoice_pdf,
+      response.stripe_invoice_url,
+      response.payment_invoice_url
+    ]);
+    if (responseUrl) {
+      return responseUrl;
+    }
+
+    var rows = Array.isArray(state.foundingSubscriptionRows) ? state.foundingSubscriptionRows : [];
+    for (var i = 0; i < rows.length; i += 1) {
+      var url = extractInvoiceUrlFromSubscriptionRow(rows[i]);
+      if (url) {
+        return url;
+      }
+    }
+
+    return "";
+  }
+
+  function extractInvoiceUrlFromSubscriptionRow(row) {
+    var metadata = row && row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+    var rawEvent = row && row.raw_event && typeof row.raw_event === "object" ? row.raw_event : {};
+    var invoiceHistory = Array.isArray(metadata.invoice_history) ? metadata.invoice_history : [];
+    var latestInvoiceHistory = invoiceHistory.length && invoiceHistory[0] && typeof invoiceHistory[0] === "object"
+      ? invoiceHistory[0]
+      : {};
+    var eventObject = rawEvent && rawEvent.data && rawEvent.data.object && typeof rawEvent.data.object === "object"
+      ? rawEvent.data.object
+      : {};
+    var nestedInvoice = eventObject && eventObject.invoice && typeof eventObject.invoice === "object"
+      ? eventObject.invoice
+      : {};
+    var metadataInvoiceId = String(metadata.invoice_id || "").trim();
+    var eventInvoiceId = String(eventObject.id || nestedInvoice.id || "").trim();
+    var invoiceId = metadataInvoiceId || eventInvoiceId;
+    var livemode = row && row.raw_event && typeof row.raw_event === "object"
+      ? row.raw_event.livemode
+      : null;
+
+    var directUrl = firstValidUrl([
+      metadata.hosted_invoice_url,
+      metadata.invoice_url,
+      metadata.invoice_pdf,
+      metadata.latest_invoice_url,
+      latestInvoiceHistory.hosted_invoice_url,
+      latestInvoiceHistory.invoice_url,
+      latestInvoiceHistory.invoice_pdf,
+      eventObject.hosted_invoice_url,
+      eventObject.invoice_url,
+      eventObject.invoice_pdf,
+      nestedInvoice.hosted_invoice_url,
+      nestedInvoice.invoice_pdf
+    ]);
+
+    if (directUrl) {
+      return directUrl;
+    }
+
+    if (invoiceId) {
+      return buildStripeDashboardInvoiceUrl(invoiceId, livemode);
+    }
+
+    return "";
+  }
+
+  function buildStripeDashboardInvoiceUrl(invoiceId, livemode) {
+    var cleanId = String(invoiceId || "").trim();
+    if (!cleanId) {
+      return "";
+    }
+
+    var modeSegment = livemode === false ? "/test" : "";
+    return "https://dashboard.stripe.com" + modeSegment + "/invoices/" + encodeURIComponent(cleanId);
+  }
+
+  function firstValidUrl(candidates) {
+    var values = Array.isArray(candidates) ? candidates : [];
+    for (var i = 0; i < values.length; i += 1) {
+      var value = String(values[i] || "").trim();
+      if (!value) {
+        continue;
+      }
+      if (value.indexOf("http://") === 0 || value.indexOf("https://") === 0) {
+        return value;
+      }
+    }
+    return "";
   }
 
   function openFormsAssignModal() {
@@ -2771,6 +3080,23 @@
         state.selectedOnboardingTemplateId = String(radio.value || "");
       });
     });
+  }
+
+  function onAssignTaskToAthlete() {
+    var titleInput = document.querySelector("[data-forms-quick-task-title]");
+    var quickTaskTitle = String(titleInput && titleInput.value || "").trim();
+
+    if (quickTaskTitle) {
+      onAssignQuickTaskToAthlete();
+      return;
+    }
+
+    if (state.selectedOnboardingTemplateId) {
+      onAssignFormTemplateToAthlete();
+      return;
+    }
+
+    setFormsAssignStatus("Select a task form or enter a quick task title.", "error");
   }
 
   function onAssignFormTemplateToAthlete() {
@@ -2939,9 +3265,7 @@
   function setFormsAssignButtonsDisabled(disabled) {
     var isDisabled = !!disabled;
     var assignBtn = document.querySelector("[data-forms-assign-submit]");
-    var quickBtn = document.querySelector("[data-forms-assign-quick-submit]");
     if (assignBtn) assignBtn.disabled = isDisabled;
-    if (quickBtn) quickBtn.disabled = isDisabled;
   }
 
   function setFormsAssignStatus(message, variant) {
@@ -2965,9 +3289,14 @@
   }
 
   function refreshFormsAndTasks() {
-    fetchFormsAndTasks().then(function (payload) {
-      state.onboardingAssignments = Array.isArray(payload && payload.rows) ? payload.rows : [];
-      state.onboardingAssignmentsError = String(payload && payload.error || "");
+    Promise.all([
+      fetchFormsAndTasks(),
+      fetchFoundingSubscriptionPayments()
+    ]).then(function (results) {
+      var payload = results[0] || {};
+      state.onboardingAssignments = Array.isArray(payload.rows) ? payload.rows : [];
+      state.onboardingAssignmentsError = String(payload.error || "");
+      state.foundingSubscriptionRows = Array.isArray(results[1]) ? results[1] : [];
       renderFormsAndTasksPanel(state.onboardingAssignments, state.onboardingAssignmentsError);
     }).catch(function (error) {
       setStatus(error && error.message ? error.message : "Failed to refresh forms and tasks.", "error");
@@ -3004,6 +3333,30 @@
       keys.length > 10 ? '<p class="insight-form-more">+' + String(keys.length - 10) + ' more response field' + (keys.length - 10 === 1 ? '' : 's') + ' recorded.</p>' : '',
       '</div>'
     ].join("");
+  }
+
+  function buildFormResponseDetailsHtml(assignment) {
+    var schema = assignment && assignment.form_schema && typeof assignment.form_schema === "object"
+      ? assignment.form_schema
+      : {};
+    var description = String(schema.description || "").trim();
+
+    return [
+      description ? '<p class="insight-form-detail-description">' + escapeHtml(description) + '</p>' : '',
+      buildFormResponsePreviewHtml(assignment && assignment.response_data),
+      isMembershipPaymentAssignment(assignment)
+        ? buildPaymentDetailActionHtml(assignment)
+        : ''
+    ].join("");
+  }
+
+  function buildPaymentDetailActionHtml(assignment) {
+    var invoiceUrl = getInvoiceUrlForAssignment(assignment);
+    if (!invoiceUrl) {
+      return '<p class="insight-empty">Invoice link is not available yet for this payment.</p>';
+    }
+
+    return '<p class="insight-form-detail-actions"><a class="btn insight-action-btn-sm insight-invoice-btn" href="' + escapeAttribute(invoiceUrl) + '" target="_blank" rel="noopener">Open Stripe Invoice</a></p>';
   }
 
   function formatFormResponseValue(value) {

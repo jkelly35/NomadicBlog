@@ -3005,7 +3005,7 @@
 
     var foundingIntakeAssignmentsRequest = state.client
       .from("athlete_onboarding_intake_assignments")
-      .select("athlete_user_id,form_id,form_name,status,assigned_at,submitted_at,due_date,updated_at")
+      .select("athlete_user_id,form_id,form_name,form_schema,status,assigned_at,submitted_at,due_date,updated_at")
       .order("updated_at", { ascending: false })
       .limit(5000);
 
@@ -3203,9 +3203,26 @@
         if (foundingIntakeAssignmentsResult && !foundingIntakeAssignmentsResult.error) {
           state.foundingIntakeAssignmentRows = Array.isArray(foundingIntakeAssignmentsResult.data)
             ? foundingIntakeAssignmentsResult.data.map(function (row) {
+                var schema = row && row.form_schema;
+                if (typeof schema === "string") {
+                  try {
+                    schema = JSON.parse(schema);
+                  } catch (_error) {
+                    schema = {};
+                  }
+                }
+
                 return {
                   athlete_user_id: String(row && row.athlete_user_id || ""),
+                  form_id: String(row && row.form_id || ""),
+                  form_name: String(row && row.form_name || ""),
+                  task_name: String(row && row.task_name || ""),
+                  title: String(row && row.title || ""),
+                  form_schema: schema && typeof schema === "object" ? schema : {},
                   status: String(row && row.status || "").toLowerCase(),
+                  assigned_at: String(row && row.assigned_at || ""),
+                  submitted_at: String(row && row.submitted_at || ""),
+                  due_date: String(row && row.due_date || ""),
                   updated_at: String(row && row.updated_at || "")
                 };
               }).filter(function (row) {
@@ -3599,11 +3616,19 @@
   }
 
   function getCoachCompletionTaskLabel(row) {
+    var formId = String(row && row.form_id || "").trim();
     var schema = row && row.form_schema && typeof row.form_schema === "object" ? row.form_schema : {};
     var rawName = String(row && row.form_name || row && row.task_name || row && row.title || "").trim();
     var schemaName = String(schema.title || schema.task_name || schema.name || schema.label || "").trim();
     var schemaDescription = String(schema.description || "").trim();
     var schemaActionLabel = String(schema.action_label || "").trim();
+
+    if (formId === "default-liability-waiver-v1") {
+      return "Liability Waiver";
+    }
+    if (formId === MEMBERSHIP_PAYMENT_TASK_FORM_ID) {
+      return MEMBERSHIP_PAYMENT_TASK_NAME;
+    }
 
     if (rawName && !isGenericCoachTaskLabel(rawName)) {
       return rawName;
@@ -3618,6 +3643,13 @@
     }
 
     if (schemaDescription) {
+      var loweredDescription = schemaDescription.toLowerCase();
+      if (loweredDescription.indexOf("liability waiver") > -1) {
+        return "Liability Waiver";
+      }
+      if (loweredDescription.indexOf("complete payment") > -1 || loweredDescription.indexOf("activate coaching access") > -1) {
+        return MEMBERSHIP_PAYMENT_TASK_NAME;
+      }
       return schemaDescription.length > 72 ? schemaDescription.slice(0, 69).trim() + "..." : schemaDescription;
     }
 
