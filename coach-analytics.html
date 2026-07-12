@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coach Analytics - Nomadic Performance</title>
+  <link rel="stylesheet" href="css/style.css?v=20260711m" />
+  <script defer src="js/analytics.js?v=20260711m"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="js/supabase-config.js?v=20260711m"></script>
+  <script defer src="js/auth-ui.js?v=20260711m"></script>
+  <script defer src="js/coach-analytics.js?v=20260711j"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="img/nomadicPerformanceLogo.png" alt="Nomadic Performance" class="logo-img" />
+      <h1>Nomadic Performance</h1>
+      <p>Move Free, Thrive Wild</p>
+    </div>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="blog.html">Blog</a>
+      <a href="about.html">About Me</a>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+      <div class="admin-overview-card" data-coach-analytics-guard>
+        <p class="admin-loading">Verifying coach access...</p>
+      </div>
+
+      <div class="admin-content" hidden data-coach-analytics-content>
+        <div class="admin-header">
+          <div class="admin-header-top">
+            <div>
+              <h1>Coach Analytics</h1>
+              <p class="admin-subtitle">Coach-only performance intelligence across recovery, training load, cognitive output, and context signals.</p>
+            </div>
+            <a class="btn admin-btn-refresh" href="admin.html">Back to Dashboard</a>
+          </div>
+          <div class="admin-quick-nav" aria-label="Coach Analytics Navigation">
+            <a class="btn admin-btn-refresh" href="admin.html#admin-athletes">Athletes</a>
+            <a class="btn admin-btn-refresh" href="coach-training-programs.html">Programming</a>
+            <a class="btn admin-btn-refresh" href="coach-analytics.html">Analytics</a>
+            <a class="btn admin-btn-refresh" href="coach-forms-manager.html">Forms</a>
+            <a class="btn admin-btn-refresh" href="coach-blog-manager.html">Blog</a>
+            <a class="btn admin-btn-refresh" href="coach-tasks.html">Tasks</a>
+          </div>
+        </div>
+
+        <section class="admin-overview-card" aria-label="Analytics Controls">
+          <div class="admin-overview-card-head">
+            <h2>Analysis Controls</h2>
+            <p>Select athlete and date window to aggregate coach-only analytics.</p>
+          </div>
+          <div class="coach-analytics-toolbar">
+            <label class="coach-analytics-field">
+              <span>Athlete</span>
+              <select class="admin-search" data-analytics-athlete-select>
+                <option value="">Loading athletes...</option>
+              </select>
+            </label>
+            <label class="coach-analytics-field">
+              <span>Window</span>
+              <select class="admin-search" data-analytics-window-select>
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="90">Last 90 days</option>
+              </select>
+            </label>
+            <label class="coach-analytics-field">
+              <span>Athlete Status</span>
+              <select class="admin-search" data-analytics-athlete-status-filter>
+                <option value="active" selected>Active Accounts</option>
+                <option value="all">All Accounts</option>
+                <option value="deleted">Deleted Accounts</option>
+                <option value="inactive">Inactive (Not Deleted)</option>
+              </select>
+            </label>
+            <div class="coach-analytics-actions">
+              <button type="button" class="btn admin-btn-refresh" data-analytics-refresh>Refresh Analytics</button>
+              <button type="button" class="btn admin-btn-refresh" data-analytics-csv-export>Export All Data as CSV</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="admin-overview-card" aria-label="Analytics Summary">
+          <div class="admin-overview-card-head">
+            <h2>Summary Snapshot</h2>
+            <p>Primary KPIs for readiness, load, output, and context.</p>
+          </div>
+          <div class="admin-insight-cards" data-analytics-summary-cards>
+            <article class="admin-insight-card is-loading">Choose an athlete to load analytics.</article>
+          </div>
+        </section>
+
+        <section class="admin-overview-grid" aria-label="Analytics Intelligence">
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Correlation Insights</h2>
+              <p>Within-athlete associations for coaching decisions.</p>
+            </div>
+            <div class="admin-insight-list" data-analytics-correlation-list>
+              <p class="admin-empty-copy">Collect at least 5 overlapping daily data points to surface correlation insights.</p>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Movement Pattern Load</h2>
+              <p>Strength volume distribution by movement pattern in selected window.</p>
+            </div>
+            <div class="admin-insight-list" data-analytics-movement-list>
+              <p class="admin-empty-copy">No movement pattern load available yet.</p>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Recent Daily Signals</h2>
+              <p>Latest integrated readiness, load, focus, and stress points.</p>
+            </div>
+            <div class="coach-analytics-table-wrap">
+              <table class="coach-analytics-table" data-analytics-daily-table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Sleep</th>
+                    <th>HRV</th>
+                    <th>Load</th>
+                    <th>Focus</th>
+                    <th>Stress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colspan="6">No daily analytics rows yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="admin-overview-card">
+            <div class="admin-overview-card-head">
+              <h2>Programming Context</h2>
+              <p>Most recent programming metadata for interpretation context.</p>
+            </div>
+            <div class="admin-insight-list" data-analytics-programming-context>
+              <p class="admin-empty-copy">No programming session metadata logged yet.</p>
+            </div>
+          </article>
+        </section>
+
+        <section class="admin-overview-card" aria-label="Population Analytics">
+          <div class="admin-overview-card-head">
+            <h2>Population Analytics</h2>
+            <p>Cross-athlete comparisons to test relationships between assessments and performance levels.</p>
+          </div>
+
+          <div class="coach-analytics-toolbar coach-analytics-toolbar-population">
+            <label class="coach-analytics-field">
+              <span>Assessment Metric</span>
+              <select class="admin-search" data-population-metric-select>
+                <option value="20mm Edge Hang Strength">20mm Edge Hang Strength</option>
+                <option value="20mm Edge Hang">20mm Edge Hang</option>
+                <option value="Pull Up Max">Pull Up Max</option>
+                <option value="Climbing Grades">Climbing Grades</option>
+              </select>
+            </label>
+
+            <label class="coach-analytics-field">
+              <span>Population Filter</span>
+              <select class="admin-search" data-population-sport-filter>
+                <option value="all">All Sports</option>
+                <option value="climbing" selected>Climbing</option>
+                <option value="running">Running</option>
+                <option value="cycling">Cycling</option>
+                <option value="skiing">Skiing</option>
+                <option value="snowboarding">Snowboarding</option>
+                <option value="hiking">Hiking</option>
+              </select>
+            </label>
+
+            <label class="coach-analytics-field">
+              <span>Comparison Outcome</span>
+              <select class="admin-search" data-population-target-select>
+                <option value="climbing_level" selected>Climbing Level</option>
+                <option value="profile_level">Profile Level</option>
+              </select>
+            </label>
+
+            <label class="coach-analytics-field">
+              <span>Leaderboard Mode</span>
+              <select class="admin-search" data-population-mode-select>
+                <option value="research" selected>Research Mode</option>
+                <option value="all">All Metrics</option>
+              </select>
+            </label>
+
+            <div class="coach-analytics-actions">
+              <button type="button" class="btn admin-btn-refresh" data-population-refresh>Refresh Population</button>
+            </div>
+          </div>
+
+          <div class="admin-insight-cards" data-population-summary-cards>
+            <article class="admin-insight-card is-loading">Loading population dataset...</article>
+          </div>
+
+          <div class="admin-insights-grid">
+            <article class="admin-overview-card">
+              <div class="admin-overview-card-head">
+                <h2>Population Correlation</h2>
+                <p>Pearson relationship between selected assessment metric and outcome.</p>
+              </div>
+              <div class="admin-insight-list" data-population-correlation-list>
+                <p class="admin-empty-copy">No population analysis available yet.</p>
+              </div>
+            </article>
+
+            <article class="admin-overview-card">
+              <div class="admin-overview-card-head">
+                <h2>Outcome Bucket Breakdown</h2>
+                <p>Average selected metric value by level bucket.</p>
+              </div>
+              <div class="admin-insight-list" data-population-bucket-list>
+                <p class="admin-empty-copy">No bucket data yet.</p>
+              </div>
+            </article>
+
+            <article class="admin-overview-card">
+              <div class="admin-overview-card-head">
+                <h2>Top Correlations Leaderboard</h2>
+                <p>Strongest current metric associations across this population filter.</p>
+              </div>
+              <div class="admin-insight-list" data-population-top-correlations-list>
+                <p class="admin-empty-copy">No leaderboard data yet.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <p class="admin-status" role="status" aria-live="polite" data-coach-analytics-status></p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

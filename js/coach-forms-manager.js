@@ -218,6 +218,50 @@
         ]
       },
       {
+        id: "data-rights-privacy-consent-v1",
+        name: "Data Rights and Privacy Consent",
+        description: "Consent for data use in coaching, benchmarking, analytics, and de-identified research.",
+        task_type: "data_consent",
+        questions: [
+          {
+            key: "privacy_consent_statement",
+            label: "Data Rights and Privacy Consent Statement",
+            type: "statement",
+            content: "Nomadic Performance uses athlete data to deliver coaching and improve outcomes. This may include training logs, wellness data, wearable data, assessment data, and communication history.\n\nHow your data may be used:\n1) Coaching Operations: To build, adjust, and monitor your training plan.\n2) Population Analytics and Benchmarking: To compare trends across athletes and improve programming quality.\n3) De-Identified Research and Education: We may use de-identified and aggregated data for internal analysis, educational content, or future publications.\n\nYour rights:\n- You can request to review your submitted data.\n- You can request correction of inaccurate data.\n- You can withdraw consent for de-identified research/benchmarking use at any time by contacting your coach.\n- Withdrawing consent does not affect core coaching operations that are necessary to provide service.\n\nData handling:\n- We limit access to authorized coaching/admin accounts.\n- We do not sell personal health data.\n- Identifiable data is handled according to our platform access controls and applicable law.",
+            required: false
+          },
+          {
+            key: "coaching_data_use_consent",
+            label: "Coaching Data Use Consent",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I understand and consent to my data being used for coaching operations and program optimization."
+            ]
+          },
+          {
+            key: "deidentified_research_consent",
+            label: "De-Identified Research and Benchmarking Consent",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I consent to de-identified and aggregated use of my data for analytics, benchmarking, and educational or research outputs."
+            ]
+          },
+          {
+            key: "withdrawal_acknowledgement",
+            label: "Withdrawal Rights Acknowledgement",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I understand I may request withdrawal from de-identified research/benchmarking use in the future."
+            ]
+          },
+          { key: "privacy_signature_name", label: "Electronic Signature (Type Full Name)", type: "text", required: true, placeholder: "Type your full legal name" },
+          { key: "privacy_signature_date", label: "Signature Date", type: "date", required: true }
+        ]
+      },
+      {
         id: "emergency-contact-health-v1",
         name: "Emergency Contact and Health Info",
         description: "Critical contact and health context for safety planning.",
@@ -510,7 +554,7 @@
 
     container.innerHTML = templates.map(function (template) {
       var id = String(template && template.id || "");
-      var isDefault = id === "default-liability-waiver-v1" || id === "founding-member-intake-v1" || id === "performance-readiness-screen-v1";
+      var isDefault = id === "default-liability-waiver-v1" || id === "data-rights-privacy-consent-v1" || id === "founding-member-intake-v1" || id === "performance-readiness-screen-v1";
       return (
         '<div class="admin-overview-item admin-widget-row">' +
           '<div>' +

@@ -569,6 +569,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   var MEMBERSHIP_PAYMENT_TASK_FORM_ID = "membership-payment-task-v1";
   var MEMBERSHIP_PAYMENT_TASK_NAME = "Complete Membership Payment";
   var MEMBERSHIP_PAYMENT_TASK_URL = "founding-member.html?checkout=start";
+  var DEFAULT_LIABILITY_WAIVER_FORM_ID = "default-liability-waiver-v1";
+  var DATA_RIGHTS_PRIVACY_CONSENT_FORM_ID = "data-rights-privacy-consent-v1";
   var METRICS_COLLAPSE_KEY = "nomadic.metricsSectionCollapsed";
   var METRICS_COMPACT_KEY = "nomadic.metricsCompactMode";
   var STRAVA_COLLAPSE_KEY = "nomadic.stravaSectionCollapsed";
@@ -707,6 +709,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     trainingProgramsCache: [],
     trainingScheduleByAssignment: {},
     dashboardUpcomingTrainingItems: [],
+    trainingAdherenceStats: null,
     trainingConsistencyMessage: "",
     goalItems: [],
     nutritionToday: null,
@@ -937,6 +940,120 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
   function getDefaultOnboardingTemplates() {
     return [
+      {
+        id: DEFAULT_LIABILITY_WAIVER_FORM_ID,
+        name: "Liability Waiver",
+        description: "Required waiver acknowledging risk, medical clearance responsibility, and agreement to proceed.",
+        task_type: "liability_waiver",
+        questions: [
+          {
+            key: "waiver_statement",
+            label: "Nomadic Performance Liability Waiver",
+            type: "statement",
+            content: "By participating in any training, coaching, rehabilitation, or related activities provided by Nomadic Performance, you acknowledge and agree to the following:\n\n1) Assumption of Risk\nI understand that physical training and outdoor sport preparation involve inherent risks, including but not limited to falls, strains, sprains, fractures, illness, and in rare cases serious injury or death. I voluntarily assume all such risks.\n\n2) Medical Readiness\nI confirm that I am medically able to participate, and I will disclose relevant medical conditions, medications, injuries, or restrictions to my coach or provider.\n\n3) Personal Responsibility\nI agree to train within my limits, follow coaching instructions to the best of my ability, and stop any activity that causes unusual pain, dizziness, or concerning symptoms.\n\n4) Limitation of Liability\nTo the fullest extent permitted by law, I release and hold harmless Nomadic Performance and its owners, coaches, contractors, and affiliates from claims or liabilities arising from my participation, except in cases of gross negligence or willful misconduct.\n\n5) Emergency and Safety Acknowledgement\nI understand I am responsible for maintaining a safe training environment, using equipment appropriately, and seeking emergency care when needed.\n\n6) Voluntary Agreement\nI have read this waiver, understand its contents, and agree voluntarily without coercion.",
+            required: false
+          },
+          {
+            key: "legal_name",
+            label: "Legal Full Name",
+            type: "text",
+            required: true,
+            placeholder: "First and last name"
+          },
+          {
+            key: "dob",
+            label: "Date of Birth",
+            type: "date",
+            required: true
+          },
+          {
+            key: "waiver_acknowledgement",
+            label: "Liability Waiver Acknowledgement",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I have read and agree to the Nomadic Performance liability waiver."
+            ]
+          },
+          {
+            key: "medical_clearance_acknowledgement",
+            label: "Medical Clearance Acknowledgement",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I confirm I am medically cleared to participate in training and will disclose relevant conditions."
+            ]
+          },
+          {
+            key: "signature_name",
+            label: "Electronic Signature (Type Full Name)",
+            type: "text",
+            required: true,
+            placeholder: "Type your full legal name"
+          },
+          {
+            key: "signed_at_date",
+            label: "Signature Date",
+            type: "date",
+            required: true
+          }
+        ]
+      },
+      {
+        id: DATA_RIGHTS_PRIVACY_CONSENT_FORM_ID,
+        name: "Data Rights and Privacy Consent",
+        description: "Consent for data use in coaching, benchmarking, analytics, and de-identified research.",
+        task_type: "data_consent",
+        questions: [
+          {
+            key: "privacy_consent_statement",
+            label: "Data Rights and Privacy Consent Statement",
+            type: "statement",
+            content: "Nomadic Performance uses athlete data to deliver coaching and improve outcomes. This may include training logs, wellness data, wearable data, assessment data, and communication history.\n\nHow your data may be used:\n1) Coaching Operations: To build, adjust, and monitor your training plan.\n2) Population Analytics and Benchmarking: To compare trends across athletes and improve programming quality.\n3) De-Identified Research and Education: We may use de-identified and aggregated data for internal analysis, educational content, or future publications.\n\nYour rights:\n- You can request to review your submitted data.\n- You can request correction of inaccurate data.\n- You can withdraw consent for de-identified research/benchmarking use at any time by contacting your coach.\n- Withdrawing consent does not affect core coaching operations that are necessary to provide service.\n\nData handling:\n- We limit access to authorized coaching/admin accounts.\n- We do not sell personal health data.\n- Identifiable data is handled according to our platform access controls and applicable law.",
+            required: false
+          },
+          {
+            key: "coaching_data_use_consent",
+            label: "Coaching Data Use Consent",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I understand and consent to my data being used for coaching operations and program optimization."
+            ]
+          },
+          {
+            key: "deidentified_research_consent",
+            label: "De-Identified Research and Benchmarking Consent",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I consent to de-identified and aggregated use of my data for analytics, benchmarking, and educational or research outputs."
+            ]
+          },
+          {
+            key: "withdrawal_acknowledgement",
+            label: "Withdrawal Rights Acknowledgement",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I understand I may request withdrawal from de-identified research/benchmarking use in the future."
+            ]
+          },
+          {
+            key: "privacy_signature_name",
+            label: "Electronic Signature (Type Full Name)",
+            type: "text",
+            required: true,
+            placeholder: "Type your full legal name"
+          },
+          {
+            key: "privacy_signature_date",
+            label: "Signature Date",
+            type: "date",
+            required: true
+          }
+        ]
+      },
       {
         id: MEMBERSHIP_PAYMENT_TASK_FORM_ID,
         name: MEMBERSHIP_PAYMENT_TASK_NAME,
@@ -1387,14 +1504,14 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (tierKey === "individualized") {
       return {
         mode: "full",
-        fullFeatureAccess: true,
+        fullFeatureAccess: false,
         features: {
           compass: false,
           workoutCalendar: true,
-          messaging: true,
+          messaging: false,
           browsePrograms: true
         },
-        reason: "Coach override: Individualized programming access (Compass hidden)."
+        reason: "Coach override: Individualized programming access (direct messaging disabled)."
       };
     }
 
@@ -1562,15 +1679,15 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
       return {
         mode: "full",
-        fullFeatureAccess: true,
+        fullFeatureAccess: !hasIndividualizedProgramming,
         features: {
           compass: individualizedCompassAccess,
           workoutCalendar: true,
-          messaging: true,
+          messaging: !hasIndividualizedProgramming,
           browsePrograms: true
         },
         reason: hasIndividualizedProgramming
-          ? "Compass is disabled for individualized programming accounts."
+          ? "Compass and direct messaging are disabled for individualized programming accounts."
           : ""
       };
     }
@@ -1606,15 +1723,15 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     if (hasPaymentTask && hasCompletedPaymentTask) {
       return {
         mode: "full",
-        fullFeatureAccess: true,
+        fullFeatureAccess: !hasIndividualizedProgramming,
         features: {
           compass: individualizedCompassAccess,
           workoutCalendar: true,
-          messaging: true,
+          messaging: !hasIndividualizedProgramming,
           browsePrograms: true
         },
         reason: hasIndividualizedProgramming
-          ? "Compass is disabled for individualized programming accounts."
+          ? "Compass and direct messaging are disabled for individualized programming accounts."
           : ""
       };
     }
@@ -2991,6 +3108,11 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var coachTaskAssignBtn = document.querySelector("[data-coach-intake-assign-quick]");
     if (coachTaskAssignBtn) {
       coachTaskAssignBtn.addEventListener("click", onAssignQuickTaskToCurrentAthlete);
+    }
+
+    var coachLegalPackAssignBtn = document.querySelector("[data-coach-intake-assign-legal-pack]");
+    if (coachLegalPackAssignBtn) {
+      coachLegalPackAssignBtn.addEventListener("click", onAssignLegalPackToCurrentAthlete);
     }
 
     var coachTaskFilterEl = document.querySelector("[data-onboarding-coach-filter]");
@@ -5145,7 +5267,6 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
 
     var dueDate = state.coachIntakeDueDate ? String(state.coachIntakeDueDate.value || "").trim() : "";
-    var nowIso = new Date().toISOString();
     state.isAssigningCoachTask = true;
     setCoachIntakeAssignButtonsDisabled(true);
     setCoachIntakeStatus("Assigning task form...", "info");
@@ -5159,56 +5280,19 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
-    state.client
-      .from("athlete_onboarding_intake_assignments")
-      .select("id")
-      .eq("athlete_user_id", viewedUserId)
-      .eq("form_id", template.id)
-      .eq("status", "assigned")
-      .order("assigned_at", { ascending: false })
-      .limit(1)
-      .then(function (existingResult) {
-        if (existingResult.error) {
-          throw existingResult.error;
+    assignOnboardingTemplateToAthlete(viewedUserId, template, dueDate)
+      .then(function (outcome) {
+        if (!outcome || !outcome.ok) {
+          throw (outcome && outcome.error) || new Error("Failed to assign task form.");
         }
 
-        var alreadyAssigned = Array.isArray(existingResult.data) && existingResult.data.length > 0;
-        if (alreadyAssigned) {
+        if (outcome.alreadyAssigned) {
           setCoachIntakeStatus("This task is already assigned to the athlete.", "info");
           setOnboardingStatus("Task already assigned to athlete.", "info");
-          setTimeout(function () {
-            closeCoachIntakeModal();
-            loadOnboardingIntake();
-          }, 350);
-          return null;
+        } else {
+          setCoachIntakeStatus("Task form assigned.", "success");
+          setOnboardingStatus("Task form assigned to athlete.", "success");
         }
-
-        return state.client
-      .from("athlete_onboarding_intake_assignments")
-      .insert({
-        athlete_user_id: viewedUserId,
-        form_id: template.id,
-        form_name: template.name,
-        form_schema: buildCoachTemplateAssignmentSchema(template),
-        response_data: {},
-        status: "assigned",
-        assigned_at: nowIso,
-        assigned_by: state.user ? state.user.id : null,
-        due_date: dueDate || null,
-        updated_at: nowIso
-      });
-      })
-      .then(function (result) {
-        if (!result) {
-          return;
-        }
-
-        if (result.error) {
-          throw result.error;
-        }
-
-        setCoachIntakeStatus("Task form assigned.", "success");
-        setOnboardingStatus("Task form assigned to athlete.", "success");
         setTimeout(function () {
           closeCoachIntakeModal();
           loadOnboardingIntake();
@@ -5392,6 +5476,129 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
   }
 
+  function onAssignLegalPackToCurrentAthlete() {
+    var viewedUserId = getViewedUserId();
+    if (!state.isCoachView || !viewedUserId || !state.client) {
+      setCoachIntakeStatus("Unable to assign legal pack right now.", "error");
+      return;
+    }
+
+    if (state.isAssigningCoachTask || state.isAssigningQuickTask) {
+      return;
+    }
+
+    var dueDate = state.coachIntakeDueDate ? String(state.coachIntakeDueDate.value || "").trim() : "";
+    var liabilityTemplate = findOnboardingTemplateById(DEFAULT_LIABILITY_WAIVER_FORM_ID);
+    var consentTemplate = findOnboardingTemplateById(DATA_RIGHTS_PRIVACY_CONSENT_FORM_ID);
+
+    if (!liabilityTemplate || !consentTemplate) {
+      setCoachIntakeStatus("Required legal templates were not found.", "error");
+      return;
+    }
+
+    state.isAssigningCoachTask = true;
+    setCoachIntakeAssignButtonsDisabled(true);
+    setCoachIntakeStatus("Assigning liability waiver and data consent...", "info");
+
+    Promise.all([
+      assignOnboardingTemplateToAthlete(viewedUserId, liabilityTemplate, dueDate),
+      assignOnboardingTemplateToAthlete(viewedUserId, consentTemplate, dueDate)
+    ])
+      .then(function (results) {
+        var failed = results.find(function (entry) {
+          return !entry || !entry.ok;
+        });
+        if (failed) {
+          throw (failed && failed.error) || new Error("Failed to assign legal pack.");
+        }
+
+        var createdCount = results.filter(function (entry) {
+          return !entry.alreadyAssigned;
+        }).length;
+        if (createdCount > 0) {
+          setCoachIntakeStatus("Legal pack assigned.", "success");
+          setOnboardingStatus("Liability waiver and data consent assigned.", "success");
+        } else {
+          setCoachIntakeStatus("Legal pack is already assigned.", "info");
+          setOnboardingStatus("Liability waiver and data consent are already assigned.", "info");
+        }
+
+        setTimeout(function () {
+          closeCoachIntakeModal();
+          loadOnboardingIntake();
+        }, 450);
+      })
+      .catch(function (error) {
+        setCoachIntakeStatus(error && error.message ? error.message : "Failed to assign legal pack.", "error");
+      })
+      .finally(function () {
+        state.isAssigningCoachTask = false;
+        setCoachIntakeAssignButtonsDisabled(false);
+      });
+  }
+
+  function findOnboardingTemplateById(templateId) {
+    var id = String(templateId || "").trim();
+    if (!id) {
+      return null;
+    }
+
+    return (state.onboardingTemplates || []).find(function (item) {
+      return String(item && item.id || "") === id;
+    }) || null;
+  }
+
+  function assignOnboardingTemplateToAthlete(athleteUserId, template, dueDate) {
+    if (!state.client || !athleteUserId || !template || !template.id) {
+      return Promise.resolve({ ok: false, alreadyAssigned: false, error: new Error("Missing assignment context.") });
+    }
+
+    var nowIso = new Date().toISOString();
+    var dueDateValue = String(dueDate || "").trim() || null;
+    return state.client
+      .from("athlete_onboarding_intake_assignments")
+      .select("id")
+      .eq("athlete_user_id", athleteUserId)
+      .eq("form_id", template.id)
+      .eq("status", "assigned")
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .then(function (existingResult) {
+        if (existingResult.error) {
+          return { ok: false, alreadyAssigned: false, error: existingResult.error };
+        }
+
+        var alreadyAssigned = Array.isArray(existingResult.data) && existingResult.data.length > 0;
+        if (alreadyAssigned) {
+          return { ok: true, alreadyAssigned: true };
+        }
+
+        return state.client
+          .from("athlete_onboarding_intake_assignments")
+          .insert({
+            athlete_user_id: athleteUserId,
+            form_id: template.id,
+            form_name: template.name,
+            form_schema: buildCoachTemplateAssignmentSchema(template),
+            response_data: {},
+            status: "assigned",
+            assigned_at: nowIso,
+            assigned_by: state.user ? state.user.id : null,
+            due_date: dueDateValue,
+            updated_at: nowIso
+          })
+          .then(function (insertResult) {
+            if (insertResult.error) {
+              return { ok: false, alreadyAssigned: false, error: insertResult.error };
+            }
+            return { ok: true, alreadyAssigned: false };
+          });
+      })
+      .catch(function (error) {
+        return { ok: false, alreadyAssigned: false, error: error };
+      });
+  }
+
   function onDeleteOnboardingAssignment(assignmentId) {
     if (!state.client || !state.isCoachView || !getViewedUserId() || !assignmentId) {
       setOnboardingStatus("Unable to delete this task from current view.", "error");
@@ -5428,12 +5635,16 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var isDisabled = !!disabled;
     var assignBtn = document.querySelector("[data-coach-intake-assign]");
     var quickBtn = document.querySelector("[data-coach-intake-assign-quick]");
+    var legalPackBtn = document.querySelector("[data-coach-intake-assign-legal-pack]");
 
     if (assignBtn) {
       assignBtn.disabled = isDisabled;
     }
     if (quickBtn) {
       quickBtn.disabled = isDisabled;
+    }
+    if (legalPackBtn) {
+      legalPackBtn.disabled = isDisabled;
     }
   }
 
@@ -6926,37 +7137,79 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var load = Number(state.statusLoadPct) || 0;
     var durability = Number(state.statusDurabilityPct) || 0;
     var progress = Number(state.statusProgressPct) || 0;
-    var composite = Math.round((readiness * 0.4) + (load * 0.2) + (durability * 0.2) + (progress * 0.2));
+    var consistencyStats = getCompassConsistencyStats();
+    var consistencyPct = Number(consistencyStats && consistencyStats.adherence30Pct || 0);
+    var nextMilestone = getNextCountdownMilestone();
+    var readinessAvailable = false;
+    var systemStatusText = computeCompassSystemSignal(readinessAvailable, readiness, consistencyPct, nextMilestone.daysUntil);
 
-    var statusText = "Maintain";
-    if (composite >= 80 && readiness >= 72 && durability >= 65) {
-      statusText = "Ready to Push";
-    } else if (composite >= 64 && readiness >= 58 && durability >= 50) {
-      statusText = "Ready to Train";
-    } else if (composite < 48 || readiness < 48 || durability < 42) {
-      statusText = "Recovery Priority";
-    }
+    var phaseLabel = updateTrailStatus(systemStatusText, readiness, load, durability, progress) || deriveRoadmapPhaseLabel(systemStatusText, readiness, load, durability, progress);
+    var compassCopy = updateCompassCurrentStatus(systemStatusText, phaseLabel, readiness, load, durability, progress);
+    var headlineText = String(compassCopy && compassCopy.trainingStatus || "").trim() || systemStatusText;
 
-    heading.textContent = statusText;
-    summary.textContent = buildCompassInterpretation(statusText, readiness, load, durability, progress);
-    var phaseLabel = updateTrailStatus(statusText, readiness, load, durability, progress) || deriveRoadmapPhaseLabel(statusText, readiness, load, durability, progress);
-    updateCompassCurrentStatus(statusText, phaseLabel, readiness, load, durability, progress);
+    heading.textContent = headlineText;
+    summary.textContent = buildCompassInterpretation(headlineText, systemStatusText, readinessAvailable, consistencyPct, nextMilestone.daysUntil);
+    renderCompassSignalCards(systemStatusText, consistencyStats, nextMilestone);
   }
 
-  function buildCompassInterpretation(statusText, readiness, load, durability, progress) {
-    var guidance = "Keep intensity moderate and stay consistent this week.";
-
-    if (statusText === "Ready to Push") {
-      guidance = "You are trending well. Keep your hard work focused, then recover with intent after big sessions.";
-    } else if (statusText === "Recovery Priority") {
-      guidance = "Your system is asking for recovery. Reduce intensity today and prioritize sleep, fueling, and tissue care.";
-    } else if (load >= 82) {
-      guidance = "Your volume is elevated. Keep strength work moderate and avoid stacking extra conditioning.";
-    } else if (progress < 45) {
-      guidance = "Progress is lagging a bit. Keep sessions consistent and review your plan with your coach.";
+  function computeCompassSystemSignal(readinessAvailable, readinessScore, consistencyPct, nextMilestoneDays) {
+    if (!readinessAvailable) {
+      return "Readiness Pending";
     }
 
-    return guidance;
+    if ((Number(readinessScore) || 0) < 45) {
+      return "Recovery Priority";
+    }
+
+    if ((Number(consistencyPct) || 0) < 55) {
+      return "Consistency Focus";
+    }
+
+    if (typeof nextMilestoneDays === "number" && nextMilestoneDays >= 0 && nextMilestoneDays <= 7) {
+      return "Event Ready Check";
+    }
+
+    if ((Number(readinessScore) || 0) >= 72 && (Number(consistencyPct) || 0) >= 75) {
+      return "Ready to Push";
+    }
+
+    return "Ready to Train";
+  }
+
+  function buildCompassInterpretation(headlineText, systemStatusText, readinessAvailable, consistencyPct, nextMilestoneDays) {
+    var parts = [];
+    var coachDirection = String(headlineText || "").trim();
+    var signalDirection = String(systemStatusText || "").trim();
+
+    if (coachDirection) {
+      parts.push("Coach direction: " + coachDirection + ".");
+    }
+
+    if (signalDirection) {
+      parts.push("System signal: " + signalDirection + ".");
+    }
+
+    if (!readinessAvailable) {
+      parts.push("Readiness scoring is coming soon once wearable sync is enabled.");
+    }
+
+    if (signalDirection === "Ready to Push") {
+      parts.push("Performance signals are aligned for quality intensity with recovery discipline.");
+    } else if (signalDirection === "Recovery Priority") {
+      parts.push("Pull intensity down today and prioritize sleep, fueling, and tissue care.");
+    } else if (signalDirection === "Consistency Focus") {
+      parts.push("Consistency is the current limiter, so prioritize session completion over intensity.");
+    } else if (signalDirection === "Event Ready Check") {
+      parts.push("Your milestone is close. Keep execution clean and avoid last-minute training spikes.");
+    } else if ((Number(consistencyPct) || 0) >= 70) {
+      parts.push("Consistency is strong this cycle. Keep stacking quality work.");
+    }
+
+    if (typeof nextMilestoneDays === "number" && nextMilestoneDays > 7) {
+      parts.push("You have " + nextMilestoneDays + " days until your next milestone.");
+    }
+
+    return parts.join(" ");
   }
 
   function updateCompassCurrentStatus(statusText, phaseLabel, readiness, load, durability, progress) {
@@ -6968,21 +7221,23 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return;
     }
 
-    var compassCopy = getCoachEditableCompassCopy();
+    var compassCopy = getCoachEditableCompassCopy(statusText, phaseLabel, readiness, load, durability, progress);
     trainingStatusEl.textContent = compassCopy.trainingStatus;
     phaseEl.textContent = compassCopy.currentPhase;
     objectiveEl.textContent = compassCopy.nextObjective;
     coachNoteEl.textContent = compassCopy.coachNote;
+
+    return compassCopy;
   }
 
-  function getCoachEditableCompassCopy() {
+  function getCoachEditableCompassCopy(systemStatusText, phaseLabel, readiness, load, durability, progress) {
     var profile = state.profile && typeof state.profile === "object" ? state.profile : {};
-    var trainingStatus = readCompassText(profile.compass_training_status, "Awaiting Assessment");
-    var currentPhase = readCompassText(profile.compass_current_phase, "Awaiting Assessment");
+    var trainingStatus = readCompassText(profile.compass_training_status, systemStatusText || "Awaiting Assessment");
+    var currentPhase = readCompassText(profile.compass_current_phase, phaseLabel || "Awaiting Assessment");
     var nextObjective = readCompassText(profile.compass_next_objective, "Schedule Initial Assessment");
     var coachNote = readCompassText(
       profile.compass_coach_note,
-      "Welcome to Nomadic Performance. We are excited to get started and will update this section after your assessment."
+      buildCoachCompassNote(systemStatusText, readiness, load, durability, progress)
     );
 
     state.compassTrainingStatus = trainingStatus;
@@ -6995,6 +7250,223 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       currentPhase: currentPhase,
       nextObjective: nextObjective,
       coachNote: coachNote
+    };
+  }
+
+  function renderCompassSignalCards(systemStatusText, consistencyStats, nextMilestone) {
+    updateCompassSignalCard(
+      "readiness",
+      "Coming Soon",
+      "Wearable sync required (HRV, sleep, recovery)",
+      ""
+    );
+
+    var profileTier = derivePerformanceProfileTier();
+    updateCompassSignalCard(
+      "performance",
+      profileTier.shortLabel,
+      profileTier.meta,
+      profileTier.tone
+    );
+
+    var consistencyPct = Number(consistencyStats && consistencyStats.adherence30Pct || 0);
+    var consistencyValue = (consistencyStats && consistencyStats.total > 0)
+      ? (formatInteger(consistencyPct) + "%")
+      : "No Data";
+    var consistencyMeta = (consistencyStats && consistencyStats.total > 0)
+      ? (String(consistencyStats.completed || 0) + "/" + String(consistencyStats.total || 0) + " workouts completed (30 days)")
+      : "No scheduled workouts in the last 30 days";
+    updateCompassSignalCard(
+      "consistency",
+      consistencyValue,
+      consistencyMeta,
+      (consistencyStats && consistencyStats.total > 0)
+        ? (consistencyPct >= 75 ? "good" : (consistencyPct < 55 ? "alert" : ""))
+        : ""
+    );
+
+    var countdownValue = "No Date";
+    var countdownMeta = "Set a goal, race, or milestone target date";
+    var countdownTone = "alert";
+    if (nextMilestone && nextMilestone.hasMilestone) {
+      countdownMeta = nextMilestone.title || "Upcoming milestone";
+      if (typeof nextMilestone.daysUntil === "number") {
+        if (nextMilestone.daysUntil > 0) {
+          countdownValue = String(nextMilestone.daysUntil) + " days";
+          countdownTone = nextMilestone.daysUntil <= 14 ? "good" : "";
+        } else if (nextMilestone.daysUntil === 0) {
+          countdownValue = "Today";
+          countdownTone = "good";
+        } else {
+          countdownValue = String(Math.abs(nextMilestone.daysUntil)) + " days ago";
+          countdownTone = "alert";
+        }
+      } else {
+        countdownValue = "Date Needed";
+      }
+    }
+    updateCompassSignalCard("countdown", countdownValue, countdownMeta, countdownTone);
+
+    var signalChip = document.querySelector("[data-compass-system-signal]");
+    if (signalChip) {
+      signalChip.textContent = "System Signal: " + String(systemStatusText || "Readiness Pending");
+      signalChip.classList.remove("is-good", "is-alert");
+      if (systemStatusText === "Ready to Push" || systemStatusText === "Ready to Train" || systemStatusText === "Event Ready Check") {
+        signalChip.classList.add("is-good");
+      } else if (systemStatusText === "Recovery Priority" || systemStatusText === "Consistency Focus" || systemStatusText === "Readiness Pending") {
+        signalChip.classList.add("is-alert");
+      }
+    }
+
+    var confidenceChip = document.querySelector("[data-compass-confidence]");
+    if (confidenceChip) {
+      var confidenceCount = 0;
+      if (state.readinessStravaConnected) {
+        confidenceCount += 1;
+      }
+      if (profileTier.assessmentCount >= 6) {
+        confidenceCount += 1;
+      }
+      if (consistencyStats && Number(consistencyStats.total) > 0) {
+        confidenceCount += 1;
+      }
+      if (nextMilestone && nextMilestone.hasMilestone && typeof nextMilestone.daysUntil === "number") {
+        confidenceCount += 1;
+      }
+
+      var confidenceLabel = "Low";
+      if (confidenceCount >= 3) {
+        confidenceLabel = "High";
+      } else if (confidenceCount >= 2) {
+        confidenceLabel = "Medium";
+      }
+
+      confidenceChip.textContent = "Signal Confidence: " + confidenceLabel;
+      confidenceChip.classList.remove("is-good", "is-alert");
+      if (confidenceLabel === "High") {
+        confidenceChip.classList.add("is-good");
+      } else if (confidenceLabel === "Low") {
+        confidenceChip.classList.add("is-alert");
+      }
+    }
+  }
+
+  function updateCompassSignalCard(type, valueText, metaText, tone) {
+    var card = document.querySelector('[data-compass-signal-card="' + String(type || "") + '"]');
+    if (!card) {
+      return;
+    }
+
+    var valueEl = card.querySelector('[data-compass-signal-value="' + String(type || "") + '"]');
+    var metaEl = card.querySelector('[data-compass-signal-meta="' + String(type || "") + '"]');
+    if (valueEl) {
+      valueEl.textContent = String(valueText || "--");
+    }
+    if (metaEl) {
+      metaEl.textContent = String(metaText || "");
+    }
+
+    card.classList.remove("is-good", "is-alert");
+    if (tone === "good") {
+      card.classList.add("is-good");
+    } else if (tone === "alert") {
+      card.classList.add("is-alert");
+    }
+  }
+
+  function getCompassConsistencyStats() {
+    if (state.trainingAdherenceStats && typeof state.trainingAdherenceStats === "object") {
+      return state.trainingAdherenceStats;
+    }
+
+    var activePrograms = (state.trainingProgramsCache || []).filter(function (program) {
+      return !!(program && program.is_active);
+    });
+    var trainingItems = collectTrainingCalendarItems(activePrograms, state.trainingScheduleByAssignment || {});
+    var stats = calculateTrainingAdherenceStats(trainingItems);
+    state.trainingAdherenceStats = stats;
+    return stats;
+  }
+
+  function getNextCountdownMilestone() {
+    var activeItems = (Array.isArray(state.goalItems) ? state.goalItems : []).filter(function (item) {
+      return String(item && item.status || "active").toLowerCase() !== "completed";
+    });
+
+    var withDate = activeItems.filter(function (item) {
+      return !!String(item && item.target_date || "").trim();
+    }).sort(function (a, b) {
+      return String(a && a.target_date || "").localeCompare(String(b && b.target_date || ""));
+    });
+
+    if (!withDate.length) {
+      return {
+        hasMilestone: false,
+        title: "",
+        daysUntil: null
+      };
+    }
+
+    var nextItem = withDate[0];
+    var targetDate = String(nextItem && nextItem.target_date || "").trim();
+    return {
+      hasMilestone: true,
+      title: String(nextItem && nextItem.title || "Upcoming milestone").trim() || "Upcoming milestone",
+      daysUntil: getDaysUntilDate(targetDate)
+    };
+  }
+
+  function derivePerformanceProfileTier() {
+    var excludedMetricPattern = /readiness|hrv|resting hr|sleep|fatigue|training load|recovery score/i;
+    var assessmentCount = (Array.isArray(state.metricsLatest) ? state.metricsLatest : []).filter(function (metric) {
+      var name = String(metric && metric.metric_name || "");
+      if (!name || excludedMetricPattern.test(name)) {
+        return false;
+      }
+      return Number.isFinite(parseNumericMetricValue(metric && metric.metric_value));
+    }).length;
+
+    if (assessmentCount >= 14) {
+      return {
+        shortLabel: "Performance Tier 5: High Performance",
+        meta: String(assessmentCount) + " assessment scores logged",
+        tone: "good",
+        assessmentCount: assessmentCount
+      };
+    }
+
+    if (assessmentCount >= 10) {
+      return {
+        shortLabel: "Performance Tier 4: Resilient",
+        meta: String(assessmentCount) + " assessment scores logged",
+        tone: "good",
+        assessmentCount: assessmentCount
+      };
+    }
+
+    if (assessmentCount >= 7) {
+      return {
+        shortLabel: "Performance Tier 3: Prepared",
+        meta: String(assessmentCount) + " assessment scores logged",
+        tone: "",
+        assessmentCount: assessmentCount
+      };
+    }
+
+    if (assessmentCount >= 4) {
+      return {
+        shortLabel: "Performance Tier 2: Developing",
+        meta: String(assessmentCount) + " assessment scores logged",
+        tone: "",
+        assessmentCount: assessmentCount
+      };
+    }
+
+    return {
+      shortLabel: "Performance Tier 1: Foundation",
+      meta: String(assessmentCount) + " assessment scores logged",
+      tone: "alert",
+      assessmentCount: assessmentCount
     };
   }
 
@@ -8415,6 +8887,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var calendarSupplementalItems = collectTrainingCalendarSupplementalItems();
     var calendarScheduledItems = trainingCalendarItems.concat(calendarSupplementalItems);
     var adherence = calculateTrainingAdherenceStats(trainingCalendarItems);
+    state.trainingAdherenceStats = adherence;
     state.trainingConsistencyMessage = trainingCalendarItems.length
       ? String(adherence && adherence.consistencyMessage || "")
       : "";
@@ -8519,6 +8992,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     state.statusDurabilityPct = 0;
     state.statusProgressPct = 0;
     state.dashboardUpcomingTrainingItems = [];
+    state.trainingAdherenceStats = null;
     state.trainingConsistencyMessage = "";
     state.compassTrainingStatus = "Awaiting Assessment";
     state.compassCurrentPhase = "Awaiting Assessment";
@@ -8546,12 +9020,56 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var todaysSessions = upcoming.filter(function (item) {
       return String(item && item.scheduled_for || "") === todayKey;
     });
+    var completedToday = todaysSessions.filter(function (item) {
+      return String(item && item.status || "scheduled").toLowerCase() === "completed";
+    });
+    var pendingToday = todaysSessions.filter(function (item) {
+      return String(item && item.status || "scheduled").toLowerCase() !== "completed";
+    });
     var nextUpcoming = upcoming.find(function (item) {
       return String(item && item.scheduled_for || "") >= todayKey;
     });
 
     if (active > 0) {
       if (todaysSessions.length) {
+        if (!pendingToday.length && completedToday.length) {
+          state.statusLoadPct = 100;
+          updateStatusRing(
+            "load",
+            state.statusLoadPct,
+            "Completed",
+            String(completedToday.length) + " workout" + (completedToday.length === 1 ? "" : "s") + " done today",
+            "good"
+          );
+          updateQuickGlanceCard(
+            "training",
+            "Completed Today",
+            "All scheduled workouts for today are marked complete",
+            "good"
+          );
+          updateDailyReadinessCard();
+          return;
+        }
+
+        if (completedToday.length && pendingToday.length) {
+          state.statusLoadPct = 94;
+          updateStatusRing(
+            "load",
+            state.statusLoadPct,
+            "In Progress",
+            String(completedToday.length) + "/" + String(todaysSessions.length) + " workouts completed",
+            "good"
+          );
+          updateQuickGlanceCard(
+            "training",
+            String(pendingToday.length) + " workout" + (pendingToday.length === 1 ? "" : "s") + " remaining",
+            String(completedToday.length) + " completed today",
+            "good"
+          );
+          updateDailyReadinessCard();
+          return;
+        }
+
         state.statusLoadPct = 100;
         updateStatusRing(
           "load",
@@ -9223,28 +9741,58 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var workoutsToday = (Array.isArray(trainingItems) ? trainingItems : []).filter(function (item) {
       return String(item && item.scheduled_for || "") === todayKey;
     });
+    var completedWorkoutsToday = workoutsToday.filter(function (item) {
+      return String(item && item.status || "scheduled").toLowerCase() === "completed";
+    });
+    var pendingWorkoutsToday = workoutsToday.filter(function (item) {
+      return String(item && item.status || "scheduled").toLowerCase() !== "completed";
+    });
     var milestonesToday = (Array.isArray(supplementalItems) ? supplementalItems : []).filter(function (item) {
       return String(item && item.scheduled_for || "") === todayKey;
     });
 
-    var value = workoutsToday.length
-      ? String(workoutsToday.length) + " workout" + (workoutsToday.length === 1 ? "" : "s") + " today"
-      : "No workout scheduled today";
+    var value = "No workout scheduled today";
     var meta = milestonesToday.length
       ? milestonesToday.map(function (item) { return String(item && item.title || "Milestone"); }).join(" | ")
       : "Use Today to jump to the current day in your calendar.";
+    var stripClasses = ["training-today-strip"];
+    var statusBadge = "";
 
-    var actionItem = workoutsToday.length ? workoutsToday[0] : getNextTrainingCalendarWorkout(trainingItems, todayKey);
+    if (workoutsToday.length) {
+      value = String(workoutsToday.length) + " workout" + (workoutsToday.length === 1 ? "" : "s") + " today";
+
+      if (!pendingWorkoutsToday.length && completedWorkoutsToday.length) {
+        value = completedWorkoutsToday.length === 1
+          ? "Workout completed today"
+          : "All workouts completed today";
+        meta = "Nice work. Today's session is marked complete.";
+        stripClasses.push("is-completed");
+        statusBadge = '<span class="training-today-strip-status">Completed</span>';
+      } else if (pendingWorkoutsToday.length && completedWorkoutsToday.length) {
+        value = String(pendingWorkoutsToday.length) + " workout" + (pendingWorkoutsToday.length === 1 ? "" : "s") + " remaining today";
+        meta = String(completedWorkoutsToday.length) + " completed so far.";
+      }
+    }
+
+    var actionItem = pendingWorkoutsToday.length
+      ? pendingWorkoutsToday[0]
+      : (workoutsToday.length ? workoutsToday[0] : getNextTrainingCalendarWorkout(trainingItems, todayKey));
     var actionHref = getTrainingSessionLaunchHref(actionItem);
     var actionDate = String(actionItem && actionItem.scheduled_for || "");
-    var actionLabel = actionDate === todayKey ? "Open Today's Session" : "Open Next Session";
+    var actionLabel = actionDate === todayKey
+      ? (pendingWorkoutsToday.length ? "Open Today's Session" : "View Completed Session")
+      : "Open Next Session";
+    var actionClass = !pendingWorkoutsToday.length && completedWorkoutsToday.length
+      ? " training-today-strip-action-completed"
+      : "";
     var actionHtml = actionHref
-      ? '<div class="training-today-strip-actions"><a class="btn profile-btn-edit-profile training-today-strip-action" href="' + escapeAttribute(actionHref) + '">' + escapeHtml(actionLabel) + '</a></div>'
+      ? '<div class="training-today-strip-actions"><a class="btn profile-btn-edit-profile training-today-strip-action' + actionClass + '" href="' + escapeAttribute(actionHref) + '">' + escapeHtml(actionLabel) + '</a></div>'
       : "";
 
     return (
-      '<article class="training-today-strip">' +
+      '<article class="' + stripClasses.join(" ") + '">' +
         '<p class="training-today-strip-label">Today</p>' +
+        statusBadge +
         '<strong class="training-today-strip-value">' + escapeHtml(value) + '</strong>' +
         '<p class="training-today-strip-meta">' + escapeHtml(meta) + '</p>' +
         actionHtml +

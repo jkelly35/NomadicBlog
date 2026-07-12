@@ -3394,6 +3394,38 @@ footer a:hover {
   line-height: 1.4;
 }
 
+.profile-compass-meta-row {
+  margin-top: 0.48rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+
+.profile-compass-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d7c8b5;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #254c4c;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.22rem 0.55rem;
+}
+
+.profile-compass-meta-chip.is-good {
+  border-color: #bdd8c8;
+  background: #f0faf4;
+  color: #236448;
+}
+
+.profile-compass-meta-chip.is-alert {
+  border-color: #e3cdb8;
+  background: #fff5ec;
+  color: #a26033;
+}
+
 .profile-compass-current-status {
   margin-top: 0.64rem;
   border: 1px solid #e6ddd0;
@@ -3632,6 +3664,18 @@ footer a:hover {
   text-align: center;
 }
 
+[data-compass-signal-card="performance"] .profile-mountain-value,
+[data-compass-signal-card="readiness"] .profile-mountain-value,
+[data-compass-signal-card="countdown"] .profile-mountain-value {
+  font-size: 1.28rem;
+  line-height: 1.2;
+}
+
+[data-compass-signal-card="performance"] .profile-mountain-value {
+  font-size: 1rem;
+  line-height: 1.28;
+}
+
 .profile-mountain-card-meta {
   margin: 0;
   font-size: 0.76rem;
@@ -3646,6 +3690,16 @@ footer a:hover {
 
 .profile-mountain-card.is-alert .profile-mountain-value {
   color: #be6a2f;
+}
+
+.profile-mountain-card.is-good {
+  border-color: #cae0d2;
+  background: linear-gradient(165deg, #ffffff 0%, #f1f9f3 100%);
+}
+
+.profile-mountain-card.is-alert {
+  border-color: #e5d0bb;
+  background: linear-gradient(165deg, #ffffff 0%, #fff3e8 100%);
 }
 
 .profile-dashboard-glance {
@@ -11786,6 +11840,23 @@ body.template-builder-mode .program-demo-container {
   color: #183b3b;
 }
 
+#admin-athletes .admin-cell-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+#admin-athletes .admin-cell-name-text {
+  font-weight: 700;
+  color: #183b3b;
+}
+
+#admin-athletes .admin-cell-subtext {
+  font-size: 0.82rem;
+  color: #4b6464;
+  font-weight: 600;
+}
+
 #admin-athletes .admin-table-chip {
   display: inline-flex;
   align-items: center;
@@ -11827,6 +11898,30 @@ body.template-builder-mode .program-demo-container {
   background: #f3e5e1;
   color: #8b342b;
   border-color: #e3beb7;
+}
+
+#admin-athletes .admin-status-pill.is-tier-member {
+  background: #dcefe4;
+  color: #1f5b3f;
+  border-color: #b8ddc9;
+}
+
+#admin-athletes .admin-status-pill.is-tier-individualized {
+  background: #fce8dd;
+  color: #9a431d;
+  border-color: #efc5ac;
+}
+
+#admin-athletes .admin-status-pill.is-tier-program {
+  background: #e1ecef;
+  color: #1f5265;
+  border-color: #c6dce4;
+}
+
+#admin-athletes .admin-status-pill.is-tier-athlete {
+  background: #f5f5f5;
+  color: #5f6769;
+  border-color: #dddddd;
 }
 
 #admin-athletes .admin-table-actions {
@@ -11985,6 +12080,80 @@ body.template-builder-mode .program-demo-container {
   gap: 0.5rem;
 }
 
+.coach-analytics-toolbar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.coach-analytics-toolbar-population {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.coach-analytics-field {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.coach-analytics-assessment-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.coach-analytics-field-wide {
+  grid-column: span 4;
+}
+
+.coach-analytics-field > span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #4f6464;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.coach-analytics-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.coach-analytics-table-wrap {
+  border: 1px solid #e2d8ca;
+  border-radius: 10px;
+  overflow-x: auto;
+  background: #fff;
+}
+
+.coach-analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.coach-analytics-table th,
+.coach-analytics-table td {
+  border-bottom: 1px solid #efe5d8;
+  padding: 0.52rem 0.6rem;
+  text-align: left;
+  font-size: 0.82rem;
+  color: #163d3d;
+}
+
+.coach-analytics-table th {
+  background: #f8f4ed;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5e7474;
+}
+
+.coach-analytics-table tr:last-child td {
+  border-bottom: none;
+}
+
 .admin-insight-row {
   display: flex;
   justify-content: space-between;
@@ -12058,6 +12227,18 @@ body.template-builder-mode .program-demo-container {
   .admin-insight-cards,
   .admin-insights-grid {
     grid-template-columns: 1fr;
+  }
+
+  .coach-analytics-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .coach-analytics-assessment-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coach-analytics-field-wide {
+    grid-column: span 1;
   }
 }
 
@@ -13206,6 +13387,51 @@ body.template-builder-mode .program-demo-container {
   border-color: #0e4749;
 }
 
+.insight-compass-gate {
+  margin: 0 0 0.9rem;
+  border: 1px solid #d8cab7;
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.84rem;
+  color: #415a59;
+  background: #fffdf8;
+}
+
+.insight-compass-gate.is-good {
+  border-color: #bfd7c7;
+  background: #f2faf4;
+  color: #1c5b42;
+}
+
+.insight-compass-gate.is-alert {
+  border-color: #e3cfbc;
+  background: #fff6ee;
+  color: #a25d2f;
+}
+
+.insight-compass-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.insight-compass-field {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.insight-compass-field > span {
+  font-size: 0.79rem;
+  font-weight: 700;
+  color: #4d5f5f;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.insight-compass-field-wide {
+  grid-column: span 2;
+}
+
 .insight-metric-card {
   background: #fff;
   border: 1px solid #dbcdbb;
@@ -13881,9 +14107,38 @@ body.template-builder-mode .program-demo-container {
 /* ---- Load panel ---- */
 .insight-load-summary-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: 1fr;
   gap: 0.7rem;
   margin-bottom: 0.5rem;
+}
+
+.insight-load-block {
+  border: 1px solid #e2d8ca;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 1px 4px rgba(20, 52, 52, 0.05);
+}
+
+.insight-load-block-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4f6666;
+  font-weight: 800;
+}
+
+.insight-load-block-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.55rem;
+}
+
+.insight-load-block-note {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  color: #607474;
 }
 
 .insight-load-card {
@@ -13898,6 +14153,31 @@ body.template-builder-mode .program-demo-container {
 }
 .insight-load-label { font-size: 0.72rem; color: #6b7d7d; text-transform: uppercase; letter-spacing: 0.05em; }
 .insight-load-value { font-size: 1.3rem; font-weight: 700; color: #0e4749; }
+
+.insight-load-pattern-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.insight-load-pattern-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #ece3d7;
+  border-radius: 8px;
+  background: #fdfbf8;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  color: #1b4343;
+}
+
+.insight-load-pattern-list li strong {
+  font-weight: 800;
+  color: #0e4749;
+}
 
 /* Bar chart */
 .insight-bar-chart {
@@ -14094,6 +14374,14 @@ body.template-builder-mode .program-demo-container {
   .insight-metric-composer-top,
   .insight-metric-composer-grid {
     grid-template-columns: 1fr;
+  }
+
+  .insight-compass-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .insight-compass-field-wide {
+    grid-column: span 1;
   }
 
   .insight-calendar-add-row {
@@ -14460,6 +14748,11 @@ body.template-builder-mode .program-demo-container {
   margin: 0 0 0.8rem;
 }
 
+.training-today-strip.is-completed {
+  border-color: #c8dfcf;
+  background: linear-gradient(145deg, #f4fbf6 0%, #edf8f2 100%);
+}
+
 .training-today-strip-label {
   margin: 0;
   font-size: 0.7rem;
@@ -14467,6 +14760,19 @@ body.template-builder-mode .program-demo-container {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #57706f;
+}
+
+.training-today-strip-status {
+  display: inline-flex;
+  margin-top: 0.35rem;
+  border: 1px solid #b8d7c1;
+  background: #ecf8f0;
+  color: #1f6a49;
+  border-radius: 999px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .training-today-strip-value {
@@ -14494,6 +14800,17 @@ body.template-builder-mode .program-demo-container {
   height: auto;
   padding: 0.48rem 0.82rem;
   font-size: 0.82rem;
+}
+
+.training-today-strip-action-completed {
+  border-color: #b8d7c1;
+  background: #f3fbf6;
+  color: #1f6a49;
+}
+
+.training-today-strip-action-completed:hover {
+  border-color: #97c5a5;
+  color: #18553b;
 }
 
 .training-upcoming-card {

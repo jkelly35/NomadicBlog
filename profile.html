@@ -11,7 +11,7 @@
   <script defer src="js/supabase-config.js"></script>
   <script defer src="js/ape-index.js"></script>
   <script defer src="js/auth-ui.js"></script>
-  <script defer src="js/athlete-profile.js?v=20260711a"></script>
+  <script defer src="js/athlete-profile.js?v=20260711d"></script>
   <script defer src="js/profile-messages.js"></script>
 </head>
 <body>
@@ -73,13 +73,40 @@
           <div class="profile-mountain-status-header">
             <div>
               <p class="profile-mountain-status-kicker">The Nomadic Performance Compass</p>
-              <h2 data-mountain-status-headline>Ready to Train</h2>
-              <p class="profile-mountain-status-summary" data-mountain-status-summary>The Nomadic Performance Compass gives athletes a simple snapshot of readiness, training load, durability, and progress so they know when to push, when to maintain, and when to recover.</p>
+              <h2 data-mountain-status-headline>Awaiting Assessment</h2>
+              <p class="profile-mountain-status-summary" data-mountain-status-summary>Coach-updated direction and live training signals in one place.</p>
+              <div class="profile-compass-meta-row">
+                <span class="profile-compass-meta-chip" data-compass-system-signal>System Signal: Awaiting data</span>
+                <span class="profile-compass-meta-chip" data-compass-confidence>Signal Confidence: Low</span>
+              </div>
             </div>
           </div>
 
+          <div class="profile-mountain-status-grid" aria-label="Compass performance signals">
+            <article class="profile-mountain-card" data-compass-signal-card="readiness">
+              <p class="profile-mountain-card-label">Readiness</p>
+              <p class="profile-mountain-value" data-compass-signal-value="readiness">Coming Soon</p>
+              <p class="profile-mountain-card-meta" data-compass-signal-meta="readiness">Wearable sync required (HRV, sleep, recovery)</p>
+            </article>
+            <article class="profile-mountain-card" data-compass-signal-card="performance">
+              <p class="profile-mountain-card-label">Performance Profile</p>
+              <p class="profile-mountain-value" data-compass-signal-value="performance">Tier Pending</p>
+              <p class="profile-mountain-card-meta" data-compass-signal-meta="performance">Based on assessment scores</p>
+            </article>
+            <article class="profile-mountain-card" data-compass-signal-card="consistency">
+              <p class="profile-mountain-card-label">Consistency Score</p>
+              <p class="profile-mountain-value" data-compass-signal-value="consistency">--</p>
+              <p class="profile-mountain-card-meta" data-compass-signal-meta="consistency">Percent of workouts completed</p>
+            </article>
+            <article class="profile-mountain-card" data-compass-signal-card="countdown">
+              <p class="profile-mountain-card-label">Next Milestone</p>
+              <p class="profile-mountain-value" data-compass-signal-value="countdown">No Date</p>
+              <p class="profile-mountain-card-meta" data-compass-signal-meta="countdown">Set a goal date to start countdown</p>
+            </article>
+          </div>
+
           <div class="profile-compass-current-status" data-compass-current-status>
-            <h3>Your Current Status</h3>
+            <h3>Coach Direction</h3>
             <div class="profile-compass-status-grid">
               <p><span>Training Status</span><strong data-compass-training-status>Awaiting Assessment</strong></p>
               <p><span>Current Phase</span><strong data-compass-phase>Awaiting Assessment</strong></p>
@@ -327,6 +354,7 @@
         <div class="admin-modal-section">
           <div class="admin-modal-actions">
             <button type="button" class="btn admin-btn-primary" data-coach-intake-assign>Assign Selected Task</button>
+            <button type="button" class="btn admin-btn-small" data-coach-intake-assign-legal-pack>Assign Liability + Data Consent</button>
             <button type="button" class="btn profile-btn-cancel" data-coach-intake-assign-quick>Assign Quick Task</button>
             <button type="button" class="btn admin-btn-reset-password" data-coach-intake-close>Cancel</button>
           </div>

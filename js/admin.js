@@ -293,6 +293,7 @@
     var automatedTodoList = document.querySelector("[data-admin-todo-automated-list]");
     if (automatedTodoList) {
       automatedTodoList.addEventListener("click", onDismissAutomatedTodoClick);
+      automatedTodoList.addEventListener("click", onWorkoutSummaryActionClick);
       automatedTodoList.addEventListener("click", onMembershipInquiryActionClick);
       automatedTodoList.addEventListener("click", onCustomPlanInquiryActionClick);
     }
@@ -1301,24 +1302,21 @@
       return Promise.resolve(Array.isArray(athletes) ? athletes : []);
     }
 
-    return state.client
-      .from("athlete_profiles")
-      .select("user_id,is_active")
-      .in("user_id", userIds)
+    return fetchAthleteProfileStateRows(userIds)
       .then(function (profileResult) {
-        if (profileResult.error) {
-          return athletes.map(function (athlete) {
-            return assignAthleteActiveState(athlete, true);
-          });
-        }
-
         var activeByUserId = {};
-        (profileResult.data || []).forEach(function (profileRow) {
+        var deletedAtByUserId = {};
+        var deletedLoginEmailByUserId = {};
+        var overrideByUserId = {};
+        (profileResult || []).forEach(function (profileRow) {
           if (!profileRow || !profileRow.user_id) {
             return;
           }
 
           activeByUserId[String(profileRow.user_id)] = profileRow.is_active !== false;
+          deletedAtByUserId[String(profileRow.user_id)] = profileRow.deleted_at || null;
+          deletedLoginEmailByUserId[String(profileRow.user_id)] = profileRow.deleted_login_email || "";
+          overrideByUserId[String(profileRow.user_id)] = normalizeCoachAccessTierOverride(profileRow.coach_access_tier_override);
         });
 
         return athletes.map(function (athlete) {
@@ -1326,19 +1324,62 @@
           var isActive = Object.prototype.hasOwnProperty.call(activeByUserId, athleteId)
             ? !!activeByUserId[athleteId]
             : true;
-          return assignAthleteActiveState(athlete, isActive);
+          var deletedAt = Object.prototype.hasOwnProperty.call(deletedAtByUserId, athleteId)
+            ? deletedAtByUserId[athleteId]
+            : null;
+          var deletedLoginEmail = Object.prototype.hasOwnProperty.call(deletedLoginEmailByUserId, athleteId)
+            ? deletedLoginEmailByUserId[athleteId]
+            : "";
+          var override = Object.prototype.hasOwnProperty.call(overrideByUserId, athleteId)
+            ? overrideByUserId[athleteId]
+            : "";
+          return assignAthleteActiveState(athlete, isActive, override, deletedAt, deletedLoginEmail);
         });
       })
       .catch(function () {
         return athletes.map(function (athlete) {
-          return assignAthleteActiveState(athlete, true);
+          return assignAthleteActiveState(athlete, true, "", null, "");
         });
       });
   }
 
-  function assignAthleteActiveState(athlete, isActive) {
+  function fetchAthleteProfileStateRows(userIds) {
+    return state.client
+      .from("athlete_profiles")
+      .select("user_id,is_active,deleted_at,deleted_login_email,coach_access_tier_override")
+      .in("user_id", userIds)
+      .then(function (result) {
+        if (!result || !result.error) {
+          return (result && result.data) || [];
+        }
+
+        if (!isMissingColumnError(result.error)) {
+          throw result.error;
+        }
+
+        return state.client
+          .from("athlete_profiles")
+          .select("user_id,is_active,coach_access_tier_override")
+          .in("user_id", userIds)
+          .then(function (fallbackResult) {
+            if (fallbackResult && fallbackResult.error) {
+              throw fallbackResult.error;
+            }
+            return (fallbackResult && fallbackResult.data) || [];
+          });
+      });
+  }
+
+  function assignAthleteActiveState(athlete, isActive, overrideTier, deletedAt, deletedLoginEmail) {
     var copy = athlete || {};
     copy.is_active = isActive !== false;
+    copy.deleted_at = deletedAt ? String(deletedAt) : "";
+    copy.is_deleted = !!copy.deleted_at;
+    copy.deleted_login_email = String(deletedLoginEmail || "").trim();
+    if (copy.is_deleted && copy.deleted_login_email) {
+      copy.email = copy.deleted_login_email;
+    }
+    copy.coach_access_tier_override = normalizeCoachAccessTierOverride(overrideTier);
     return copy;
   }
 
@@ -1350,11 +1391,76 @@
     }
 
     var activeProgramByUserId = {};
+    var individualizedProgramByUserId = {};
     (state.activePrograms || []).forEach(function (row) {
       if (!row || row.is_active === false || !row.user_id) {
         return;
       }
-      activeProgramByUserId[String(row.user_id)] = true;
+      var athleteId = String(row.user_id);
+      activeProgramByUserId[athleteId] = true;
+      if (isLikelyIndividualizedProgramRow(row)) {
+        individualizedProgramByUserId[athleteId] = true;
+      }
+    });
+
+    var onboardingByUserId = {};
+    (state.foundingOnboardingRows || []).forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      if (!athleteId) {
+        return;
+      }
+
+      var existing = onboardingByUserId[athleteId];
+      var rowTime = new Date(String(row && row.updated_at || row && row.created_at || 0)).getTime();
+      var existingTime = existing
+        ? new Date(String(existing.updated_at || existing.created_at || 0)).getTime()
+        : -Infinity;
+
+      if (!existing || rowTime >= existingTime) {
+        onboardingByUserId[athleteId] = row;
+      }
+    });
+
+    var subscriptionByUserId = {};
+    var subscriptionByEmail = {};
+    (state.foundingSubscriptionRows || []).forEach(function (row) {
+      var athleteId = String(row && row.user_id || "").trim();
+      var rowTime = new Date(String(row && row.updated_at || row && row.last_event_created_at || 0)).getTime();
+      if (athleteId) {
+        var existingById = subscriptionByUserId[athleteId];
+        var existingByIdTime = existingById
+          ? new Date(String(existingById.updated_at || existingById.last_event_created_at || 0)).getTime()
+          : -Infinity;
+
+        if (!existingById || rowTime >= existingByIdTime) {
+          subscriptionByUserId[athleteId] = row;
+        }
+      }
+
+      var email = String(row && row.customer_email || "").trim().toLowerCase();
+      if (email) {
+        var existingByEmail = subscriptionByEmail[email];
+        var existingByEmailTime = existingByEmail
+          ? new Date(String(existingByEmail.updated_at || existingByEmail.last_event_created_at || 0)).getTime()
+          : -Infinity;
+
+        if (!existingByEmail || rowTime >= existingByEmailTime) {
+          subscriptionByEmail[email] = row;
+        }
+      }
+    });
+
+    var completedPaymentTaskByUserId = {};
+    (state.foundingIntakeAssignmentRows || []).forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      if (!athleteId || !isMembershipPaymentTaskAssignmentRow(row)) {
+        return;
+      }
+
+      var status = String(row && row.status || "").toLowerCase();
+      if (status === "submitted" || status === "archived") {
+        completedPaymentTaskByUserId[athleteId] = true;
+      }
     });
 
     var purchasedByUserId = {};
@@ -1367,11 +1473,17 @@
     });
 
     var filtered = state.athletes.filter(function (a) {
-      if (state.memberFilter === "active" && a.is_active === false) {
+      var isDeleted = !!(a && a.deleted_at);
+
+      if (state.memberFilter === "active" && (a.is_active === false || isDeleted)) {
         return false;
       }
 
-      if (state.memberFilter === "inactive" && a.is_active !== false) {
+      if (state.memberFilter === "inactive" && (a.is_active !== false || isDeleted)) {
+        return false;
+      }
+
+      if (state.memberFilter === "deleted" && !isDeleted) {
         return false;
       }
 
@@ -1431,6 +1543,8 @@
           " active, " +
           String(getInactiveAthleteCount()) +
           " inactive, " +
+          String(getDeletedAthleteCount()) +
+          " deleted, " +
           String(filteredIndividualizedCount) +
           " individualized, " +
           String(filteredPurchasedCount) +
@@ -1440,7 +1554,7 @@
 
     if (!paginated.length) {
       tbody.innerHTML =
-        '<tr class="admin-table-loading"><td colspan="7" style="text-align: center; padding: 2rem;">No athletes found for this view.</td></tr>';
+        '<tr class="admin-table-loading"><td colspan="4" style="text-align: center; padding: 2rem;">No athletes found for this view.</td></tr>';
       renderPagination(filtered.length);
       return;
     }
@@ -1449,17 +1563,36 @@
       .map(function (athlete) {
         var athleteId = String(athlete.user_id || "");
         var isActive = athlete.is_active !== false;
-        var statusLabel = isActive ? "Active" : "Inactive";
+        var athleteProfile = state.athleteProfilesById[String(athleteId)] || null;
+        var profileForTier = athleteProfile
+          ? Object.assign({}, athleteProfile, {
+              coach_access_tier_override: normalizeCoachAccessTierOverride(
+                athlete.coach_access_tier_override || athleteProfile.coach_access_tier_override
+              )
+            })
+          : {
+              coach_access_tier_override: normalizeCoachAccessTierOverride(athlete.coach_access_tier_override)
+            };
+        var tier = resolveAthleteMembershipTierDescriptor({
+          profile: profileForTier,
+          hasIndividualizedProgramming: !!individualizedProgramByUserId[athleteId],
+          hasActiveProgram: !!activeProgramByUserId[athleteId],
+          hasCompletedMembership:
+            !!completedPaymentTaskByUserId[athleteId] ||
+            hasCompletedMembershipPaymentFromOnboardingRow(onboardingByUserId[athleteId]) ||
+            hasCompletedMembershipPaymentFromSubscriptionRow(subscriptionByUserId[athleteId]) ||
+            hasCompletedMembershipPaymentFromSubscriptionRow(subscriptionByEmail[String(athlete && athlete.email || "").trim().toLowerCase()])
+        });
         var insightsHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
-        var sportLabel = athlete.sport ? escapeHtml(athlete.sport) : "Not set";
-        var levelLabel = athlete.level ? escapeHtml(athlete.level) : "Not set";
+        var athleteName = athlete.name ? escapeHtml(athlete.name) : "—";
+        var athleteEmail = escapeHtml(athlete.email || "N/A");
+        var isDeleted = !!(athlete && athlete.deleted_at);
+        var statusActionLabel = isDeleted ? "Restore" : (isActive ? "Deactivate" : "Activate");
+        var deleteActionLabel = isDeleted ? "Archived" : "Archive";
         return (
           "<tr>" +
-          "<td class='admin-cell-email'>" + escapeHtml(athlete.email || "N/A") + "</td>" +
-          "<td class='admin-cell-name'>" + (athlete.name ? escapeHtml(athlete.name) : "—") + "</td>" +
-          "<td><span class='admin-table-chip'>" + sportLabel + "</span></td>" +
-          "<td><span class='admin-table-chip is-muted'>" + levelLabel + "</span></td>" +
-          "<td><span class='admin-status-pill " + (isActive ? "is-active" : "is-inactive") + "'>" + escapeHtml(statusLabel) + "</span></td>" +
+          "<td class='admin-cell-name'><div class='admin-cell-name-wrap'><span class='admin-cell-name-text'>" + athleteName + "</span><span class='admin-cell-subtext'>" + athleteEmail + "</span></div></td>" +
+          "<td><span class='admin-status-pill " + escapeAttribute(tier.toneClass || "is-tier-athlete") + "'>" + escapeHtml(tier.label || "Athlete Account") + "</span></td>" +
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
           "<td><div class='admin-table-actions'><a class='btn admin-btn-small admin-action-insights' href='" +
           insightsHref +
@@ -1468,10 +1601,10 @@
           "' data-athlete-id='" +
           escapeAttribute(athleteId) +
           "'>" +
-          (isActive ? "Deactivate" : "Activate") +
+          statusActionLabel +
           "</button><button type='button' class='btn admin-btn-delete-mini admin-action-delete' data-admin-delete-athlete='1' data-athlete-id='" +
           escapeAttribute(athleteId) +
-          "'>Delete</button></div></td>" +
+          "'" + (isDeleted ? " disabled" : "") + ">" + deleteActionLabel + "</button></div></td>" +
           "</tr>"
         );
       })
@@ -1574,7 +1707,8 @@
     var toggleBtn = document.querySelector("[data-admin-modal-toggle-active]");
     if (toggleBtn) {
       var isActive = athlete.is_active !== false;
-      toggleBtn.textContent = isActive ? "Deactivate Account" : "Activate Account";
+      var isDeleted = !!(athlete && athlete.deleted_at);
+      toggleBtn.textContent = isDeleted ? "Restore Account" : (isActive ? "Deactivate Account" : "Activate Account");
       toggleBtn.setAttribute("data-athlete-active", isActive ? "true" : "false");
     }
 
@@ -2090,38 +2224,49 @@
 
     setDeleteStatus(shouldActivate ? "Activating account..." : "Deactivating account...", "info", fromModal);
 
+    var basePayload = {
+      user_id: athleteId,
+      is_active: !!shouldActivate,
+      updated_at: new Date().toISOString()
+    };
+    var restorePayload = shouldActivate
+      ? Object.assign({}, basePayload, {
+          deleted_at: null,
+          deleted_by: null,
+          deletion_reason: null
+        })
+      : basePayload;
+
     state.client
       .from("athlete_profiles")
-      .upsert({
-        user_id: athleteId,
-        is_active: !!shouldActivate,
-        updated_at: new Date().toISOString()
-      }, { onConflict: "user_id" })
+      .upsert(restorePayload, { onConflict: "user_id" })
       .then(function (result) {
         if (result.error) {
+          if (isMissingColumnError(result.error) && shouldActivate) {
+            return state.client
+              .from("athlete_profiles")
+              .upsert(basePayload, { onConflict: "user_id" })
+              .then(function (fallbackResult) {
+                if (fallbackResult.error) {
+                  setDeleteStatus(fallbackResult.error.message || "Could not update member status.", "error", fromModal);
+                  return;
+                }
+                applyAthleteActivationLocalState(athleteId, shouldActivate);
+                setDeleteStatus("Athlete restored.", "success", fromModal);
+              });
+          }
           setDeleteStatus(result.error.message || "Could not update member status.", "error", fromModal);
           return;
         }
 
-        state.athletes = state.athletes.map(function (athlete) {
-          if (!athlete || String(athlete.user_id || "") !== athleteId) {
-            return athlete;
-          }
-          athlete.is_active = !!shouldActivate;
-          return athlete;
-        });
-
-        if (state.currentAthlete && String(state.currentAthlete.user_id || "") === athleteId) {
-          state.currentAthlete.is_active = !!shouldActivate;
-          populateModal(state.currentAthlete);
-        }
+        applyAthleteActivationLocalState(athleteId, shouldActivate);
 
         state.currentPage = 1;
         renderAthletesTable();
         renderCoachOverview();
         updateStats();
 
-        setDeleteStatus(shouldActivate ? "Athlete marked active." : "Athlete marked inactive.", "success", fromModal);
+        setDeleteStatus(shouldActivate ? "Athlete restored." : "Athlete marked inactive.", "success", fromModal);
       })
       .catch(function (error) {
         setDeleteStatus(
@@ -2132,23 +2277,46 @@
       });
   }
 
+  function applyAthleteActivationLocalState(athleteId, shouldActivate) {
+    state.athletes = state.athletes.map(function (athlete) {
+      if (!athlete || String(athlete.user_id || "") !== athleteId) {
+        return athlete;
+      }
+      athlete.is_active = !!shouldActivate;
+      if (shouldActivate) {
+        athlete.deleted_at = "";
+        athlete.is_deleted = false;
+      }
+      return athlete;
+    });
+
+    if (state.currentAthlete && String(state.currentAthlete.user_id || "") === athleteId) {
+      state.currentAthlete.is_active = !!shouldActivate;
+      if (shouldActivate) {
+        state.currentAthlete.deleted_at = "";
+        state.currentAthlete.is_deleted = false;
+      }
+      populateModal(state.currentAthlete);
+    }
+  }
+
   function executeAthleteDelete(athlete, fromModal) {
     if (!athlete) {
       return;
     }
 
     var athleteLabel = athlete.email || athlete.name || "this athlete";
-    if (!confirm("Permanently delete " + athleteLabel + " account?")) {
+    if (!confirm("Archive " + athleteLabel + " account?")) {
       return;
     }
 
-    if (!confirm("This action cannot be undone. Continue?")) {
+    if (!confirm("This will disable athlete access but keep analytics and legal records on file. Continue?")) {
       return;
     }
 
-    setDeleteStatus("Deleting account...", "info", fromModal);
+    setDeleteStatus("Archiving account...", "info", fromModal);
 
-    // Preferred path: server-side RPC that deletes profile/metrics/assignments and auth user.
+    // Preferred path: server-side RPC that soft-deletes account data for compliance retention.
     state.client
       .rpc("admin_delete_athlete_account", {
         target_user_id: athlete.user_id
@@ -2159,18 +2327,17 @@
           return;
         }
 
-        state.athletes = state.athletes.filter(function (item) {
-          return item.user_id !== athlete.user_id;
-        });
+        markAthleteDeletedLocally(String(athlete.user_id || ""));
         renderAthletesTable();
+        renderCoachOverview();
         updateStats();
 
-        setDeleteStatus("Athlete account deleted.", "success", fromModal);
+        setDeleteStatus("Athlete account archived.", "success", fromModal);
         setTimeout(function () {
           if (fromModal) {
             closeModal();
           }
-          setStatus("Athlete account deleted.", "success");
+          setStatus("Athlete account archived and retained for compliance.", "success");
         }, 700);
       })
       .catch(function (error) {
@@ -2179,47 +2346,83 @@
   }
 
   function handleLegacyAthleteDelete(athlete, deleteError, fromModal) {
+    var athleteId = String(athlete && athlete.user_id || "").trim();
+    if (!athleteId) {
+      setDeleteStatus("Failed to archive account: missing athlete id.", "error", fromModal);
+      return;
+    }
+
+    var deletedAtIso = new Date().toISOString();
+    var payload = {
+      user_id: athleteId,
+      is_active: false,
+      deleted_at: deletedAtIso,
+      deleted_by: state.user && state.user.id ? state.user.id : null,
+      deletion_reason: "coach_deleted",
+      updated_at: deletedAtIso
+    };
+
     state.client
       .from("athlete_profiles")
-      .delete()
-      .eq("user_id", athlete.user_id)
+      .upsert(payload, { onConflict: "user_id" })
       .then(function (result) {
         if (result.error) {
-          setDeleteStatus(result.error.message, "error", fromModal);
+          if (isMissingColumnError(result.error)) {
+            return state.client
+              .from("athlete_profiles")
+              .upsert({
+                user_id: athleteId,
+                is_active: false,
+                updated_at: deletedAtIso
+              }, { onConflict: "user_id" })
+              .then(function (fallbackResult) {
+                if (fallbackResult.error) {
+                  setDeleteStatus(fallbackResult.error.message || "Failed to archive account.", "error", fromModal);
+                  return;
+                }
+
+                markAthleteDeletedLocally(athleteId, deletedAtIso);
+                renderAthletesTable();
+                renderCoachOverview();
+                updateStats();
+                setDeleteStatus("Athlete account archived (legacy schema fallback).", "success", fromModal);
+              });
+          }
+          setDeleteStatus(result.error.message || "Failed to archive account.", "error", fromModal);
           return;
         }
 
-        hideAthleteFromDashboard(athlete.user_id);
-        state.athletes = state.athletes.filter(function (item) {
-          return item.user_id !== athlete.user_id;
-        });
+        markAthleteDeletedLocally(athleteId, deletedAtIso);
         renderAthletesTable();
+        renderCoachOverview();
         updateStats();
-
-        setDeleteStatus(
-          "Profile removed from dashboard, but full auth-account delete is not configured yet.",
-          "info",
-          fromModal
-        );
-        setTimeout(function () {
-          if (fromModal) {
-            closeModal();
-          }
-          setStatus(
-            "Profile removed. To fully delete athlete logins, run sql/admin-delete-athlete-account-rpc.sql in Supabase.",
-            "info"
-          );
-        }, 1000);
+        setDeleteStatus("Athlete account archived.", "success", fromModal);
       })
       .catch(function (error) {
-        var baseMessage = error && error.message ? error.message : "Failed to delete account.";
+        var baseMessage = error && error.message ? error.message : "Failed to archive account.";
         var priorMessage = deleteError && deleteError.message ? " " + deleteError.message : "";
-        setDeleteStatus(
-          baseMessage + priorMessage,
-          "error",
-          fromModal
-        );
+        setDeleteStatus(baseMessage + priorMessage, "error", fromModal);
       });
+  }
+
+  function markAthleteDeletedLocally(athleteId, deletedAtIso) {
+    var stamp = deletedAtIso || new Date().toISOString();
+    state.athletes = state.athletes.map(function (item) {
+      if (!item || String(item.user_id || "") !== athleteId) {
+        return item;
+      }
+      item.is_active = false;
+      item.deleted_at = stamp;
+      item.is_deleted = true;
+      return item;
+    });
+
+    if (state.currentAthlete && String(state.currentAthlete.user_id || "") === athleteId) {
+      state.currentAthlete.is_active = false;
+      state.currentAthlete.deleted_at = stamp;
+      state.currentAthlete.is_deleted = true;
+      populateModal(state.currentAthlete);
+    }
   }
 
   function setDeleteStatus(message, variant, fromModal) {
@@ -2946,7 +3149,7 @@
 
     var activeProgramsRequest = state.client
       .from("user_training_programs")
-      .select("user_id,program_id,program_name,is_active,assigned_at")
+      .select("user_id,program_id,program_name,is_active,assigned_at,assigned_by")
       .eq("is_active", true)
       .order("assigned_at", { ascending: false })
       .limit(200);
@@ -2972,7 +3175,7 @@
 
     var athleteProfilesRequest = state.client
       .from("athlete_profiles")
-      .select("user_id,name,sport,level,sports,sport_overview,height_cm,arm_span_cm,is_active");
+      .select("user_id,name,sport,level,sports,sport_overview,height_cm,arm_span_cm,is_active,coach_access_tier_override");
 
     var foundingOnboardingRequest = state.client
       .from("founding_member_onboarding")
@@ -3001,7 +3204,7 @@
 
     var foundingSubscriptionsRequest = state.client
       .from("founding_member_subscriptions")
-      .select("user_id,status,last_event_type,last_event_created_at,updated_at")
+      .select("user_id,customer_email,status,last_event_type,last_event_created_at,updated_at")
       .order("updated_at", { ascending: false })
       .limit(1000);
 
@@ -3013,7 +3216,7 @@
 
     var workoutCompletionHistoryRequest = state.client
       .from("athlete_exercise_history")
-      .select("athlete_user_id,slot_key,workout_completed_at,total_sets,completed_sets")
+      .select("athlete_user_id,slot_key,workout_completed_at,total_sets,completed_sets,exercise_name,top_weight,volume_load,set_logs,workout_summary")
       .order("workout_completed_at", { ascending: false })
       .limit(4000);
 
@@ -3099,6 +3302,7 @@
               sport_overview: profile && profile.sport_overview ? profile.sport_overview : null,
               height_cm: profile && profile.height_cm != null ? profile.height_cm : null,
               arm_span_cm: profile && profile.arm_span_cm != null ? profile.arm_span_cm : null,
+              coach_access_tier_override: normalizeCoachAccessTierOverride(profile && profile.coach_access_tier_override),
               is_active: !(profile && profile.is_active === false)
             };
           });
@@ -3196,6 +3400,7 @@
             ? foundingSubscriptionsResult.data.map(function (row) {
                 return {
                   user_id: String(row && row.user_id || ""),
+                  customer_email: String(row && row.customer_email || "").trim().toLowerCase(),
                   status: String(row && row.status || "").toLowerCase(),
                   last_event_type: String(row && row.last_event_type || ""),
                   last_event_created_at: String(row && row.last_event_created_at || ""),
@@ -3254,7 +3459,12 @@
                   slot_key: String(row && row.slot_key || ""),
                   workout_completed_at: String(row && row.workout_completed_at || ""),
                   total_sets: row && row.total_sets != null ? Number(row.total_sets) : 0,
-                  completed_sets: row && row.completed_sets != null ? Number(row.completed_sets) : 0
+                  completed_sets: row && row.completed_sets != null ? Number(row.completed_sets) : 0,
+                  exercise_name: String(row && row.exercise_name || ""),
+                  top_weight: row && row.top_weight != null ? Number(row.top_weight) : null,
+                  volume_load: row && row.volume_load != null ? Number(row.volume_load) : 0,
+                  set_logs: Array.isArray(row && row.set_logs) ? row.set_logs : [],
+                  workout_summary: row && row.workout_summary && typeof row.workout_summary === "object" ? row.workout_summary : null
                 };
               }).filter(function (row) {
                 return !!row.athlete_user_id && !!row.workout_completed_at;
@@ -3626,13 +3836,56 @@
           completedAt: completedAt,
           slotKey: slotKey,
           totalSets: 0,
-          completedSets: 0
+          completedSets: 0,
+          exerciseCount: 0,
+          exerciseLookup: {},
+          topWeight: null,
+          volumeLoad: 0,
+          workoutSummary: null,
+          noteItems: []
         };
       }
 
       var item = completionGroupMap[mapKey];
       item.totalSets += Number(row && row.total_sets || 0);
       item.completedSets += Number(row && row.completed_sets || 0);
+
+      var exerciseName = String(row && row.exercise_name || "").trim();
+      if (exerciseName && !item.exerciseLookup[exerciseName]) {
+        item.exerciseLookup[exerciseName] = true;
+        item.exerciseCount += 1;
+      }
+
+      var rowTopWeight = row && row.top_weight != null ? Number(row.top_weight) : null;
+      if (Number.isFinite(rowTopWeight) && (item.topWeight == null || rowTopWeight > item.topWeight)) {
+        item.topWeight = rowTopWeight;
+      }
+
+      var rowVolumeLoad = Number(row && row.volume_load || 0);
+      if (Number.isFinite(rowVolumeLoad)) {
+        item.volumeLoad += rowVolumeLoad;
+      }
+
+      if (!item.workoutSummary && row && row.workout_summary && typeof row.workout_summary === "object") {
+        item.workoutSummary = row.workout_summary;
+      }
+
+      var rowSetLogs = Array.isArray(row && row.set_logs) ? row.set_logs : [];
+      rowSetLogs.forEach(function (setLog, setIndex) {
+        var note = String(setLog && setLog.notes || "").trim();
+        if (!note) {
+          return;
+        }
+
+        item.noteItems.push({
+          exerciseName: exerciseName || "Exercise",
+          setNumber: Number(setLog && setLog.setNumber || setIndex + 1),
+          note: note,
+          reps: String(setLog && setLog.reps || "").trim(),
+          weight: String(setLog && setLog.weight || "").trim(),
+          rpe: String(setLog && setLog.rpe || "").trim()
+        });
+      });
     });
 
     Object.keys(completionGroupMap).forEach(function (mapKey) {
@@ -3656,11 +3909,26 @@
       }
       meta += " • " + String(completionPct) + "% (" + entry.completedSets + "/" + entry.totalSets + " sets)";
 
+      var summary = {
+        slotKey: entry.slotKey,
+        completedAt: entry.completedAt,
+        completedSets: entry.completedSets,
+        totalSets: entry.totalSets,
+        completionPct: completionPct,
+        exerciseCount: entry.exerciseCount,
+        topWeight: entry.topWeight,
+        volumeLoad: entry.volumeLoad,
+        workoutSummary: entry.workoutSummary,
+        noteItems: entry.noteItems
+      };
+
       items.push({
         key: requestKey,
         title: athleteLabel + " completed a workout",
         meta: meta,
         chip: "Workout",
+        type: "workout",
+        summary: summary,
         href: "athlete-insight.html?athleteId=" + encodeURIComponent(entry.athleteId),
         sortMs: completedMs
       });
@@ -3684,6 +3952,80 @@
         '<p class="admin-overview-item-title">Open Coach Notifications</p>' +
       '</div>' +
       items.slice(0, 8).map(function (item) {
+        var isWorkout = item && item.type === "workout";
+        var previewOpen = isWorkout && state.activeRequestPreviewKey === String(item.key || "");
+        var summary = item && item.summary && typeof item.summary === "object" ? item.summary : {};
+        var workoutSummary = summary && summary.workoutSummary && typeof summary.workoutSummary === "object" ? summary.workoutSummary : null;
+        var noteItems = Array.isArray(summary.noteItems) ? summary.noteItems.slice(0, 8) : [];
+        var summaryHtml = "";
+        if (isWorkout && previewOpen) {
+          var topWeightText = Number.isFinite(summary.topWeight) ? String(summary.topWeight) : "—";
+          var volumeText = Number.isFinite(summary.volumeLoad) ? String(Math.round(summary.volumeLoad * 100) / 100) : "—";
+          var completionText = workoutSummary && workoutSummary.totalSets > 0
+            ? String(workoutSummary.completionPercent || 0) + "% (" + Number(workoutSummary.doneSets || 0) + "/" + Number(workoutSummary.totalSets || 0) + " sets)"
+            : String(summary.completionPct || 0) + "% (" + summary.completedSets + "/" + summary.totalSets + " sets)";
+          var elapsedLabel = workoutSummary && workoutSummary.elapsedLabel ? String(workoutSummary.elapsedLabel) : "—";
+          var intensityLabel = workoutSummary && workoutSummary.intensityRating != null ? String(workoutSummary.intensityRating) + "/10" : "—";
+          var summaryComment = workoutSummary && workoutSummary.comments ? String(workoutSummary.comments) : "";
+          var athleteComment = workoutSummary && workoutSummary.athleteComments ? String(workoutSummary.athleteComments) : "";
+          var badges = workoutSummary && Array.isArray(workoutSummary.badges) ? workoutSummary.badges.slice(0, 6) : [];
+          var prItems = workoutSummary && Array.isArray(workoutSummary.prItems) ? workoutSummary.prItems.slice(0, 5) : [];
+          var embeddedExerciseNotes = workoutSummary && Array.isArray(workoutSummary.exerciseNotes)
+            ? workoutSummary.exerciseNotes.slice(0, 8)
+            : [];
+          var effectiveNotes = embeddedExerciseNotes.length ? embeddedExerciseNotes : noteItems;
+
+          var badgesHtml = badges.length
+            ? '<p><strong>Badges:</strong> ' + escapeHtml(badges.join(", ")) + '</p>'
+            : "";
+
+          var prHtml = prItems.length
+            ? '<div><p><strong>PR Highlights:</strong></p><ul class="admin-request-detail-list">' + prItems.map(function (pr) {
+                var prName = String(pr && pr.exerciseName || "Exercise");
+                var prCurrent = pr && pr.currentWeight != null ? String(pr.currentWeight) : "—";
+                var prPrev = pr && pr.previousWeight != null ? String(pr.previousWeight) : "—";
+                return '<li>' + escapeHtml(prName + ": " + prCurrent + " (prev " + prPrev + ")") + '</li>';
+              }).join("") + '</ul></div>'
+            : "";
+
+          var notesHtml = effectiveNotes.length
+            ? '<div><p><strong>Athlete Set Notes / Questions:</strong></p><ul class="admin-request-detail-list">' + effectiveNotes.map(function (noteRow) {
+                var exerciseLabel = String(noteRow && noteRow.exerciseName || "Exercise");
+                var setLabel = Number(noteRow && noteRow.setNumber || 0);
+                var noteText = String(noteRow && noteRow.note || "");
+                var detailBits = [];
+                if (noteRow && noteRow.reps) {
+                  detailBits.push("reps " + String(noteRow.reps));
+                }
+                if (noteRow && noteRow.weight) {
+                  detailBits.push("load " + String(noteRow.weight));
+                }
+                if (noteRow && noteRow.rpe) {
+                  detailBits.push("rpe " + String(noteRow.rpe));
+                }
+                var detailSuffix = detailBits.length ? " (" + detailBits.join(", ") + ")" : "";
+                return '<li>' + escapeHtml(exerciseLabel + " - Set " + setLabel + ": " + noteText + detailSuffix) + '</li>';
+              }).join("") + '</ul></div>'
+            : "";
+
+          summaryHtml =
+            '<div class="admin-request-detail">' +
+              '<p><strong>Completed:</strong> ' + escapeHtml(formatDate(summary.completedAt)) + '</p>' +
+              '<p><strong>Slot:</strong> ' + escapeHtml(summary.slotKey ? String(summary.slotKey).toUpperCase() : "N/A") + '</p>' +
+              '<p><strong>Duration:</strong> ' + escapeHtml(elapsedLabel) + '</p>' +
+              '<p><strong>Completion:</strong> ' + escapeHtml(completionText) + '</p>' +
+              '<p><strong>Intensity:</strong> ' + escapeHtml(intensityLabel) + '</p>' +
+              '<p><strong>Exercises Logged:</strong> ' + escapeHtml(String(summary.exerciseCount || 0)) + '</p>' +
+              '<p><strong>Top Load:</strong> ' + escapeHtml(topWeightText) + '</p>' +
+              '<p><strong>Volume Load:</strong> ' + escapeHtml(volumeText) + '</p>' +
+              (summaryComment ? '<p><strong>Workout Summary:</strong> ' + escapeHtml(summaryComment) + '</p>' : '') +
+              (athleteComment ? '<p><strong>Athlete Comment:</strong> ' + escapeHtml(athleteComment) + '</p>' : '') +
+              badgesHtml +
+              prHtml +
+              notesHtml +
+            '</div>';
+        }
+
         return (
           '<div class="admin-overview-item admin-widget-row">' +
             '<div>' +
@@ -3693,14 +4035,32 @@
             '<div class="admin-request-side">' +
               '<span class="admin-request-type-chip">' + escapeHtml(item.chip) + '</span>' +
               '<div class="admin-request-actions">' +
-                '<a class="btn admin-btn-refresh" href="' + escapeAttribute(item.href) + '">View Athlete</a>' +
+                (isWorkout
+                  ? '<button type="button" class="btn admin-btn-refresh" data-workout-summary-action="toggle" data-workout-summary-key="' + escapeAttribute(item.key) + '">' + (previewOpen ? 'Hide Summary' : 'View Summary') + '</button>'
+                  : '<a class="btn admin-btn-refresh" href="' + escapeAttribute(item.href) + '">View Athlete</a>') +
                 '<button type="button" class="btn admin-btn-small" data-automated-todo-complete="' + escapeAttribute(item.key) + '">Completed</button>' +
               '</div>' +
             '</div>' +
+            summaryHtml +
           '</div>'
         );
       }).join("")
     );
+  }
+
+  function onWorkoutSummaryActionClick(event) {
+    var actionBtn = event.target && event.target.closest("[data-workout-summary-action]");
+    if (!actionBtn) {
+      return;
+    }
+
+    var action = String(actionBtn.getAttribute("data-workout-summary-action") || "").trim().toLowerCase();
+    var requestKey = String(actionBtn.getAttribute("data-workout-summary-key") || "").trim();
+    if (!requestKey || action !== "toggle") {
+      return;
+    }
+
+    toggleRequestPreview(requestKey);
   }
 
   function getCoachCompletionTaskLabel(row) {
@@ -6268,7 +6628,7 @@
   }
 
   function hasCompletedMembershipPaymentFromSubscriptionRow(row) {
-    if (!row || !row.user_id) {
+    if (!row) {
       return false;
     }
 
@@ -6291,6 +6651,36 @@
     );
   }
 
+  function isMembershipPaymentTaskAssignmentRow(row) {
+    var formId = String(row && row.form_id || "").trim().toLowerCase();
+    var formName = String(row && row.form_name || row && row.task_name || row && row.title || "").trim().toLowerCase();
+    var schema = row && row.form_schema && typeof row.form_schema === "object" ? row.form_schema : {};
+    var schemaName = String(schema && (schema.title || schema.task_name || schema.name || schema.label) || "").trim().toLowerCase();
+    var schemaDescription = String(schema && schema.description || "").trim().toLowerCase();
+    var actionUrl = String(schema && schema.action_url || "").trim().toLowerCase();
+
+    if (
+      formId === MEMBERSHIP_PAYMENT_TASK_FORM_ID ||
+      formId.indexOf("membership-payment") > -1 ||
+      formId.indexOf("membership_payment") > -1 ||
+      formId.indexOf("founding-payment") > -1
+    ) {
+      return true;
+    }
+
+    if (actionUrl.indexOf("founding-member.html") > -1 && actionUrl.indexOf("checkout=start") > -1) {
+      return true;
+    }
+
+    var combined = [formName, schemaName, schemaDescription].join(" ");
+    return (
+      combined.indexOf("membership payment") > -1 ||
+      combined.indexOf("complete membership payment") > -1 ||
+      (combined.indexOf("membership") > -1 && combined.indexOf("checkout") > -1) ||
+      (combined.indexOf("membership") > -1 && combined.indexOf("subscription") > -1)
+    );
+  }
+
   function isLikelyIndividualizedProgramName(programName) {
     var name = String(programName || "").toLowerCase();
     return (
@@ -6299,6 +6689,91 @@
       name.indexOf("1:1") > -1 ||
       name.indexOf("1-1") > -1
     );
+  }
+
+  function isLikelyIndividualizedProgramRow(row) {
+    var programRow = row && typeof row === "object" ? row : {};
+    if (isLikelyIndividualizedProgramName(programRow.program_name)) {
+      return true;
+    }
+
+    var athleteId = String(programRow.user_id || "").trim();
+    var assignedBy = String(programRow.assigned_by || "").trim();
+    return !!assignedBy && !!athleteId && assignedBy !== athleteId;
+  }
+
+  function normalizeCoachAccessTierOverride(value) {
+    var raw = String(value == null ? "" : value).trim().toLowerCase();
+    if (!raw || raw === "auto" || raw === "none" || raw === "system") {
+      return "";
+    }
+
+    if (raw === "athlete" || raw === "athlete_account") {
+      return "athlete";
+    }
+    if (raw === "active_member" || raw === "active_membership" || raw === "member") {
+      return "active_member";
+    }
+    if (raw === "active_program" || raw === "program") {
+      return "active_program";
+    }
+    if (raw === "individualized" || raw === "individualized_programming" || raw === "custom_program") {
+      return "individualized";
+    }
+
+    return "";
+  }
+
+  function membershipTierDescriptorFromKey(tierKey) {
+    if (tierKey === "individualized") {
+      return {
+        key: "individualized",
+        label: "Individualized Programming",
+        toneClass: "is-tier-individualized"
+      };
+    }
+
+    if (tierKey === "active_program") {
+      return {
+        key: "active_program",
+        label: "Active Program",
+        toneClass: "is-tier-program"
+      };
+    }
+
+    if (tierKey === "active_member") {
+      return {
+        key: "active_member",
+        label: "Active Membership",
+        toneClass: "is-tier-member"
+      };
+    }
+
+    return {
+      key: "athlete",
+      label: "Athlete Account",
+      toneClass: "is-tier-athlete"
+    };
+  }
+
+  function resolveAthleteMembershipTierDescriptor(context) {
+    var safe = context && typeof context === "object" ? context : {};
+    var override = normalizeCoachAccessTierOverride(safe.profile && safe.profile.coach_access_tier_override);
+    if (override) {
+      return membershipTierDescriptorFromKey(override);
+    }
+
+    if (safe.hasIndividualizedProgramming) {
+      return membershipTierDescriptorFromKey("individualized");
+    }
+    if (safe.hasCompletedMembership) {
+      return membershipTierDescriptorFromKey("active_member");
+    }
+    if (safe.hasActiveProgram) {
+      return membershipTierDescriptorFromKey("active_program");
+    }
+
+    return membershipTierDescriptorFromKey("athlete");
   }
 
   function getAthleteTierCounts() {
@@ -6325,20 +6800,44 @@
     });
 
     var subscriptionByAthlete = {};
+    var subscriptionByEmail = {};
     (state.foundingSubscriptionRows || []).forEach(function (row) {
       var athleteId = String(row && row.user_id || "").trim();
-      if (!athleteId) {
+      var rowTime = new Date(String(row && row.updated_at || row && row.last_event_created_at || 0)).getTime();
+      if (athleteId) {
+        var existing = subscriptionByAthlete[athleteId];
+        var existingTime = existing
+          ? new Date(String(existing.updated_at || existing.last_event_created_at || 0)).getTime()
+          : -Infinity;
+
+        if (!existing || rowTime >= existingTime) {
+          subscriptionByAthlete[athleteId] = row;
+        }
+      }
+
+      var email = String(row && row.customer_email || "").trim().toLowerCase();
+      if (email) {
+        var existingByEmail = subscriptionByEmail[email];
+        var existingByEmailTime = existingByEmail
+          ? new Date(String(existingByEmail.updated_at || existingByEmail.last_event_created_at || 0)).getTime()
+          : -Infinity;
+
+        if (!existingByEmail || rowTime >= existingByEmailTime) {
+          subscriptionByEmail[email] = row;
+        }
+      }
+    });
+
+    var completedPaymentTaskByAthlete = {};
+    (state.foundingIntakeAssignmentRows || []).forEach(function (row) {
+      var athleteId = String(row && row.athlete_user_id || "").trim();
+      if (!athleteId || !isMembershipPaymentTaskAssignmentRow(row)) {
         return;
       }
 
-      var existing = subscriptionByAthlete[athleteId];
-      var rowTime = new Date(String(row && row.updated_at || row && row.last_event_created_at || 0)).getTime();
-      var existingTime = existing
-        ? new Date(String(existing.updated_at || existing.last_event_created_at || 0)).getTime()
-        : -Infinity;
-
-      if (!existing || rowTime >= existingTime) {
-        subscriptionByAthlete[athleteId] = row;
+      var status = String(row && row.status || "").toLowerCase();
+      if (status === "submitted" || status === "archived") {
+        completedPaymentTaskByAthlete[athleteId] = true;
       }
     });
 
@@ -6351,7 +6850,7 @@
       }
 
       activeProgramsByAthlete[athleteId] = true;
-      if (isLikelyIndividualizedProgramName(row.program_name)) {
+      if (isLikelyIndividualizedProgramRow(row)) {
         individualizedProgramsByAthlete[athleteId] = true;
       }
     });
@@ -6362,18 +6861,41 @@
         return counts;
       }
 
+      var athleteProfile = state.athleteProfilesById && state.athleteProfilesById[athleteId]
+        ? state.athleteProfilesById[athleteId]
+        : null;
+      var overrideTier = normalizeCoachAccessTierOverride(athleteProfile && athleteProfile.coach_access_tier_override);
+      if (overrideTier === "individualized") {
+        counts.individualizedProgramming += 1;
+        return counts;
+      }
+      if (overrideTier === "active_member") {
+        counts.activeMembership += 1;
+        return counts;
+      }
+      if (overrideTier === "active_program") {
+        counts.activeProgram += 1;
+        return counts;
+      }
+      if (overrideTier === "athlete") {
+        counts.athleteAccount += 1;
+        return counts;
+      }
+
       var hasIndividualizedProgramming = !!individualizedProgramsByAthlete[athleteId];
       var hasActiveProgram = !!activeProgramsByAthlete[athleteId];
       var hasCompletedMembership =
+        !!completedPaymentTaskByAthlete[athleteId] ||
         hasCompletedMembershipPaymentFromOnboardingRow(onboardingByAthlete[athleteId]) ||
-        hasCompletedMembershipPaymentFromSubscriptionRow(subscriptionByAthlete[athleteId]);
+        hasCompletedMembershipPaymentFromSubscriptionRow(subscriptionByAthlete[athleteId]) ||
+        hasCompletedMembershipPaymentFromSubscriptionRow(subscriptionByEmail[String(athlete && athlete.email || "").trim().toLowerCase()]);
 
       if (hasIndividualizedProgramming) {
         counts.individualizedProgramming += 1;
-      } else if (hasActiveProgram) {
-        counts.activeProgram += 1;
       } else if (hasCompletedMembership) {
         counts.activeMembership += 1;
+      } else if (hasActiveProgram) {
+        counts.activeProgram += 1;
       } else {
         counts.athleteAccount += 1;
       }
@@ -6423,13 +6945,19 @@
 
   function getActiveAthleteCount() {
     return state.athletes.filter(function (athlete) {
-      return athlete && athlete.is_active !== false;
+      return athlete && athlete.is_active !== false && !athlete.deleted_at;
     }).length;
   }
 
   function getInactiveAthleteCount() {
     return state.athletes.filter(function (athlete) {
-      return athlete && athlete.is_active === false;
+      return athlete && athlete.is_active === false && !athlete.deleted_at;
+    }).length;
+  }
+
+  function getDeletedAthleteCount() {
+    return state.athletes.filter(function (athlete) {
+      return athlete && !!athlete.deleted_at;
     }).length;
   }
 
@@ -6796,6 +7324,16 @@
   function isMissingTableError(error) {
     var msg = error && error.message ? error.message.toLowerCase() : "";
     return error && error.code === "42P01" || msg.indexOf("does not exist") > -1;
+  }
+
+  function isMissingColumnError(error) {
+    var message = String(error && error.message || "").toLowerCase();
+    var details = String(error && error.details || "").toLowerCase();
+    return (
+      String(error && error.code || "") === "42703"
+      || (message.indexOf("column") > -1 && message.indexOf("does not exist") > -1)
+      || (details.indexOf("column") > -1 && details.indexOf("does not exist") > -1)
+    );
   }
 
   function getPasswordResetRedirectUrl() {

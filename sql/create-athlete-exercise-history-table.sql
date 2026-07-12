@@ -30,11 +30,15 @@ create table if not exists public.athlete_exercise_history (
   completed_sets int not null default 0,
   top_weight numeric,
   volume_load numeric not null default 0,
+  workout_summary jsonb,
   set_logs jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint athlete_exercise_history_sets_chk check (total_sets >= 0 and completed_sets >= 0 and completed_sets <= total_sets),
-  constraint athlete_exercise_history_set_logs_array_chk check (jsonb_typeof(set_logs) = 'array')
+  constraint athlete_exercise_history_set_logs_array_chk check (jsonb_typeof(set_logs) = 'array'),
+  constraint athlete_exercise_history_workout_summary_object_chk check (
+    workout_summary is null or jsonb_typeof(workout_summary) = 'object'
+  )
 );
 
 create index if not exists athlete_exercise_history_athlete_exercise_idx

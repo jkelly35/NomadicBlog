@@ -57,6 +57,7 @@
     cloudExerciseHistoryLoaded: false,
     lastWorkoutCompletionCloudSyncPromise: null,
     currentUserId: null,
+    currentUserEmail: null,
     assignmentAthleteUserId: null,
     assignmentCoachUserId: null
   };
@@ -428,6 +429,16 @@
     configureAssignedTemplateMode();
     setProgramTitleFromQuery();
 
+    // Hard guard: when URL explicitly requests builder mode, ensure the
+    // coach template wizard is activated even if an earlier init branch failed.
+    if (isBuilderModeRequestedFromQuery() && !state.isTemplateBuilder) {
+      try {
+        activateTemplateBuilder({ id: null, email: "" });
+      } catch (_error) {
+        // Keep existing fallback behavior intact if activation fails.
+      }
+    }
+
     // Aggregate overview links from the athlete dashboard should bypass
     // workout-log rendering and open the full compiled viewer immediately.
     if (shouldOpenProgramOverviewFromQuery() && shouldUseAggregateOverviewFromQuery()) {
@@ -481,6 +492,7 @@
         state.day = daySelect.value;
       }
       loadExercisesForDay();
+      restoreWorkoutCompletionSummaryForCurrentDay();
       renderRows();
       renderDailyProgrammingDesigner();
       updateDayInfo();
@@ -648,11 +660,18 @@
     }
 
     loadExercisesForDay();
+    restoreWorkoutCompletionSummaryForCurrentDay();
     renderRows();
     renderDailyProgrammingDesigner();
     updateDayInfo();
     refreshTemplateDayTools();
     updateStats();
+
+    // Re-apply the requested builder step after all init rendering paths run.
+    // This prevents non-builder/default render code from leaving the page on daily view.
+    if (state.isTemplateBuilder) {
+      setBuilderStep(getRequestedBuilderStepFromQuery());
+    }
 
     if (shouldOpenProgramOverviewFromQuery()) {
       // For assigned-template views, wait until template hydration completes
@@ -661,6 +680,31 @@
         openFullPlanOverviewInCurrentPage(getProgramOverviewReturnUrlFromQuery());
         return;
       }
+    }
+  }
+
+  function isBuilderModeRequestedFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return params.get("builder") === "1";
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function getRequestedBuilderStepFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      var value = parseInt(String(params.get("step") || "1"), 10);
+      if (value === 2) {
+        return 2;
+      }
+      if (value === 3) {
+        return 3;
+      }
+      return 1;
+    } catch (_error) {
+      return 1;
     }
   }
 
@@ -2858,56 +2902,60 @@
   }
 
   function configureBuilderMode() {
+    // Critical template-builder flow contract:
+    // - newTemplate=1 must start a blank builder without rehydrating old template/preset data.
+    // - autosaveTemplate=1 + redirectToLibrary=1 must persist to training_programs and return to coach list.
+    // - templateName should come from page-1 builder input and must not require a save-time prompt.
     try {
       var params = new URLSearchParams(window.location.search);
       var wantsTemplateBuilder = params.get("builder") === "1";
+      var requestedStep = parseInt(String(params.get("step") || "1"), 10);
       state.templateId = params.get("templateId") || null;
       state.templatePresetKey = String(params.get("preset") || "").trim() || null;
+      state.templateName = String(params.get("templateName") || state.templateName || "").trim();
+      var forceNewTemplate = params.get("newTemplate") === "1";
       var builderAthleteId = String(params.get("athleteId") || "").trim();
       state.targetAthleteId = isUuid(builderAthleteId) ? builderAthleteId : null;
 
+      if (forceNewTemplate) {
+        state.templateId = null;
+        state.templatePresetKey = null;
+        try {
+          params.delete("templateId");
+          params.delete("preset");
+          if (params.get("autosaveTemplate") !== "1") {
+            params.delete("autosaveTemplate");
+            params.delete("redirectToLibrary");
+          }
+          window.history.replaceState({}, "", window.location.pathname + "?" + params.toString());
+        } catch (historyError) {
+          // Ignore history update errors.
+        }
+      }
+
       if (!wantsTemplateBuilder) {
         return;
+      }
+
+      if (Number.isFinite(requestedStep)) {
+        state.builderStep = requestedStep === 3 ? 3 : (requestedStep === 2 ? 2 : 1);
+      } else {
+        state.builderStep = 1;
       }
 
       if (!state.client) {
         state.client = createSupabaseClient();
       }
 
-      if (!state.client) {
-        lockBuilderToReadOnly();
-        setStatus("Template editing is coach-only and requires an authenticated session.", "info");
-        return;
-      }
-
-      resolveTemplateBuilderCoachAccess().then(function (result) {
-        var user = result && result.user ? result.user : null;
-        if (!result || !result.allowed || !user) {
-          state.isTemplateBuilder = false;
-          lockBuilderToReadOnly();
-          refreshTemplateDayTools();
-          setStatus("Template editing tools are available to coach accounts only.", "info");
-          return;
-        }
-
-        try {
-          activateTemplateBuilder(user);
-        } catch (error) {
-          state.isTemplateBuilder = false;
-          state.coachUserId = null;
-        }
-            var phases = getDailyNavigatorPhases();
-            if (!phases.length) {
-              state.dailyProgrammingViewMode = "week"; // Default to week if no phases
-              return;
-            }
-      }).catch(function () {
+      try {
+        activateTemplateBuilder({ id: null, email: "" });
+      } catch (error) {
         state.isTemplateBuilder = false;
         state.coachUserId = null;
         lockBuilderToReadOnly();
         refreshTemplateDayTools();
-        setStatus("Could not verify coach access. Template editing was disabled.", "info");
-      });
+        setStatus("Could not initialize template builder mode.", "error");
+      }
     } catch (e) {
       // Ignore malformed query parameters.
     }
@@ -2928,6 +2976,19 @@
       peak_date: "",
       tags: []
     };
+  }
+
+  function resetTemplateBuilderDraftState() {
+    state.day = "w1d1";
+    state.exercises = [];
+    state.templateFocus = "strength";
+    state.sessionPlans = {};
+    state.daySessionTypes = {};
+    state.customDayNames = {};
+    state.customDayNameMode = "legacy-suffix";
+    state.programMeta = getDefaultProgramMeta();
+    state.programPhases = [];
+    state.weeklyStructure = [];
   }
 
   function bindTemplatePlannerEvents() {
@@ -3132,6 +3193,11 @@
     state.coachUserId = user && user.id ? String(user.id) : null;
     state.builderStep = 1;
     state.storagePrefix = TEMPLATE_DRAFT_PREFIX;
+
+    if (!state.templateId) {
+      resetTemplateBuilderDraftState();
+    }
+
     state.programMeta = normalizeProgramMeta(state.programMeta, state.structure);
     state.programPhases = normalizeProgramPhases(state.programPhases, state.structure.weeks, state.programMeta.program_type);
     state.weeklyStructure = normalizeWeeklyStructure(state.weeklyStructure, state.structure.workoutsPerWeek, state.templateFocus, state.programMeta.program_type);
@@ -3525,6 +3591,9 @@
 
   function syncWorkoutLogFooterState() {
     var footer = document.querySelector("[data-workout-log-actions]");
+    var heading = footer ? footer.querySelector(".program-demo-log-actions-head h3") : null;
+    var copy = footer ? footer.querySelector(".program-demo-log-actions-head p") : null;
+    var completeBtn = footer ? footer.querySelector("[data-workout-footer-complete]") : null;
     if (!footer) {
       return;
     }
@@ -3537,6 +3606,33 @@
 
     footer.hidden = !shouldShow;
     footer.style.display = shouldShow ? "grid" : "none";
+
+    if (!shouldShow) {
+      return;
+    }
+
+    if (isCurrentWorkoutCompletionRecorded()) {
+      if (heading) {
+        heading.textContent = "Workout Completed";
+      }
+      if (copy) {
+        copy.textContent = "This workout is already completed. Your finish summary appears below.";
+      }
+      if (completeBtn) {
+        completeBtn.textContent = "View Completion Modal";
+      }
+      return;
+    }
+
+    if (heading) {
+      heading.textContent = "Finish Workout";
+    }
+    if (copy) {
+      copy.textContent = "Use Save Workout any time. Select Complete Workout to open the finish summary and feedback form.";
+    }
+    if (completeBtn) {
+      completeBtn.textContent = "Complete Workout";
+    }
   }
 
   function getWorkoutFeedbackValues() {
@@ -3868,12 +3964,11 @@
 
     if (fullPlanPrintBtn) {
       fullPlanPrintBtn.style.display = "inline-flex";
-      fullPlanPrintBtn.innerHTML = "<span>👁️</span> View Workout Program";
+      fullPlanPrintBtn.innerHTML = "Next: Workout Overview & Calendar";
     }
 
     if (saveBtn) {
-      saveBtn.style.display = "inline-flex";
-      saveBtn.innerHTML = "<span>💾</span> Save Template";
+      saveBtn.style.display = "none";
     }
 
     if (clearBtn) {
@@ -4027,6 +4122,7 @@
     var phasesSection = document.querySelector("[data-template-step='phases']");
     var dailyBanner = document.querySelector("[data-template-daily-step-banner]");
     var dailyAreas = document.querySelectorAll("[data-template-daily-programming]");
+    var templateWorkoutLog = document.querySelector("[data-template-workout-log]");
     var dayTools = document.querySelector("[data-template-day-tools]");
     var dayTypeControls = document.querySelector("[data-template-day-type-controls]");
     var subtitle = document.querySelector(".program-demo-subtitle");
@@ -4050,6 +4146,10 @@
     dailyAreas.forEach(function (element) {
       element.hidden = nextStep !== 3;
     });
+
+    if (templateWorkoutLog) {
+      templateWorkoutLog.hidden = nextStep !== 3 || state.isTemplateBuilder;
+    }
 
     var overviewPanel = document.querySelector("[data-template-program-overview]");
     if (overviewPanel && nextStep !== 3) {
@@ -4262,14 +4362,52 @@
     var calendarData = buildTemplateOverviewCalendarData(slotKeys, totalWeeks);
     var serializedCalendarData = JSON.stringify(calendarData).replace(/</g, "\\u003c");
     var safeReturnUrl = String(returnUrl || "training-program-example.html").replace(/"/g, "&quot;");
+    var safeTemplateName = escapeHtml(String(state.templateName || "Training Program Template"));
 
     return [
+      "<!doctype html>",
+      '<html lang="en">',
+      "<head>",
+      '  <meta charset="UTF-8" />',
+      '  <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+      "  <title>" + safeTemplateName + " - Workout Overview</title>",
+      '  <link rel="stylesheet" href="css/style.css" />',
+      "</head>",
+      '<body class="program-overview-page">',
+      '<main class="program-demo-main" style="max-width: 1200px; margin: 0 auto; padding: 1.5rem;">',
+      '  <section class="program-builder-overview-panel" style="display:block; margin-bottom: 1rem;">',
+      '    <div class="program-builder-overview-head">',
+      '      <div>',
+      "        <h2 style=\"margin:0;\">" + safeTemplateName + "</h2>",
+      '        <p style="margin:0.35rem 0 0;">Review workout sessions, then map them into a weekly calendar.</p>',
+      "      </div>",
+      '      <div class="admin-request-actions">',
+      '        <button id="viewCalendarBtn" type="button" class="btn btn-secondary">Edit Calendar</button>',
+      '        <button id="backToOverviewBtn" type="button" class="btn btn-secondary" hidden>Back to Overview</button>',
+      '        <button id="saveTemplateFromOverviewBtn" type="button" class="btn admin-btn-primary">Save Template</button>',
+      '        <button id="backToBuilderBtn" type="button" class="btn btn-secondary">Back to Builder</button>',
+      "      </div>",
+      "    </div>",
+      "  </section>",
+      '  <section id="overviewPanel" class="program-builder-overview-list" style="display:block;">',
+      "    " + (phaseCards || '<p class="admin-loading">No phase overview available yet.</p>'),
+      "  </section>",
+      '  <section id="calendarPanel" class="program-builder-overview-panel" hidden>',
+      '    <div class="program-builder-overview-head">',
+      '      <div>',
+      "        <h3 style=\"margin:0;\">Calendar Layout</h3>",
+      '        <p style="margin:0.35rem 0 0;">Drag workouts between weekdays or use dropdowns to assign each session.</p>',
+      "      </div>",
+      "    </div>",
+      '    <div class="calendar-editor-list" id="calendarWeeks"></div>',
+      "  </section>",
       "</main>",
-      '<script>window.__OVERVIEW_DATA__ = ' + serializedCalendarData + ';window.__RETURN_URL__ = "' + safeReturnUrl + '";<\/script>',
+      '<script>window.__OVERVIEW_DATA__ = ' + serializedCalendarData + ';window.__RETURN_URL__ = "' + safeReturnUrl + '";window.__OPEN_CALENDAR_FIRST__ = true;<\/script>',
       "<script>",
       "(function () {",
       "  var data = window.__OVERVIEW_DATA__ || { weeks: [] };",
       "  var returnUrl = window.__RETURN_URL__ || 'training-program-example.html';",
+      "  var openCalendarFirst = window.__OPEN_CALENDAR_FIRST__ === true;",
       "  var overviewPanel = document.getElementById('overviewPanel');",
       "  var calendarPanel = document.getElementById('calendarPanel');",
       "  var saveTemplateFromOverviewBtn = document.getElementById('saveTemplateFromOverviewBtn');",
@@ -4315,7 +4453,7 @@
       "          var selected = dayNum === currentDay ? ' selected' : '';",
       "          return '<option value=\"' + String(dayNum) + '\"' + selected + '>' + label + '</option>';",
       "        }).join('');",
-      "        return '<div class=\"calendar-control-row\"><label>' + workout.label + '</label><select data-slot-key=\"' + workout.slotKey + '\">' + options + '</select></div>';",
+      "        return '<label class=\"calendar-editor-filter-field\"><span>' + workout.label + '</span><select data-slot-key=\"' + workout.slotKey + '\">' + options + '</select></label>';",
       "      }).join('');",
       "      var byDay = {};",
       "      weekdays.forEach(function (_, i) { byDay[i + 1] = []; });",
@@ -4323,15 +4461,16 @@
       "        var assigned = getAssignedDay(workout.slotKey, idx);",
       "        byDay[assigned].push(workout);",
       "      });",
+      "      var weekdayHead = weekdays.map(function (label) { return '<span>' + label.slice(0, 3) + '</span>'; }).join('');",
       "      var cells = weekdays.map(function (label, i) {",
       "        var dayNum = i + 1;",
       "        var workouts = byDay[dayNum] || [];",
-      "        var items = workouts.length ? workouts.map(function (w) { return '<div class=\"calendar-workout\" draggable=\"true\" data-slot-key=\"' + w.slotKey + '\"><div>' + w.title + '</div><div class=\"calendar-workout-meta\">' + (w.sessionTypeLabel || '') + '</div></div>'; }).join('') : '<div class=\"calendar-empty\">No workout</div>';",
-      "        return '<article class=\"calendar-day\" data-day-num=\"' + String(dayNum) + '\"><h4>' + label + '</h4>' + items + '</article>';",
+      "        var items = workouts.length ? workouts.map(function (w) { return '<div class=\"training-calendar-session is-future\" draggable=\"true\" data-slot-key=\"' + w.slotKey + '\"><span class=\"training-calendar-session-title\">' + w.title + '</span><span class=\"training-calendar-session-program\">' + (w.sessionTypeLabel || '') + '</span></div>'; }).join('') : '<div class=\"training-calendar-supplement\"><span class=\"training-calendar-session-title\">No workout</span></div>';",
+      "        return '<article class=\"training-calendar-day' + (workouts.length ? ' has-session' : '') + '\" data-day-num=\"' + String(dayNum) + '\"><div class=\"training-calendar-day-number\">' + label.slice(0, 3) + '</div><div class=\"training-calendar-day-sessions\">' + items + '</div></article>';",
       "      }).join('');",
-      "      return '<section class=\"calendar-week-card\"><h3>Week ' + String(week.week) + '</h3><p class=\"calendar-meta\">' + String((week.workouts || []).length) + ' planned workout' + (((week.workouts || []).length === 1) ? '' : 's') + '</p><div class=\"calendar-controls\">' + (controls || '<p class=\"calendar-empty\">No workouts in this week.</p>') + '</div><div class=\"calendar-week-grid\">' + cells + '</div></section>';",
+      "      return '<section class=\"calendar-editor-panel\"><div class=\"training-calendar-month-header\">Week ' + String(week.week) + '</div><p class=\"training-calendar-meta\">' + String((week.workouts || []).length) + ' planned workout' + (((week.workouts || []).length === 1) ? '' : 's') + '</p><div class=\"calendar-editor-filters\">' + (controls || '<p class=\"training-calendar-meta\">No workouts in this week.</p>') + '</div><div class=\"training-calendar-weekdays\">' + weekdayHead + '</div><div class=\"training-calendar-grid\">' + cells + '</div></section>';",
       "    }).join('');",
-      "    calendarWeeks.innerHTML = weekCards || '<p class=\"calendar-empty\">No weeks available.</p>';",
+      "    calendarWeeks.innerHTML = weekCards || '<p class=\"admin-loading\">No weeks available.</p>';",
       "    var selects = calendarWeeks.querySelectorAll('select[data-slot-key]');",
       "    selects.forEach(function (selectEl) {",
       "      selectEl.addEventListener('change', function () {",
@@ -4343,8 +4482,8 @@
       "        renderCalendar();",
       "      });",
       "    });",
-      "    var workoutCards = calendarWeeks.querySelectorAll('.calendar-workout[data-slot-key]');",
-      "    var dayCells = calendarWeeks.querySelectorAll('.calendar-day[data-day-num]');",
+      "    var workoutCards = calendarWeeks.querySelectorAll('.training-calendar-session[data-slot-key]');",
+      "    var dayCells = calendarWeeks.querySelectorAll('.training-calendar-day[data-day-num]');",
       "    workoutCards.forEach(function (card) {",
       "      card.addEventListener('dragstart', function () {",
       "        draggedSlotKey = String(card.getAttribute('data-slot-key') || '');",
@@ -4400,21 +4539,27 @@
       "      });",
       "    });",
       "  }",
+      "  function showCalendarView() {",
+      "    if (overviewPanel) { overviewPanel.hidden = true; }",
+      "    if (calendarPanel) { calendarPanel.hidden = false; }",
+      "    if (viewCalendarBtn) { viewCalendarBtn.hidden = true; }",
+      "    if (backToOverviewBtn) { backToOverviewBtn.hidden = false; }",
+      "    renderCalendar();",
+      "  }",
+      "  function showOverviewView() {",
+      "    if (overviewPanel) { overviewPanel.hidden = false; }",
+      "    if (calendarPanel) { calendarPanel.hidden = true; }",
+      "    if (backToOverviewBtn) { backToOverviewBtn.hidden = true; }",
+      "    if (viewCalendarBtn) { viewCalendarBtn.hidden = false; }",
+      "  }",
       "  if (viewCalendarBtn) {",
       "    viewCalendarBtn.addEventListener('click', function () {",
-      "      if (overviewPanel) { overviewPanel.hidden = true; }",
-      "      if (calendarPanel) { calendarPanel.hidden = false; }",
-      "      viewCalendarBtn.hidden = true;",
-      "      if (backToOverviewBtn) { backToOverviewBtn.hidden = false; }",
-      "      renderCalendar();",
+      "      showCalendarView();",
       "    });",
       "  }",
       "  if (backToOverviewBtn) {",
       "    backToOverviewBtn.addEventListener('click', function () {",
-      "      if (overviewPanel) { overviewPanel.hidden = false; }",
-      "      if (calendarPanel) { calendarPanel.hidden = true; }",
-      "      backToOverviewBtn.hidden = true;",
-      "      if (viewCalendarBtn) { viewCalendarBtn.hidden = false; }",
+      "      showOverviewView();",
       "    });",
       "  }",
       "  if (backToBuilderBtn) {",
@@ -4425,10 +4570,19 @@
       "  if (saveTemplateFromOverviewBtn) {",
       "    saveTemplateFromOverviewBtn.addEventListener('click', function () {",
       "      var nextUrl = new URL(returnUrl, window.location.origin);",
+      "      var titleSource = '';",
+      "      try { titleSource = String(data && data.templateName || '').trim(); } catch (e) { titleSource = ''; }",
+      "      if (titleSource) { nextUrl.searchParams.set('templateName', titleSource); }",
+      "      nextUrl.searchParams.delete('newTemplate');",
       "      nextUrl.searchParams.set('autosaveTemplate', '1');",
       "      nextUrl.searchParams.set('redirectToLibrary', '1');",
       "      window.location.href = nextUrl.toString();",
       "    });",
+      "  }",
+      "  if (openCalendarFirst) {",
+      "    showCalendarView();",
+      "  } else {",
+      "    showOverviewView();",
       "  }",
       "})();",
       "<\/script>",
@@ -4470,7 +4624,8 @@
       weeks: weeks,
       layoutKey: getTemplateCalendarLayoutKey(),
       storagePrefix: TEMPLATE_DRAFT_PREFIX,
-      sessionTypeOptions: WEEKLY_SESSION_TYPE_OPTIONS
+      sessionTypeOptions: WEEKLY_SESSION_TYPE_OPTIONS,
+      templateName: String(state.templateName || "").trim()
     };
   }
 
@@ -6963,6 +7118,41 @@
     state.exercises = normalizeExercisesArray(state.exercises);
   }
 
+  function restoreWorkoutCompletionSummaryForCurrentDay() {
+    var stored = readWorkoutLogForDay() || {};
+    var storedSummary = stored.workout_completion_summary;
+
+    if (storedSummary && typeof storedSummary === "object") {
+      state.workoutCompletionSummary = {
+        elapsedLabel: String(storedSummary.elapsedLabel || "").trim(),
+        doneSets: Number(storedSummary.doneSets || 0),
+        totalSets: Number(storedSummary.totalSets || 0),
+        completionPercent: Number(storedSummary.completionPercent || 0),
+        prItems: Array.isArray(storedSummary.prItems) ? storedSummary.prItems : [],
+        badges: Array.isArray(storedSummary.badges) ? storedSummary.badges : [],
+        intensityRating: storedSummary.intensityRating == null ? null : Number(storedSummary.intensityRating),
+        athleteComments: String(storedSummary.athleteComments || "").trim(),
+        comments: String(storedSummary.comments || "").trim()
+      };
+      return;
+    }
+
+    if (stored.workout_completed_at || stored.workout_completion_recorded) {
+      var finishedAt = Date.parse(String(stored.workout_completed_at || ""));
+      var startedAt = Date.parse(String(stored.workout_completed_started_at || ""));
+      var safeFinishedAt = Number.isFinite(finishedAt) ? finishedAt : Date.now();
+      var safeStartedAt = Number.isFinite(startedAt) ? startedAt : safeFinishedAt;
+      var feedback = stored.workout_completed_feedback && typeof stored.workout_completed_feedback === "object"
+        ? stored.workout_completed_feedback
+        : { intensityRating: null, comments: "" };
+
+      state.workoutCompletionSummary = buildWorkoutCompletionSummary(safeStartedAt, safeFinishedAt, feedback);
+      return;
+    }
+
+    state.workoutCompletionSummary = null;
+  }
+
   function saveExercisesForDay(silent) {
     var slotSessionPlan = null;
     if (state.isTemplateBuilder || state.isCoachAssignedProgramEdit) {
@@ -6986,6 +7176,7 @@
       workout_completion_recorded: !!existingStored.workout_completion_recorded,
       workout_completed_started_at: existingStored.workout_completed_started_at || null,
       workout_completed_feedback: existingStored.workout_completed_feedback || null,
+      workout_completion_summary: existingStored.workout_completion_summary || null,
       workout_performance_entries: existingStored.workout_performance_entries || null,
       workout_total_volume_load: existingStored.workout_total_volume_load || null,
       workout_volume_by_movement_pattern: existingStored.workout_volume_by_movement_pattern || null,
@@ -7067,6 +7258,10 @@
     var startedIso = startedAt ? new Date(startedAt).toISOString() : null;
     var safeFeedback = feedback && typeof feedback === "object" ? feedback : {};
     var performance = buildWorkoutPerformanceSnapshot(state.exercises || []);
+    var completionSummary = state.workoutCompletionSummary && typeof state.workoutCompletionSummary === "object"
+      ? state.workoutCompletionSummary
+      : buildWorkoutCompletionSummary(startedAt, finishedAt, safeFeedback);
+    var cloudWorkoutSummary = buildCloudWorkoutSummaryPayload(completionSummary, state.exercises || [], performance);
 
     var payload = {
       exercises: state.isCoachAssignedProgramEdit
@@ -7080,6 +7275,7 @@
         intensityRating: safeFeedback.intensityRating == null ? null : safeFeedback.intensityRating,
         comments: String(safeFeedback.comments || "").trim()
       },
+      workout_completion_summary: cloudWorkoutSummary,
       workout_performance_entries: performance.entries,
       workout_total_volume_load: performance.totalVolumeLoad,
       workout_volume_by_movement_pattern: performance.volumeByMovementPattern,
@@ -7089,7 +7285,7 @@
 
     writeToStorage(storageKeyForDay(), payload);
     persistExercisePerformanceHistory(startedAt, finishedAt, performance.entries);
-    state.lastWorkoutCompletionCloudSyncPromise = syncWorkoutPerformanceToCloud(startedAt, finishedAt, performance.entries);
+    state.lastWorkoutCompletionCloudSyncPromise = syncWorkoutPerformanceToCloud(startedAt, finishedAt, performance.entries, cloudWorkoutSummary);
   }
 
   function clearCurrentWorkoutCompletedMarker() {
@@ -7103,6 +7299,7 @@
       workout_completion_recorded: false,
       workout_completed_started_at: null,
       workout_completed_feedback: null,
+      workout_completion_summary: null,
       workout_performance_entries: null,
       workout_total_volume_load: null,
       workout_volume_by_movement_pattern: null,
@@ -7111,11 +7308,12 @@
     };
 
     writeToStorage(storageKeyForDay(), payload);
+    state.workoutCompletionSummary = null;
   }
 
   function saveTemplateProgram() {
     var saveData = buildTemplateSaveData({
-      promptForName: true,
+      promptForName: false,
       showErrors: true
     });
     if (!saveData) {
@@ -7264,7 +7462,7 @@
     }
 
     var saveData = buildTemplateSaveData({
-      promptForName: true,
+      promptForName: false,
       showErrors: true
     });
     if (!saveData) {
@@ -7696,6 +7894,13 @@
 
   function getBuiltInTemplatePreset(presetKey) {
     var key = String(presetKey || "").trim().toLowerCase();
+    if (key === "climbing-12-week-logical") {
+      return {
+        key: key,
+        name: "12-Week Climbing Logical Progression",
+        payload: buildClimbingCoaching12WeekTemplatePayload()
+      };
+    }
     if (key === "climbing-12-week") {
       return {
         key: key,
@@ -7703,7 +7908,338 @@
         payload: buildClimbing12WeekTemplatePayload()
       };
     }
+    if (key === "climbing-coaching-12-week") {
+      return {
+        key: key,
+        name: "12-Week Climbing Coaching Programming Template",
+        payload: buildClimbing12WeekTemplatePayload()
+      };
+    }
     return null;
+  }
+
+  function buildClimbingCoaching12WeekTemplatePayload() {
+    var structure = { weeks: 12, workoutsPerWeek: 6 };
+    var programMeta = normalizeProgramMeta({
+      program_type: "individualized",
+      sport_focus: "Climbing",
+      athlete_level: "intermediate",
+      primary_goal: "Peak climbing performance while maintaining maximal strength and finger force.",
+      secondary_goal: "Improve movement quality and power endurance with low-fatigue strength support.",
+      training_days_per_week: 6,
+      strength_days_per_week: 2,
+      endurance_days_per_week: 2,
+      mobility_days_per_week: 1,
+      deload_frequency: "every_4",
+      tags: ["climbing", "strength", "hangboard", "power", "power-endurance", "logical-progression"]
+    }, structure);
+
+    var programPhases = normalizeProgramPhases([
+      {
+        name: "Phase 1: General Max Strength",
+        start_week: 1,
+        end_week: 4,
+        focus: "Heavy strength and finger force with movement quality maintained.",
+        training_days_per_week: 6,
+        strength_days_per_week: 2,
+        cardio_days_per_week: 1,
+        skill_days_per_week: 2,
+        multi_focus_days_per_week: 0,
+        endurance_days_per_week: 2,
+        mobility_days_per_week: 1
+      },
+      {
+        name: "Phase 2: Strength -> Power",
+        start_week: 5,
+        end_week: 8,
+        focus: "Convert general strength to dynamic climbing power and contact strength.",
+        training_days_per_week: 6,
+        strength_days_per_week: 2,
+        cardio_days_per_week: 1,
+        skill_days_per_week: 2,
+        multi_focus_days_per_week: 0,
+        endurance_days_per_week: 2,
+        mobility_days_per_week: 1
+      },
+      {
+        name: "Phase 3: Peak + Power Endurance",
+        start_week: 9,
+        end_week: 12,
+        focus: "Peak climbing quality and power endurance while maintaining strength.",
+        training_days_per_week: 6,
+        strength_days_per_week: 2,
+        cardio_days_per_week: 1,
+        skill_days_per_week: 2,
+        multi_focus_days_per_week: 0,
+        endurance_days_per_week: 2,
+        mobility_days_per_week: 1
+      }
+    ], structure.weeks, programMeta.program_type);
+
+    var weeklyStructure = normalizeWeeklyStructure([
+      { workout: 1, name: "Monday - Integrated Strength A", session_type: "strength_full", note: "Max hangs + heavy lower/press + core + mobility." },
+      { workout: 2, name: "Tuesday - Limit Bouldering / Technique", session_type: "threshold", note: "Phase-specific climbing quality day with long rests." },
+      { workout: 3, name: "Wednesday - Zone 2 / Recovery", session_type: "zone2", note: "45-60 minutes aerobic support at 120-145 bpm." },
+      { workout: 4, name: "Thursday - Integrated Strength B", session_type: "strength_full", note: "Heavy pull/squat/single-leg/OHP, more explosive in weeks 5-12." },
+      { workout: 5, name: "Saturday - Performance Climbing", session_type: "assessment", note: "Primary high-output performance day with long rests." },
+      { workout: 6, name: "Sunday - Volume / Endurance Climbing", session_type: "long_endurance", note: "Phase-specific volume, density, or power-endurance." }
+    ], structure.workoutsPerWeek, "hybrid", programMeta.program_type);
+
+    var sessionPlans = {};
+    var daySessionTypes = {};
+    var customDayNames = {};
+
+    for (var week = 1; week <= 12; week++) {
+      var wk = "w" + week;
+      sessionPlans[wk + "d1"] = buildCoachingTemplateMonday(week);
+      sessionPlans[wk + "d2"] = buildCoachingTemplateTuesday(week);
+      sessionPlans[wk + "d3"] = buildCoachingTemplateWednesday(week);
+      sessionPlans[wk + "d4"] = buildCoachingTemplateThursday(week);
+      sessionPlans[wk + "d5"] = buildCoachingTemplateSaturday(week);
+      sessionPlans[wk + "d6"] = buildCoachingTemplateSunday(week);
+
+      daySessionTypes[wk + "d1"] = "strength_full";
+      daySessionTypes[wk + "d2"] = "threshold";
+      daySessionTypes[wk + "d3"] = "zone2";
+      daySessionTypes[wk + "d4"] = "strength_full";
+      daySessionTypes[wk + "d5"] = "assessment";
+      daySessionTypes[wk + "d6"] = week >= 9 ? "threshold" : "long_endurance";
+
+      customDayNames[wk + "d1"] = "Monday - Integrated Strength A";
+      customDayNames[wk + "d2"] = "Tuesday - Limit Bouldering / Technique";
+      customDayNames[wk + "d3"] = "Wednesday - Zone 2 / Recovery";
+      customDayNames[wk + "d4"] = "Thursday - Integrated Strength B";
+      customDayNames[wk + "d5"] = "Saturday - Performance Climbing";
+      customDayNames[wk + "d6"] = "Sunday - Volume / Endurance Climbing";
+    }
+
+    return {
+      archived: false,
+      focus: "hybrid",
+      program_meta: programMeta,
+      program_phases: programPhases,
+      weekly_structure: weeklyStructure,
+      day_session_types: daySessionTypes,
+      custom_day_names: customDayNames,
+      custom_day_name_mode: "full-label",
+      structure: structure,
+      session_plans: sessionPlans,
+      days: buildTemplateDaysFromSessionPlans(sessionPlans)
+    };
+  }
+
+  function buildCoachingTemplateMonday(week) {
+    var isTestingWeek = week === 1 || week === 5 || week === 9;
+    var isDeload = week === 4 || week === 8;
+    var isPerformance = week === 12;
+    var phase = week <= 4 ? 1 : week <= 8 ? 2 : 3;
+
+    var hangRounds = isPerformance ? 3 : isDeload ? 3 : phase === 1 ? 5 : phase === 2 ? 6 : 4;
+    var hangSeconds = isPerformance ? 8 : 10;
+    var hangRest = isPerformance ? 120 : phase === 2 ? 135 : 150;
+    var hangEffort = isPerformance ? "RPE 7" : phase === 1 ? "RPE 8" : phase === 2 ? "RPE 8.5" : "RPE 8";
+
+    var deadliftReps = isPerformance ? ["2", "2"] : isDeload ? ["3", "3"] : ["3", "3", "3", "3"];
+    var deadliftRpe = isPerformance ? ["7", "7"] : isDeload ? ["8", "8"] : phase === 1 ? ["8", "8", "8.5", "8.5"] : ["8", "8.5", "8.5", "9"];
+
+    var pressReps = isPerformance ? ["3", "3"] : isDeload ? ["4", "4"] : ["4", "4", "4"];
+    var pressRpe = isPerformance ? ["7", "7"] : isDeload ? ["7.5", "7.5"] : ["8", "8", "8.5"];
+
+    return normalizeSessionPlan({
+      title: "Monday - Integrated Strength A",
+      session_type: "strength_full",
+      session_goal: "Max finger force and general maximal strength with low fatigue.",
+      coach_notes: "Stop all sets at technical failure. Keep 1-2 reps in reserve.",
+      blocks: [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 12, target_intensity: "Bike 5 min + scap/hips/wrists prep" },
+        isTestingWeek
+          ? { type: "assessment", title: "Testing: BW, 10s Max Hang, 3RM Pull-Up, 3RM Trap Bar, Vertical Jump, 10s Push-Up", prescription: "Record best clean effort for each test", notes: "Testing checkpoint week. Rest 2-4 minutes between test efforts." }
+          : null,
+        { type: "activation", title: "Activation", duration_minutes: 6, target_intensity: "Glute bridge ISO, dead bug, cuff activation" },
+        { type: "hangboarding", title: "Max Hangs (20 mm)", hang_protocol_name: "Max Hangs", hang_grip_type: "20mm edge, half crimp", hang_rounds: hangRounds, hang_hang_seconds: hangSeconds, hang_rest_seconds: hangRest, hang_effort: hangEffort },
+        buildClimbingPresetExerciseBlock("main_strength", "Heavy Lower + Press", "straight", "180s", [
+          { name: "Trap Bar Deadlift", reps: deadliftReps, intensities: deadliftRpe, rests: deadliftReps.map(function () { return "180s"; }), defaultIntensityType: "rpe" },
+          { name: "Incline Dumbbell Press", reps: pressReps, intensities: pressRpe, rests: pressReps.map(function () { return "150s"; }), defaultIntensityType: "rpe" }
+        ], { notes: "80-90% intent. Full recovery between sets." }),
+        buildClimbingPresetExerciseBlock("secondary_strength", "Core", "superset", "60s", [
+          { name: "Ab Wheel", reps: isPerformance ? ["6", "6"] : ["8", "8", "8"], intensities: isPerformance ? ["7", "7"] : ["8", "8", "8"], rests: isPerformance ? ["", ""] : ["", "", ""], defaultIntensityType: "rpe" },
+          { name: "Pallof Press ISO (sec/side)", reps: isPerformance ? ["20", "20"] : ["25", "25", "25"], intensities: ["Control", "Control", "Control"].slice(0, isPerformance ? 2 : 3), rests: isPerformance ? ["", ""] : ["", "", ""], defaultIntensityType: "custom" }
+        ], { restStrategy: "between_rounds", notes: "Brace and anti-rotation focus." }),
+        { type: "mobility", title: "Hip + Shoulder Mobility", duration_minutes: isPerformance ? 8 : 10, target_intensity: "90/90s, couch stretch, wall slides, lat opener" }
+      ].filter(function (block) { return !!block; })
+    }, "w" + week + "d1");
+  }
+
+  function buildCoachingTemplateTuesday(week) {
+    var isDeload = week === 4 || week === 8;
+    var isPerformance = week === 12;
+    var phase = week <= 4 ? 1 : week <= 8 ? 2 : 3;
+
+    var drillSets = phase === 1 ? ["4", "4", "4"] : phase === 2 ? ["3", "3", "3"] : ["2", "2", "2"];
+    var limitAttempts = isPerformance ? ["2", "2", "2", "2"] : isDeload ? ["2", "2", "2", "2", "2"] : ["3", "3", "3", "3", "3", "3"];
+
+    return normalizeSessionPlan({
+      title: "Tuesday - Limit Bouldering / Technique",
+      session_type: phase >= 2 ? "threshold" : "long_endurance",
+      session_goal: phase === 1 ? "Movement quality and high-quality limit attempts." : phase === 2 ? "Dynamic power and contact strength." : "Maximum quality attempts and project simulation.",
+      coach_notes: "Rest 3-5 minutes between hard attempts. End session when movement quality drops.",
+      blocks: [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 20, target_intensity: "Easy traversing + progressive boulders" },
+        { type: "activation", title: "Activation", duration_minutes: 8, target_intensity: "Scap pulls, finger recruitment, pogo hops" },
+        buildClimbingPresetExerciseBlock("power", "Technical / Power Climbing Blocks", "straight", "180s", [
+          {
+            name: phase === 1 ? "Movement Drills (silent feet, pause positions)" : phase === 2 ? "Dynamic Deadpoint Practice" : "Project Simulation Attempts",
+            reps: drillSets,
+            intensities: phase === 1 ? ["RPE 6", "RPE 6", "RPE 6"] : phase === 2 ? ["RPE 7", "RPE 7", "RPE 7"] : ["RPE 8", "RPE 8", "RPE 8"],
+            rests: drillSets.map(function () { return "120s"; }),
+            defaultIntensityType: "custom"
+          },
+          {
+            name: phase === 1 ? "Limit Boulder Attempts" : phase === 2 ? "Power Boulder Attempts" : "Maximum Quality Send Attempts",
+            reps: limitAttempts,
+            intensities: limitAttempts.map(function () { return isPerformance ? "RPE 8" : "RPE 9"; }),
+            rests: limitAttempts.map(function () { return isPerformance ? "240s" : "300s"; }),
+            defaultIntensityType: "custom"
+          }
+        ], { notes: isDeload ? "Deload week: keep quality high, reduce attempt count." : "Long rests, high intent, no junk volume." }),
+        { type: "cooldown", title: "Cooldown", duration_minutes: 10, target_intensity: "Easy movement + forearm/hip mobility" }
+      ]
+    }, "w" + week + "d2");
+  }
+
+  function buildCoachingTemplateWednesday(week) {
+    var isTestingWeek = week === 1 || week === 5 || week === 9;
+    var isDeload = week === 4 || week === 8;
+    var isPerformance = week === 12;
+    var duration = isPerformance ? 40 : isDeload ? 40 : 55;
+
+    return normalizeSessionPlan({
+      title: "Wednesday - Zone 2 / Recovery",
+      session_type: "zone2",
+      session_goal: "Build aerobic support and speed recovery between climbing sessions.",
+      coach_notes: "Keep heart rate between 120-145 bpm. Conversational pace.",
+      blocks: [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 8, target_intensity: "Easy ramp" },
+        {
+          type: "zone2",
+          title: "Zone 2 Cardio",
+          exercise_form: "rowing",
+          duration_minutes: duration,
+          target_intensity: "HR 120-145"
+        },
+        isTestingWeek
+          ? { type: "assessment", title: "Testing: 10-Min Row/Ski Erg + Foot-On Campus Endurance", prescription: "Record total distance and campus rung total", notes: "Use same setup each testing week for validity." }
+          : null,
+        { type: "mobility", title: "Mobility Reset", duration_minutes: 12, target_intensity: "Hips, t-spine, shoulders, wrists" }
+      ].filter(function (block) { return !!block; })
+    }, "w" + week + "d3");
+  }
+
+  function buildCoachingTemplateThursday(week) {
+    var isDeload = week === 4 || week === 8;
+    var isPerformance = week === 12;
+    var phase = week <= 4 ? 1 : week <= 8 ? 2 : 3;
+
+    var pullReps = isPerformance ? ["2", "2"] : isDeload ? ["3", "3"] : ["3", "3", "3", "3"];
+    var pullRpe = isPerformance ? ["7", "7"] : isDeload ? ["8", "8"] : phase === 1 ? ["8", "8", "8.5", "8.5"] : ["8.5", "8.5", "9", "9"];
+
+    var squatName = phase >= 2 ? "Front Squat (speed intent)" : "Front Squat";
+    var squatRpe = isPerformance ? ["7", "7"] : isDeload ? ["7.5", "7.5"] : phase === 1 ? ["8", "8", "8", "8.5"] : ["8", "8.5", "8.5", "9"];
+
+    return normalizeSessionPlan({
+      title: "Thursday - Integrated Strength B",
+      session_type: "strength_full",
+      session_goal: "Alternate Monday patterns; keep strength exposure while shifting toward power from week 5 onward.",
+      coach_notes: "Weeks 5-12: prioritize movement speed and intent.",
+      blocks: [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 10, target_intensity: "Erg + ring row + split-squat rocks" },
+        { type: "activation", title: "Activation", duration_minutes: 6, target_intensity: "Single-leg RDL reach, scap push-up, wrist prep" },
+        buildClimbingPresetExerciseBlock("main_strength", "Heavy Pull + Squat", "straight", "180s", [
+          { name: "Weighted Pull-Up", reps: pullReps, intensities: pullRpe, rests: pullReps.map(function () { return "180s"; }), defaultIntensityType: "rpe" },
+          { name: squatName, reps: pullReps, intensities: squatRpe, rests: pullReps.map(function () { return "180s"; }), defaultIntensityType: "rpe" }
+        ], { notes: "High quality, low fatigue." }),
+        buildClimbingPresetExerciseBlock("power", "Single-Leg + Overhead Press", phase >= 2 ? "contrast" : "superset", "90s", [
+          { name: "Rear Foot Elevated Split Squat", reps: isPerformance ? ["4", "4"] : ["5", "5", "5"], intensities: isPerformance ? ["7", "7"] : ["8", "8", "8"], rests: isPerformance ? ["", ""] : ["", "", ""], defaultIntensityType: "rpe" },
+          { name: phase >= 2 ? "Push Press" : "Strict Overhead Press", reps: isPerformance ? ["3", "3"] : ["4", "4", "4"], intensities: isPerformance ? ["7", "7"] : phase >= 2 ? ["8", "8", "8.5"] : ["7.5", "8", "8"], rests: isPerformance ? ["", ""] : ["", "", ""], defaultIntensityType: "rpe" }
+        ], { restStrategy: "between_rounds" }),
+        buildClimbingPresetExerciseBlock("secondary_strength", "Core + Finger Extensors", "superset", "60s", [
+          { name: "Hollow Body Hold (sec)", reps: isPerformance ? ["20", "20"] : ["25", "25", "25"], intensities: ["Control", "Control", "Control"].slice(0, isPerformance ? 2 : 3), rests: isPerformance ? ["", ""] : ["", "", ""], defaultIntensityType: "custom" },
+          { name: "Finger Extensor Band Opens", reps: isPerformance ? ["20", "20"] : ["25", "25", "25"], intensities: ["Steady", "Steady", "Steady"].slice(0, isPerformance ? 2 : 3), rests: isPerformance ? ["", ""] : ["", "", ""], defaultIntensityType: "custom" }
+        ], { restStrategy: "between_rounds" }),
+        { type: "mobility", title: "Mobility", duration_minutes: 8, target_intensity: "Ankles, T-spine, shoulders" }
+      ]
+    }, "w" + week + "d4");
+  }
+
+  function buildCoachingTemplateSaturday(week) {
+    var isDeload = week === 4 || week === 8;
+    var isPerformance = week === 12;
+    var phase = week <= 4 ? 1 : week <= 8 ? 2 : 3;
+
+    var attemptCount = isPerformance ? ["4", "4", "4"] : isDeload ? ["4", "4", "4", "4"] : ["6", "6", "6", "6", "6"];
+    var restTarget = isPerformance ? "360s" : "300s";
+
+    return normalizeSessionPlan({
+      title: "Saturday - Performance Climbing",
+      session_type: "assessment",
+      session_goal: "Primary output day: hard climbing with long rests and low attempt count.",
+      coach_notes: "Outdoor preferred. If indoors use board climbing or hard route attempts with full recovery.",
+      blocks: [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 25, target_intensity: "Progressive recruitment + movement rehearsal" },
+        buildClimbingPresetExerciseBlock("power", "Performance Attempt Block", "straight", restTarget, [
+          {
+            name: phase === 1 ? "Limit Boulder / Hard Route Attempts" : phase === 2 ? "Dynamic Hard Attempts (Board/Steep)" : "Project Send Attempts",
+            reps: attemptCount,
+            intensities: attemptCount.map(function () { return isPerformance ? "RPE 8.5" : "RPE 9"; }),
+            rests: attemptCount.map(function () { return restTarget; }),
+            defaultIntensityType: "custom"
+          }
+        ], { notes: "Quality over volume. End session if power drops." }),
+        { type: "cooldown", title: "Cooldown", duration_minutes: 12, target_intensity: "Easy downclimb + breathing reset" }
+      ]
+    }, "w" + week + "d5");
+  }
+
+  function buildCoachingTemplateSunday(week) {
+    var isDeload = week === 4 || week === 8;
+    var isPerformance = week === 12;
+    var phase = week <= 4 ? 1 : week <= 8 ? 2 : 3;
+    var blocks;
+
+    if (phase === 1) {
+      blocks = [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 15, target_intensity: "Easy progressive climbing" },
+        { type: "intervals", title: "Easy Volume Continuous Climbing", interval_exercise_mode: "free_text", interval_exercise_name: "Continuous moderate routes / circuits", interval_rounds: isDeload ? 2 : 3, interval_work_time: "15:00", interval_rest_time: "6:00", interval_work_intensity_type: "rpe", interval_rest_intensity_type: "complete_rest", interval_work_intensity: isDeload ? "RPE 5" : "RPE 6" },
+        { type: "cooldown", title: "Cooldown", duration_minutes: 10, target_intensity: "Movement quality downclimb + mobility" }
+      ];
+    } else if (phase === 2) {
+      blocks = [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 15, target_intensity: "Progressive boulders/routes" },
+        buildClimbingPresetExerciseBlock("threshold", "Low-Density Climbing", "straight", "150s", [
+          { name: "Problems ~2 grades below onsight", reps: isDeload ? ["6", "6", "6"] : ["8", "8", "8", "8"], intensities: isDeload ? ["RPE 6", "RPE 6", "RPE 6"] : ["RPE 6", "RPE 6.5", "RPE 6.5", "RPE 7"], rests: isDeload ? ["120s", "120s", "120s"] : ["120s", "120s", "150s", "150s"], defaultIntensityType: "custom" }
+        ], { notes: "Perfect movement quality. No grinding." }),
+        { type: "cooldown", title: "Cooldown", duration_minutes: 10, target_intensity: "Easy" }
+      ];
+    } else {
+      var peProtocol = week === 9 ? "4x4s" : week === 10 ? "Rhythm Intervals" : week === 11 ? "High Load Density" : "Foot-On Campus Ladders";
+      var workTime = week === 9 ? "2:00" : week === 10 ? "0:40" : week === 11 ? "1:00" : "0:10";
+      var restTime = week === 9 ? "2:00" : week === 10 ? "0:40" : week === 11 ? "1:30" : "1:20";
+      var rounds = week === 9 ? 8 : week === 10 ? 12 : week === 11 ? 10 : 8;
+
+      blocks = [
+        { type: "warmup", title: "Warm-Up", duration_minutes: 15, target_intensity: "Progressive recruitment" },
+        { type: "intervals", title: "Power Endurance - " + peProtocol, interval_exercise_mode: "free_text", interval_exercise_name: peProtocol, interval_rounds: rounds, interval_work_time: workTime, interval_rest_time: restTime, interval_work_intensity_type: "rpe", interval_rest_intensity_type: "complete_rest", interval_work_intensity: isPerformance ? "RPE 7.5" : "RPE 8.5" },
+        { type: "cooldown", title: "Cooldown", duration_minutes: 10, target_intensity: "Easy + forearm recovery" }
+      ];
+    }
+
+    return normalizeSessionPlan({
+      title: "Sunday - Volume / Endurance Climbing",
+      session_type: phase === 3 ? "threshold" : "long_endurance",
+      session_goal: phase === 1 ? "Easy volume and movement quality." : phase === 2 ? "Sustainable low-density climbing." : "Peak power endurance with controlled fatigue.",
+      coach_notes: isDeload ? "Deload: reduce total rounds and maintain clean execution." : "Terminate work when technique breaks down.",
+      blocks: blocks
+    }, "w" + week + "d6");
   }
 
   function buildClimbing12WeekTemplatePayload() {
@@ -10798,9 +11334,22 @@
     }
 
     if (notifyCoach) {
-      sendWorkoutCompletionNotification(state.workoutCompletionSummary)
-        .then(function (sent) {
-          if (sent) {
+      shouldNotifyCoachForWorkoutCompletion()
+        .then(function (canNotify) {
+          if (!canNotify) {
+            return "skipped";
+          }
+
+          return sendWorkoutCompletionNotification(state.workoutCompletionSummary)
+            .then(function (sent) {
+              return sent ? "sent" : "failed";
+            })
+            .catch(function () {
+              return "failed";
+            });
+        })
+        .then(function (result) {
+          if (result === "sent") {
             setStatus("Workout completed. Coach To-Do notification updated.", "success");
             return;
           }
@@ -11271,6 +11820,242 @@
       });
   }
 
+  function resolveCurrentUserEmail() {
+    if (state.currentUserEmail) {
+      return Promise.resolve(String(state.currentUserEmail));
+    }
+
+    if (!state.client || !state.client.auth) {
+      return Promise.resolve("");
+    }
+
+    return state.client.auth.getSession()
+      .then(function (result) {
+        var user = result && result.data && result.data.session && result.data.session.user;
+        if (user && user.email) {
+          state.currentUserEmail = String(user.email).trim().toLowerCase();
+          return state.currentUserEmail;
+        }
+
+        if (typeof state.client.auth.getUser === "function") {
+          return state.client.auth.getUser().then(function (userResult) {
+            var fallbackUser = userResult && userResult.data && userResult.data.user;
+            state.currentUserEmail = fallbackUser && fallbackUser.email
+              ? String(fallbackUser.email).trim().toLowerCase()
+              : "";
+            return state.currentUserEmail;
+          });
+        }
+
+        return "";
+      })
+      .catch(function () {
+        return "";
+      });
+  }
+
+  function normalizeCoachAccessTierOverrideValue(value) {
+    var raw = String(value == null ? "" : value).trim().toLowerCase();
+    if (!raw || raw === "auto" || raw === "none" || raw === "system") {
+      return "";
+    }
+
+    if (raw === "athlete" || raw === "athlete_account") {
+      return "athlete";
+    }
+    if (raw === "active_member" || raw === "active_membership" || raw === "member") {
+      return "active_member";
+    }
+    if (raw === "active_program" || raw === "program") {
+      return "active_program";
+    }
+    if (raw === "individualized" || raw === "individualized_programming" || raw === "custom_program") {
+      return "individualized";
+    }
+
+    return "";
+  }
+
+  function isLikelyIndividualizedAssignmentProgram(row, athleteUserId) {
+    var programRow = row && typeof row === "object" ? row : {};
+    var name = String(programRow.program_name || "").toLowerCase();
+    if (
+      name.indexOf("custom") > -1 ||
+      name.indexOf("individualized") > -1 ||
+      name.indexOf("1:1") > -1 ||
+      name.indexOf("1-1") > -1
+    ) {
+      return true;
+    }
+
+    var assignedBy = String(programRow.assigned_by || "").trim();
+    var athleteId = String(athleteUserId || programRow.user_id || "").trim();
+    return !!assignedBy && !!athleteId && assignedBy !== athleteId;
+  }
+
+  function isMembershipPaymentTaskAssignmentForAthlete(row) {
+    var status = String(row && row.status || "").toLowerCase();
+    if (!(status === "submitted" || status === "archived")) {
+      return false;
+    }
+
+    var formId = String(row && row.form_id || "").trim().toLowerCase();
+    var formName = String(row && row.form_name || row && row.task_name || row && row.title || "").trim().toLowerCase();
+    var schema = row && row.form_schema && typeof row.form_schema === "object" ? row.form_schema : {};
+    var schemaName = String(schema && (schema.title || schema.task_name || schema.name || schema.label) || "").trim().toLowerCase();
+    var schemaDescription = String(schema && schema.description || "").trim().toLowerCase();
+    var actionUrl = String(schema && schema.action_url || "").trim().toLowerCase();
+
+    if (
+      formId.indexOf("membership-payment") > -1 ||
+      formId.indexOf("membership_payment") > -1 ||
+      formId.indexOf("founding-payment") > -1
+    ) {
+      return true;
+    }
+
+    if (actionUrl.indexOf("founding-member.html") > -1 && actionUrl.indexOf("checkout=start") > -1) {
+      return true;
+    }
+
+    var combined = [formName, schemaName, schemaDescription].join(" ");
+    return (
+      combined.indexOf("membership payment") > -1 ||
+      combined.indexOf("complete membership payment") > -1 ||
+      (combined.indexOf("membership") > -1 && combined.indexOf("checkout") > -1) ||
+      (combined.indexOf("membership") > -1 && combined.indexOf("subscription") > -1)
+    );
+  }
+
+  function hasCompletedMembershipPaymentFromSubscriptionRecord(row) {
+    if (!row) {
+      return false;
+    }
+
+    var status = String(row.status || "").toLowerCase();
+    if (
+      status === "active" ||
+      status === "trialing" ||
+      status === "paid" ||
+      status === "completed" ||
+      status === "succeeded"
+    ) {
+      return true;
+    }
+
+    var lastEventType = String(row.last_event_type || "").toLowerCase();
+    return (
+      lastEventType === "invoice.payment_succeeded" ||
+      lastEventType === "checkout.session.completed" ||
+      lastEventType === "checkout.session.async_payment_succeeded"
+    );
+  }
+
+  function shouldNotifyCoachForWorkoutCompletion() {
+    if (!state.client || !state.isAthleteLockedView || state.isProgramReadOnly) {
+      return Promise.resolve(false);
+    }
+
+    return ensureAssignmentMessagingContext()
+      .then(resolveHistoryAthleteUserId)
+      .then(function (athleteUserId) {
+        if (!isUuid(athleteUserId)) {
+          return false;
+        }
+
+        var profileRequest = state.client
+          .from("athlete_profiles")
+          .select("coach_access_tier_override")
+          .eq("user_id", athleteUserId)
+          .single();
+
+        var assignmentRequest = state.assignedProgramInstanceId
+          ? state.client
+              .from("user_training_programs")
+              .select("user_id,assigned_by,program_name,is_active")
+              .eq("id", state.assignedProgramInstanceId)
+              .single()
+          : Promise.resolve({ data: null, error: null });
+
+        var paymentTaskRequest = state.client
+          .from("athlete_onboarding_intake_assignments")
+          .select("form_id,form_name,form_schema,status")
+          .eq("athlete_user_id", athleteUserId)
+          .order("updated_at", { ascending: false })
+          .limit(120);
+
+        var subscriptionByUserRequest = state.client
+          .from("founding_member_subscriptions")
+          .select("status,last_event_type")
+          .eq("user_id", athleteUserId)
+          .order("updated_at", { ascending: false })
+          .limit(40);
+
+        return Promise.all([
+          profileRequest,
+          assignmentRequest,
+          paymentTaskRequest,
+          subscriptionByUserRequest,
+          resolveCurrentUserEmail()
+        ]).then(function (results) {
+          var profileResult = results[0];
+          var assignmentResult = results[1];
+          var paymentTaskResult = results[2];
+          var subscriptionByUserResult = results[3];
+          var athleteEmail = String(results[4] || "").trim().toLowerCase();
+
+          var overrideTier = normalizeCoachAccessTierOverrideValue(
+            profileResult && profileResult.data && profileResult.data.coach_access_tier_override
+          );
+          if (overrideTier) {
+            return overrideTier === "active_member";
+          }
+
+          var assignmentRow = assignmentResult && !assignmentResult.error ? assignmentResult.data : null;
+          var hasIndividualizedProgramming = !!(assignmentRow && isLikelyIndividualizedAssignmentProgram(assignmentRow, athleteUserId));
+          if (hasIndividualizedProgramming) {
+            return false;
+          }
+
+          var completedPaymentTask = (paymentTaskResult && Array.isArray(paymentTaskResult.data)
+            ? paymentTaskResult.data
+            : []).some(isMembershipPaymentTaskAssignmentForAthlete);
+          if (completedPaymentTask) {
+            return true;
+          }
+
+          var hasCompletedSubscription = (subscriptionByUserResult && Array.isArray(subscriptionByUserResult.data)
+            ? subscriptionByUserResult.data
+            : []).some(hasCompletedMembershipPaymentFromSubscriptionRecord);
+          if (hasCompletedSubscription) {
+            return true;
+          }
+
+          if (!athleteEmail) {
+            return false;
+          }
+
+          return state.client
+            .from("founding_member_subscriptions")
+            .select("status,last_event_type")
+            .eq("customer_email", athleteEmail)
+            .order("updated_at", { ascending: false })
+            .limit(40)
+            .then(function (subscriptionByEmailResult) {
+              return (subscriptionByEmailResult && Array.isArray(subscriptionByEmailResult.data)
+                ? subscriptionByEmailResult.data
+                : []).some(hasCompletedMembershipPaymentFromSubscriptionRecord);
+            })
+            .catch(function () {
+              return false;
+            });
+        });
+      })
+      .catch(function () {
+        return false;
+      });
+  }
+
   function resolveHistoryAthleteUserId() {
     var assignmentAthleteId = String(state.assignmentAthleteUserId || "").trim();
     if (isUuid(assignmentAthleteId)) {
@@ -11336,7 +12121,7 @@
       });
   }
 
-  function syncWorkoutPerformanceToCloud(startedAt, finishedAt, entries) {
+  function syncWorkoutPerformanceToCloud(startedAt, finishedAt, entries, workoutSummary) {
     if (!state.client || !state.isAthleteLockedView || state.isProgramReadOnly) {
       return Promise.resolve(false);
     }
@@ -11376,7 +12161,8 @@
             completed_sets: Number(entry && entry.completedSets || 0),
             top_weight: entry && entry.topWeight != null ? Number(entry.topWeight) : null,
             volume_load: entry && entry.volumeLoad != null ? Number(entry.volumeLoad) : 0,
-            set_logs: entry && Array.isArray(entry.sets) ? entry.sets : []
+            set_logs: entry && Array.isArray(entry.sets) ? entry.sets : [],
+            workout_summary: workoutSummary && typeof workoutSummary === "object" ? workoutSummary : null
           };
         });
 
@@ -11412,6 +12198,34 @@
       .catch(function () {
         return false;
       });
+  }
+
+  function buildCloudWorkoutSummaryPayload(summary, exercises, performance) {
+    var safeSummary = summary && typeof summary === "object" ? summary : {};
+    var safePerformance = performance && typeof performance === "object" ? performance : {};
+    var exerciseNotes = collectWorkoutExerciseNotes(Array.isArray(exercises) ? exercises : []).slice(0, 30);
+    var prItems = Array.isArray(safeSummary.prItems) ? safeSummary.prItems.slice(0, 20) : [];
+    var badges = Array.isArray(safeSummary.badges) ? safeSummary.badges.slice(0, 8) : [];
+
+    return {
+      elapsedLabel: String(safeSummary.elapsedLabel || "").trim(),
+      doneSets: Number(safeSummary.doneSets || 0),
+      totalSets: Number(safeSummary.totalSets || 0),
+      completionPercent: Number(safeSummary.completionPercent || 0),
+      intensityRating: safeSummary.intensityRating == null ? null : Number(safeSummary.intensityRating),
+      comments: String(safeSummary.comments || "").trim(),
+      athleteComments: String(safeSummary.athleteComments || "").trim(),
+      badges: badges,
+      prItems: prItems,
+      exerciseNotes: exerciseNotes,
+      totalVolumeLoad: safePerformance.totalVolumeLoad != null ? Number(safePerformance.totalVolumeLoad) : 0,
+      volumeByMovementPattern: safePerformance.volumeByMovementPattern && typeof safePerformance.volumeByMovementPattern === "object"
+        ? safePerformance.volumeByMovementPattern
+        : {},
+      volumeByPrimaryMuscle: safePerformance.volumeByPrimaryMuscle && typeof safePerformance.volumeByPrimaryMuscle === "object"
+        ? safePerformance.volumeByPrimaryMuscle
+        : {}
+    };
   }
 
   function collectWorkoutExerciseNotes(exercises) {
@@ -13036,7 +13850,10 @@
 
     var percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     var progressText = completed + " / " + total + " sets marked done";
-    summary.querySelector(".progress-text").textContent = "Completion: " + progressText + " (" + percentage + "%)";
+    var progressTextEl = summary.querySelector(".progress-text");
+    if (progressTextEl) {
+      progressTextEl.textContent = "Completion: " + progressText + " (" + percentage + "%)";
+    }
 
     // Update progress bar if it exists
     var progressBar = summary.querySelector(".progress-bar");

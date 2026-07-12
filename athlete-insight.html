@@ -9,7 +9,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js?v=20260711c"></script>
   <script defer src="js/auth-ui.js?v=20260711c"></script>
-  <script defer src="js/athlete-insight.js?v=20260711c"></script>
+  <script defer src="js/athlete-insight.js?v=20260711d"></script>
 </head>
 <body>
 
@@ -84,6 +84,7 @@
           <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-training" data-tab="training">Training Programs</button>
           <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-forms" data-tab="forms">Forms &amp; Tasks</button>
           <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-load" data-tab="load">Load &amp; Activity</button>
+          <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-compass" data-tab="compass">Nomadic Compass</button>
           <button class="insight-tab" role="tab" aria-selected="false" aria-controls="panel-notes" data-tab="notes">Coach Notes</button>
         </nav>
 
@@ -105,6 +106,20 @@
                 <div class="insight-dl-row"><dt>Weight</dt><dd data-ov-weight>—</dd></div>
                 <div class="insight-dl-row"><dt>Arm Span</dt><dd data-ov-armspan>—</dd></div>
               </dl>
+
+              <div class="insight-panel-toolbar" style="margin-top: 0.85rem;">
+                <span class="insight-panel-toolbar-label">Coach Override</span>
+                <div class="insight-panel-toolbar-actions">
+                  <select class="insight-metric-input" data-ov-membership-level-input aria-label="Membership level override" style="min-width: 13rem;">
+                    <option value="">Auto (System Managed)</option>
+                    <option value="athlete">Athlete Account</option>
+                    <option value="active_member">Active Membership</option>
+                    <option value="active_program">Active Program</option>
+                    <option value="individualized">Individualized Programming</option>
+                  </select>
+                  <button type="button" class="btn insight-action-btn-sm" data-ov-membership-level-save>Save Level</button>
+                </div>
+              </div>
             </section>
 
             <!-- Bio -->
@@ -229,7 +244,7 @@
         <!-- ====== LOAD & ACTIVITY PANEL ====== -->
         <div id="panel-load" class="insight-panel" role="tabpanel" data-panel="load" hidden>
           <div class="insight-panel-toolbar">
-            <span class="insight-panel-toolbar-label">Strava Activity &amp; Training Load (last 30 days)</span>
+            <span class="insight-panel-toolbar-label">Wearable Metrics, Strength Volume, and Endurance Load Tracking</span>
           </div>
 
           <div class="insight-load-summary-cards" data-load-cards>
@@ -248,6 +263,49 @@
             <div class="insight-recovery-grid" data-recovery-grid>
               <p class="insight-empty">No recovery data available.</p>
             </div>
+          </section>
+        </div>
+
+        <!-- ====== NOMADIC COMPASS PANEL ====== -->
+        <div id="panel-compass" class="insight-panel" role="tabpanel" data-panel="compass" hidden>
+          <div class="insight-panel-toolbar">
+            <span class="insight-panel-toolbar-label">Coach editable Compass values shown on the athlete dashboard.</span>
+          </div>
+
+          <section class="insight-section">
+            <h2 class="insight-section-title">Nomadic Performance Compass</h2>
+            <p class="insight-compass-gate" data-compass-membership-gate></p>
+
+            <div class="insight-compass-grid">
+              <label class="insight-compass-field">
+                <span>Training Status</span>
+                <input type="text" class="insight-metric-input" data-compass-training-status-input maxlength="120" placeholder="e.g. Recovery Priority" />
+              </label>
+
+              <label class="insight-compass-field">
+                <span>Current Phase</span>
+                <input type="text" class="insight-metric-input" data-compass-current-phase-input maxlength="120" placeholder="e.g. Base Build" />
+              </label>
+
+              <label class="insight-compass-field insight-compass-field-wide">
+                <span>Next Objective</span>
+                <input type="text" class="insight-metric-input" data-compass-next-objective-input maxlength="180" placeholder="e.g. Complete 2 quality sessions this week" />
+              </label>
+
+              <label class="insight-compass-field insight-compass-field-wide">
+                <span>Coach Note</span>
+                <textarea class="insight-notes-textarea" data-compass-coach-note-input rows="4" maxlength="1200" placeholder="Message shown on the athlete dashboard compass card."></textarea>
+              </label>
+            </div>
+
+            <div class="insight-panel-toolbar" style="margin-top: 0.8rem;">
+              <span class="insight-panel-toolbar-label">Save to update the athlete dashboard immediately.</span>
+              <div class="insight-panel-toolbar-actions">
+                <button type="button" class="btn insight-action-btn-sm" data-compass-save>Save Compass</button>
+              </div>
+            </div>
+
+            <p class="insight-status" data-compass-status role="status" aria-live="polite"></p>
           </section>
         </div>
 

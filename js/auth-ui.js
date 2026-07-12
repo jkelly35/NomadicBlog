@@ -7,13 +7,15 @@
     authButton: null,
     modal: null,
     status: null,
-    mode: "signin"
+    mode: "signin",
+    accessCheckToken: 0
   };
 
   document.addEventListener("DOMContentLoaded", function () {
     syncHeaderNav();
     state.authButton = mountLoginButton();
     mountAuthModal();
+    showPendingAccessNotice();
     bindPreferredAuthModeTriggers();
     initializeAuth();
   });
@@ -227,6 +229,37 @@
   }
 
   function setUser(user) {
+    var checkToken = state.accessCheckToken + 1;
+    state.accessCheckToken = checkToken;
+
+    if (!user || isCoachUser(user)) {
+      applyUserState(user);
+      return;
+    }
+
+    ensureAthleteAccessAllowed(user)
+      .then(function (access) {
+        if (checkToken !== state.accessCheckToken) {
+          return;
+        }
+
+        if (!access.allowed) {
+          handleBlockedAthleteAccess(access.message);
+          return;
+        }
+
+        applyUserState(user);
+      })
+      .catch(function () {
+        if (checkToken !== state.accessCheckToken) {
+          return;
+        }
+
+        applyUserState(user);
+      });
+  }
+
+  function applyUserState(user) {
     state.user = user;
     var header = document.querySelector("header");
     var nav = ensureHeaderNav();
@@ -290,6 +323,126 @@
     enforceFoundingOnboardingGate();
 
     syncModalMode();
+  }
+
+  function isCoachUser(user) {
+    return !!(user && user.email && String(user.email).toLowerCase() === ADMIN_EMAIL);
+  }
+
+  function ensureAthleteAccessAllowed(user) {
+    if (!state.client || !user || !user.id) {
+      return Promise.resolve({ allowed: true });
+    }
+
+    return state.client
+      .rpc("get_my_account_access_state")
+      .then(function (result) {
+        if (result && result.error) {
+          if (!isSchemaAvailabilityError(result.error)) {
+            throw result.error;
+          }
+          return null;
+        }
+
+        return result && result.data && typeof result.data === "object"
+          ? result.data
+          : null;
+      })
+      .then(function (accessState) {
+        if (accessState && typeof accessState.allowed === "boolean") {
+          return {
+            allowed: !!accessState.allowed,
+            message: String(accessState.message || "").trim()
+          };
+        }
+
+        return ensureAthleteAccessAllowedFromProfile(user);
+      });
+  }
+
+  function ensureAthleteAccessAllowedFromProfile(user) {
+    if (!state.client || !user || !user.id) {
+      return Promise.resolve({ allowed: true });
+    }
+
+    return state.client
+      .from("athlete_profiles")
+      .select("is_active,deleted_at")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(function (result) {
+        if (result && result.error) {
+          if (isSchemaAvailabilityError(result.error)) {
+            return { allowed: true };
+          }
+          throw result.error;
+        }
+
+        var row = result && result.data ? result.data : null;
+        if (!row) {
+          return { allowed: true };
+        }
+
+        var isDeleted = !!row.deleted_at;
+        var isActive = row.is_active !== false;
+        if (!isDeleted && isActive) {
+          return { allowed: true };
+        }
+
+        return {
+          allowed: false,
+          message: isDeleted
+            ? "This account has been deleted. Historical records remain on file, but sign-in access has been removed."
+            : "This account is inactive. Contact your coach if you believe this is a mistake."
+        };
+      });
+  }
+
+  function handleBlockedAthleteAccess(message) {
+    var notice = String(message || "This account no longer has sign-in access.").trim();
+    persistAccessNotice(notice);
+
+    if (!state.client || !state.client.auth) {
+      window.location.replace(toSiteHref("index.html"));
+      return;
+    }
+
+    state.client.auth.signOut().finally(function () {
+      window.location.replace(toSiteHref("index.html"));
+    });
+  }
+
+  function persistAccessNotice(message) {
+    try {
+      sessionStorage.setItem("nomadic_access_notice", String(message || ""));
+    } catch (_error) {
+      // Best effort only.
+    }
+  }
+
+  function consumeAccessNotice() {
+    try {
+      var raw = sessionStorage.getItem("nomadic_access_notice");
+      if (!raw) {
+        return "";
+      }
+      sessionStorage.removeItem("nomadic_access_notice");
+      return String(raw || "").trim();
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function showPendingAccessNotice() {
+    var notice = consumeAccessNotice();
+    if (!notice || !state.modal) {
+      return;
+    }
+
+    state.modal.hidden = false;
+    document.body.classList.add("auth-modal-open");
+    syncModalMode();
+    setStatus(notice, "error");
   }
 
 
@@ -469,18 +622,28 @@
 
         var signedInUser = result && result.data && result.data.user ? result.data.user : null;
 
-        if (shouldForcePasswordUpdate(signedInUser)) {
-          window.location.href = "update-password.html?firstLogin=1";
-          return;
-        }
+        return ensureAthleteAccessAllowed(signedInUser).then(function (access) {
+          if (!access.allowed) {
+            setStatus(access.message, "error");
+            return state.client.auth.signOut().then(function () {
+              return null;
+            });
+          }
 
-        // On successful sign in, send coach to admin and athletes to dashboard.
-        var userEmail = (result.data && result.data.user && result.data.user.email) || email;
-        if (String(userEmail || "").toLowerCase() === ADMIN_EMAIL) {
-          window.location.href = "admin.html";
-        } else {
-          window.location.href = "profile.html";
-        }
+          if (shouldForcePasswordUpdate(signedInUser)) {
+            window.location.href = "update-password.html?firstLogin=1";
+            return null;
+          }
+
+          // On successful sign in, send coach to admin and athletes to dashboard.
+          var userEmail = (result.data && result.data.user && result.data.user.email) || email;
+          if (String(userEmail || "").toLowerCase() === ADMIN_EMAIL) {
+            window.location.href = "admin.html";
+          } else {
+            window.location.href = "profile.html";
+          }
+          return null;
+        });
       })
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Authentication failed.", "error");
@@ -652,6 +815,18 @@
 
     state.status.textContent = "";
     state.status.classList.remove("is-error", "is-success", "is-info");
+  }
+
+  function isSchemaAvailabilityError(error) {
+    var code = String(error && error.code || "").trim();
+    var message = String(error && error.message || "").toLowerCase();
+    var details = String(error && error.details || "").toLowerCase();
+    return (
+      code === "42P01"
+      || code === "42703"
+      || (message.indexOf("does not exist") > -1)
+      || (details.indexOf("does not exist") > -1)
+    );
   }
 
   function shouldForcePasswordUpdate(user) {

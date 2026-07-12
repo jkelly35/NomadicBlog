@@ -1,31 +1,58 @@
--- Nomadic Performance - athlete self-delete account RPC
+-- Nomadic Performance - athlete self-delete account RPC (soft delete)
 -- Run this in Supabase SQL Editor.
 
 begin;
 
-drop function if exists public.delete_rows_if_table_exists(text, text, uuid);
+alter table public.athlete_profiles
+  add column if not exists deleted_at timestamptz,
+  add column if not exists deleted_by uuid,
+  add column if not exists deletion_reason text,
+  add column if not exists deleted_login_email text;
 
-create or replace function public.delete_rows_if_table_exists(
-  p_table_name text,
-  p_column_name text,
-  p_target_user_id uuid
-)
-returns void
+create index if not exists idx_athlete_profiles_deleted_at
+  on public.athlete_profiles (deleted_at);
+
+create or replace function public.release_auth_email_for_deleted_account(p_target_user_id uuid)
+returns text
 language plpgsql
 security definer
 set search_path = public, auth
 as $$
+declare
+  original_email text := '';
+  archived_email text := '';
 begin
-  if to_regclass(p_table_name) is not null
-    and exists (
-      select 1
-      from information_schema.columns c
-      where c.table_schema = 'public'
-        and c.table_name = split_part(p_table_name, '.', 2)
-        and c.column_name = p_column_name
-    ) then
-    execute format('delete from %s where %I = $1', p_table_name, p_column_name) using p_target_user_id;
+  if p_target_user_id is null then
+    return '';
   end if;
+
+  select lower(coalesce(u.email, ''))
+  into original_email
+  from auth.users u
+  where u.id = p_target_user_id
+  limit 1;
+
+  if original_email = '' then
+    return '';
+  end if;
+
+  archived_email := 'deleted+' || replace(p_target_user_id::text, '-', '') || '@archived.nomadic.local';
+
+  update public.athlete_profiles
+  set deleted_login_email = coalesce(nullif(trim(coalesce(deleted_login_email, '')), ''), original_email)
+  where user_id = p_target_user_id;
+
+  update auth.users
+  set
+    email = archived_email,
+    raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object(
+      'archived_original_email', original_email,
+      'account_archived', true
+    ),
+    updated_at = now()
+  where id = p_target_user_id;
+
+  return original_email;
 end;
 $$;
 
@@ -37,120 +64,34 @@ set search_path = public, auth
 as $$
 declare
   target_user_id uuid := auth.uid();
-  deleted_auth_count integer := 0;
+  updated_profile_count integer := 0;
 begin
   if target_user_id is null then
     raise exception 'not authenticated';
   end if;
 
-  -- Remove athlete-owned rows first to avoid FK constraint issues where cascade is not configured.
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_onboarding_intake_assignments',
-    'athlete_user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_program_schedule',
-    'athlete_user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.user_training_programs',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_goals_events',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_nutrition_food_entries',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_nutrition_logs',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_nutrition_targets',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_strava_daily_metrics',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_strava_tokens',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_strava_connections',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_whoop_daily_metrics',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_whoop_tokens',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_whoop_connections',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.coach_athlete_messages',
-    'athlete_user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.founding_member_legal_signatures',
-    'athlete_user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.founding_member_onboarding',
-    'athlete_user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.founding_member_subscriptions',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.membership_inquiries',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_metrics',
-    'user_id',
-    target_user_id
-  );
-  perform public.delete_rows_if_table_exists(
-    'public.athlete_profiles',
-    'user_id',
-    target_user_id
-  );
+  -- Soft-delete account to retain legal/waiver and analytics history.
+  update public.athlete_profiles
+  set
+    is_active = false,
+    deleted_at = coalesce(deleted_at, now()),
+    deleted_by = target_user_id,
+    deletion_reason = coalesce(nullif(trim(coalesce(deletion_reason, '')), ''), 'athlete_self_delete')
+  where user_id = target_user_id;
+  get diagnostics updated_profile_count = row_count;
 
-  delete from auth.users where id = target_user_id;
-  get diagnostics deleted_auth_count = row_count;
+  perform public.release_auth_email_for_deleted_account(target_user_id);
+
+  if to_regclass('public.user_training_programs') is not null then
+    update public.user_training_programs
+    set is_active = false
+    where user_id = target_user_id
+      and is_active = true;
+  end if;
 
   return jsonb_build_object(
-    'ok', deleted_auth_count > 0,
-    'deleted_auth_rows', deleted_auth_count
+    'ok', updated_profile_count > 0,
+    'soft_deleted_profile_rows', updated_profile_count
   );
 end;
 $$;

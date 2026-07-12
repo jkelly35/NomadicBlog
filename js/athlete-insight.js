@@ -24,6 +24,7 @@
     foundingSubscriptionRows: [],
     calendarRows: [],
     stravaRows: [],
+    exerciseHistoryRows: [],
     trainingTab: "current",
     calendarDraftDate: "",
     inlineAddDate: "",
@@ -209,8 +210,10 @@
       }
 
       setupTabNavigation();
-  activateTab(state.initialTab);
+        activateTab(state.initialTab);
       wireActionLinks();
+      wireMembershipLevelEditor();
+        wireCompassEditor();
       state.onboardingTemplates = getDefaultOnboardingTemplates();
       loadAll();
     });
@@ -234,7 +237,7 @@
 
   function normalizeInsightTab(tab) {
     var value = String(tab || "").trim().toLowerCase();
-    return value === "metrics" || value === "training" || value === "forms" || value === "load" || value === "notes"
+    return value === "metrics" || value === "training" || value === "forms" || value === "load" || value === "compass" || value === "notes"
       ? value
       : "overview";
   }
@@ -270,6 +273,28 @@
     }
   }
 
+  function wireMembershipLevelEditor() {
+    var saveBtn = document.querySelector("[data-ov-membership-level-save]");
+    if (!saveBtn) {
+      return;
+    }
+
+    saveBtn.addEventListener("click", function () {
+      saveMembershipLevelOverride();
+    });
+  }
+
+  function wireCompassEditor() {
+    var saveBtn = document.querySelector("[data-compass-save]");
+    if (!saveBtn) {
+      return;
+    }
+
+    saveBtn.addEventListener("click", function () {
+      saveCompassValues();
+    });
+  }
+
   // ─── Data loading ─────────────────────────────────────────────────────────────
   function loadAll() {
     showContent();
@@ -282,6 +307,7 @@
       fetchPrograms(),
       fetchStrava(),
       fetchFormsAndTasks(),
+      fetchExerciseHistory(),
       fetchTrainingTemplates()
     ]).then(function (results) {
       var authUser = results[0];
@@ -295,7 +321,8 @@
       state.stravaRows = results[4] || [];
       state.onboardingAssignments = Array.isArray(formsPayload.rows) ? formsPayload.rows : [];
       state.onboardingAssignmentsError = String(formsPayload.error || "");
-      state.templates = Array.isArray(results[6]) ? results[6] : [];
+      state.exerciseHistoryRows = Array.isArray(results[6]) ? results[6] : [];
+      state.templates = Array.isArray(results[7]) ? results[7] : [];
 
       return Promise.all([
         fetchCalendarRows(state.programs),
@@ -308,10 +335,11 @@
 
         renderHero(authUser, profile);
         renderOverviewPanel(profile);
+        renderCompassPanel(profile);
         renderMetricsPanel(state.metrics);
         renderTrainingPanel(state.programs, state.calendarRows);
         renderFormsAndTasksPanel(state.onboardingAssignments, state.onboardingAssignmentsError);
-        renderLoadPanel(state.stravaRows);
+        renderLoadPanel(state.stravaRows, state.exerciseHistoryRows);
       });
     }).catch(function (err) {
       setStatus(err && err.message ? err.message : "Failed to load athlete data.", "error");
@@ -378,6 +406,25 @@
       .limit(30)
       .then(function (result) {
         return (result && !result.error && Array.isArray(result.data)) ? result.data : [];
+      })
+      .catch(function () { return []; });
+  }
+
+  function fetchExerciseHistory() {
+    return state.client
+      .from("athlete_exercise_history")
+      .select("workout_completed_at,volume_load,movement_pattern,exercise_name,completed_sets,total_sets")
+      .eq("athlete_user_id", state.athleteId)
+      .order("workout_completed_at", { ascending: false })
+      .limit(3000)
+      .then(function (result) {
+        if (result && result.error) {
+          if (isMissingRelationError(result.error)) {
+            return [];
+          }
+          return [];
+        }
+        return (result && Array.isArray(result.data)) ? result.data : [];
       })
       .catch(function () { return []; });
   }
@@ -619,6 +666,11 @@
     setText("[data-ov-weight]",  p.weight_kg ? p.weight_kg + " kg" : "—");
     setText("[data-ov-armspan]", p.arm_span_cm ? p.arm_span_cm + " cm" : "—");
 
+    var membershipOverrideInput = document.querySelector("[data-ov-membership-level-input]");
+    if (membershipOverrideInput) {
+      membershipOverrideInput.value = normalizeCoachAccessTierOverride(p.coach_access_tier_override) || "";
+    }
+
     // Bio
     var bioEl = document.querySelector("[data-ov-bio]");
     if (bioEl) {
@@ -635,6 +687,187 @@
         overviewEl.innerHTML = buildSportOverviewHtml(sport_overview, sports);
       }
     }
+  }
+
+  function saveMembershipLevelOverride() {
+    if (!state.client || !state.athleteId) {
+      setStatus("Unable to save membership level right now.", "error");
+      return;
+    }
+
+    var input = document.querySelector("[data-ov-membership-level-input]");
+    var saveBtn = document.querySelector("[data-ov-membership-level-save]");
+    if (!input || !saveBtn) {
+      return;
+    }
+
+    var nextTier = normalizeCoachAccessTierOverride(input.value);
+    var nowIso = new Date().toISOString();
+    var payload = {
+      coach_access_tier_override: nextTier || null,
+      coach_access_tier_override_updated_at: nextTier ? nowIso : null,
+      updated_at: nowIso
+    };
+
+    saveBtn.disabled = true;
+    setStatus("Saving membership level override...", "info");
+
+    state.client
+      .from("athlete_profiles")
+      .update(payload)
+      .eq("user_id", state.athleteId)
+      .then(function (result) {
+        if (result && result.error) {
+          if (isMissingColumnError(result.error)) {
+            setStatus("Database migration needed: run sql/add-athlete-profile-access-tier-override.sql in Supabase, then retry.", "error");
+            return;
+          }
+          setStatus(String(result.error.message || "Failed to save membership level override."), "error");
+          return;
+        }
+
+        state.profile = Object.assign({}, state.profile || {}, {
+          coach_access_tier_override: nextTier || null,
+          coach_access_tier_override_updated_at: nextTier ? nowIso : null,
+          updated_at: nowIso
+        });
+        renderOverviewPanel(state.profile);
+        renderCompassPanel(state.profile);
+        setStatus(nextTier ? "Membership level override saved." : "Membership level override cleared. Auto mode restored.", "success");
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to save membership level override.", "error");
+      })
+      .finally(function () {
+        saveBtn.disabled = false;
+      });
+  }
+
+  function renderCompassPanel(profile) {
+    var p = profile || {};
+    var statusInput = document.querySelector("[data-compass-training-status-input]");
+    var phaseInput = document.querySelector("[data-compass-current-phase-input]");
+    var objectiveInput = document.querySelector("[data-compass-next-objective-input]");
+    var coachNoteInput = document.querySelector("[data-compass-coach-note-input]");
+    var saveBtn = document.querySelector("[data-compass-save]");
+    var gateEl = document.querySelector("[data-compass-membership-gate]");
+
+    if (!statusInput || !phaseInput || !objectiveInput || !coachNoteInput) {
+      return;
+    }
+
+    statusInput.value = readCompassInputValue(p.compass_training_status, "Awaiting Assessment");
+    phaseInput.value = readCompassInputValue(p.compass_current_phase, "Awaiting Assessment");
+    objectiveInput.value = readCompassInputValue(p.compass_next_objective, "Schedule Initial Assessment");
+    coachNoteInput.value = readCompassInputValue(
+      p.compass_coach_note,
+      "Welcome to Nomadic Performance. We are excited to get started and will update this section after your assessment."
+    );
+
+    var tierKey = resolveInsightMembershipTierKey(p);
+    var isActiveMember = tierKey === "active_member";
+
+    if (gateEl) {
+      gateEl.className = "insight-compass-gate" + (isActiveMember ? " is-good" : " is-alert");
+      gateEl.textContent = isActiveMember
+        ? "Active Membership confirmed. Saving here updates the athlete dashboard Compass card."
+        : "Compass editing is limited to Active Membership athletes. Update membership level first to enable saving.";
+    }
+
+    [statusInput, phaseInput, objectiveInput, coachNoteInput].forEach(function (field) {
+      field.disabled = !isActiveMember;
+      field.readOnly = !isActiveMember;
+    });
+
+    if (saveBtn) {
+      saveBtn.disabled = !isActiveMember;
+    }
+  }
+
+  function saveCompassValues() {
+    if (!state.client || !state.athleteId) {
+      setCompassStatus("Unable to save compass right now.", "error");
+      return;
+    }
+
+    var currentTier = resolveInsightMembershipTierKey(state.profile || {});
+    if (currentTier !== "active_member") {
+      setCompassStatus("Only Active Membership athletes can receive Compass updates.", "error");
+      return;
+    }
+
+    var statusInput = document.querySelector("[data-compass-training-status-input]");
+    var phaseInput = document.querySelector("[data-compass-current-phase-input]");
+    var objectiveInput = document.querySelector("[data-compass-next-objective-input]");
+    var coachNoteInput = document.querySelector("[data-compass-coach-note-input]");
+    var saveBtn = document.querySelector("[data-compass-save]");
+
+    if (!statusInput || !phaseInput || !objectiveInput || !coachNoteInput || !saveBtn) {
+      return;
+    }
+
+    var nextStatus = String(statusInput.value || "").trim();
+    var nextPhase = String(phaseInput.value || "").trim();
+    var nextObjective = String(objectiveInput.value || "").trim();
+    var nextCoachNote = String(coachNoteInput.value || "").trim();
+
+    if (!nextStatus || !nextPhase || !nextObjective || !nextCoachNote) {
+      setCompassStatus("All compass fields are required before saving.", "error");
+      return;
+    }
+
+    var nowIso = new Date().toISOString();
+    var payload = {
+      compass_training_status: nextStatus,
+      compass_current_phase: nextPhase,
+      compass_next_objective: nextObjective,
+      compass_coach_note: nextCoachNote,
+      updated_at: nowIso
+    };
+
+    saveBtn.disabled = true;
+    setCompassStatus("Saving compass updates...", "info");
+
+    state.client
+      .from("athlete_profiles")
+      .update(payload)
+      .eq("user_id", state.athleteId)
+      .then(function (result) {
+        if (result && result.error) {
+          if (isMissingColumnError(result.error)) {
+            setCompassStatus("Database migration needed: run sql/add-athlete-profile-compass-fields.sql in Supabase, then retry.", "error");
+            return;
+          }
+          setCompassStatus(String(result.error.message || "Failed to save compass."), "error");
+          return;
+        }
+
+        state.profile = Object.assign({}, state.profile || {}, payload);
+        renderCompassPanel(state.profile);
+        setCompassStatus("Compass saved. Athlete dashboard values are updated.", "success");
+        setStatus("Nomadic Compass updated for athlete dashboard.", "success");
+      })
+      .catch(function (error) {
+        setCompassStatus(error && error.message ? error.message : "Failed to save compass.", "error");
+      })
+      .finally(function () {
+        renderCompassPanel(state.profile || {});
+      });
+  }
+
+  function setCompassStatus(message, variant) {
+    var statusEl = document.querySelector("[data-compass-status]");
+    if (!statusEl) {
+      return;
+    }
+
+    statusEl.textContent = message || "";
+    statusEl.className = "insight-status" + (variant ? " is-" + variant : "");
+  }
+
+  function readCompassInputValue(value, fallback) {
+    var text = String(value == null ? "" : value).trim();
+    return text || String(fallback || "");
   }
 
   function normalizeCoachAccessTierOverride(value) {
@@ -723,25 +956,29 @@
   }
 
   function resolveInsightMembershipLevelLabel(profile) {
+    return resolveTierLabelFromKey(resolveInsightMembershipTierKey(profile));
+  }
+
+  function resolveInsightMembershipTierKey(profile) {
     var overrideTier = normalizeCoachAccessTierOverride(profile && profile.coach_access_tier_override);
     if (overrideTier) {
-      return resolveTierLabelFromKey(overrideTier);
+      return overrideTier;
     }
 
     var activePrograms = (state.programs || []).filter(function (program) {
       return !!(program && program.is_active);
     });
     if (activePrograms.some(isLikelyIndividualizedProgram)) {
-      return resolveTierLabelFromKey("individualized");
+      return "individualized";
     }
     if (activePrograms.length) {
-      return resolveTierLabelFromKey("active_program");
+      return "active_program";
     }
     if (hasCompletedMembershipPaymentForInsight()) {
-      return resolveTierLabelFromKey("active_member");
+      return "active_member";
     }
 
-    return resolveTierLabelFromKey("athlete");
+    return "athlete";
   }
 
   function getSportOverview(profile) {
@@ -2863,11 +3100,12 @@
   }
 
   // ─── Load & Activity panel ────────────────────────────────────────────────────
-  function renderLoadPanel(rows) {
-    var data = Array.isArray(rows) ? rows : [];
-    renderLoadSummaryCards(data);
-    renderLoadChart(data);
-    renderRecoveryGrid(data);
+  function renderLoadPanel(rows, exerciseRows) {
+    var stravaData = Array.isArray(rows) ? rows : [];
+    var strengthData = Array.isArray(exerciseRows) ? exerciseRows : [];
+    renderLoadSummaryCards(stravaData, strengthData);
+    renderLoadChart(stravaData);
+    renderRecoveryGrid(stravaData);
   }
 
   // ─── Forms & tasks panel ────────────────────────────────────────────────────
@@ -3584,37 +3822,162 @@
       .replace(/\b\w/g, function (char) { return char.toUpperCase(); });
   }
 
-  function renderLoadSummaryCards(data) {
+  function renderLoadSummaryCards(data, exerciseRows) {
     var cardsEl = document.querySelector("[data-load-cards]");
     if (!cardsEl) return;
 
-    if (!data.length) {
-      cardsEl.innerHTML = '<p class="insight-empty">No Strava daily metrics synced yet. Connect and sync Strava from the athlete dashboard to unlock load tracking.</p>';
-      return;
-    }
-
-    var seven  = data.slice(0, 7);
-    var thirty = data.slice(0, 30);
-
-    var cards = [
-      { label: "7-Day Distance",      value: formatDecimal(sumNumeric(seven, "distance_m") / 1000, 1) + " km" },
-      { label: "7-Day Moving Time",   value: formatDecimal(sumNumeric(seven, "moving_time_sec") / 3600, 1) + " h" },
-      { label: "7-Day Elevation",     value: formatInteger(sumNumeric(seven, "elevation_gain_m")) + " m" },
-      { label: "7-Day Activities",    value: formatInteger(sumNumeric(seven, "activity_count")) },
-      { label: "7-Day Training Load", value: formatInteger(sumNumeric(seven, "training_load")) },
-      { label: "30-Day Load",         value: formatInteger(sumNumeric(thirty, "training_load")) },
-      { label: "Resting HR",          value: formatNullable(findLatestDefined(data, "resting_hr"), " bpm") },
-      { label: "HRV",                 value: formatNullable(findLatestDefined(data, "hrv_ms"), " ms") }
+    var wearableCards = [
+      { label: "Latest HRV", value: formatNullable(findLatestDefined(data, "hrv_ms"), " ms") },
+      { label: "Latest Sleep", value: formatNullable(findLatestDefined(data, "sleep_hours"), " h") },
+      { label: "Latest Recovery", value: formatNullable(findLatestDefined(data, "recovery_score")) },
+      { label: "Resting HR", value: formatNullable(findLatestDefined(data, "resting_hr"), " bpm") }
     ];
 
-    cardsEl.innerHTML = cards.map(function (c) {
-      return [
-        '<article class="insight-load-card">',
-        '<span class="insight-load-label">' + escapeHtml(c.label) + '</span>',
-        '<strong class="insight-load-value">' + escapeHtml(c.value) + '</strong>',
-        '</article>'
-      ].join("");
-    }).join("");
+    var strengthDaily = sumExerciseVolumeWindow(exerciseRows, 1);
+    var strengthWeekly = sumExerciseVolumeWindow(exerciseRows, 7);
+    var strengthMonthly = sumExerciseVolumeWindow(exerciseRows, 30);
+    var completedSetsWeekly = sumExerciseSetsWindow(exerciseRows, 7);
+
+    var strengthCards = [
+      { label: "Daily Volume", value: formatInteger(strengthDaily) },
+      { label: "Weekly Volume", value: formatInteger(strengthWeekly) },
+      { label: "Monthly Volume", value: formatInteger(strengthMonthly) },
+      { label: "Weekly Completed Sets", value: formatInteger(completedSetsWeekly) }
+    ];
+
+    var enduranceDailyKm = sumStravaWindow(data, "distance_m", 1) / 1000;
+    var enduranceWeeklyKm = sumStravaWindow(data, "distance_m", 7) / 1000;
+    var enduranceMonthlyKm = sumStravaWindow(data, "distance_m", 30) / 1000;
+    var activityWeekly = sumStravaWindow(data, "activity_count", 7);
+
+    var enduranceCards = [
+      { label: "Daily Mileage", value: formatDecimal(enduranceDailyKm, 1) + " km" },
+      { label: "Weekly Mileage", value: formatDecimal(enduranceWeeklyKm, 1) + " km" },
+      { label: "Monthly Mileage", value: formatDecimal(enduranceMonthlyKm, 1) + " km" },
+      { label: "Weekly Activities", value: formatInteger(activityWeekly) }
+    ];
+
+    var movementBreakdown = buildMovementPatternBreakdown(exerciseRows, 30);
+
+    cardsEl.innerHTML = [
+      buildLoadBlockHtml(
+        "Wearable Readiness Metrics",
+        wearableCards,
+        data.length
+          ? "Latest synced values for coach monitoring."
+          : "No wearable data synced yet. Athlete will need device sync to populate HRV, sleep, and recovery."
+      ),
+      buildLoadBlockHtml(
+        "Strength Volume Load (sets x reps x load)",
+        strengthCards,
+        exerciseRows.length
+          ? "Derived from logged workout history in athlete exercise sessions."
+          : "No strength session history found yet."
+      ),
+      buildLoadBlockHtml(
+        "Endurance Mileage & Activity",
+        enduranceCards,
+        data.length
+          ? "Derived from synced activity data (running, biking, hiking, etc.)."
+          : "No synced endurance activity data yet."
+      ),
+      '<section class="insight-load-block">' +
+        '<h3 class="insight-load-block-title">Movement Pattern Volume (last 30 days)</h3>' +
+        (movementBreakdown.length
+          ? '<ul class="insight-load-pattern-list">' + movementBreakdown.map(function (item) {
+              return '<li><span>' + escapeHtml(item.label) + '</span><strong>' + escapeHtml(formatInteger(item.volume)) + '</strong></li>';
+            }).join("") + '</ul>'
+          : '<p class="insight-empty">No movement pattern load data yet. Ensure exercises include movement labels (e.g. squat, vertical pull).</p>') +
+      '</section>'
+    ].join("");
+  }
+
+  function buildLoadBlockHtml(title, cards, note) {
+    var safeCards = Array.isArray(cards) ? cards : [];
+    return [
+      '<section class="insight-load-block">',
+      '<h3 class="insight-load-block-title">' + escapeHtml(title) + '</h3>',
+      '<div class="insight-load-block-grid">',
+      safeCards.map(function (card) {
+        return [
+          '<article class="insight-load-card">',
+          '<span class="insight-load-label">' + escapeHtml(card.label) + '</span>',
+          '<strong class="insight-load-value">' + escapeHtml(card.value) + '</strong>',
+          '</article>'
+        ].join("");
+      }).join(""),
+      '</div>',
+      note ? '<p class="insight-load-block-note">' + escapeHtml(note) + '</p>' : '',
+      '</section>'
+    ].join("");
+  }
+
+  function sumStravaWindow(rows, field, windowDays) {
+    var windowRows = filterRowsByDateWindow(rows, "metric_date", windowDays);
+    return sumNumeric(windowRows, field);
+  }
+
+  function sumExerciseVolumeWindow(rows, windowDays) {
+    var windowRows = filterRowsByDateWindow(rows, "workout_completed_at", windowDays);
+    return sumNumeric(windowRows, "volume_load");
+  }
+
+  function sumExerciseSetsWindow(rows, windowDays) {
+    var windowRows = filterRowsByDateWindow(rows, "workout_completed_at", windowDays);
+    return sumNumeric(windowRows, "completed_sets");
+  }
+
+  function buildMovementPatternBreakdown(rows, windowDays) {
+    var windowRows = filterRowsByDateWindow(rows, "workout_completed_at", windowDays);
+    var totals = {};
+
+    windowRows.forEach(function (row) {
+      var label = String(row && row.movement_pattern || "").trim() || "Unlabeled";
+      var key = label.toLowerCase();
+      var volume = Number(row && row.volume_load);
+      totals[key] = totals[key] || { label: label, volume: 0 };
+      if (Number.isFinite(volume)) {
+        totals[key].volume += volume;
+      }
+    });
+
+    return Object.keys(totals)
+      .map(function (key) { return totals[key]; })
+      .sort(function (a, b) { return b.volume - a.volume; })
+      .slice(0, 8);
+  }
+
+  function filterRowsByDateWindow(rows, dateField, windowDays) {
+    var safeRows = Array.isArray(rows) ? rows : [];
+    var days = Math.max(1, parseInt(windowDays, 10) || 1);
+    var endDate = getTodayDateInputValue();
+    var startDate = formatDateInputFromDate(addDaysToDateInput(endDate, -(days - 1)));
+
+    return safeRows.filter(function (row) {
+      var key = extractDateKey(row && row[dateField]);
+      if (!key) {
+        return false;
+      }
+      return key >= startDate && key <= endDate;
+    });
+  }
+
+  function extractDateKey(value) {
+    var raw = String(value || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+
+    var parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return formatDateInputFromDate(parsed);
+    }
+
+    return "";
   }
 
   function renderLoadChart(data) {
@@ -3748,6 +4111,16 @@
     return year + "-" + month + "-" + day;
   }
 
+  function addDaysToDateInput(dateInput, daysToAdd) {
+    var base = new Date(String(dateInput || ""));
+    if (Number.isNaN(base.getTime())) {
+      base = new Date();
+    }
+    base.setHours(0, 0, 0, 0);
+    base.setDate(base.getDate() + (parseInt(daysToAdd, 10) || 0));
+    return base;
+  }
+
   function formatInteger(value) {
     var n = Number(value);
     return Number.isFinite(n) ? Math.round(n).toString() : "—";
@@ -3808,6 +4181,21 @@
       message.indexOf("relation") > -1 ||
       details.indexOf("does not exist") > -1 ||
       hint.indexOf("does not exist") > -1
+    );
+  }
+
+  function isMissingColumnError(error) {
+    if (!error) {
+      return false;
+    }
+
+    var message = String(error.message || "").toLowerCase();
+    var details = String(error.details || "").toLowerCase();
+    var hint = String(error.hint || "").toLowerCase();
+    return (
+      message.indexOf("column") > -1 && message.indexOf("does not exist") > -1 ||
+      details.indexOf("column") > -1 && details.indexOf("does not exist") > -1 ||
+      hint.indexOf("column") > -1 && hint.indexOf("does not exist") > -1
     );
   }
 

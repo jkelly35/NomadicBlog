@@ -9,7 +9,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js"></script>
   <script defer src="js/auth-ui.js"></script>
-  <script defer src="js/admin.js"></script>
+  <script defer src="js/admin.js?v=20260711b"></script>
   <script defer src="js/coach-messages.js?v=20260711a"></script>
 </head>
 <body>
@@ -54,6 +54,7 @@
           <div class="admin-quick-nav" aria-label="Coach Quick Navigation">
             <a class="btn admin-btn-refresh" href="#admin-athletes">Athletes</a>
             <a class="btn admin-btn-refresh" href="coach-training-programs.html">Programming</a>
+            <a class="btn admin-btn-refresh" href="coach-analytics.html">Analytics</a>
             <a class="btn admin-btn-refresh" href="coach-forms-manager.html">Forms</a>
             <a class="btn admin-btn-refresh" href="coach-blog-manager.html">Blog</a>
             <a class="btn admin-btn-refresh" href="coach-tasks.html">Tasks</a>
@@ -132,6 +133,7 @@
                 <option value="all" selected>All Membership Statuses</option>
                 <option value="active">Active Members</option>
                 <option value="inactive">Inactive Members</option>
+                <option value="deleted">Deleted Accounts</option>
               </select>
               <select class="admin-search" data-admin-program-filter aria-label="Program filter">
                 <option value="all" selected>All Program States</option>
@@ -153,6 +155,7 @@
                 <div class="admin-tools-menu-list">
                   <a class="admin-tools-menu-link" href="exercise-library.html">Exercise Library</a>
                   <a class="admin-tools-menu-link" href="coach-training-programs.html">Programming</a>
+                  <a class="admin-tools-menu-link" href="coach-analytics.html">Analytics</a>
                   <a class="admin-tools-menu-link" href="coach-blog-manager.html">Blog Manager</a>
                   <a class="admin-tools-menu-link" href="coach-tasks.html">Tasks</a>
                 </div>
@@ -165,10 +168,7 @@
             <table class="admin-table" data-admin-table>
               <thead>
                 <tr>
-                  <th>Email</th>
                   <th>Name</th>
-                  <th>Sport</th>
-                  <th>Level</th>
                   <th>Status</th>
                   <th>Joined</th>
                   <th>Actions</th>
@@ -176,7 +176,7 @@
               </thead>
               <tbody data-admin-table-body>
                 <tr class="admin-table-loading">
-                  <td colspan="7" style="text-align: center; padding: 2rem;">Loading athletes...</td>
+                  <td colspan="4" style="text-align: center; padding: 2rem;">Loading athletes...</td>
                 </tr>
               </tbody>
             </table>
@@ -412,7 +412,7 @@
             <button type="button" class="btn admin-btn-primary" data-admin-edit-athlete>📝 Edit Profile</button>
             <button type="button" class="btn admin-btn-refresh" data-admin-modal-toggle-active>Deactivate Account</button>
             <button class="btn admin-btn-reset-password" data-admin-modal-reset>Reset Password</button>
-            <button class="btn admin-btn-delete" data-admin-modal-delete>Delete Account</button>
+            <button class="btn admin-btn-delete" data-admin-modal-delete>Archive Account</button>
           </div>
         </div>
 

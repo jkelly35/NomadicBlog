@@ -1699,11 +1699,11 @@
       return;
     }
 
-    if (!confirm("Are you sure you want to delete your account? This cannot be undone.")) {
+    if (!confirm("Are you sure you want to delete your account?")) {
       return;
     }
 
-    if (!confirm("This will permanently delete your account and all data. Continue?")) {
+    if (!confirm("This will disable your account, but legal and training records will be retained. Continue?")) {
       return;
     }
 
@@ -1726,7 +1726,7 @@
           return;
         }
 
-        setAccountStatus("Account deleted. Redirecting...", "success");
+        setAccountStatus("Account deleted. Records retained for compliance. Redirecting...", "success");
 
         state.client.auth
           .signOut()
