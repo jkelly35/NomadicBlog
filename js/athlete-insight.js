@@ -531,7 +531,7 @@
         return state.client
           .from("founding_member_subscriptions")
           .select(selectFields)
-          .eq("customer_email", athleteEmail)
+          .ilike("customer_email", athleteEmail)
           .order("updated_at", { ascending: false })
           .limit(30)
           .then(function (emailResult) {
@@ -3320,11 +3320,139 @@
     var invoiceUrl = getInvoiceUrlForAssignment(assignment);
 
     if (!invoiceUrl) {
-      setStatus("No invoice link is available for this completed payment yet.", "info");
+      if (!isMembershipPaymentAssignment(assignment)) {
+        setStatus("No invoice link is available for this completed payment yet.", "info");
+        return;
+      }
+
+      setStatus("Trying to recover invoice link from Stripe...", "info");
+      reconcileMembershipPaymentInvoice(assignment)
+        .then(function (reconcileResult) {
+          if (!reconcileResult || !reconcileResult.ok) {
+            var failureMessage = reconcileResult && reconcileResult.message
+              ? reconcileResult.message
+              : "No invoice link is available for this completed payment yet.";
+            setStatus(failureMessage, "info");
+            return { continueFlow: false };
+          }
+
+          return refreshMembershipPaymentInvoiceData().then(function () {
+            return { continueFlow: true };
+          });
+        })
+        .then(function (stepState) {
+          if (!stepState || !stepState.continueFlow) {
+            return;
+          }
+
+          var refreshedAssignment = state.completedAssignmentLookup[assignmentKey] || assignment;
+          var recoveredUrl = getInvoiceUrlForAssignment(refreshedAssignment);
+          if (!recoveredUrl) {
+            setStatus("No invoice link is available for this completed payment yet.", "info");
+            return;
+          }
+
+          setStatus("Invoice link recovered.", "success");
+          window.open(recoveredUrl, "_blank", "noopener");
+        })
+        .catch(function () {
+          setStatus("No invoice link is available for this completed payment yet.", "info");
+        });
       return;
     }
 
     window.open(invoiceUrl, "_blank", "noopener");
+  }
+
+  function reconcileMembershipPaymentInvoice(assignment) {
+    if (!assignment || !isMembershipPaymentAssignment(assignment)) {
+      return Promise.resolve({ ok: false, message: "No invoice link is available for this completed payment yet." });
+    }
+    if (!state.client || !state.client.functions || !state.client.functions.invoke) {
+      return Promise.resolve({ ok: false, message: "Stripe reconciliation is not configured on this page." });
+    }
+
+    var response = assignment && assignment.response_data && typeof assignment.response_data === "object"
+      ? assignment.response_data
+      : {};
+    var responsePayment = response && response.payment && typeof response.payment === "object"
+      ? response.payment
+      : {};
+    var checkoutSessionId = String(
+      response.stripe_checkout_session_id ||
+      response.checkout_session_id ||
+      responsePayment.stripe_checkout_session_id ||
+      responsePayment.checkout_session_id ||
+      ""
+    ).trim();
+
+    return state.client.functions
+      .invoke("stripe-reconcile-payment", {
+        body: {
+          athlete_user_id: state.athleteId || null,
+          session_id: checkoutSessionId || null,
+          athlete_email: state.athleteAccountEmail || null
+        }
+      })
+      .then(function (result) {
+        if (result && result.error) {
+          throw result.error;
+        }
+
+        var data = result && result.data && typeof result.data === "object" ? result.data : {};
+        var invoiceUrl = String(data.invoice_url || "").trim();
+        var invoiceId = String(data.invoice_id || "").trim();
+        if (!invoiceUrl && !(invoiceId && invoiceId.indexOf("in_") === 0)) {
+          var diagnostic = data && data.diagnostic && typeof data.diagnostic === "object"
+            ? data.diagnostic
+            : null;
+          var source = diagnostic && diagnostic.subscription_lookup_source
+            ? String(diagnostic.subscription_lookup_source)
+            : "none";
+          var customerMatches = diagnostic && diagnostic.customer_email_matches_found != null
+            ? String(diagnostic.customer_email_matches_found)
+            : "0";
+          return {
+            ok: false,
+            message: "Stripe reconciliation completed but no invoice was found. Source: " + source + ", customer matches: " + customerMatches + "."
+          };
+        }
+
+        return { ok: true, message: "Invoice link recovered." };
+      })
+      .catch(function (error) {
+        var message = String(error && error.message || "").trim();
+        var normalized = message.toLowerCase();
+        if (
+          normalized.indexOf("failed to send a request to the edge function") > -1 ||
+          normalized.indexOf("edge function") > -1 && normalized.indexOf("failed") > -1
+        ) {
+          message = "Could not reach stripe-reconcile-payment. Deploy the Edge Function and verify Supabase URL/keys, then retry.";
+        }
+        if (!message) {
+          message = "Stripe reconciliation failed. Verify Stripe test-mode webhook and keys.";
+        }
+        return {
+          ok: false,
+          message: message
+        };
+      });
+  }
+
+  function refreshMembershipPaymentInvoiceData() {
+    return Promise.all([
+      fetchFormsAndTasks(),
+      fetchFoundingSubscriptionPayments()
+    ]).then(function (results) {
+      var formsPayload = results[0] || {};
+      state.onboardingAssignments = Array.isArray(formsPayload.rows) ? formsPayload.rows : [];
+      state.onboardingAssignmentsError = String(formsPayload.error || "");
+      state.foundingSubscriptionRows = Array.isArray(results[1]) ? results[1] : [];
+      renderFormsAndTasksPanel(state.onboardingAssignments, state.onboardingAssignmentsError);
+      return true;
+    }).catch(function () {
+      return false;
+    });
   }
 
   function getCompletedAssignmentKey(assignment, index) {
@@ -3355,15 +3483,55 @@
       ? assignment.response_data
       : {};
 
+    var responsePayment = response && response.payment && typeof response.payment === "object"
+      ? response.payment
+      : {};
+    var responseInvoiceHistory = Array.isArray(response.invoice_history) ? response.invoice_history : [];
+    var responsePaymentInvoiceHistory = Array.isArray(responsePayment.invoice_history) ? responsePayment.invoice_history : [];
+    var responseHistoryUrls = [];
+
+    responseInvoiceHistory.forEach(function (entry) {
+      if (!entry || typeof entry !== "object") {
+        return;
+      }
+      responseHistoryUrls.push(entry.hosted_invoice_url, entry.invoice_url, entry.invoice_pdf, entry.url, entry.receipt_url);
+    });
+    responsePaymentInvoiceHistory.forEach(function (entry) {
+      if (!entry || typeof entry !== "object") {
+        return;
+      }
+      responseHistoryUrls.push(entry.hosted_invoice_url, entry.invoice_url, entry.invoice_pdf, entry.url, entry.receipt_url);
+    });
+
     var responseUrl = firstValidUrl([
       response.invoice_url,
       response.hosted_invoice_url,
       response.invoice_pdf,
       response.stripe_invoice_url,
-      response.payment_invoice_url
-    ]);
+      response.payment_invoice_url,
+      response.receipt_url,
+      response.latest_invoice_url,
+      responsePayment.invoice_url,
+      responsePayment.hosted_invoice_url,
+      responsePayment.invoice_pdf,
+      responsePayment.receipt_url,
+      responsePayment.latest_invoice_url
+    ].concat(responseHistoryUrls));
     if (responseUrl) {
       return responseUrl;
+    }
+
+    var responseInvoiceId = String(
+      response.invoice_id ||
+      response.latest_invoice_id ||
+      response.stripe_invoice_id ||
+      responsePayment.invoice_id ||
+      responsePayment.latest_invoice_id ||
+      responsePayment.stripe_invoice_id ||
+      ""
+    ).trim();
+    if (responseInvoiceId && responseInvoiceId.indexOf("in_") === 0) {
+      return buildStripeDashboardInvoiceUrl(responseInvoiceId, null);
     }
 
     var rows = Array.isArray(state.foundingSubscriptionRows) ? state.foundingSubscriptionRows : [];
@@ -3381,43 +3549,89 @@
     var metadata = row && row.metadata && typeof row.metadata === "object" ? row.metadata : {};
     var rawEvent = row && row.raw_event && typeof row.raw_event === "object" ? row.raw_event : {};
     var invoiceHistory = Array.isArray(metadata.invoice_history) ? metadata.invoice_history : [];
-    var latestInvoiceHistory = invoiceHistory.length && invoiceHistory[0] && typeof invoiceHistory[0] === "object"
-      ? invoiceHistory[0]
-      : {};
     var eventObject = rawEvent && rawEvent.data && rawEvent.data.object && typeof rawEvent.data.object === "object"
       ? rawEvent.data.object
       : {};
     var nestedInvoice = eventObject && eventObject.invoice && typeof eventObject.invoice === "object"
       ? eventObject.invoice
       : {};
-    var metadataInvoiceId = String(metadata.invoice_id || "").trim();
-    var eventInvoiceId = String(eventObject.id || nestedInvoice.id || "").trim();
+    var latestInvoiceObject = eventObject && eventObject.latest_invoice && typeof eventObject.latest_invoice === "object"
+      ? eventObject.latest_invoice
+      : {};
+    var metadataInvoiceId = String(
+      metadata.invoice_id ||
+      metadata.latest_invoice_id ||
+      metadata.latest_invoice ||
+      metadata.stripe_invoice_id ||
+      metadata.stripe_latest_invoice_id ||
+      ""
+    ).trim();
+    var eventInvoiceId = findInvoiceIdInStripeEvent(eventObject, nestedInvoice, latestInvoiceObject);
     var invoiceId = metadataInvoiceId || eventInvoiceId;
     var livemode = row && row.raw_event && typeof row.raw_event === "object"
       ? row.raw_event.livemode
       : null;
+
+    var historyUrls = [];
+    invoiceHistory.forEach(function (entry) {
+      if (!entry || typeof entry !== "object") {
+        return;
+      }
+      historyUrls.push(entry.hosted_invoice_url, entry.invoice_url, entry.invoice_pdf, entry.url, entry.receipt_url);
+    });
 
     var directUrl = firstValidUrl([
       metadata.hosted_invoice_url,
       metadata.invoice_url,
       metadata.invoice_pdf,
       metadata.latest_invoice_url,
-      latestInvoiceHistory.hosted_invoice_url,
-      latestInvoiceHistory.invoice_url,
-      latestInvoiceHistory.invoice_pdf,
+      metadata.receipt_url,
+      metadata.latest_receipt_url,
       eventObject.hosted_invoice_url,
       eventObject.invoice_url,
       eventObject.invoice_pdf,
+      eventObject.receipt_url,
+      latestInvoiceObject.hosted_invoice_url,
+      latestInvoiceObject.invoice_url,
+      latestInvoiceObject.invoice_pdf,
+      latestInvoiceObject.receipt_url,
       nestedInvoice.hosted_invoice_url,
-      nestedInvoice.invoice_pdf
-    ]);
+      nestedInvoice.invoice_pdf,
+      nestedInvoice.receipt_url
+    ].concat(historyUrls));
 
     if (directUrl) {
       return directUrl;
     }
 
-    if (invoiceId) {
+    if (invoiceId && String(invoiceId).indexOf("in_") === 0) {
       return buildStripeDashboardInvoiceUrl(invoiceId, livemode);
+    }
+
+    return "";
+  }
+
+  function findInvoiceIdInStripeEvent(eventObject, nestedInvoice, latestInvoiceObject) {
+    var eventInvoice = String(eventObject && eventObject.invoice || "").trim();
+    var latestInvoice = String(eventObject && eventObject.latest_invoice || "").trim();
+    var nestedInvoiceId = String(nestedInvoice && nestedInvoice.id || "").trim();
+    var latestInvoiceId = String(latestInvoiceObject && latestInvoiceObject.id || "").trim();
+    var eventObjectId = String(eventObject && eventObject.id || "").trim();
+
+    if (eventInvoice && eventInvoice.indexOf("in_") === 0) {
+      return eventInvoice;
+    }
+    if (latestInvoice && latestInvoice.indexOf("in_") === 0) {
+      return latestInvoice;
+    }
+    if (nestedInvoiceId && nestedInvoiceId.indexOf("in_") === 0) {
+      return nestedInvoiceId;
+    }
+    if (latestInvoiceId && latestInvoiceId.indexOf("in_") === 0) {
+      return latestInvoiceId;
+    }
+    if (eventObjectId && eventObjectId.indexOf("in_") === 0) {
+      return eventObjectId;
     }
 
     return "";

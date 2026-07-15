@@ -1374,13 +1374,38 @@
     var copy = athlete || {};
     copy.is_active = isActive !== false;
     copy.deleted_at = deletedAt ? String(deletedAt) : "";
-    copy.is_deleted = !!copy.deleted_at;
     copy.deleted_login_email = String(deletedLoginEmail || "").trim();
+    copy.is_deleted = isDeletedAthleteAccount(copy);
     if (copy.is_deleted && copy.deleted_login_email) {
       copy.email = copy.deleted_login_email;
     }
     copy.coach_access_tier_override = normalizeCoachAccessTierOverride(overrideTier);
     return copy;
+  }
+
+  function isArchivedAccountEmail(email) {
+    var value = String(email || "").trim().toLowerCase();
+    return value.indexOf("deleted+") === 0 && value.indexOf("@archived.nomadic.local") > -1;
+  }
+
+  function isDeletedAthleteAccount(athlete) {
+    if (!athlete) {
+      return false;
+    }
+
+    if (athlete.is_deleted === true) {
+      return true;
+    }
+
+    if (String(athlete.deleted_at || "").trim()) {
+      return true;
+    }
+
+    if (String(athlete.deleted_login_email || "").trim()) {
+      return true;
+    }
+
+    return isArchivedAccountEmail(athlete.email);
   }
 
   function renderAthletesTable() {
@@ -1473,7 +1498,11 @@
     });
 
     var filtered = state.athletes.filter(function (a) {
-      var isDeleted = !!(a && a.deleted_at);
+      var isDeleted = isDeletedAthleteAccount(a);
+
+      if (state.memberFilter === "all" && isDeleted) {
+        return false;
+      }
 
       if (state.memberFilter === "active" && (a.is_active === false || isDeleted)) {
         return false;
@@ -1586,13 +1615,15 @@
         var insightsHref = "athlete-insight.html?athleteId=" + encodeURIComponent(athleteId);
         var athleteName = athlete.name ? escapeHtml(athlete.name) : "—";
         var athleteEmail = escapeHtml(athlete.email || "N/A");
-        var isDeleted = !!(athlete && athlete.deleted_at);
+        var isDeleted = isDeletedAthleteAccount(athlete);
         var statusActionLabel = isDeleted ? "Restore" : (isActive ? "Deactivate" : "Activate");
-        var deleteActionLabel = isDeleted ? "Archived" : "Archive";
+        var deleteActionLabel = isDeleted ? "Deleted" : "Delete";
+        var statusLabel = isDeleted ? "Deleted" : (tier.label || "Athlete Account");
+        var statusToneClass = isDeleted ? "is-tier-deleted" : (tier.toneClass || "is-tier-athlete");
         return (
           "<tr>" +
           "<td class='admin-cell-name'><div class='admin-cell-name-wrap'><span class='admin-cell-name-text'>" + athleteName + "</span><span class='admin-cell-subtext'>" + athleteEmail + "</span></div></td>" +
-          "<td><span class='admin-status-pill " + escapeAttribute(tier.toneClass || "is-tier-athlete") + "'>" + escapeHtml(tier.label || "Athlete Account") + "</span></td>" +
+          "<td><span class='admin-status-pill " + escapeAttribute(statusToneClass) + "'>" + escapeHtml(statusLabel) + "</span></td>" +
           "<td>" + formatDate(athlete.user_created_at) + "</td>" +
           "<td><div class='admin-table-actions'><a class='btn admin-btn-small admin-action-insights' href='" +
           insightsHref +
@@ -1707,7 +1738,7 @@
     var toggleBtn = document.querySelector("[data-admin-modal-toggle-active]");
     if (toggleBtn) {
       var isActive = athlete.is_active !== false;
-      var isDeleted = !!(athlete && athlete.deleted_at);
+      var isDeleted = isDeletedAthleteAccount(athlete);
       toggleBtn.textContent = isDeleted ? "Restore Account" : (isActive ? "Deactivate Account" : "Activate Account");
       toggleBtn.setAttribute("data-athlete-active", isActive ? "true" : "false");
     }
@@ -2306,7 +2337,7 @@
     }
 
     var athleteLabel = athlete.email || athlete.name || "this athlete";
-    if (!confirm("Archive " + athleteLabel + " account?")) {
+    if (!confirm("Delete " + athleteLabel + " account?")) {
       return;
     }
 
@@ -2314,7 +2345,7 @@
       return;
     }
 
-    setDeleteStatus("Archiving account...", "info", fromModal);
+    setDeleteStatus("Deleting account...", "info", fromModal);
 
     // Preferred path: server-side RPC that soft-deletes account data for compliance retention.
     state.client
@@ -2332,12 +2363,12 @@
         renderCoachOverview();
         updateStats();
 
-        setDeleteStatus("Athlete account archived.", "success", fromModal);
+        setDeleteStatus("Athlete account deleted.", "success", fromModal);
         setTimeout(function () {
           if (fromModal) {
             closeModal();
           }
-          setStatus("Athlete account archived and retained for compliance.", "success");
+          setStatus("Athlete account deleted and retained for compliance.", "success");
         }, 700);
       })
       .catch(function (error) {
@@ -2348,7 +2379,7 @@
   function handleLegacyAthleteDelete(athlete, deleteError, fromModal) {
     var athleteId = String(athlete && athlete.user_id || "").trim();
     if (!athleteId) {
-      setDeleteStatus("Failed to archive account: missing athlete id.", "error", fromModal);
+      setDeleteStatus("Failed to delete account: missing athlete id.", "error", fromModal);
       return;
     }
 
@@ -2377,7 +2408,7 @@
               }, { onConflict: "user_id" })
               .then(function (fallbackResult) {
                 if (fallbackResult.error) {
-                  setDeleteStatus(fallbackResult.error.message || "Failed to archive account.", "error", fromModal);
+                  setDeleteStatus(fallbackResult.error.message || "Failed to delete account.", "error", fromModal);
                   return;
                 }
 
@@ -2385,10 +2416,10 @@
                 renderAthletesTable();
                 renderCoachOverview();
                 updateStats();
-                setDeleteStatus("Athlete account archived (legacy schema fallback).", "success", fromModal);
+                setDeleteStatus("Athlete account deleted (legacy schema fallback).", "success", fromModal);
               });
           }
-          setDeleteStatus(result.error.message || "Failed to archive account.", "error", fromModal);
+          setDeleteStatus(result.error.message || "Failed to delete account.", "error", fromModal);
           return;
         }
 
@@ -2396,10 +2427,10 @@
         renderAthletesTable();
         renderCoachOverview();
         updateStats();
-        setDeleteStatus("Athlete account archived.", "success", fromModal);
+        setDeleteStatus("Athlete account deleted.", "success", fromModal);
       })
       .catch(function (error) {
-        var baseMessage = error && error.message ? error.message : "Failed to archive account.";
+        var baseMessage = error && error.message ? error.message : "Failed to delete account.";
         var priorMessage = deleteError && deleteError.message ? " " + deleteError.message : "";
         setDeleteStatus(baseMessage + priorMessage, "error", fromModal);
       });
@@ -6778,7 +6809,7 @@
 
   function getAthleteTierCounts() {
     var activeAthletes = (state.athletes || []).filter(function (athlete) {
-      return athlete && athlete.is_active !== false;
+      return athlete && athlete.is_active !== false && !isDeletedAthleteAccount(athlete);
     });
 
     var onboardingByAthlete = {};
@@ -6945,19 +6976,19 @@
 
   function getActiveAthleteCount() {
     return state.athletes.filter(function (athlete) {
-      return athlete && athlete.is_active !== false && !athlete.deleted_at;
+      return athlete && athlete.is_active !== false && !isDeletedAthleteAccount(athlete);
     }).length;
   }
 
   function getInactiveAthleteCount() {
     return state.athletes.filter(function (athlete) {
-      return athlete && athlete.is_active === false && !athlete.deleted_at;
+      return athlete && athlete.is_active === false && !isDeletedAthleteAccount(athlete);
     }).length;
   }
 
   function getDeletedAthleteCount() {
     return state.athletes.filter(function (athlete) {
-      return athlete && !!athlete.deleted_at;
+      return athlete && isDeletedAthleteAccount(athlete);
     }).length;
   }
 

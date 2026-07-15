@@ -571,6 +571,8 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
   var MEMBERSHIP_PAYMENT_TASK_URL = "founding-member.html?checkout=start";
   var DEFAULT_LIABILITY_WAIVER_FORM_ID = "default-liability-waiver-v1";
   var DATA_RIGHTS_PRIVACY_CONSENT_FORM_ID = "data-rights-privacy-consent-v1";
+  var LIABILITY_DATA_CONSENT_COMPREHENSIVE_FORM_ID = "liability-data-consent-comprehensive-v1";
+  var PROTOCOL_AUTOFILL_ONBOARDING_FORM_ID = "protocol-intake-autofill-v1";
   var METRICS_COLLAPSE_KEY = "nomadic.metricsSectionCollapsed";
   var METRICS_COMPACT_KEY = "nomadic.metricsCompactMode";
   var STRAVA_COLLAPSE_KEY = "nomadic.stravaSectionCollapsed";
@@ -950,7 +952,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
             key: "waiver_statement",
             label: "Nomadic Performance Liability Waiver",
             type: "statement",
-            content: "By participating in any training, coaching, rehabilitation, or related activities provided by Nomadic Performance, you acknowledge and agree to the following:\n\n1) Assumption of Risk\nI understand that physical training and outdoor sport preparation involve inherent risks, including but not limited to falls, strains, sprains, fractures, illness, and in rare cases serious injury or death. I voluntarily assume all such risks.\n\n2) Medical Readiness\nI confirm that I am medically able to participate, and I will disclose relevant medical conditions, medications, injuries, or restrictions to my coach or provider.\n\n3) Personal Responsibility\nI agree to train within my limits, follow coaching instructions to the best of my ability, and stop any activity that causes unusual pain, dizziness, or concerning symptoms.\n\n4) Limitation of Liability\nTo the fullest extent permitted by law, I release and hold harmless Nomadic Performance and its owners, coaches, contractors, and affiliates from claims or liabilities arising from my participation, except in cases of gross negligence or willful misconduct.\n\n5) Emergency and Safety Acknowledgement\nI understand I am responsible for maintaining a safe training environment, using equipment appropriately, and seeking emergency care when needed.\n\n6) Voluntary Agreement\nI have read this waiver, understand its contents, and agree voluntarily without coercion.",
+            content: "Nomadic Performance Liability Waiver, Assumption of Risk, and Release of Claims\n\nThis Liability Waiver, Assumption of Risk, and Release of Claims (\"Waiver\") is entered into by the undersigned participant (\"Participant,\" \"I,\" \"me,\" or \"my\") in favor of Nomadic Performance, its owner(s), employees, contractors, representatives, affiliates, successors, and assigns (\"Nomadic Performance,\" \"Company,\" \"we,\" \"us,\" or \"our\").\n\nBy signing this Waiver, I acknowledge that I have read, understood, and voluntarily agree to the terms below.\n\n1. Participation in Services\n\nI understand that Nomadic Performance may provide services including, but not limited to:\n\n- Strength and conditioning\n- Mobility training\n- Corrective exercise\n- Performance coaching\n- Sport-specific training guidance\n- Endurance training guidance\n- Exercise programming\n- Movement assessments\n- Performance assessments\n- Recovery guidance\n- Training load guidance\n- Outdoor sport preparation\n- Educational resources\n- In-person or remote coaching\n- General health, wellness, recovery, and performance guidance within appropriate scope\n\nI understand that participation may occur in person, remotely, at home, in a gym, outdoors, or in another training environment.\n\n2. Inherent Risks of Exercise and Sport\n\nI understand that physical activity, exercise, training, testing, and sport participation involve inherent risks.\n\nThese risks may include, but are not limited to:\n\n- Muscle soreness\n- Fatigue\n- Dizziness\n- Shortness of breath\n- Strains or sprains\n- Joint pain\n- Tendon irritation\n- Overuse injuries\n- Falls\n- Equipment-related injuries\n- Aggravation of pre-existing injuries\n- Worsening of current symptoms\n- Cardiovascular events\n- Serious injury\n- Permanent disability\n- Death\n\nI also understand that mountain sports and outdoor activities, including but not limited to skiing, snowboarding, climbing, mountain biking, trail running, hiking, mountaineering, and related activities, involve additional risks including:\n\n- Falls\n- Collisions\n- Changing terrain\n- Weather exposure\n- Altitude\n- Rockfall\n- Avalanches\n- Equipment failure\n- Remote location\n- Limited access to emergency services\n- Other unpredictable outdoor hazards\n\nI understand that these risks cannot be completely eliminated.\n\n3. Assumption of Risk\n\nI voluntarily choose to participate in Nomadic Performance services.\n\nI acknowledge and accept the risks associated with exercise, training, testing, sport participation, and related activities.\n\nI agree that I am responsible for determining whether I am physically and medically able to participate in any exercise, training session, program, assessment, or activity.\n\nI agree to stop any activity immediately if I experience concerning symptoms, including but not limited to chest pain, difficulty breathing, fainting, dizziness, sudden severe pain, numbness, weakness, loss of coordination, unusual shortness of breath, or any symptom that feels unsafe.\n\n4. Health and Medical Responsibility\n\nI certify that, to the best of my knowledge, I am physically able to participate in exercise and training activities.\n\nI agree to disclose any relevant health conditions, injuries, surgeries, medications, pain, symptoms, limitations, or medical concerns that may affect my ability to participate safely.\n\nI understand that Nomadic Performance relies on the accuracy and completeness of the information I provide.\n\nI understand that if I have any concern about whether I should participate in exercise or training, I should consult a physician or qualified healthcare provider before participating.\n\n5. No Guarantee of Results\n\nI understand that Nomadic Performance may provide programming, guidance, coaching, education, assessments, and recommendations, but no specific result is guaranteed.\n\nI understand that progress depends on many factors, including but not limited to:\n\n- Consistency\n- Training history\n- Recovery\n- Sleep\n- Nutrition\n- Stress\n- Genetics\n- Injury history\n- Lifestyle factors\n- Communication\n- Program adherence\n- Sport participation\n- Factors outside the control of Nomadic Performance\n\nNomadic Performance does not guarantee injury prevention, pain resolution, improved performance, weight loss, strength gains, fitness improvements, or successful completion of any sport-related goal, race, trip, climb, event, or activity.\n\n6. Release of Claims\n\nTo the fullest extent permitted by law, I voluntarily release, waive, discharge, and agree not to sue Nomadic Performance, its owner(s), employees, contractors, representatives, affiliates, successors, and assigns from any and all claims, demands, damages, losses, liabilities, costs, or expenses arising out of or related to my participation in Nomadic Performance services.\n\nThis includes claims related to:\n\n- Exercise participation\n- Training programs\n- Movement or performance assessments\n- Sport-specific training guidance\n- Remote or in-person coaching\n- Use of exercise equipment\n- Use of training facilities\n- Outdoor activity preparation\n- Following or not following recommendations\n- Injuries, pain, illness, or adverse outcomes connected to participation\n\nThis release includes claims arising from ordinary negligence to the fullest extent permitted by law.\n\nThis Waiver does not release claims that cannot legally be waived under applicable law.\n\n7. Indemnification\n\nI agree to indemnify, defend, and hold harmless Nomadic Performance, its owner(s), employees, contractors, representatives, affiliates, successors, and assigns from any claims, demands, damages, losses, liabilities, costs, or expenses, including reasonable attorney fees, arising out of or related to:\n\n- My participation in Nomadic Performance services\n- My failure to disclose relevant health or injury information\n- My failure to follow instructions\n- My unsafe or inappropriate use of equipment\n- My participation in sport or exercise outside of direct supervision\n- My violation of this Waiver or any related agreement\n\n8. Remote Coaching and Independent Training\n\nI understand that some Nomadic Performance services may be delivered remotely.\n\nWhen I perform exercises, workouts, mobility drills, testing, or sport activities outside of direct supervision, I am responsible for:\n\n- Choosing a safe environment\n- Using appropriate equipment\n- Ensuring equipment is properly set up\n- Following instructions carefully\n- Modifying or stopping activity when needed\n- Avoiding exercises that feel unsafe\n- Seeking medical care when appropriate\n\nI understand that Nomadic Performance cannot control my environment, equipment, technique, effort, decisions, or actions when I am training independently.\n\n9. Equipment and Facilities\n\nI understand that I may use exercise equipment, gym facilities, home equipment, outdoor terrain, or other environments as part of my training.\n\nI agree to inspect equipment and surroundings before use and to avoid using equipment or environments that appear unsafe.\n\nI understand that Nomadic Performance is not responsible for hazards, defects, unsafe conditions, or injuries arising from third-party facilities, equipment, trails, gyms, climbing areas, ski resorts, roads, or outdoor environments.\n\n10. Pain, Injury, and Symptom Reporting\n\nI agree to promptly inform Nomadic Performance of any pain, injury, symptom change, illness, or concern that may affect safe participation.\n\nI understand that continuing to train through pain or symptoms may increase risk of injury.\n\nI agree that if symptoms are severe, worsening, unusual, or concerning, I will stop activity and seek appropriate medical care.\n\n11. Emergency Medical Care\n\nI understand that Nomadic Performance does not provide emergency medical services.\n\nIf I experience a medical emergency, I will call 911 or seek emergency medical care immediately.\n\nI understand that direct messaging, email, online forms, or the Nomadic Performance platform should not be used for emergencies or urgent medical concerns.\n\n12. Physical Therapy and Medical Services\n\nI understand that general membership services, performance coaching, training guidance, and exercise programming are not a substitute for medical care, emergency care, or formal physical therapy treatment.\n\nIf I receive formal physical therapy services from Nomadic Performance, those services may require separate documentation, consent forms, evaluation, treatment notes, and payment.\n\nI understand that dry needling, manual therapy, physical therapy evaluation, and physical therapy treatment are not automatically included in general membership services unless specifically stated in writing.\n\n13. Dry Needling\n\nI understand that dry needling, if provided, is a separate skilled intervention that requires appropriate screening, informed consent, and clinical determination that the intervention is appropriate.\n\nI understand that dry needling is not covered by this general liability waiver alone and may require a separate dry needling informed consent form before treatment.\n\n14. Media and Testimonials\n\nI understand that Nomadic Performance will not use my name, image, likeness, testimonial, results, photos, videos, or identifiable information for marketing purposes without my separate written permission.\n\n15. Minors\n\nIf the Participant is under 18 years old, a parent or legal guardian must sign this Waiver on behalf of the minor Participant.\n\nThe parent or legal guardian represents that they have authority to sign this Waiver and agrees to its terms on behalf of the minor Participant to the fullest extent permitted by law.\n\n16. Governing Law\n\nThis Waiver shall be governed by the laws of the State of Utah, unless otherwise required by applicable law.\n\n17. Severability\n\nIf any portion of this Waiver is found to be invalid or unenforceable, the remaining portions shall remain in full force and effect to the fullest extent permitted by law.\n\n18. Acknowledgment\n\nI acknowledge that:\n\n- I have read this Waiver carefully.\n- I understand its terms.\n- I understand that I am giving up certain legal rights.\n- I am signing voluntarily.\n- I have had the opportunity to ask questions before signing.\n- I understand that participation involves risk.\n- I agree to assume those risks.",
             required: false
           },
           {
@@ -1055,6 +1057,79 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         ]
       },
       {
+        id: LIABILITY_DATA_CONSENT_COMPREHENSIVE_FORM_ID,
+        name: "Comprehensive Liability + Data Consent",
+        description: "Single-signature legal form covering risk, consent, privacy, and de-identified analytics use.",
+        task_type: "legal_consent",
+        questions: [
+          {
+            key: "liability_data_consent_statement",
+            label: "Nomadic Performance Liability and Data Consent Agreement",
+            type: "statement",
+            content: "By participating in Nomadic Performance coaching, you acknowledge and agree to the following:\n\n1) Assumption of Risk\nYou understand training and sport preparation carry inherent risks, including injury, illness, or in rare cases serious harm.\n\n2) Medical Responsibility\nYou confirm you are medically able to participate and will disclose relevant health considerations.\n\n3) Coaching Scope\nYou understand coaching guidance is educational/performance-oriented and does not replace individualized medical diagnosis or treatment.\n\n4) Data Use\nYou consent to your submitted data being used for coaching operations and program optimization.\n\n5) De-Identified Analytics\nYou consent to de-identified, aggregated use of your data for analytics, benchmarking, education, and internal research.\n\n6) Withdrawal Rights\nYou may request withdrawal from de-identified analytics/research use in the future.\n\n7) Electronic Signature\nTyping your legal name serves as your electronic signature and confirms voluntary agreement.",
+            required: false
+          },
+          {
+            key: "liability_risk_ack",
+            label: "Risk and Liability Acknowledgement",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I understand and accept the risks associated with participation."
+            ]
+          },
+          {
+            key: "medical_readiness_ack",
+            label: "Medical Readiness Acknowledgement",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I confirm I am medically able to participate and will report relevant limitations."
+            ]
+          },
+          {
+            key: "coaching_scope_ack",
+            label: "Coaching Scope Acknowledgement",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I understand coaching does not replace medical diagnosis or treatment."
+            ]
+          },
+          {
+            key: "data_use_ack",
+            label: "Data Use Consent",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I consent to data use for coaching operations and optimization."
+            ]
+          },
+          {
+            key: "deidentified_analytics_ack",
+            label: "De-Identified Analytics Consent",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I consent to de-identified and aggregated analytics/benchmarking use."
+            ]
+          },
+          {
+            key: "legal_full_name",
+            label: "Legal Full Name",
+            type: "text",
+            required: true,
+            placeholder: "First and last name"
+          },
+          {
+            key: "signature_date",
+            label: "Signature Date",
+            type: "date",
+            required: true
+          }
+        ]
+      },
+      {
         id: MEMBERSHIP_PAYMENT_TASK_FORM_ID,
         name: MEMBERSHIP_PAYMENT_TASK_NAME,
         description: "Assign this when an athlete is approved for membership. Includes a direct checkout link.",
@@ -1063,6 +1138,45 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         action_url: MEMBERSHIP_PAYMENT_TASK_URL,
         action_target: "_self",
         questions: []
+      },
+      {
+        id: PROTOCOL_AUTOFILL_ONBOARDING_FORM_ID,
+        name: "Protocol Intake and Profile Auto-Fill Waiver",
+        description: "Onboarding waiver + intake that auto-populates profile/protocol fields on submission.",
+        task_type: "protocol_autofill",
+        questions: [
+          {
+            key: "protocol_autofill_statement",
+            label: "Profile Auto-Fill Consent",
+            type: "statement",
+            content: "Complete this intake to help your coach build your protocol faster. By submitting, you consent to this information being used to auto-populate your athlete profile and protocol context."
+          },
+          { key: "legal_name", label: "Legal Full Name", type: "text", required: true, placeholder: "First and last name" },
+          { key: "preferred_name", label: "Preferred Name", type: "text", placeholder: "What should your coach call you?" },
+          { key: "date_of_birth", label: "Date of Birth", type: "date", required: true },
+          { key: "gender", label: "Gender", type: "select", required: true, options: ["Male", "Female", "Non-binary", "Prefer not to say"] },
+          { key: "primary_sport", label: "Primary Sport", type: "select", required: true, options: ["Climbing", "Running", "Skiing", "Snowboarding", "Cycling", "Other"] },
+          { key: "secondary_sports", label: "Secondary Sports (comma-separated)", type: "text", placeholder: "e.g. Running, Skiing" },
+          { key: "primary_goal", label: "Primary Goal", type: "textarea", rows: 2, required: true, placeholder: "What is your main outcome this cycle?" },
+          { key: "secondary_goals", label: "Secondary Goals", type: "textarea", rows: 2 },
+          { key: "key_event_name", label: "Key Event / Race / Objective", type: "text", placeholder: "Event name or objective" },
+          { key: "key_event_date", label: "Key Event Date", type: "date" },
+          { key: "milestone_1", label: "Milestone 1", type: "text", placeholder: "First milestone" },
+          { key: "milestone_2", label: "Milestone 2", type: "text", placeholder: "Second milestone" },
+          { key: "milestone_3", label: "Milestone 3", type: "text", placeholder: "Third milestone" },
+          { key: "training_days", label: "Preferred Training Days", type: "text", placeholder: "e.g. Mon, Wed, Fri" },
+          { key: "minutes_per_session", label: "Typical Session Length (minutes)", type: "number", min: 10, max: 300 },
+          { key: "constraints", label: "Current Constraints / Notes", type: "textarea", rows: 3, placeholder: "Work schedule, travel, equipment, recovery constraints" },
+          {
+            key: "protocol_autofill_ack",
+            label: "Protocol Auto-Fill Acknowledgement",
+            type: "checkbox",
+            required: true,
+            options: [
+              "I consent to this information being auto-populated into my athlete profile and protocol context."
+            ]
+          }
+        ]
       },
       {
         id: "founding-member-intake-v1",
@@ -3075,6 +3189,46 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
 
       state.athleteTaskModal.addEventListener("click", function (event) {
+        var openWaiverBtn = event.target && event.target.closest("[data-waiver-open-popup]");
+        if (openWaiverBtn) {
+          event.preventDefault();
+          var waiverForm = openWaiverBtn.closest("[data-onboarding-response-form]");
+          var waiverPopup = waiverForm ? waiverForm.querySelector("[data-waiver-popup]") : null;
+          if (waiverPopup) {
+            waiverPopup.hidden = false;
+            document.body.classList.add("admin-modal-open");
+          }
+          return;
+        }
+
+        var markWaiverReviewedBtn = event.target && event.target.closest("[data-waiver-popup-reviewed]");
+        if (markWaiverReviewedBtn) {
+          event.preventDefault();
+          var reviewedPopup = markWaiverReviewedBtn.closest("[data-waiver-popup]");
+          var reviewedForm = markWaiverReviewedBtn.closest("[data-onboarding-response-form]");
+          if (reviewedForm) {
+            reviewedForm.setAttribute("data-waiver-opened", "1");
+            var statusEl = reviewedForm.querySelector("[data-waiver-open-status]");
+            if (statusEl) {
+              statusEl.textContent = "Waiver opened and reviewed.";
+            }
+          }
+          if (reviewedPopup) {
+            reviewedPopup.hidden = true;
+          }
+          return;
+        }
+
+        var closeWaiverBtn = event.target && event.target.closest("[data-waiver-popup-close]");
+        if (closeWaiverBtn) {
+          event.preventDefault();
+          var popupToClose = closeWaiverBtn.closest("[data-waiver-popup]");
+          if (popupToClose) {
+            popupToClose.hidden = true;
+          }
+          return;
+        }
+
         var closeBtn = event.target && event.target.closest("[data-athlete-task-close]");
         if (!closeBtn) {
           return;
@@ -4717,17 +4871,45 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var schemaQuestions = Array.isArray(assignment.form_schema && assignment.form_schema.questions)
       ? assignment.form_schema.questions
       : [];
+    var requiresWaiverPopup = assignmentRequiresLiabilityWaiverPopup(assignment);
+    var waiverStatementQuestion = getLiabilityWaiverStatementQuestion(assignment);
+    var waiverStatementTitle = waiverStatementQuestion && waiverStatementQuestion.label
+      ? String(waiverStatementQuestion.label)
+      : "Nomadic Performance Liability Waiver";
+    var waiverStatementContent = waiverStatementQuestion && waiverStatementQuestion.content
+      ? String(waiverStatementQuestion.content)
+      : "";
+    var waiverStatementHtml = waiverStatementContent
+      ? escapeHtml(waiverStatementContent).replace(/\n/g, "<br />")
+      : '<span class="profile-empty-state-copy">No statement content configured.</span>';
 
     var html = '';
-    html += '<form data-onboarding-response-form data-assignment-id="' + escapeAttribute(assignment.id) + '">';
+    html += '<form data-onboarding-response-form data-assignment-id="' + escapeAttribute(assignment.id) + '" data-requires-waiver-popup="' + (requiresWaiverPopup ? "1" : "0") + '" data-waiver-opened="0">';
     if (!schemaQuestions.length) {
       html += '<p class="profile-empty-state-copy">This intake form has no questions configured.</p>';
     } else {
       html += schemaQuestions
         .map(function (question) {
-          return buildOnboardingQuestionField(question, assignment.response_data || {});
+          return buildOnboardingQuestionField(question, assignment.response_data || {}, assignment);
         })
         .join('');
+    }
+
+    if (requiresWaiverPopup && waiverStatementQuestion) {
+      html += '<section class="athlete-waiver-popup" data-waiver-popup hidden>';
+      html += '<div class="athlete-waiver-popup-overlay" data-waiver-popup-close></div>';
+      html += '<article class="athlete-waiver-popup-dialog" role="dialog" aria-modal="true" aria-label="Liability waiver">';
+      html += '<div class="athlete-waiver-popup-head">';
+      html += '<h3>' + escapeHtml(waiverStatementTitle) + '</h3>';
+      html += '<button type="button" class="athlete-waiver-popup-close" data-waiver-popup-close aria-label="Close waiver">×</button>';
+      html += '</div>';
+      html += '<div class="athlete-waiver-popup-body">' + waiverStatementHtml + '</div>';
+      html += '<div class="profile-section-actions">';
+      html += '<button type="button" class="btn profile-btn-save" data-waiver-popup-reviewed>I Have Read This Waiver</button>';
+      html += '<button type="button" class="btn profile-btn-cancel" data-waiver-popup-close>Close</button>';
+      html += '</div>';
+      html += '</article>';
+      html += '</section>';
     }
 
     html += '<div class="profile-section-actions">';
@@ -4773,7 +4955,40 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       });
   }
 
-  function buildOnboardingQuestionField(question, responseData) {
+  function assignmentRequiresLiabilityWaiverPopup(assignment) {
+    if (!assignment) {
+      return false;
+    }
+
+    var formId = String(assignment.form_id || "").trim();
+    if (formId === DEFAULT_LIABILITY_WAIVER_FORM_ID || formId === LIABILITY_DATA_CONSENT_COMPREHENSIVE_FORM_ID) {
+      return true;
+    }
+
+    var taskType = String(assignment.form_schema && assignment.form_schema.task_type || "").trim().toLowerCase();
+    return taskType === "liability_waiver" || taskType === "legal_consent";
+  }
+
+  function getLiabilityWaiverStatementQuestion(assignment) {
+    var questions = Array.isArray(assignment && assignment.form_schema && assignment.form_schema.questions)
+      ? assignment.form_schema.questions
+      : [];
+
+    return questions.find(function (question) {
+      if (!question) {
+        return false;
+      }
+      var type = String(question.type || "").trim().toLowerCase();
+      if (type !== "statement") {
+        return false;
+      }
+      var label = String(question.label || "").trim().toLowerCase();
+      var content = String(question.content || "").trim().toLowerCase();
+      return label.indexOf("liability") > -1 || content.indexOf("assumption of risk") > -1 || content.indexOf("liability") > -1;
+    }) || null;
+  }
+
+  function buildOnboardingQuestionField(question, responseData, assignment) {
     var q = question && typeof question === "object" ? question : {};
     var type = String(q.type || "text").toLowerCase();
     var key = String(q.key || "").trim();
@@ -4785,6 +5000,19 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       var statementHtml = statementContent
         ? escapeHtml(statementContent).replace(/\n/g, "<br />")
         : '<span class="profile-empty-state-copy">No statement content configured.</span>';
+
+      if (assignmentRequiresLiabilityWaiverPopup(assignment)) {
+        return (
+          '<div class="form-group profile-waiver-statement profile-waiver-gate">' +
+            '<label>' + escapeHtml(statementTitle) + '</label>' +
+            '<p class="profile-empty-state-copy">Open and review the waiver before agreeing below.</p>' +
+            '<div class="profile-section-actions">' +
+              '<button type="button" class="btn profile-btn-cancel" data-waiver-open-popup>Open Liability Waiver</button>' +
+            '</div>' +
+            '<p class="profile-waiver-open-status" data-waiver-open-status>Waiver not opened yet.</p>' +
+          '</div>'
+        );
+      }
 
       return (
         '<div class="form-group profile-waiver-statement">' +
@@ -4819,6 +5047,22 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         html += '<option value="' + escapeAttribute(optionText) + '"' + selected + '>' + escapeHtml(optionText) + '</option>';
       });
       html += '</select>';
+    } else if (type === "checkbox") {
+      var checkboxOptions = Array.isArray(q.options) && q.options.length ? q.options : [label];
+      var selectedValues = String(value || "")
+        .split(";")
+        .map(function (entry) { return String(entry || "").trim(); })
+        .filter(Boolean);
+      html += '<div class="profile-checkbox-group">';
+      checkboxOptions.forEach(function (optionValue) {
+        var optionText = String(optionValue || "").trim();
+        var isChecked = selectedValues.indexOf(optionText) > -1;
+        html += '<label class="profile-checkbox-item">' +
+          '<input type="checkbox" name="q:' + escapeAttribute(key) + '" value="' + escapeAttribute(optionText) + '"' + (isChecked ? ' checked' : '') + ' />' +
+          '<span>' + escapeHtml(optionText) + '</span>' +
+          '</label>';
+      });
+      html += '</div>';
     } else {
       var inputType = ["number", "date", "email"].indexOf(type) > -1 ? type : "text";
       var minAttr = q.min != null ? ' min="' + escapeAttribute(String(q.min)) + '"' : "";
@@ -4853,8 +5097,39 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         return;
       }
       var responseKey = String(key).slice(2);
-      responses[responseKey] = String(value || "").trim();
+      var nextValue = String(value || "").trim();
+      if (!Object.prototype.hasOwnProperty.call(responses, responseKey)) {
+        responses[responseKey] = nextValue;
+        return;
+      }
+
+      if (Array.isArray(responses[responseKey])) {
+        responses[responseKey].push(nextValue);
+        return;
+      }
+
+      responses[responseKey] = [String(responses[responseKey] || ""), nextValue];
     });
+
+    Object.keys(responses).forEach(function (key) {
+      var value = responses[key];
+      if (!Array.isArray(value)) {
+        return;
+      }
+      responses[key] = value
+        .map(function (entry) { return String(entry || "").trim(); })
+        .filter(Boolean)
+        .join("; ");
+    });
+
+    if (assignmentRequiresLiabilityWaiverPopup(assignment)) {
+      var waiverOpened = String(formEl.getAttribute("data-waiver-opened") || "") === "1";
+      if (!waiverOpened) {
+        setOnboardingStatus("Please open and review the liability waiver before submitting.", "error");
+        setAthleteTaskModalStatus("Please open and review the liability waiver before submitting.", "error");
+        return;
+      }
+    }
 
     var requiredQuestions = Array.isArray(assignment.form_schema && assignment.form_schema.questions)
       ? assignment.form_schema.questions.filter(function (question) {
@@ -4870,6 +5145,20 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       setOnboardingStatus("Please complete required field: " + String(missingQuestion.label || missingQuestion.key), "error");
       setAthleteTaskModalStatus("Please complete required field: " + String(missingQuestion.label || missingQuestion.key), "error");
       return;
+    }
+
+    if (assignmentRequiresLiabilityWaiverPopup(assignment)) {
+      var schemaQuestions = Array.isArray(assignment.form_schema && assignment.form_schema.questions)
+        ? assignment.form_schema.questions
+        : [];
+      var hasWaiverAckQuestion = schemaQuestions.some(function (question) {
+        return String(question && question.key || "").trim() === "waiver_acknowledgement";
+      });
+      if (hasWaiverAckQuestion && !String(responses.waiver_acknowledgement || "").trim()) {
+        setOnboardingStatus("Please check the liability waiver acknowledgement to continue.", "error");
+        setAthleteTaskModalStatus("Please check the liability waiver acknowledgement to continue.", "error");
+        return;
+      }
     }
 
     setOnboardingStatus("Saving task responses...", "info");
@@ -4891,15 +5180,35 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
           return;
         }
 
-        maybeAdvanceFoundingStageAfterIntakeSubmission()
-          .then(function (advanced) {
+        applyOnboardingSubmissionProtocolAutofill(assignment, responses)
+          .then(function (autofillResult) {
+            return maybeAdvanceFoundingStageAfterIntakeSubmission()
+              .then(function (advanced) {
+                return {
+                  advanced: advanced,
+                  autofillApplied: !!(autofillResult && autofillResult.applied),
+                  autofillError: autofillResult && autofillResult.error ? autofillResult.error : null
+                };
+              });
+          })
+          .then(function (resultState) {
+            var advanced = !!(resultState && resultState.advanced);
+            var autofillApplied = !!(resultState && resultState.autofillApplied);
+            var autofillError = resultState && resultState.autofillError ? String(resultState.autofillError) : "";
+
+            var baseMessage = "Task responses saved.";
             if (advanced) {
-              setOnboardingStatus("Task responses saved. Membership workflow advanced to assessment pending review.", "success");
-              setAthleteTaskModalStatus("Task responses saved.", "success");
-            } else {
-              setOnboardingStatus("Task responses saved.", "success");
-              setAthleteTaskModalStatus("Task responses saved.", "success");
+              baseMessage = "Task responses saved. Membership workflow advanced to assessment pending review.";
             }
+
+            if (autofillApplied) {
+              baseMessage += " Profile protocol fields were auto-populated.";
+            } else if (autofillError) {
+              baseMessage += " Profile auto-populate could not be completed: " + autofillError;
+            }
+
+            setOnboardingStatus(baseMessage, autofillError ? "info" : "success");
+            setAthleteTaskModalStatus("Task responses saved.", "success");
             closeAthleteTaskModal();
             loadOnboardingIntake();
           })
@@ -4914,6 +5223,174 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
         setOnboardingStatus(error && error.message ? error.message : "Failed to save task responses.", "error");
         setAthleteTaskModalStatus(error && error.message ? error.message : "Failed to save task responses.", "error");
       });
+  }
+
+  function applyOnboardingSubmissionProtocolAutofill(assignment, responses) {
+    if (!assignment || !responses || state.isCoachView || !state.client || !getViewedUserId()) {
+      return Promise.resolve({ applied: false });
+    }
+
+    var formId = String(assignment.form_id || "").trim();
+    if (formId !== PROTOCOL_AUTOFILL_ONBOARDING_FORM_ID) {
+      return Promise.resolve({ applied: false });
+    }
+
+    var profile = state.profile && typeof state.profile === "object" ? state.profile : {};
+    var sportOverview = profile.sport_overview && typeof profile.sport_overview === "object"
+      ? JSON.parse(JSON.stringify(profile.sport_overview))
+      : {};
+    var general = sportOverview.general && typeof sportOverview.general === "object"
+      ? sportOverview.general
+      : {};
+
+    var legalName = String(responses.legal_name || "").trim();
+    var preferredName = String(responses.preferred_name || "").trim();
+    var profileName = preferredName || legalName;
+
+    var dob = String(responses.date_of_birth || "").trim();
+    var normalizedSex = normalizeProtocolAutofillSex(responses.gender);
+    var primarySport = normalizeProtocolAutofillSport(responses.primary_sport);
+    var secondarySports = parseProtocolAutofillSportList(responses.secondary_sports);
+    var sportsList = [];
+    if (primarySport) {
+      sportsList.push(primarySport);
+    }
+    secondarySports.forEach(function (sport) {
+      if (sportsList.indexOf(sport) === -1) {
+        sportsList.push(sport);
+      }
+    });
+
+    var eventName = String(responses.key_event_name || "").trim();
+    var eventDate = String(responses.key_event_date || "").trim();
+    var eventSummary = [eventName, eventDate].filter(Boolean).join(" - ");
+
+    var milestones = [responses.milestone_1, responses.milestone_2, responses.milestone_3]
+      .map(function (entry) { return String(entry || "").trim(); })
+      .filter(Boolean)
+      .join(" | ");
+
+    var goalsCombined = [responses.primary_goal, responses.secondary_goals]
+      .map(function (entry) { return String(entry || "").trim(); })
+      .filter(Boolean)
+      .join(" | ");
+
+    var constraints = String(responses.constraints || "").trim();
+    var trainingDays = String(responses.training_days || "").trim();
+    var minutesPerSession = String(responses.minutes_per_session || "").trim();
+
+    if (dob) {
+      general.dob = dob;
+      general.date_of_birth = dob;
+    }
+    if (goalsCombined) {
+      general.goals = goalsCombined;
+    }
+    if (eventSummary) {
+      general.upcoming_event = eventSummary;
+    }
+    if (milestones) {
+      general.milestones = milestones;
+    }
+    if (trainingDays) {
+      general.training_days = trainingDays;
+    }
+    if (minutesPerSession) {
+      general.minutes_per_session = minutesPerSession;
+    }
+    if (constraints) {
+      general.notes = constraints;
+      general.protocol_constraints = constraints;
+    }
+
+    sportOverview.general = general;
+
+    var nextPayload = {
+      user_id: getViewedUserId(),
+      sport_overview: sportOverview,
+      updated_at: new Date().toISOString()
+    };
+
+    if (profileName) {
+      nextPayload.name = profileName;
+    }
+    if (normalizedSex) {
+      nextPayload.sex = normalizedSex;
+    }
+    if (sportsList.length) {
+      nextPayload.sport = sportsList[0];
+      nextPayload.sports = sportsList;
+    }
+    if (dob) {
+      var derivedAge = calculateAgeFromDob(dob);
+      if (derivedAge != null) {
+        nextPayload.age = derivedAge;
+      }
+    }
+
+    return saveProfileWithFallback(nextPayload)
+      .then(function (result) {
+        if (result && result.error) {
+          return { applied: false, error: String(result.error.message || "Profile update failed.") };
+        }
+
+        state.profile = Object.assign({}, state.profile || {}, result && result.data ? result.data : nextPayload);
+        updateHero(state.profile);
+        refreshTrainingProgramsCalendarFromState();
+        persistLocalSportProfile(state.profile);
+
+        return { applied: true };
+      })
+      .catch(function (error) {
+        return { applied: false, error: String(error && error.message || "Profile update failed.") };
+      });
+  }
+
+  function normalizeProtocolAutofillSex(value) {
+    var text = String(value || "").trim().toLowerCase();
+    if (!text) {
+      return null;
+    }
+    if (text === "male") {
+      return "male";
+    }
+    if (text === "female") {
+      return "female";
+    }
+    if (text === "non-binary" || text === "nonbinary") {
+      return "non-binary";
+    }
+    if (text.indexOf("prefer") > -1) {
+      return "prefer_not";
+    }
+    return null;
+  }
+
+  function normalizeProtocolAutofillSport(value) {
+    var text = String(value || "").trim().toLowerCase();
+    if (!text) {
+      return "";
+    }
+
+    var map = {
+      climbing: "climbing",
+      running: "running",
+      skiing: "skiing",
+      snowboarding: "snowboarding",
+      cycling: "cycling",
+      other: "other"
+    };
+
+    return map[text] || text;
+  }
+
+  function parseProtocolAutofillSportList(rawValue) {
+    return String(rawValue || "")
+      .split(/[,/;|]+/)
+      .map(function (entry) {
+        return normalizeProtocolAutofillSport(entry);
+      })
+      .filter(Boolean);
   }
 
   function openAthleteTaskModalByAssignmentId(assignmentId) {
@@ -8629,17 +9106,39 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
       return Promise.resolve(false);
     }
 
-    return state.client
-      .rpc("complete_founding_member_payment", {
-        p_athlete_user_id: getViewedUserId()
-      })
-      .then(function (result) {
-        if (result.error) {
-          throw result.error;
-        }
+    var viewedUserId = getViewedUserId();
 
-        return true;
-      });
+    function runCompleteRpc() {
+      return state.client
+        .rpc("complete_founding_member_payment", {
+          p_athlete_user_id: viewedUserId
+        })
+        .then(function (result) {
+          if (result.error) {
+            throw result.error;
+          }
+
+          return true;
+        });
+    }
+
+    if (state.client.functions && state.client.functions.invoke) {
+      return state.client.functions
+        .invoke("stripe-reconcile-payment", {
+          body: {
+            athlete_user_id: viewedUserId,
+            session_id: null
+          }
+        })
+        .catch(function () {
+          return null;
+        })
+        .then(function () {
+          return runCompleteRpc();
+        });
+    }
+
+    return runCompleteRpc();
   }
 
   function setStravaStatus(message, variant) {

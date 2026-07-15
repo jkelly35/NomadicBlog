@@ -612,6 +612,34 @@
     authRequest
       .then(function (result) {
         if (result.error) {
+          if (state.mode === "signup" && isEmailAlreadyRegisteredError(result.error)) {
+            return releaseDeletedAccountEmailForSignup(email).then(function (released) {
+              if (released) {
+                setStatus("That email was released from a deleted account. Retrying signup...", "info");
+                return state.client.auth.signUp({
+                  email: email,
+                  password: password,
+                  options: {
+                    data: {
+                      role: "athlete"
+                    }
+                  }
+                }).then(function (retryResult) {
+                  if (retryResult.error) {
+                    setStatus(retryResult.error.message, "error");
+                    return null;
+                  }
+
+                  setStatus("Account created. Redirecting...", "success");
+                  return handleSuccessfulAuthResult(retryResult, email);
+                });
+              }
+
+              setStatus(result.error.message, "error");
+              return null;
+            });
+          }
+
           setStatus(result.error.message, "error");
           return;
         }
@@ -620,33 +648,71 @@
           setStatus("Account created. Redirecting...", "success");
         }
 
-        var signedInUser = result && result.data && result.data.user ? result.data.user : null;
-
-        return ensureAthleteAccessAllowed(signedInUser).then(function (access) {
-          if (!access.allowed) {
-            setStatus(access.message, "error");
-            return state.client.auth.signOut().then(function () {
-              return null;
-            });
-          }
-
-          if (shouldForcePasswordUpdate(signedInUser)) {
-            window.location.href = "update-password.html?firstLogin=1";
-            return null;
-          }
-
-          // On successful sign in, send coach to admin and athletes to dashboard.
-          var userEmail = (result.data && result.data.user && result.data.user.email) || email;
-          if (String(userEmail || "").toLowerCase() === ADMIN_EMAIL) {
-            window.location.href = "admin.html";
-          } else {
-            window.location.href = "profile.html";
-          }
-          return null;
-        });
+        return handleSuccessfulAuthResult(result, email);
       })
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Authentication failed.", "error");
+      });
+  }
+
+  function handleSuccessfulAuthResult(result, fallbackEmail) {
+    var signedInUser = result && result.data && result.data.user ? result.data.user : null;
+
+    return ensureAthleteAccessAllowed(signedInUser).then(function (access) {
+      if (!access.allowed) {
+        setStatus(access.message, "error");
+        return state.client.auth.signOut().then(function () {
+          return null;
+        });
+      }
+
+      if (shouldForcePasswordUpdate(signedInUser)) {
+        window.location.href = "update-password.html?firstLogin=1";
+        return null;
+      }
+
+      // On successful sign in, send coach to admin and athletes to dashboard.
+      var userEmail = (result.data && result.data.user && result.data.user.email) || fallbackEmail;
+      if (String(userEmail || "").toLowerCase() === ADMIN_EMAIL) {
+        window.location.href = "admin.html";
+      } else {
+        window.location.href = "profile.html";
+      }
+      return null;
+    });
+  }
+
+  function isEmailAlreadyRegisteredError(error) {
+    var message = String(error && error.message || error && error.error_description || "").toLowerCase();
+    var code = String(error && error.code || "").toLowerCase();
+    return (
+      message.indexOf("already registered") > -1 ||
+      message.indexOf("already exists") > -1 ||
+      code === "user_already_exists"
+    );
+  }
+
+  function releaseDeletedAccountEmailForSignup(email) {
+    if (!state.client || !state.client.rpc) {
+      return Promise.resolve(false);
+    }
+
+    return state.client
+      .rpc("release_deleted_account_email_for_signup", { p_email: email })
+      .then(function (result) {
+        if (result && result.error) {
+          return false;
+        }
+
+        var data = result && result.data ? result.data : null;
+        if (data && typeof data === "object" && data.released) {
+          return true;
+        }
+
+        return false;
+      })
+      .catch(function () {
+        return false;
       });
   }
 

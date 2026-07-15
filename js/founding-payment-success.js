@@ -27,6 +27,15 @@
     }
   }
 
+  function getCheckoutSessionIdFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return String(params.get("checkout_session_id") || "").trim();
+    } catch (_error) {
+      return "";
+    }
+  }
+
   function setAutoRedirectMessage(message) {
     var statusEl = document.querySelector("[data-payment-success-auto-status]");
     if (!statusEl) {
@@ -58,6 +67,26 @@
       });
   }
 
+  function reconcilePaymentFromStripe(client, expectedUserId, checkoutSessionId) {
+    if (!client || !client.functions || !client.functions.invoke) {
+      return Promise.resolve(false);
+    }
+
+    return client.functions
+      .invoke("stripe-reconcile-payment", {
+        body: {
+          athlete_user_id: expectedUserId || null,
+          session_id: checkoutSessionId || null
+        }
+      })
+      .then(function (result) {
+        if (result && result.error) {
+          throw result.error;
+        }
+        return true;
+      });
+  }
+
   function init() {
     var client = createClient();
     if (!client || !client.auth) {
@@ -65,6 +94,7 @@
     }
 
     var expectedUserId = getExpectedUserIdFromQuery();
+    var checkoutSessionId = getCheckoutSessionIdFromQuery();
 
     client.auth
       .getSession()
@@ -82,7 +112,13 @@
         }
 
         setAutoRedirectMessage("Payment complete. Updating your athlete account and redirecting to your dashboard...");
-        finalizePaymentForSession(client, expectedUserId || currentUserId)
+        reconcilePaymentFromStripe(client, expectedUserId || currentUserId, checkoutSessionId)
+          .catch(function () {
+            // Best-effort: fall back to standard completion path.
+          })
+          .then(function () {
+            return finalizePaymentForSession(client, expectedUserId || currentUserId);
+          })
           .catch(function () {
             // Best-effort: redirect even if the reconciliation RPC is temporarily unavailable.
           })

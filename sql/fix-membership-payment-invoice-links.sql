@@ -1,3 +1,9 @@
+-- Nomadic Performance - backfill invoice links onto completed membership payment tasks
+-- Run in Supabase SQL Editor.
+
+begin;
+
+-- Ensure the payment completion RPC stores invoice fields for future completions.
 create or replace function public.complete_founding_member_payment(p_athlete_user_id uuid default null)
 returns jsonb
 language plpgsql
@@ -134,3 +140,95 @@ end;
 $$;
 
 grant execute on function public.complete_founding_member_payment(uuid) to authenticated;
+
+-- Backfill existing completed membership payment assignments with invoice links.
+do $$
+begin
+  if to_regclass('public.founding_member_subscriptions') is null then
+    raise notice 'Skipping invoice backfill: public.founding_member_subscriptions does not exist.';
+  else
+    with latest_subscription as (
+      select distinct on (coalesce(fms.user_id::text, lower(coalesce(fms.customer_email, ''))))
+        fms.user_id,
+        lower(coalesce(fms.customer_email, '')) as customer_email_lower,
+        coalesce(
+          nullif(trim(coalesce(fms.metadata ->> 'invoice_url', '')), ''),
+          nullif(trim(coalesce(fms.metadata ->> 'hosted_invoice_url', '')), ''),
+          nullif(trim(coalesce(fms.metadata ->> 'latest_invoice_url', '')), ''),
+          nullif(trim(coalesce(fms.metadata ->> 'receipt_url', '')), ''),
+          nullif(trim(coalesce(fms.metadata #>> '{invoice_history,0,hosted_invoice_url}', '')), ''),
+          nullif(trim(coalesce(fms.metadata #>> '{invoice_history,0,invoice_url}', '')), ''),
+          nullif(trim(coalesce(fms.metadata #>> '{invoice_history,0,invoice_pdf}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,hosted_invoice_url}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice_url}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice_pdf}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,receipt_url}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice,hosted_invoice_url}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice,invoice_url}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice,invoice_pdf}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice,receipt_url}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,latest_invoice,hosted_invoice_url}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,latest_invoice,invoice_url}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,latest_invoice,invoice_pdf}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,latest_invoice,receipt_url}', '')), '')
+        ) as invoice_url,
+        coalesce(
+          nullif(trim(coalesce(fms.metadata ->> 'invoice_pdf', '')), ''),
+          nullif(trim(coalesce(fms.metadata ->> 'latest_invoice_pdf', '')), ''),
+          nullif(trim(coalesce(fms.metadata #>> '{invoice_history,0,invoice_pdf}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice_pdf}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice,invoice_pdf}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,latest_invoice,invoice_pdf}', '')), '')
+        ) as invoice_pdf,
+        coalesce(
+          nullif(trim(coalesce(fms.metadata ->> 'invoice_id', '')), ''),
+          nullif(trim(coalesce(fms.metadata ->> 'latest_invoice_id', '')), ''),
+          nullif(trim(coalesce(fms.metadata ->> 'stripe_invoice_id', '')), ''),
+          nullif(trim(coalesce(fms.metadata #>> '{invoice_history,0,invoice_id}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice_id}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,latest_invoice}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,invoice,id}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,latest_invoice,id}', '')), ''),
+          nullif(trim(coalesce(fms.raw_event #>> '{data,object,id}', '')), '')
+        ) as invoice_id,
+        nullif(trim(coalesce(fms.stripe_checkout_session_id, '')), '') as stripe_checkout_session_id,
+        nullif(trim(coalesce(fms.stripe_subscription_id, '')), '') as stripe_subscription_id
+      from public.founding_member_subscriptions fms
+      order by coalesce(fms.user_id::text, lower(coalesce(fms.customer_email, ''))),
+               coalesce(fms.last_event_created_at, fms.updated_at, fms.created_at) desc
+    )
+    update public.athlete_onboarding_intake_assignments aoia
+    set response_data = coalesce(aoia.response_data, '{}'::jsonb) || jsonb_strip_nulls(jsonb_build_object(
+          'invoice_url', nullif(ls.invoice_url, ''),
+          'hosted_invoice_url', nullif(ls.invoice_url, ''),
+          'invoice_pdf', nullif(ls.invoice_pdf, ''),
+          'invoice_id', nullif(ls.invoice_id, ''),
+          'stripe_checkout_session_id', nullif(ls.stripe_checkout_session_id, ''),
+          'stripe_subscription_id', nullif(ls.stripe_subscription_id, '')
+        )),
+        updated_at = now()
+    from auth.users u
+    left join lateral (
+      select ls_pick.*
+      from latest_subscription ls_pick
+      where ls_pick.user_id = u.id
+         or (
+           ls_pick.customer_email_lower <> ''
+           and ls_pick.customer_email_lower = lower(coalesce(u.email, ''))
+         )
+      order by case when ls_pick.user_id = u.id then 0 else 1 end
+      limit 1
+    ) ls on true
+    where aoia.athlete_user_id = u.id
+      and aoia.status in ('submitted', 'archived')
+      and (
+        aoia.form_id = 'membership-payment-task-v1'
+        or lower(coalesce(aoia.form_name, '')) like '%membership%payment%'
+        or lower(coalesce(aoia.form_schema ->> 'action_url', '')) like '%founding-member.html%checkout=start%'
+      );
+  end if;
+end;
+$$;
+
+commit;

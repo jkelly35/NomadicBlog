@@ -5470,6 +5470,79 @@ body.athlete-locked-view .program-demo-day-selector {
   overflow: auto;
 }
 
+.profile-waiver-gate {
+  border: 1px solid #e5d8c6;
+  border-radius: 10px;
+  background: #fffcf6;
+  padding: 0.75rem;
+}
+
+.profile-waiver-open-status {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #556b6b;
+}
+
+.athlete-waiver-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+}
+
+.athlete-waiver-popup-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 32, 32, 0.58);
+}
+
+.athlete-waiver-popup-dialog {
+  position: relative;
+  max-width: 780px;
+  width: min(92vw, 780px);
+  max-height: 85vh;
+  margin: 5vh auto;
+  border-radius: 14px;
+  border: 1px solid #ddcfbc;
+  background: #fffdf8;
+  box-shadow: 0 22px 48px rgba(9, 28, 28, 0.28);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.athlete-waiver-popup-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #ebdfce;
+}
+
+.athlete-waiver-popup-head h3 {
+  margin: 0;
+  color: #173535;
+  font-size: 1rem;
+}
+
+.athlete-waiver-popup-close {
+  border: none;
+  background: transparent;
+  color: #355;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.athlete-waiver-popup-body {
+  padding: 0.85rem 1rem;
+  overflow: auto;
+  color: #2f4b4b;
+  font-size: 0.9rem;
+  line-height: 1.52;
+  border-bottom: 1px solid #ebdfce;
+}
+
 @media (max-width: 900px) {
   .coach-forms-question-grid {
     grid-template-columns: 1fr;
@@ -11401,6 +11474,69 @@ body.template-builder-mode .program-demo-container {
   font-size: 0.86rem;
 }
 
+.program-builder-peak-visibility,
+.program-builder-daily-peak-panel {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.program-builder-peak-item {
+  border: 1px solid #eadfce;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.65rem 0.75rem;
+}
+
+.program-builder-peak-item.is-active {
+  border-color: #c56a2c;
+  background: #fff6ec;
+}
+
+.program-builder-peak-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #163636;
+}
+
+.program-builder-peak-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: #607474;
+}
+
+.program-builder-peak-goal {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: #35504c;
+}
+
+.program-builder-peak-inline-note {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #e5d9c9;
+  background: #fbf6ee;
+  font-size: 0.82rem;
+  color: #4d5f5f;
+}
+
+.program-builder-estimated-date {
+  margin: 0.45rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 9px;
+  border: 1px solid #e2d5c4;
+  background: #faf5ee;
+  color: #3f5757;
+  font-size: 0.82rem;
+}
+
+.program-builder-week-meta {
+  margin: 0.25rem 0 0;
+  color: #607474;
+  font-size: 0.78rem;
+}
+
 .program-builder-daily-editor {
   display: grid;
   gap: 0.9rem;
@@ -11922,6 +12058,12 @@ body.template-builder-mode .program-demo-container {
   background: #f5f5f5;
   color: #5f6769;
   border-color: #dddddd;
+}
+
+#admin-athletes .admin-status-pill.is-tier-deleted {
+  background: #f8e1dc;
+  color: #8f2f22;
+  border-color: #e2b2a8;
 }
 
 #admin-athletes .admin-table-actions {

@@ -51,6 +51,11 @@ It also contains nutrition catalog enrichment used by `athlete-nutrition.html` /
   - Verifies Stripe webhook signatures
   - Upserts founding member subscription events
   - Activates matching `athlete_profiles.is_active` rows when paid/active events arrive
+- `stripe-reconcile-payment`
+  - Auth required
+  - Fetches latest Stripe subscription/invoice details for current user (or explicit checkout session)
+  - Writes invoice metadata onto membership payment task `response_data`
+  - Best-effort upserts `founding_member_subscriptions` when available
 - `nutrition-food-search`
   - Auth required
   - Searches local `nutrition_foods`
@@ -119,6 +124,7 @@ supabase functions deploy whoop-disconnect
 supabase functions deploy whoop-manual-connect
 supabase functions deploy stripe-create-checkout
 supabase functions deploy stripe-webhook
+supabase functions deploy stripe-reconcile-payment
 supabase functions deploy nutrition-food-search
 ```
 

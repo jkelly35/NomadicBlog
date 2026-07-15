@@ -53,6 +53,20 @@ begin
     updated_at = now()
   where id = p_target_user_id;
 
+  if to_regclass('auth.identities') is not null then
+    update auth.identities
+    set
+      identity_data = coalesce(identity_data, '{}'::jsonb) || jsonb_build_object(
+        'email', archived_email,
+        'archived_original_email', original_email,
+        'account_archived', true
+      ),
+      provider_id = archived_email,
+      updated_at = now()
+    where user_id = p_target_user_id
+      and provider = 'email';
+  end if;
+
   return original_email;
 end;
 $$;

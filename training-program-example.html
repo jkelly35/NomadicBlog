@@ -57,6 +57,10 @@
                 <span>Weeks</span>
                 <input type="number" min="1" max="52" step="1" value="1" data-template-weeks />
               </label>
+              <label class="program-builder-structure-field">
+                <span>Estimated Program Start Date</span>
+                <input type="date" data-template-meta-field="estimated_start_date" data-template-estimated-start-date />
+              </label>
             </div>
             <div class="program-builder-meta-grid">
               <label class="program-builder-structure-field">
@@ -127,6 +131,28 @@
               </div>
               <p class="program-builder-phase-warning" data-template-phase-warning hidden></p>
             </section>
+              <section class="program-builder-planner-card">
+                <div class="program-builder-planner-head">
+                  <div>
+                    <h3>Peaks In View</h3>
+                    <p>Keep key events visible while mapping phase focus and loading.</p>
+                  </div>
+                </div>
+                <div class="program-builder-peak-visibility" data-template-phase-peak-panel>
+                  <p class="admin-loading">No peak dates added yet.</p>
+                </div>
+              </section>
+              <section class="program-builder-planner-card">
+                <div class="program-builder-planner-head">
+                  <div>
+                    <h3>Weekly Training Days</h3>
+                    <p>Select which weekday each workout slot should occur so daily programming can project calendar dates.</p>
+                  </div>
+                </div>
+                <div class="program-builder-week-list" data-template-week-structure-list>
+                  <p class="admin-loading">Weekly structure unavailable.</p>
+                </div>
+              </section>
             </div>
           </section>
           <div class="program-builder-schedule-row" data-template-athlete-schedule hidden>
@@ -195,6 +221,10 @@
           </div>
           <select id="workout-day-select" class="day-select-dropdown" data-workout-day></select>
           <div class="day-info" data-day-info>Select a workout day to build</div>
+          <p class="program-builder-estimated-date" data-template-estimated-workout-date></p>
+          <div class="program-builder-daily-peak-panel" data-template-daily-peak-panel>
+            <p class="admin-loading">No peak dates added yet.</p>
+          </div>
         </div>
         <div class="program-builder-axis-grid" data-daily-axis-grid></div>
       </div>

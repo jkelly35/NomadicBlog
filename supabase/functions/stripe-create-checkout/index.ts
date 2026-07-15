@@ -116,6 +116,22 @@ function isSameOrigin(urlA: string | null, urlB: string | null): boolean {
   }
 }
 
+function appendUrlParams(baseUrl: string, params: Record<string, string | null | undefined>): string {
+  try {
+    const parsed = new URL(baseUrl);
+    Object.entries(params).forEach(([key, value]) => {
+      const text = String(value || "").trim();
+      if (!text) {
+        return;
+      }
+      parsed.searchParams.set(key, text);
+    });
+    return parsed.toString();
+  } catch (_error) {
+    return baseUrl;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -178,6 +194,11 @@ Deno.serve(async (req) => {
       sanitizeUrl(Deno.env.get("STRIPE_SUCCESS_URL")) ||
       "https://nomadicperformance.com/founding-payment-success.html";
 
+    const successUrlWithContext = appendUrlParams(defaultSuccessUrl, {
+      expected_user_id: authedUser.id,
+      checkout_session_id: "{CHECKOUT_SESSION_ID}"
+    });
+
     const defaultCancelUrl =
       trustedCancelUrl ||
       originCancelUrl ||
@@ -188,7 +209,7 @@ Deno.serve(async (req) => {
     payload.set("mode", "subscription");
     payload.set("line_items[0][price]", foundingMemberPriceId);
     payload.set("line_items[0][quantity]", "1");
-    payload.set("success_url", defaultSuccessUrl);
+    payload.set("success_url", successUrlWithContext);
     payload.set("cancel_url", defaultCancelUrl);
     payload.set("allow_promotion_codes", "true");
     payload.set("metadata[plan]", "founding_member");

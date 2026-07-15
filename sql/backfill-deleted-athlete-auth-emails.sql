@@ -47,7 +47,57 @@ begin
     updated_at = now()
   where id = p_target_user_id;
 
+  if to_regclass('auth.identities') is not null then
+    update auth.identities
+    set
+      identity_data = coalesce(identity_data, '{}'::jsonb) || jsonb_build_object(
+        'email', archived_email,
+        'archived_original_email', original_email,
+        'account_archived', true
+      ),
+      provider_id = archived_email,
+      updated_at = now()
+    where user_id = p_target_user_id
+      and provider = 'email';
+  end if;
+
   return original_email;
+end;
+$$;
+
+create or replace function public.release_deleted_account_email_for_signup(p_email text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  normalized_email text := lower(trim(coalesce(p_email, '')));
+  target_user_id uuid := null;
+begin
+  if normalized_email = '' then
+    return jsonb_build_object('ok', false, 'released', false);
+  end if;
+
+  select ap.user_id
+  into target_user_id
+  from public.athlete_profiles ap
+  left join auth.users u on u.id = ap.user_id
+  where ap.deleted_at is not null
+    and (
+      lower(coalesce(ap.deleted_login_email, '')) = normalized_email
+      or lower(coalesce(u.email, '')) = normalized_email
+    )
+  order by ap.deleted_at desc nulls last
+  limit 1;
+
+  if target_user_id is null then
+    return jsonb_build_object('ok', true, 'released', false);
+  end if;
+
+  perform public.release_auth_email_for_deleted_account(target_user_id);
+
+  return jsonb_build_object('ok', true, 'released', true, 'user_id', target_user_id);
 end;
 $$;
 

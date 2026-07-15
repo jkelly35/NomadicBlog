@@ -20,7 +20,7 @@
     isProgramReadOnly: false,
     coachUserId: null,
     builderStep: 1,
-    dailyProgrammingViewMode: "week",
+    dailyProgrammingViewMode: "day",
     dailyProgrammingPhaseIndex: 0,
     dailyProgrammingWeekInPhase: 1,
     dailyProgrammingDayInPhase: 1,
@@ -75,6 +75,16 @@
     "w1d2": "Upper Pull + Core",
     "w1d3": "Conditioning"
   };
+
+  var WEEKDAY_OPTIONS = [
+    { value: "sunday", label: "Sunday", dayIndex: 0 },
+    { value: "monday", label: "Monday", dayIndex: 1 },
+    { value: "tuesday", label: "Tuesday", dayIndex: 2 },
+    { value: "wednesday", label: "Wednesday", dayIndex: 3 },
+    { value: "thursday", label: "Thursday", dayIndex: 4 },
+    { value: "friday", label: "Friday", dayIndex: 5 },
+    { value: "saturday", label: "Saturday", dayIndex: 6 }
+  ];
 
   var defaultSections = [
     "Warm Up",
@@ -1124,7 +1134,7 @@
     }
 
     if (state.dailyProgrammingViewMode !== "day" && state.dailyProgrammingViewMode !== "week" && state.dailyProgrammingViewMode !== "phase") {
-      state.dailyProgrammingViewMode = state.isCoachAssignedProgramEdit ? "day" : "week";
+      state.dailyProgrammingViewMode = "day";
     }
 
     var phase = getSelectedDailyNavigatorPhase();
@@ -1229,7 +1239,7 @@
     var daySelect = document.querySelector("[data-daily-nav-day]");
 
     if (modeSelect) {
-      var nextMode = String(modeSelect.value || (state.isCoachAssignedProgramEdit ? "day" : "week")).trim().toLowerCase();
+      var nextMode = String(modeSelect.value || "day").trim().toLowerCase();
       state.dailyProgrammingViewMode = nextMode === "phase"
         ? "phase"
         : nextMode === "day"
@@ -1307,6 +1317,223 @@
     renderDailyAxisEditorCards();
     renderSessionPlanBlocks(plan);
     renderDailyProgrammingSummary(plan);
+    renderDailyBuilderPeakPanel();
+    renderEstimatedWorkoutDateInDailyProgramming();
+  }
+
+  function getBuilderSeasonObjectives() {
+    var objectives = Array.isArray(state.programMeta && state.programMeta.season_objectives)
+      ? state.programMeta.season_objectives
+      : [];
+    return deriveSeasonObjectiveWindows(objectives);
+  }
+
+  function formatBuilderPeakDate(dateValue) {
+    var raw = String(dateValue || "").trim();
+    if (!raw) {
+      return "No date set";
+    }
+
+    var parsed = new Date(raw + "T00:00:00");
+    if (isNaN(parsed.getTime())) {
+      return raw;
+    }
+
+    try {
+      return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    } catch (e) {
+      return raw;
+    }
+  }
+
+  function parseIsoDateAtLocalMidnight(value) {
+    var raw = String(value || "").trim();
+    var match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+    if (!match) {
+      return null;
+    }
+
+    var year = parseInt(match[1], 10);
+    var month = parseInt(match[2], 10) - 1;
+    var day = parseInt(match[3], 10);
+    var parsed = new Date(year, month, day);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function getWeekdayIndex(weekdayValue) {
+    var normalized = normalizeWeeklyDayOfWeek(weekdayValue, "monday");
+    var found = WEEKDAY_OPTIONS.find(function (option) {
+      return option.value === normalized;
+    });
+    return found ? found.dayIndex : 1;
+  }
+
+  function getEstimatedWorkoutDateForSlot(slotKey) {
+    var parsed = parseSlotKey(slotKey);
+    if (!parsed) {
+      return null;
+    }
+
+    var meta = normalizeProgramMeta(state.programMeta, state.structure);
+    if (!isIsoDate(meta.estimated_start_date)) {
+      return null;
+    }
+
+    var startDate = parseIsoDateAtLocalMidnight(meta.estimated_start_date);
+    if (!startDate) {
+      return null;
+    }
+
+    var weeklyEntry = Array.isArray(state.weeklyStructure) ? state.weeklyStructure[parsed.workout - 1] : null;
+    var dayValue = normalizeWeeklyDayOfWeek(weeklyEntry && weeklyEntry.day_of_week, getDefaultWeeklyWorkoutDay(parsed.workout - 1, state.structure.workoutsPerWeek));
+    var targetIndex = getWeekdayIndex(dayValue);
+    var weekAnchor = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    weekAnchor.setDate(weekAnchor.getDate() + ((parsed.week - 1) * 7));
+
+    var offset = targetIndex - weekAnchor.getDay();
+    if (offset < 0) {
+      offset += 7;
+    }
+
+    var estimated = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate());
+    estimated.setDate(estimated.getDate() + offset);
+    return estimated;
+  }
+
+  function formatEstimatedWorkoutDateForDisplay(dateValue) {
+    if (!(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
+      return "Not scheduled";
+    }
+
+    try {
+      return dateValue.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    } catch (e) {
+      return dateValue.toDateString();
+    }
+  }
+
+  function renderEstimatedWorkoutDateInDailyProgramming() {
+    var panel = document.querySelector("[data-template-estimated-workout-date]");
+    if (!panel) {
+      return;
+    }
+
+    if ((!state.isTemplateBuilder && !state.isCoachAssignedProgramEdit) || state.builderStep !== 3) {
+      panel.textContent = "";
+      return;
+    }
+
+    var meta = normalizeProgramMeta(state.programMeta, state.structure);
+    if (!isIsoDate(meta.estimated_start_date)) {
+      panel.textContent = "Add an estimated program start date in Overview to project workout dates.";
+      return;
+    }
+
+    var estimatedDate = getEstimatedWorkoutDateForSlot(state.day);
+    if (!estimatedDate) {
+      panel.textContent = "Set workout weekdays in Program Phases to project workout dates.";
+      return;
+    }
+
+    panel.textContent = "Estimated workout date: " + formatEstimatedWorkoutDateForDisplay(estimatedDate) + ".";
+  }
+
+  function getBuilderCurrentWeek() {
+    var parsed = parseSlotKey(state.day);
+    if (parsed && Number.isFinite(parsed.week)) {
+      return parsed.week;
+    }
+    return 1;
+  }
+
+  function renderPhaseBuilderPeakPanel() {
+    var container = document.querySelector("[data-template-phase-peak-panel]");
+    if (!container) {
+      return;
+    }
+
+    var objectives = getBuilderSeasonObjectives();
+    if (!objectives.length) {
+      container.innerHTML = '<p class="admin-loading">No peak dates added yet.</p>';
+      return;
+    }
+
+    container.innerHTML = objectives.map(function (objective) {
+      var label = String(objective && objective.label || "Peak").trim() || "Peak";
+      var weekStart = clampNumber(parseInt(objective && objective.phase_start_week, 10), 1, state.structure.weeks, 1);
+      var weekEnd = clampNumber(parseInt(objective && objective.phase_end_week, 10), weekStart, state.structure.weeks, weekStart);
+      var goal = String(objective && (objective.primary_goal || objective.notes) || "").trim();
+      return [
+        '<article class="program-builder-peak-item">',
+        '<p class="program-builder-peak-title">' + escapeHtml(label) + '</p>',
+        '<p class="program-builder-peak-meta">' + escapeHtml(formatBuilderPeakDate(objective && objective.peak_date)) + ' • Weeks ' + String(weekStart) + '-' + String(weekEnd) + '</p>',
+        goal ? '<p class="program-builder-peak-goal">' + escapeHtml(goal) + '</p>' : '',
+        '</article>'
+      ].join('');
+    }).join('');
+  }
+
+  function renderDailyBuilderPeakPanel() {
+    var container = document.querySelector("[data-template-daily-peak-panel]");
+    if (!container) {
+      return;
+    }
+
+    if ((!state.isTemplateBuilder && !state.isCoachAssignedProgramEdit) || state.builderStep !== 3) {
+      container.innerHTML = "";
+      return;
+    }
+
+    var objectives = getBuilderSeasonObjectives();
+    if (!objectives.length) {
+      container.innerHTML = '<p class="admin-loading">No peak dates added yet.</p>';
+      return;
+    }
+
+    var currentWeek = getBuilderCurrentWeek();
+    var current = objectives.filter(function (objective) {
+      var start = clampNumber(parseInt(objective && objective.phase_start_week, 10), 1, state.structure.weeks, 1);
+      var end = clampNumber(parseInt(objective && objective.phase_end_week, 10), start, state.structure.weeks, start);
+      return currentWeek >= start && currentWeek <= end;
+    });
+
+    var upcoming = objectives
+      .filter(function (objective) {
+        var start = clampNumber(parseInt(objective && objective.phase_start_week, 10), 1, state.structure.weeks, 1);
+        return start > currentWeek;
+      })
+      .sort(function (a, b) {
+        return clampNumber(parseInt(a && a.phase_start_week, 10), 1, state.structure.weeks, 1)
+          - clampNumber(parseInt(b && b.phase_start_week, 10), 1, state.structure.weeks, 1);
+      });
+
+    var cards = [];
+    current.forEach(function (objective) {
+      var label = String(objective && objective.label || "Peak").trim() || "Peak";
+      var start = clampNumber(parseInt(objective && objective.phase_start_week, 10), 1, state.structure.weeks, 1);
+      var end = clampNumber(parseInt(objective && objective.phase_end_week, 10), start, state.structure.weeks, start);
+      var goal = String(objective && (objective.primary_goal || objective.notes) || "").trim();
+      cards.push([
+        '<article class="program-builder-peak-item is-active">',
+        '<p class="program-builder-peak-title">In Scope Now: ' + escapeHtml(label) + '</p>',
+        '<p class="program-builder-peak-meta">Week ' + String(currentWeek) + ' • Peak window Weeks ' + String(start) + '-' + String(end) + ' • ' + escapeHtml(formatBuilderPeakDate(objective && objective.peak_date)) + '</p>',
+        goal ? '<p class="program-builder-peak-goal">' + escapeHtml(goal) + '</p>' : '',
+        '</article>'
+      ].join(''));
+    });
+
+    if (!cards.length) {
+      cards.push('<p class="program-builder-peak-inline-note">Week ' + String(currentWeek) + ': no peak window is currently in scope.</p>');
+    }
+
+    if (upcoming.length) {
+      var next = upcoming[0];
+      var nextLabel = String(next && next.label || "Peak").trim() || "Peak";
+      var nextStart = clampNumber(parseInt(next && next.phase_start_week, 10), 1, state.structure.weeks, 1);
+      cards.push('<p class="program-builder-peak-inline-note">Next peak focus: ' + escapeHtml(nextLabel) + ' begins Week ' + String(nextStart) + ' (' + escapeHtml(formatBuilderPeakDate(next && next.peak_date)) + ').</p>');
+    }
+
+    container.innerHTML = cards.join('');
   }
 
   function getCurrentAxisSlotKeys() {
@@ -1377,6 +1604,10 @@
       var axisSubtitle = useNavigatorLabels
         ? "Week " + String(parsed.week) + " • Day " + String(parsed.workout)
         : String(labelForSlot(slotKey) || ("Week " + String(parsed.week) + " • Day " + String(parsed.workout)));
+      var estimatedDate = getEstimatedWorkoutDateForSlot(slotKey);
+      if (estimatedDate) {
+        axisSubtitle += " • " + formatEstimatedWorkoutDateForDisplay(estimatedDate);
+      }
       return [
         '<article class="program-builder-axis-card">',
         '<div class="program-builder-axis-card-head">',
@@ -2966,6 +3197,7 @@
       program_type: "hybrid",
       sport_focus: "",
       athlete_level: "intermediate",
+      estimated_start_date: "",
       primary_goal: "",
       secondary_goal: "",
       training_days_per_week: state && state.structure ? state.structure.workoutsPerWeek : 3,
@@ -3070,6 +3302,8 @@
         var objectiveIndex = parseInt(String(target.getAttribute("data-template-objective-index") || "-1"), 10);
         if (Number.isFinite(objectiveIndex)) {
           syncSeasonObjectiveField(objectiveIndex, objectiveField, target.value);
+          renderPhaseBuilderPeakPanel();
+          renderDailyBuilderPeakPanel();
           renderProgramBuilderAlerts();
         }
         return;
@@ -4176,6 +4410,10 @@
     if (daySelect) {
       refreshWorkoutDaySelect(daySelect);
     }
+
+    renderPhaseBuilderPeakPanel();
+    renderDailyBuilderPeakPanel();
+    renderEstimatedWorkoutDateInDailyProgramming();
   }
 
   function bindTemplateProgramOverviewEvents() {
@@ -4729,6 +4967,8 @@
   function updateDayInfo() {
     var dayInfo = document.querySelector("[data-day-info]");
     if (!dayInfo) {
+      renderDailyBuilderPeakPanel();
+      renderEstimatedWorkoutDateInDailyProgramming();
       return;
     }
 
@@ -4743,6 +4983,8 @@
       } else {
         dayInfo.textContent = "Phase View • " + phaseName + " • Day " + String(state.dailyProgrammingDayInPhase) + " • Editing progression across phase weeks.";
       }
+      renderDailyBuilderPeakPanel();
+      renderEstimatedWorkoutDateInDailyProgramming();
       return;
     }
 
@@ -4754,6 +4996,8 @@
     } else {
       dayInfo.textContent = "📅 " + label + dayTypeLabel;
     }
+    renderDailyBuilderPeakPanel();
+    renderEstimatedWorkoutDateInDailyProgramming();
   }
 
   function formatWorkoutOverviewSetHint(exercise) {
@@ -9896,6 +10140,7 @@
     state.programMeta = meta;
     setInputValue("[data-template-program-type]", meta.program_type);
     setInputValue("[data-template-sport-focus]", meta.sport_focus);
+    setInputValue("[data-template-estimated-start-date]", meta.estimated_start_date);
     setInputValue("[data-template-athlete-level]", meta.athlete_level);
     setInputValue("[data-template-peak-date]", meta.peak_date);
     setInputValue("[data-template-primary-goal]", meta.primary_goal);
@@ -9913,6 +10158,8 @@
       renderProgramMetaInputs();
       renderSeasonObjectives();
       renderProgramPhases();
+      renderPhaseBuilderPeakPanel();
+      renderDailyBuilderPeakPanel();
       renderWeeklyStructure();
       renderProgramBuilderAlerts();
     } catch (error) {
@@ -9963,6 +10210,9 @@
         '</div>'
       ].join('');
     }).join('');
+
+    renderPhaseBuilderPeakPanel();
+    renderDailyBuilderPeakPanel();
   }
 
   function renderProgramPhases() {
@@ -10030,6 +10280,7 @@
     }).join('');
 
     renderProgramPhaseWeeksWarning();
+    renderPhaseBuilderPeakPanel();
   }
 
   function getProgramPhaseWeekSummary() {
@@ -10085,9 +10336,21 @@
     }
 
     container.innerHTML = state.weeklyStructure.map(function (entry, index) {
+      var weekOneSlot = "w1d" + String(index + 1);
+      var projected = getEstimatedWorkoutDateForSlot(weekOneSlot);
+      var projectedLabel = projected
+        ? formatEstimatedWorkoutDateForDisplay(projected)
+        : "Set estimated start date to project week 1";
       return [
         '<div class="program-builder-week-item">',
         '<p class="program-builder-week-kicker">Workout ' + escapeHtml(String(entry.workout || (index + 1))) + '</p>',
+        '<label class="program-builder-structure-field">',
+        '<span>Day Of Week</span>',
+        '<select data-template-week-field="day_of_week" data-template-week-index="' + index + '">',
+        buildWeeklyDayOfWeekOptions(entry.day_of_week),
+        '</select>',
+        '</label>',
+        '<p class="program-builder-week-meta">Estimated Week 1 date: ' + escapeHtml(projectedLabel) + '</p>',
         '<label class="program-builder-structure-field">',
         '<span>Session Title</span>',
         '<input type="text" data-template-week-field="name" data-template-week-index="' + index + '" value="' + escapeAttribute(entry.name || '') + '" />',
@@ -10196,6 +10459,43 @@
     }).join('');
   }
 
+  function normalizeWeeklyDayOfWeek(value, fallbackValue) {
+    var target = String(value || "").trim().toLowerCase();
+    var found = WEEKDAY_OPTIONS.some(function (option) {
+      return option.value === target;
+    });
+    if (found) {
+      return target;
+    }
+    return String(fallbackValue || "monday").trim().toLowerCase();
+  }
+
+  function getDefaultWeeklyWorkoutDay(index, workoutsPerWeek) {
+    var total = Math.max(1, Math.min(7, parseInt(workoutsPerWeek, 10) || 1));
+    var patterns = {
+      1: [1],
+      2: [1, 4],
+      3: [1, 3, 5],
+      4: [1, 2, 4, 6],
+      5: [1, 2, 3, 5, 6],
+      6: [1, 2, 3, 4, 5, 6],
+      7: [0, 1, 2, 3, 4, 5, 6]
+    };
+    var byIndex = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    var pattern = patterns[total] || patterns[3];
+    var safe = Math.max(0, parseInt(index, 10) || 0);
+    var dayIndex = pattern[Math.min(safe, pattern.length - 1)];
+    return byIndex[dayIndex] || "monday";
+  }
+
+  function buildWeeklyDayOfWeekOptions(selectedValue) {
+    var selected = normalizeWeeklyDayOfWeek(selectedValue, "monday");
+    return WEEKDAY_OPTIONS.map(function (option) {
+      var isSelected = option.value === selected ? " selected" : "";
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join("");
+  }
+
   function syncProgramMetaField(field, value) {
     var meta = normalizeProgramMeta(state.programMeta, state.structure);
     if (field === 'tags') {
@@ -10296,6 +10596,8 @@
     var item = state.weeklyStructure[index] || buildDefaultWeeklyStructure(state.structure.workoutsPerWeek, state.templateFocus, state.programMeta && state.programMeta.program_type)[index] || {};
     if (field === 'session_type') {
       item[field] = normalizeWeeklySessionType(value);
+    } else if (field === "day_of_week") {
+      item[field] = normalizeWeeklyDayOfWeek(value, getDefaultWeeklyWorkoutDay(index, state.structure.workoutsPerWeek));
     } else {
       item[field] = String(value || '').trim();
     }
@@ -10595,6 +10897,7 @@
       program_type: normalizeProgramType(source.program_type),
       sport_focus: String(source.sport_focus || "").trim(),
       athlete_level: normalizeAthleteLevel(source.athlete_level),
+      estimated_start_date: isIsoDate(source.estimated_start_date) ? String(source.estimated_start_date) : "",
       primary_goal: String(source.primary_goal || "").trim(),
       secondary_goal: String(source.secondary_goal || "").trim(),
       training_days_per_week: clampNumber(trainingDays, 1, 14, normalizedStructure.workoutsPerWeek),
@@ -10691,10 +10994,11 @@
 
     for (var i = 0; i < total; i++) {
       var item = source[i] && typeof source[i] === "object" ? source[i] : {};
-      var fallback = defaults[i] || defaults[defaults.length - 1] || { name: "Workout " + String(i + 1), session_type: "strength_full", note: "" };
+      var fallback = defaults[i] || defaults[defaults.length - 1] || { name: "Workout " + String(i + 1), session_type: "strength_full", note: "", day_of_week: getDefaultWeeklyWorkoutDay(i, total) };
       normalized.push({
         workout: i + 1,
         name: String(item.name || fallback.name || ("Workout " + String(i + 1))).trim(),
+        day_of_week: normalizeWeeklyDayOfWeek(item.day_of_week || fallback.day_of_week, getDefaultWeeklyWorkoutDay(i, total)),
         session_type: normalizeWeeklySessionType(item.session_type || fallback.session_type),
         note: String(item.note || fallback.note || "").trim()
       });
@@ -10780,6 +11084,7 @@
       result.push({
         workout: i + 1,
         name: entry.name,
+        day_of_week: getDefaultWeeklyWorkoutDay(i, total),
         session_type: entry.session_type,
         note: entry.note
       });
