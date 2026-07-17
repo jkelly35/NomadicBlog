@@ -518,6 +518,11 @@
 
     if (dayCopyForwardBtn) {
       dayCopyForwardBtn.addEventListener("click", function () {
+        if (shouldUsePhaseDailyNavigator() && state.dailyProgrammingViewMode === "phase") {
+          copyCurrentPhaseDayForward();
+          return;
+        }
+
         copyCurrentDayForward();
       });
     }
@@ -733,6 +738,24 @@
             renderSessionPlanBlocks(addBlockPlan);
             renderDailyProgrammingSummary(addBlockPlan);
           }
+        }
+        return;
+      }
+
+      var copyAxisWeekBtn = event.target && event.target.closest("[data-axis-copy-week-forward]");
+      if (copyAxisWeekBtn) {
+        var copyAxisWeekSlot = String(copyAxisWeekBtn.getAttribute("data-axis-copy-week-forward") || "").trim();
+        if (copyAxisWeekSlot) {
+          copyCurrentPhaseWeekForward(copyAxisWeekSlot);
+        }
+        return;
+      }
+
+      var copyAxisDayBtn = event.target && event.target.closest("[data-axis-copy-forward]");
+      if (copyAxisDayBtn) {
+        var copyAxisSlot = String(copyAxisDayBtn.getAttribute("data-axis-copy-forward") || "").trim();
+        if (copyAxisSlot) {
+          copyCurrentPhaseDayForward(copyAxisSlot);
         }
         return;
       }
@@ -1300,6 +1323,8 @@
       return;
     }
 
+    var focusedFieldState = captureFocusedFieldState();
+
     var plan = getCurrentSessionPlan();
     state.sessionPlans[state.day] = plan;
 
@@ -1319,6 +1344,81 @@
     renderDailyProgrammingSummary(plan);
     renderDailyBuilderPeakPanel();
     renderEstimatedWorkoutDateInDailyProgramming();
+    restoreFocusedFieldState(focusedFieldState);
+  }
+
+  function captureFocusedFieldState() {
+    var active = document.activeElement;
+    if (!active || !active.getAttribute || !active.matches) {
+      return null;
+    }
+
+    if (!active.matches("input, textarea, select")) {
+      return null;
+    }
+
+    var selectorParts = [];
+    [
+      "data-axis-slot",
+      "data-axis-block-index",
+      "data-axis-block-field",
+      "data-axis-exercise-index",
+      "data-axis-set-index",
+      "data-session-plan-field",
+      "data-session-block-index",
+      "data-session-block-field",
+      "data-template-meta-field",
+      "data-template-objective-index",
+      "data-template-objective-field",
+      "data-template-phase-index",
+      "data-template-phase-field",
+      "data-template-week-index",
+      "data-template-week-field",
+      "data-overview-slot",
+      "data-overview-block-index",
+      "data-overview-block-field",
+      "data-notes-textarea"
+    ].forEach(function (attrName) {
+      var attrValue = active.getAttribute(attrName);
+      if (attrValue !== null) {
+        selectorParts.push("[" + attrName + "='" + String(attrValue).replace(/'/g, "\\'") + "']");
+      }
+    });
+
+    if (!selectorParts.length) {
+      return null;
+    }
+
+    return {
+      selector: active.tagName.toLowerCase() + selectorParts.join(""),
+      selectionStart: typeof active.selectionStart === "number" ? active.selectionStart : null,
+      selectionEnd: typeof active.selectionEnd === "number" ? active.selectionEnd : null
+    };
+  }
+
+  function restoreFocusedFieldState(focusedFieldState) {
+    if (!focusedFieldState || !focusedFieldState.selector) {
+      return;
+    }
+
+    var nextField = document.querySelector(focusedFieldState.selector);
+    if (!nextField || typeof nextField.focus !== "function") {
+      return;
+    }
+
+    try {
+      nextField.focus({ preventScroll: true });
+    } catch (e) {
+      nextField.focus();
+    }
+
+    if (typeof nextField.setSelectionRange === "function" && focusedFieldState.selectionStart !== null && focusedFieldState.selectionEnd !== null) {
+      try {
+        nextField.setSelectionRange(focusedFieldState.selectionStart, focusedFieldState.selectionEnd);
+      } catch (selectionError) {
+        // Ignore selection restore errors.
+      }
+    }
   }
 
   function getBuilderSeasonObjectives() {
@@ -1575,6 +1675,8 @@
       return;
     }
 
+    var focusedFieldState = captureFocusedFieldState();
+
     if (!shouldUsePhaseDailyNavigator()) {
       container.innerHTML = "";
       return;
@@ -1586,8 +1688,26 @@
       return;
     }
 
-    container.innerHTML = buildDailyAxisEditorCardsHtml(slotKeys, true);
+    var footerHtml = state.dailyProgrammingViewMode === "week"
+      ? buildDailyAxisWeekCopyFooterHtml(slotKeys)
+      : "";
+
+    container.innerHTML = buildDailyAxisEditorCardsHtml(slotKeys, true) + footerHtml;
     applyDailyAxisSelectValues(container, slotKeys);
+    restoreFocusedFieldState(focusedFieldState);
+  }
+
+  function buildDailyAxisWeekCopyFooterHtml(slotKeys) {
+    var sourceSlotKey = Array.isArray(slotKeys) && slotKeys.length ? String(slotKeys[0] || "").trim() : "";
+    if (!sourceSlotKey) {
+      return "";
+    }
+
+    return [
+      '<div class="program-builder-axis-week-copy-footer">',
+      '<button type="button" class="btn admin-btn-primary" data-axis-copy-week-forward="' + escapeAttribute(sourceSlotKey) + '">Copy Week Forward</button>',
+      '</div>'
+    ].join('');
   }
 
   function buildDailyAxisEditorCardsHtml(slotKeys, useNavigatorLabels) {
@@ -1649,6 +1769,9 @@
         '</div>',
         renderAxisSessionPlanBlocks(slotKey, plan),
         '<button type="button" class="btn admin-btn-small" data-axis-plan-add-block="' + escapeAttribute(slotKey) + '">Add Block</button>',
+        (shouldUsePhaseDailyNavigator() && state.dailyProgrammingViewMode === "phase"
+          ? '<button type="button" class="btn admin-btn-primary" data-axis-copy-forward="' + escapeAttribute(slotKey) + '">Copy Day Forward</button>'
+          : ''),
         '</div>',
         '</article>'
       ].join('');
@@ -4424,7 +4547,8 @@
       }
     });
 
-    function handleOverviewInput(target) {
+    function handleOverviewInput(event) {
+      var target = event && event.target ? event.target : null;
       if (!target || !target.closest) {
         return;
       }
@@ -4467,20 +4591,22 @@
       state.sessionPlans[slotKey] = normalizeSessionPlan(plan, slotKey);
       persistSessionPlanForSlot(slotKey, state.sessionPlans[slotKey]);
 
-      if (slotKey === state.day) {
+      if (event && event.type === "change" && slotKey === state.day) {
         renderDailyProgrammingDesigner();
         renderDailyProgrammingSummary(state.sessionPlans[slotKey]);
       }
 
-      renderTemplateProgramOverview();
+      if (event && event.type === "change") {
+        renderTemplateProgramOverview();
+      }
     }
 
     document.addEventListener("input", function (event) {
-      handleOverviewInput(event.target);
+      handleOverviewInput(event);
     });
 
     document.addEventListener("change", function (event) {
-      handleOverviewInput(event.target);
+      handleOverviewInput(event);
     });
   }
 
@@ -4522,6 +4648,7 @@
   function renderTemplateProgramOverview() {
     var panel = document.querySelector("[data-template-program-overview]");
     var list = document.querySelector("[data-template-program-overview-list]");
+    var focusedFieldState = captureFocusedFieldState();
     if (!panel || panel.hidden || !list) {
       return;
     }
@@ -4573,12 +4700,19 @@
         '</article>'
       ].join("");
     }).join("");
+
+    restoreFocusedFieldState(focusedFieldState);
   }
 
   function openTemplateProgramOverviewPage() {
     if (!state.isTemplateBuilder) {
       return;
     }
+
+    window.__PENDING_TEMPLATE_SAVE_DATA__ = buildTemplateSaveData({
+      promptForName: false,
+      showErrors: true
+    });
 
     var returnUrl = String(window.location.href || "training-program-example.html");
     var previewWindow = window.open("", "_self");
@@ -4807,14 +4941,31 @@
       "  }",
       "  if (saveTemplateFromOverviewBtn) {",
       "    saveTemplateFromOverviewBtn.addEventListener('click', function () {",
-      "      var nextUrl = new URL(returnUrl, window.location.origin);",
-      "      var titleSource = '';",
-      "      try { titleSource = String(data && data.templateName || '').trim(); } catch (e) { titleSource = ''; }",
-      "      if (titleSource) { nextUrl.searchParams.set('templateName', titleSource); }",
-      "      nextUrl.searchParams.delete('newTemplate');",
-      "      nextUrl.searchParams.set('autosaveTemplate', '1');",
-      "      nextUrl.searchParams.set('redirectToLibrary', '1');",
-      "      window.location.href = nextUrl.toString();",
+      "      saveTemplateFromOverviewBtn.disabled = true;",
+      "      saveTemplateFromOverviewBtn.textContent = 'Saving...';",
+      "      var saveData = window.__PENDING_TEMPLATE_SAVE_DATA__ || null;",
+      "      if (!saveData && window.buildTemplateSaveData) {",
+      "        try {",
+      "          saveData = window.buildTemplateSaveData({ promptForName: false, showErrors: true });",
+      "        } catch (e) {",
+      "          saveData = null;",
+      "        }",
+      "      }",
+      "      if (!saveData || !window.saveTemplateToLibrary) {",
+      "        saveTemplateFromOverviewBtn.disabled = false;",
+      "        saveTemplateFromOverviewBtn.textContent = 'Save Template';",
+      "        return;",
+      "      }",
+      "      window.saveTemplateToLibrary(saveData)",
+      "        .then(function () {",
+      "          window.__PENDING_TEMPLATE_SAVE_DATA__ = null;",
+      "          window.location.href = 'coach-training-programs.html';",
+      "        })",
+      "        .catch(function (error) {",
+      "          saveTemplateFromOverviewBtn.disabled = false;",
+      "          saveTemplateFromOverviewBtn.textContent = 'Save Template';",
+      "          window.alert(error && error.message ? error.message : 'Failed to save template.');",
+      "        });",
       "    });",
       "  }",
       "  if (openCalendarFirst) {",
@@ -5159,6 +5310,7 @@
   function refreshTemplateDayTools() {
     var dayTools = document.querySelector("[data-template-day-tools]");
     var dayNameInput = document.querySelector("[data-template-day-name]");
+    var dayCopyForwardBtn = document.querySelector("[data-template-day-copy-forward]");
     if (!dayTools || !dayNameInput) {
       return;
     }
@@ -5170,6 +5322,12 @@
 
     dayTools.hidden = false;
     dayNameInput.value = String(labelForSlot(state.day) || "");
+
+    if (dayCopyForwardBtn) {
+      dayCopyForwardBtn.textContent = shouldUsePhaseDailyNavigator() && state.dailyProgrammingViewMode === "phase"
+        ? "Copy Day Forward in Phase"
+        : "Copy Day Forward";
+    }
   }
 
   function renameCurrentDay(nextName) {
@@ -5220,10 +5378,14 @@
 
     for (var i = currentIndex + 1; i < slotKeys.length; i++) {
       var slotKey = slotKeys[i];
-      writeToStorage(state.storagePrefix + slotKey, {
+      var targetPayload = {
         exercises: cloneExercises(sourceExercises),
+        session_plan: cloneSessionPlan(getCurrentSessionPlan(), slotKey),
         saved_at: new Date().toISOString()
-      });
+      };
+
+      writeToStorage(state.storagePrefix + slotKey, targetPayload);
+      state.sessionPlans[slotKey] = normalizeSessionPlan(targetPayload.session_plan, slotKey);
 
       if (state.daySessionTypes && state.daySessionTypes[state.day]) {
         state.daySessionTypes[slotKey] = state.daySessionTypes[state.day];
@@ -5243,6 +5405,182 @@
     }
 
     setStatus("Copied this day forward to " + copied + " future slot(s).", "success");
+  }
+
+  function copyCurrentPhaseDayForward(sourceSlotKey) {
+    var sourceKey = String(sourceSlotKey || state.day || "").trim();
+    if (!state.isTemplateBuilder || !sourceKey || !shouldUsePhaseDailyNavigator()) {
+      return;
+    }
+
+    ensureDailyNavigatorState();
+    var phase = getSelectedDailyNavigatorPhase();
+    var parsed = parseSlotKey(sourceKey);
+    if (!phase || !parsed) {
+      return;
+    }
+
+    var sourceWeek = parsed.week;
+    var sourceWorkout = parsed.workout;
+    var phaseEndWeek = clampNumber(parseInt(phase.end_week, 10), sourceWeek, state.structure.weeks, sourceWeek);
+
+    if (sourceWeek >= phaseEndWeek) {
+      setStatus("No later weeks in this phase are available to copy into.", "info");
+      return;
+    }
+
+    saveExercisesForDay(true);
+
+    var sourcePayload = readFromStorage(state.storagePrefix + sourceKey) || {};
+    var sourcePlan = sourcePayload.session_plan || state.sessionPlans[sourceKey] || getCurrentSessionPlan();
+    var sourceExercises = Array.isArray(sourcePayload.exercises)
+      ? cloneExercises(sourcePayload.exercises)
+      : cloneExercises(state.exercises || []);
+    var copiedCount = 0;
+
+    for (var week = sourceWeek + 1; week <= phaseEndWeek; week++) {
+      var targetKey = "w" + String(week) + "d" + String(sourceWorkout);
+      var targetSessionPlan = cloneSessionPlan(sourcePlan, targetKey);
+      var targetPayload = Object.assign({}, sourcePayload, {
+        exercises: cloneExercises(sourceExercises),
+        session_plan: targetSessionPlan,
+        workout_completed_at: null,
+        workout_completion_recorded: false,
+        workout_completed_started_at: null,
+        workout_completed_feedback: null,
+        workout_completion_summary: null,
+        workout_performance_entries: null,
+        workout_total_volume_load: null,
+        workout_volume_by_movement_pattern: null,
+        workout_volume_by_primary_muscle: null,
+        saved_at: new Date().toISOString()
+      });
+
+      writeToStorage(state.storagePrefix + targetKey, targetPayload);
+      state.sessionPlans[targetKey] = normalizeSessionPlan(targetSessionPlan, targetKey);
+
+      if (state.daySessionTypes && state.daySessionTypes[sourceKey]) {
+        state.daySessionTypes[targetKey] = state.daySessionTypes[sourceKey];
+      }
+
+      if (state.customDayNames && state.customDayNames[sourceKey]) {
+        state.customDayNames[targetKey] = state.customDayNames[sourceKey];
+      }
+
+      copiedCount += 1;
+    }
+
+    var daySelect = document.querySelector("[data-workout-day]");
+    if (daySelect) {
+      refreshWorkoutDaySelect(daySelect);
+      daySelect.value = state.day;
+    }
+
+    renderDailyAxisEditorCards();
+    renderDailyProgrammingDesigner();
+    setStatus("Copied this day forward across " + copiedCount + " future week(s) in this phase.", "success");
+  }
+
+  function copyCurrentPhaseWeekForward(sourceSlotKey) {
+    var sourceKey = String(sourceSlotKey || state.day || "").trim();
+    if (!state.isTemplateBuilder || !sourceKey || !shouldUsePhaseDailyNavigator()) {
+      return;
+    }
+
+    ensureDailyNavigatorState();
+    var phase = getSelectedDailyNavigatorPhase();
+    var parsed = parseSlotKey(sourceKey);
+    if (!phase || !parsed) {
+      return;
+    }
+
+    var sourceWeek = parsed.week;
+    var phaseEndWeek = clampNumber(parseInt(phase.end_week, 10), sourceWeek, state.structure.weeks, sourceWeek);
+    if (sourceWeek >= phaseEndWeek) {
+      setStatus("No later weeks in this phase are available to copy into.", "info");
+      return;
+    }
+
+    var slotKeys = getCurrentAxisSlotKeys();
+    if (!slotKeys.length) {
+      setStatus("No current week slots are available to copy.", "info");
+      return;
+    }
+
+    saveExercisesForDay(true);
+
+    var copiedWeeks = 0;
+    for (var week = sourceWeek + 1; week <= phaseEndWeek; week++) {
+      slotKeys.forEach(function (weekSourceKey) {
+        var weekSourceParsed = parseSlotKey(weekSourceKey);
+        if (!weekSourceParsed) {
+          return;
+        }
+
+        var targetKey = "w" + String(week) + "d" + String(weekSourceParsed.workout);
+        var sourcePayload = readFromStorage(state.storagePrefix + weekSourceKey) || {};
+        var sourcePlan = state.sessionPlans[weekSourceKey] || sourcePayload.session_plan || getSessionPlanForSlot(weekSourceKey);
+        var sourceExercises = Array.isArray(sourcePayload.exercises) && sourcePayload.exercises.length
+          ? cloneExercises(sourcePayload.exercises)
+          : convertSessionPlanToExercises(sourcePlan);
+        var targetSessionPlan = cloneSessionPlan(sourcePlan, targetKey);
+        var targetPayload = Object.assign({}, sourcePayload, {
+          exercises: cloneExercises(sourceExercises),
+          session_plan: targetSessionPlan,
+          workout_completed_at: null,
+          workout_completion_recorded: false,
+          workout_completed_started_at: null,
+          workout_completed_feedback: null,
+          workout_completion_summary: null,
+          workout_performance_entries: null,
+          workout_total_volume_load: null,
+          workout_volume_by_movement_pattern: null,
+          workout_volume_by_primary_muscle: null,
+          saved_at: new Date().toISOString()
+        });
+
+        writeToStorage(state.storagePrefix + targetKey, targetPayload);
+        state.sessionPlans[targetKey] = normalizeSessionPlan(targetSessionPlan, targetKey);
+
+        if (state.daySessionTypes && state.daySessionTypes[weekSourceKey]) {
+          state.daySessionTypes[targetKey] = state.daySessionTypes[weekSourceKey];
+        }
+
+        if (state.customDayNames && state.customDayNames[weekSourceKey]) {
+          state.customDayNames[targetKey] = state.customDayNames[weekSourceKey];
+        }
+      });
+
+      copiedWeeks += 1;
+    }
+
+    renderDailyAxisEditorCards();
+    renderDailyProgrammingDesigner();
+    setStatus("Copied this week forward across " + copiedWeeks + " future week(s) in this phase.", "success");
+  }
+
+  function cloneSessionPlan(plan, slotKey) {
+    var source = plan && typeof plan === "object" ? plan : {};
+    return normalizeSessionPlan({
+      title: source.title,
+      session_type: source.session_type,
+      phase_name: source.phase_name,
+      objective_label: source.objective_label,
+      session_goal: source.session_goal,
+      sport_focus: source.sport_focus,
+      duration_minutes: source.duration_minutes,
+      terrain: source.terrain,
+      vertical_gain: source.vertical_gain,
+      intensity_target: source.intensity_target,
+      coach_notes: source.coach_notes,
+      blocks: cloneSessionBlocks(source.blocks)
+    }, slotKey);
+  }
+
+  function cloneSessionBlocks(blocks) {
+    return (Array.isArray(blocks) ? blocks : []).map(function (block) {
+      return JSON.parse(JSON.stringify(block || {}));
+    });
   }
 
   function bindTemplateWorkspaceEvents() {
@@ -7598,6 +7936,7 @@
   function buildTemplateSaveData(options) {
     var config = options || {};
 
+    syncTemplateBuilderStateFromInputs();
     saveExercisesForDay(true);
 
     var nameInput = document.querySelector("[data-template-name]");
@@ -7653,6 +7992,35 @@
     };
   }
 
+  function syncTemplateBuilderStateFromInputs() {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    var weeksInput = document.querySelector("[data-template-weeks]");
+    var workoutsInput = document.querySelector("[data-template-workouts-per-week]");
+    var phaseCountInput = document.querySelector("[data-template-phase-count]");
+
+    var nextWeeks = parseInt((weeksInput && weeksInput.value) || String(state.structure && state.structure.weeks || 1), 10);
+    var nextWorkouts = parseInt((workoutsInput && workoutsInput.value) || String(state.structure && state.structure.workoutsPerWeek || 3), 10);
+
+    if (!state.structure || nextWeeks !== state.structure.weeks || nextWorkouts !== state.structure.workoutsPerWeek) {
+      updateTemplateStructure(nextWeeks, nextWorkouts);
+    }
+
+    if (phaseCountInput) {
+      var nextPhaseCount = parseInt(String(phaseCountInput.value || ""), 10);
+      var currentPhaseCount = Array.isArray(state.programPhases) ? state.programPhases.length : 0;
+      if (Number.isFinite(nextPhaseCount) && nextPhaseCount > 0 && nextPhaseCount !== currentPhaseCount) {
+        resizeProgramPhases(nextPhaseCount);
+      }
+    }
+
+    state.programMeta = normalizeProgramMeta(state.programMeta, state.structure);
+    state.programPhases = normalizeProgramPhases(state.programPhases, state.structure.weeks, state.programMeta && state.programMeta.program_type);
+    state.weeklyStructure = normalizeWeeklyStructure(state.weeklyStructure, state.structure.workoutsPerWeek, state.templateFocus, state.programMeta && state.programMeta.program_type);
+  }
+
   function saveTemplateToLibrary(saveData) {
     var templateIdForUpdate = state.templateId && isUuid(state.templateId) ? state.templateId : null;
     var isEditingExistingTemplate = !!templateIdForUpdate;
@@ -7691,6 +8059,11 @@
         isEditingExistingTemplate: isEditingExistingTemplate
       };
     });
+  }
+
+  if (typeof window !== "undefined") {
+    window.buildTemplateSaveData = buildTemplateSaveData;
+    window.saveTemplateToLibrary = saveTemplateToLibrary;
   }
 
   function scheduleTemplateToAthleteCalendar(startDateInput) {

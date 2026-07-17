@@ -11134,6 +11134,41 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
               return;
             }
 
+            var existingProgramName = String(activeAssignment.program_name || sourceProgram.name || "").trim();
+            var isExistingCustomProgram = /\(Custom\)\s*$/i.test(existingProgramName);
+            if (isExistingCustomProgram) {
+              setTrainingProgramStatus("Opening existing athlete-specific program editor...", "info");
+              var existingAthleteNameParam =
+                (state.profile && state.profile.name) ||
+                (state.viewUser && state.viewUser.email) ||
+                "Athlete";
+
+              maybeRepairExistingCustomProgramPayload(activeAssignment, sourcePayload, viewedUserId)
+                .then(function (repairResult) {
+                  if (repairResult && repairResult.repaired) {
+                    setTrainingProgramStatus("Repaired missing program structure and reopened editor.", "success");
+                  }
+
+                  window.location.href =
+                    "training-program-example.html?builder=1&templateId=" +
+                    encodeURIComponent(activeAssignment.program_id) +
+                    "&athleteId=" +
+                    encodeURIComponent(viewedUserId) +
+                    "&athleteName=" +
+                    encodeURIComponent(existingAthleteNameParam);
+                })
+                .catch(function () {
+                  window.location.href =
+                    "training-program-example.html?builder=1&templateId=" +
+                    encodeURIComponent(activeAssignment.program_id) +
+                    "&athleteId=" +
+                    encodeURIComponent(viewedUserId) +
+                    "&athleteName=" +
+                    encodeURIComponent(existingAthleteNameParam);
+                });
+              return;
+            }
+
             var athleteLabel =
               (state.profile && state.profile.name) ||
               (state.viewUser && state.viewUser.email) ||
@@ -11141,7 +11176,15 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
 
             var customPayload = {
               archived: true,
+              focus: sourcePayload.focus || "strength",
+              program_meta: sourcePayload.program_meta || {},
+              program_phases: Array.isArray(sourcePayload.program_phases) ? sourcePayload.program_phases : [],
+              weekly_structure: Array.isArray(sourcePayload.weekly_structure) ? sourcePayload.weekly_structure : [],
+              day_session_types: sourcePayload.day_session_types || {},
+              custom_day_names: sourcePayload.custom_day_names || {},
+              custom_day_name_mode: sourcePayload.custom_day_name_mode || "legacy-suffix",
               structure: normalizeTemplateStructure(sourcePayload.structure),
+              session_plans: sourcePayload.session_plans || {},
               days: sourcePayload.days || {}
             };
 
@@ -11437,11 +11480,137 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     }
   }
 
+  function hasNonEmptyObject(value) {
+    return !!(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length);
+  }
+
+  function isTemplatePayloadMissingBuilderState(payload) {
+    var source = payload && typeof payload === "object" ? payload : {};
+    var hasProgramMeta = hasNonEmptyObject(source.program_meta);
+    var hasProgramPhases = Array.isArray(source.program_phases) && source.program_phases.length > 0;
+    var hasWeeklyStructure = Array.isArray(source.weekly_structure) && source.weekly_structure.length > 0;
+    var hasSessionPlans = hasNonEmptyObject(source.session_plans);
+    return !(hasProgramMeta || hasProgramPhases || hasWeeklyStructure || hasSessionPlans);
+  }
+
+  function buildRepairedCustomProgramPayload(currentPayload, fallbackPayload) {
+    var current = currentPayload && typeof currentPayload === "object" ? currentPayload : {};
+    var fallback = fallbackPayload && typeof fallbackPayload === "object" ? fallbackPayload : {};
+
+    var hasCurrentMeta = hasNonEmptyObject(current.program_meta);
+    var hasCurrentPhases = Array.isArray(current.program_phases) && current.program_phases.length > 0;
+    var hasCurrentWeekly = Array.isArray(current.weekly_structure) && current.weekly_structure.length > 0;
+    var hasCurrentSessionPlans = hasNonEmptyObject(current.session_plans);
+    var hasCurrentDaySessionTypes = hasNonEmptyObject(current.day_session_types);
+
+    return {
+      archived: true,
+      focus: current.focus || fallback.focus || "strength",
+      program_meta: hasCurrentMeta ? current.program_meta : (fallback.program_meta || {}),
+      program_phases: hasCurrentPhases ? current.program_phases : (Array.isArray(fallback.program_phases) ? fallback.program_phases : []),
+      weekly_structure: hasCurrentWeekly ? current.weekly_structure : (Array.isArray(fallback.weekly_structure) ? fallback.weekly_structure : []),
+      day_session_types: hasCurrentDaySessionTypes ? current.day_session_types : (fallback.day_session_types || {}),
+      custom_day_names: current.custom_day_names || fallback.custom_day_names || {},
+      custom_day_name_mode: current.custom_day_name_mode || fallback.custom_day_name_mode || "legacy-suffix",
+      structure: normalizeTemplateStructure(current.structure || fallback.structure),
+      session_plans: hasCurrentSessionPlans ? current.session_plans : (fallback.session_plans || {}),
+      days: current.days || fallback.days || {}
+    };
+  }
+
+  function maybeRepairExistingCustomProgramPayload(activeAssignment, currentPayload, viewedUserId) {
+    var assignment = activeAssignment && typeof activeAssignment === "object" ? activeAssignment : {};
+    var activeProgramId = String(assignment.program_id || "").trim();
+    var athleteId = String(viewedUserId || "").trim();
+
+    if (!state.client || !activeProgramId || !athleteId) {
+      return Promise.resolve({ repaired: false });
+    }
+
+    if (!isTemplatePayloadMissingBuilderState(currentPayload)) {
+      return Promise.resolve({ repaired: false });
+    }
+
+    return state.client
+      .from("user_training_programs")
+      .select("program_id,program_name,assigned_at")
+      .eq("user_id", athleteId)
+      .eq("is_active", true)
+      .order("assigned_at", { ascending: false })
+      .then(function (assignmentResult) {
+        if (assignmentResult.error) {
+          return { repaired: false };
+        }
+
+        var fallbackAssignment = (assignmentResult.data || []).find(function (item) {
+          var fallbackProgramId = String(item && item.program_id || "").trim();
+          var fallbackProgramName = String(item && item.program_name || "").trim();
+          var isCustom = /\(Custom\)\s*$/i.test(fallbackProgramName);
+          return fallbackProgramId && fallbackProgramId !== activeProgramId && !isCustom;
+        });
+
+        if (!fallbackAssignment) {
+          return { repaired: false };
+        }
+
+        var fallbackProgramId = String(fallbackAssignment.program_id || "").trim();
+        if (!fallbackProgramId) {
+          return { repaired: false };
+        }
+
+        return state.client
+          .from("training_programs")
+          .select("description")
+          .eq("id", fallbackProgramId)
+          .single()
+          .then(function (fallbackProgramResult) {
+            if (fallbackProgramResult.error || !fallbackProgramResult.data) {
+              return { repaired: false };
+            }
+
+            var fallbackPayload = parseTemplatePayload(fallbackProgramResult.data.description);
+            if (!fallbackPayload) {
+              return { repaired: false };
+            }
+
+            var repairedPayload = buildRepairedCustomProgramPayload(currentPayload, fallbackPayload);
+
+            return state.client
+              .from("training_programs")
+              .update({ description: serializeTemplatePayload(repairedPayload) })
+              .eq("id", activeProgramId)
+              .then(function (updateResult) {
+                if (updateResult.error) {
+                  return { repaired: false };
+                }
+                return { repaired: true };
+              })
+              .catch(function () {
+                return { repaired: false };
+              });
+          })
+          .catch(function () {
+            return { repaired: false };
+          });
+      })
+      .catch(function () {
+        return { repaired: false };
+      });
+  }
+
   function serializeTemplatePayload(payload) {
     var marker = "__NOMADIC_TEMPLATE__";
     var safePayload = {
       archived: !!(payload && payload.archived),
+      focus: payload && payload.focus ? payload.focus : "strength",
+      program_meta: payload && payload.program_meta ? payload.program_meta : {},
+      program_phases: payload && payload.program_phases ? payload.program_phases : [],
+      weekly_structure: payload && payload.weekly_structure ? payload.weekly_structure : [],
+      day_session_types: payload && payload.day_session_types ? payload.day_session_types : {},
+      custom_day_names: payload && payload.custom_day_names ? payload.custom_day_names : {},
+      custom_day_name_mode: payload && payload.custom_day_name_mode ? payload.custom_day_name_mode : "legacy-suffix",
       structure: normalizeTemplateStructure(payload && payload.structure),
+      session_plans: payload && payload.session_plans ? payload.session_plans : {},
       days: payload && payload.days ? payload.days : {}
     };
     return marker + JSON.stringify(safePayload);
@@ -11451,7 +11620,7 @@ function estimateClimbingLevelForGender(metricName, result, gender) {
     var weeks = parseInt((structure && structure.weeks) || 1, 10);
     var workoutsPerWeek = parseInt((structure && structure.workoutsPerWeek) || 3, 10);
     return {
-      weeks: Math.max(1, Math.min(24, isNaN(weeks) ? 1 : weeks)),
+      weeks: Math.max(1, Math.min(52, isNaN(weeks) ? 1 : weeks)),
       workoutsPerWeek: Math.max(1, Math.min(14, isNaN(workoutsPerWeek) ? 3 : workoutsPerWeek))
     };
   }

@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Training Program Example - Nomadic Performance</title>
-  <link rel="stylesheet" href="css/style.css?v=20260711o" />
+  <link rel="stylesheet" href="css/style.css?v=20260717a" />
   <script defer src="js/analytics.js?v=20260711e"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js?v=20260711e"></script>
   <script defer src="js/auth-ui.js?v=20260711e"></script>
-  <script defer src="js/training-program-demo.js?v=20260711am"></script>
+  <script defer src="js/training-program-demo.js?v=20260717a"></script>
 </head>
 <body>
   <header>
@@ -84,6 +84,11 @@
               <div class="program-builder-planner-head">
                 <div>
                   <h3>Peaks &amp; Key Events</h3>
+                <div class="program-builder-day-tools" data-template-day-tools>
+                  <button type="button" class="btn admin-btn-primary" data-template-day-copy-forward>
+                    Copy Day Forward
+                  </button>
+                </div>
                   <p>Add peak dates and a description of what each peak is for.</p>
                 </div>
                 <button type="button" class="btn admin-btn-small" data-template-add-objective>Add Peak</button>
