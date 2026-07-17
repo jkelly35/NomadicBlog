@@ -5373,11 +5373,25 @@
       return;
     }
 
+    var currentParsed = parseSlotKey(state.day);
+    var phaseLimitWeek = null;
+    if (shouldUsePhaseDailyNavigator()) {
+      var selectedPhase = getSelectedDailyNavigatorPhase();
+      if (selectedPhase) {
+        phaseLimitWeek = clampNumber(parseInt(selectedPhase.end_week, 10), 1, state.structure.weeks, state.structure.weeks);
+      }
+    }
+
     var sourceExercises = cloneExercises(state.exercises);
     var copied = 0;
 
     for (var i = currentIndex + 1; i < slotKeys.length; i++) {
       var slotKey = slotKeys[i];
+      var targetParsed = parseSlotKey(slotKey);
+      if (phaseLimitWeek !== null && targetParsed && targetParsed.week > phaseLimitWeek) {
+        break;
+      }
+
       var targetPayload = {
         exercises: cloneExercises(sourceExercises),
         session_plan: cloneSessionPlan(getCurrentSessionPlan(), slotKey),
@@ -5396,6 +5410,11 @@
       }
 
       copied++;
+    }
+
+    if (!copied && phaseLimitWeek !== null && currentParsed && currentParsed.week >= phaseLimitWeek) {
+      setStatus("No later days in this phase are available to copy into.", "info");
+      return;
     }
 
     var daySelect = document.querySelector("[data-workout-day]");
@@ -6718,6 +6737,18 @@
 
     var sourceWeek = parsed.week;
     var targetWeek = sourceWeek + 1;
+
+    if (shouldUsePhaseDailyNavigator()) {
+      var selectedPhase = getSelectedDailyNavigatorPhase();
+      if (selectedPhase) {
+        var phaseEndWeek = clampNumber(parseInt(selectedPhase.end_week, 10), sourceWeek, state.structure.weeks, state.structure.weeks);
+        if (targetWeek > phaseEndWeek) {
+          setStatus("No following week in this phase is available to copy into.", "info");
+          return;
+        }
+      }
+    }
+
     if (targetWeek > state.structure.weeks) {
       setStatus("No following week available to copy into.", "info");
       return;
