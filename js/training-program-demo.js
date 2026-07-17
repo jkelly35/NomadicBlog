@@ -460,6 +460,8 @@
     var addExerciseBtn = document.querySelector("[data-add-exercise]");
     var printBtn = document.querySelector("[data-print-workout]");
     var fullPlanPrintBtn = document.querySelector("[data-print-full-plan]");
+    var programPdfPreviewBtn = document.querySelector("[data-program-pdf-preview]");
+    var programPdfExportBtn = document.querySelector("[data-program-pdf-export]");
     var saveBtn = document.querySelector("[data-save-workout]");
     var clearBtn = document.querySelector("[data-clear-workout]");
     var startWorkoutBtn = document.querySelector("[data-start-workout]");
@@ -579,6 +581,18 @@
           return;
         }
         openFullPlanOverviewPage();
+      });
+    }
+
+    if (programPdfPreviewBtn) {
+      programPdfPreviewBtn.addEventListener("click", function () {
+        openProgramPdfPreviewFromState({ autoPrint: false });
+      });
+    }
+
+    if (programPdfExportBtn) {
+      programPdfExportBtn.addEventListener("click", function () {
+        openProgramPdfPreviewFromState({ autoPrint: true });
       });
     }
 
@@ -3320,6 +3334,13 @@
       program_type: "hybrid",
       sport_focus: "",
       athlete_level: "intermediate",
+      program_subtitle: "",
+      program_description: "",
+      program_version: "",
+      program_assumption: "",
+      program_principles_text: "",
+      program_disclaimers_text: "",
+      program_worksheets_text: "",
       estimated_start_date: "",
       primary_goal: "",
       secondary_goal: "",
@@ -10331,6 +10352,144 @@
     return fallback;
   }
 
+  function openProgramPdfPreviewFromState(options) {
+    if (!window.NomadicProgramPdf || typeof window.NomadicProgramPdf.openProgramPdfPreview !== "function") {
+      setStatus("Program PDF module failed to load.", "error");
+      return;
+    }
+
+    saveExercisesForDay(true);
+
+    var rawProgram = buildRawProgramSnapshotForPdf();
+    var config = options && typeof options === "object" ? options : {};
+    var result = window.NomadicProgramPdf.openProgramPdfPreview(rawProgram, {
+      autoPrint: !!config.autoPrint
+    });
+
+    if (!result || !result.ok) {
+      setStatus(result && result.error ? result.error : "Could not open PDF preview.", "error");
+      return;
+    }
+
+    if (Array.isArray(result.warnings) && result.warnings.length) {
+      setStatus("PDF preview opened with " + result.warnings.length + " data warning(s).", "info");
+      return;
+    }
+
+    setStatus(config.autoPrint ? "Program PDF export opened." : "Program PDF preview opened.", "success");
+  }
+
+  function buildRawProgramSnapshotForPdf() {
+    var normalizedStructure = normalizeStructure(state.structure || {});
+    var normalizedMeta = normalizeProgramMeta(state.programMeta, normalizedStructure);
+    var normalizedPhases = normalizeProgramPhases(
+      state.programPhases,
+      normalizedStructure.weeks,
+      normalizedMeta && normalizedMeta.program_type
+    );
+    var normalizedWeeklyStructure = normalizeWeeklyStructure(
+      state.weeklyStructure,
+      normalizedStructure.workoutsPerWeek,
+      state.templateFocus,
+      normalizedMeta && normalizedMeta.program_type
+    );
+
+    return {
+      id: state.templateId || state.assignedTemplateId || "",
+      title: resolvePrintProgramTitle("Training Program"),
+      subtitle: normalizedMeta && normalizedMeta.program_subtitle
+        ? normalizedMeta.program_subtitle
+        : (state.isTemplateBuilder ? "Template Builder Export" : "Assigned Program Export"),
+      description: normalizedMeta && normalizedMeta.program_description
+        ? normalizedMeta.program_description
+        : (normalizedMeta && normalizedMeta.primary_goal ? normalizedMeta.primary_goal : ""),
+      version: normalizedMeta && normalizedMeta.program_version
+        ? normalizedMeta.program_version
+        : ("Updated " + new Date().toISOString().slice(0, 10)),
+      brand_name: "Nomadic Performance",
+      brand_tagline: "Move Free, Thrive Wild",
+      athlete: {
+        id: state.assignmentAthleteUserId || "",
+        name: resolvePrintAthleteLabel(),
+        email: ""
+      },
+      focus: state.templateFocus,
+      structure: normalizedStructure,
+      program_meta: normalizedMeta,
+      program_phases: normalizedPhases,
+      weekly_structure: normalizedWeeklyStructure,
+      session_plans: buildPdfSessionPlansSnapshot(),
+      days: buildPdfDaysSnapshot(),
+      worksheets: parseWorksheetEntries(normalizedMeta && normalizedMeta.program_worksheets_text),
+      custom_day_names: normalizeCustomDayNames(state.customDayNames),
+      disclaimers: buildProgramDisclaimersForPdf(normalizedMeta)
+    };
+  }
+
+  function buildProgramDisclaimersForPdf(meta) {
+    var lines = parseTextLines(meta && meta.program_disclaimers_text);
+    var assumption = String(meta && meta.program_assumption || "").trim();
+
+    if (assumption) {
+      lines.unshift(assumption);
+    }
+
+    if (!lines.length) {
+      lines = [
+        "Training load should be adjusted based on readiness, symptoms, and recovery.",
+        "Contact your coach if pain, excessive fatigue, or unexpected responses occur."
+      ];
+    }
+
+    return lines;
+  }
+
+  function parseWorksheetEntries(value) {
+    return parseTextLines(value).map(function (line) {
+      var parts = String(line || "").split("|");
+      return {
+        title: String(parts[0] || "").trim(),
+        description: String(parts.slice(1).join("|") || "").trim()
+      };
+    }).filter(function (item) {
+      return !!item.title;
+    });
+  }
+
+  function parseTextLines(value) {
+    return String(value || "")
+      .split(/\r?\n/)
+      .map(function (line) {
+        return String(line || "").trim();
+      })
+      .filter(function (line) {
+        return !!line;
+      });
+  }
+
+  function buildPdfSessionPlansSnapshot() {
+    var plans = {};
+
+    getAllSlotKeys().forEach(function (slotKey) {
+      plans[slotKey] = normalizeSessionPlan(getSessionPlanForSlot(slotKey), slotKey);
+    });
+
+    return plans;
+  }
+
+  function buildPdfDaysSnapshot() {
+    var days = {};
+
+    getAllSlotKeys().forEach(function (slotKey) {
+      var exercises = getExercisesForPrintForDay(slotKey);
+      if (Array.isArray(exercises) && exercises.length) {
+        days[slotKey] = normalizeExercisesArray(exercises);
+      }
+    });
+
+    return days;
+  }
+
   function buildFullPlanOverviewCard(slotKey, exercises) {
     var grouped = groupExercisesForFullPlanPrint(exercises);
     var sectionsHtml = grouped
@@ -10546,6 +10705,13 @@
     setInputValue("[data-template-sport-focus]", meta.sport_focus);
     setInputValue("[data-template-estimated-start-date]", meta.estimated_start_date);
     setInputValue("[data-template-athlete-level]", meta.athlete_level);
+    setInputValue("[data-template-program-subtitle]", meta.program_subtitle);
+    setInputValue("[data-template-program-description]", meta.program_description);
+    setInputValue("[data-template-program-version]", meta.program_version);
+    setInputValue("[data-template-program-assumption]", meta.program_assumption);
+    setInputValue("[data-template-program-principles]", meta.program_principles_text);
+    setInputValue("[data-template-program-disclaimers]", meta.program_disclaimers_text);
+    setInputValue("[data-template-program-worksheets]", meta.program_worksheets_text);
     setInputValue("[data-template-peak-date]", meta.peak_date);
     setInputValue("[data-template-primary-goal]", meta.primary_goal);
     setInputValue("[data-template-secondary-goal]", meta.secondary_goal);
@@ -10658,6 +10824,14 @@
         '<span>Phase Goal</span>',
         '<input type="text" data-template-phase-field="focus" data-template-phase-index="' + index + '" value="' + escapeAttribute(phase.focus || '') + '" placeholder="What this phase is trying to build" />',
         '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Phase Rationale</span>',
+        '<textarea rows="2" data-template-phase-field="rationale" data-template-phase-index="' + index + '" placeholder="Why this phase exists in the larger progression">' + escapeHtml(phase.rationale || '') + '</textarea>',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Phase Priorities (one per line)</span>',
+        '<textarea rows="2" data-template-phase-field="priorities_text" data-template-phase-index="' + index + '" placeholder="Priority items shown on phase page">' + escapeHtml(phase.priorities_text || '') + '</textarea>',
+        '</label>',
         '<div class="program-builder-phase-grid">',
         '<label class="program-builder-structure-field">',
         '<span>Strength Days</span>',
@@ -10674,6 +10848,34 @@
         '<label class="program-builder-structure-field">',
         '<span>Multi-Focus Days</span>',
         '<input type="number" min="0" max="14" data-template-phase-field="multi_focus_days_per_week" data-template-phase-index="' + index + '" value="' + escapeAttribute(String(phase.multi_focus_days_per_week || 0)) + '" />',
+        '</label>',
+        '</div>',
+        '<div class="program-builder-phase-grid">',
+        '<label class="program-builder-structure-field">',
+        '<span>Monitoring Metrics (one per line)</span>',
+        '<textarea rows="3" data-template-phase-field="monitoring_metrics_text" data-template-phase-index="' + index + '" placeholder="Sleep score | daily | target 7+ hours">' + escapeHtml(phase.monitoring_metrics_text || '') + '</textarea>',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Progress Rules (one per line)</span>',
+        '<textarea rows="3" data-template-phase-field="progress_rules_text" data-template-phase-index="' + index + '" placeholder="Progress when">' + escapeHtml(phase.progress_rules_text || '') + '</textarea>',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Reduce / Modify Rules (one per line)</span>',
+        '<textarea rows="3" data-template-phase-field="reduce_rules_text" data-template-phase-index="' + index + '" placeholder="Reduce when">' + escapeHtml(phase.reduce_rules_text || '') + '</textarea>',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Stop &amp; Reassess Rules (one per line)</span>',
+        '<textarea rows="3" data-template-phase-field="stop_rules_text" data-template-phase-index="' + index + '" placeholder="Stop when">' + escapeHtml(phase.stop_rules_text || '') + '</textarea>',
+        '</label>',
+        '</div>',
+        '<div class="program-builder-phase-grid">',
+        '<label class="program-builder-structure-field">',
+        '<span>Phase Assessments (one per line)</span>',
+        '<textarea rows="2" data-template-phase-field="phase_assessments_text" data-template-phase-index="' + index + '" placeholder="Assessment title | benchmark | notes">' + escapeHtml(phase.phase_assessments_text || '') + '</textarea>',
+        '</label>',
+        '<label class="program-builder-structure-field">',
+        '<span>Exit Criteria (one per line)</span>',
+        '<textarea rows="2" data-template-phase-field="exit_criteria_text" data-template-phase-index="' + index + '" placeholder="Criteria for advancing">' + escapeHtml(phase.exit_criteria_text || '') + '</textarea>',
         '</label>',
         '</div>',
         '<div class="program-builder-phase-actions">',
@@ -11035,8 +11237,16 @@
       start_week: Math.min(index + 1, totalWeeks),
       end_week: Math.min(index + 1, totalWeeks),
       focus: '',
+      rationale: '',
+      priorities_text: '',
       strength_rule: '',
       endurance_rule: '',
+      monitoring_metrics_text: '',
+      progress_rules_text: '',
+      reduce_rules_text: '',
+      stop_rules_text: '',
+      phase_assessments_text: '',
+      exit_criteria_text: '',
       training_days_per_week: defaultTrainingDays,
       strength_days_per_week: Math.min(2, defaultTrainingDays),
       cardio_days_per_week: Math.min(1, defaultTrainingDays),
@@ -11301,6 +11511,13 @@
       program_type: normalizeProgramType(source.program_type),
       sport_focus: String(source.sport_focus || "").trim(),
       athlete_level: normalizeAthleteLevel(source.athlete_level),
+      program_subtitle: String(source.program_subtitle || "").trim(),
+      program_description: String(source.program_description || "").trim(),
+      program_version: String(source.program_version || "").trim(),
+      program_assumption: String(source.program_assumption || "").trim(),
+      program_principles_text: String(source.program_principles_text || "").trim(),
+      program_disclaimers_text: String(source.program_disclaimers_text || "").trim(),
+      program_worksheets_text: String(source.program_worksheets_text || "").trim(),
       estimated_start_date: isIsoDate(source.estimated_start_date) ? String(source.estimated_start_date) : "",
       primary_goal: String(source.primary_goal || "").trim(),
       secondary_goal: String(source.secondary_goal || "").trim(),
@@ -11361,8 +11578,16 @@
         start_week: clampNumber(parseInt(item.start_week, 10), 1, weeks, Math.min(index + 1, weeks)),
         end_week: clampNumber(parseInt(item.end_week, 10), 1, weeks, Math.min(index + 1, weeks)),
         focus: String(item.focus || "").trim(),
+        rationale: String(item.rationale || "").trim(),
+        priorities_text: String(item.priorities_text || "").trim(),
         strength_rule: String(item.strength_rule || "").trim(),
         endurance_rule: String(item.endurance_rule || "").trim(),
+        monitoring_metrics_text: String(item.monitoring_metrics_text || "").trim(),
+        progress_rules_text: String(item.progress_rules_text || "").trim(),
+        reduce_rules_text: String(item.reduce_rules_text || "").trim(),
+        stop_rules_text: String(item.stop_rules_text || "").trim(),
+        phase_assessments_text: String(item.phase_assessments_text || "").trim(),
+        exit_criteria_text: String(item.exit_criteria_text || "").trim(),
         training_days_per_week: normalizedTraining,
         strength_days_per_week: normalizedStrength,
         cardio_days_per_week: normalizedCardio,
@@ -11428,8 +11653,16 @@
         start_week: currentWeek,
         end_week: endWeek,
         focus: preset.focus,
+        rationale: '',
+        priorities_text: '',
         strength_rule: preset.strength_rule,
         endurance_rule: preset.endurance_rule,
+        monitoring_metrics_text: '',
+        progress_rules_text: '',
+        reduce_rules_text: '',
+        stop_rules_text: '',
+        phase_assessments_text: '',
+        exit_criteria_text: '',
         training_days_per_week: defaultTrainingDays,
         strength_days_per_week: Math.min(2, defaultTrainingDays),
         cardio_days_per_week: Math.min(1, defaultTrainingDays),

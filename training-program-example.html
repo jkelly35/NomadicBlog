@@ -9,6 +9,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer src="js/supabase-config.js?v=20260711e"></script>
   <script defer src="js/auth-ui.js?v=20260711e"></script>
+  <script defer src="js/program-pdf.js?v=20260717a"></script>
   <script defer src="js/training-program-demo.js?v=20260717a"></script>
 </head>
 <body>
@@ -79,7 +80,89 @@
                 <span>Sport Focus</span>
                 <input type="text" placeholder="e.g., Ski touring" data-template-sport-focus data-template-meta-field="sport_focus" />
               </label>
+              <label class="program-builder-structure-field">
+                <span>Athlete Level</span>
+                <select data-template-athlete-level data-template-meta-field="athlete_level">
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                  <option value="elite">Elite</option>
+                </select>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Program Version</span>
+                <input type="text" placeholder="e.g., v1.2" data-template-program-version data-template-meta-field="program_version" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Program Subtitle</span>
+                <input type="text" placeholder="e.g., 16-Week Alpine Performance Build" data-template-program-subtitle data-template-meta-field="program_subtitle" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Primary Goal</span>
+                <input type="text" placeholder="Primary outcome this program targets" data-template-primary-goal data-template-meta-field="primary_goal" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Secondary Goal</span>
+                <input type="text" placeholder="Secondary outcome" data-template-secondary-goal data-template-meta-field="secondary_goal" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Training Days / Week</span>
+                <input type="number" min="1" max="14" data-template-training-days data-template-meta-field="training_days_per_week" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Strength Days / Week</span>
+                <input type="number" min="0" max="14" data-template-strength-days data-template-meta-field="strength_days_per_week" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Endurance Days / Week</span>
+                <input type="number" min="0" max="14" data-template-endurance-days data-template-meta-field="endurance_days_per_week" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Mobility Days / Week</span>
+                <input type="number" min="0" max="14" data-template-mobility-days data-template-meta-field="mobility_days_per_week" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Deload Frequency</span>
+                <select data-template-deload-frequency data-template-meta-field="deload_frequency">
+                  <option value="every_3">Every 3 Weeks</option>
+                  <option value="every_4">Every 4 Weeks</option>
+                  <option value="reactive">Reactive</option>
+                  <option value="taper_only">Taper Only</option>
+                </select>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Program Tags</span>
+                <input type="text" placeholder="comma-separated tags" data-template-tags data-template-meta-field="tags" />
+              </label>
             </div>
+            <label class="program-builder-structure-field">
+              <span>Program Description</span>
+              <textarea rows="3" placeholder="High-level program summary shown in cover/overview" data-template-program-description data-template-meta-field="program_description"></textarea>
+            </label>
+            <section class="program-builder-planner-card">
+              <div class="program-builder-planner-head">
+                <div>
+                  <h3>PDF-Specific Content</h3>
+                  <p>Add optional narrative sections so they render in the generated PDF.</p>
+                </div>
+              </div>
+              <label class="program-builder-structure-field">
+                <span>Important Assumption / Disclaimer</span>
+                <textarea rows="2" placeholder="Single key assumption shown on cover page" data-template-program-assumption data-template-meta-field="program_assumption"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Global Programming Principles (one per line)</span>
+                <textarea rows="4" placeholder="Example: Progress load only when movement quality is maintained" data-template-program-principles data-template-meta-field="program_principles_text"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Additional Disclaimers (one per line)</span>
+                <textarea rows="3" placeholder="Optional disclaimer lines for PDF" data-template-program-disclaimers data-template-meta-field="program_disclaimers_text"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Optional Worksheets (one per line, use Title | Description)</span>
+                <textarea rows="4" placeholder="Readiness Log | Complete before key sessions" data-template-program-worksheets data-template-meta-field="program_worksheets_text"></textarea>
+              </label>
+            </section>
             <section class="program-builder-planner-card">
               <div class="program-builder-planner-head">
                 <div>
@@ -235,6 +318,12 @@
       </div>
 
       <div class="program-demo-actions-section" data-template-daily-programming>
+        <button type="button" class="btn btn-secondary" data-program-pdf-preview>
+          Program PDF Preview
+        </button>
+        <button type="button" class="btn btn-secondary" data-program-pdf-export>
+          Export Program PDF
+        </button>
         <button type="button" class="btn btn-secondary" data-print-full-plan>
           View Workout
         </button>
