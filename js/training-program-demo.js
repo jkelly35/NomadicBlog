@@ -10130,7 +10130,7 @@
     var workoutsPerWeek = parseInt((structure && structure.workoutsPerWeek) || 3, 10);
 
     return {
-      weeks: Math.max(1, Math.min(24, isNaN(weeks) ? 1 : weeks)),
+      weeks: Math.max(1, Math.min(52, isNaN(weeks) ? 1 : weeks)),
       workoutsPerWeek: Math.max(1, Math.min(14, isNaN(workoutsPerWeek) ? 3 : workoutsPerWeek))
     };
   }
