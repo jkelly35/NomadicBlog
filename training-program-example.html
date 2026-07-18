@@ -106,31 +106,6 @@
                 <input type="text" placeholder="Secondary outcome" data-template-secondary-goal data-template-meta-field="secondary_goal" />
               </label>
               <label class="program-builder-structure-field">
-                <span>Training Days / Week</span>
-                <input type="number" min="1" max="14" data-template-training-days data-template-meta-field="training_days_per_week" />
-              </label>
-              <label class="program-builder-structure-field">
-                <span>Strength Days / Week</span>
-                <input type="number" min="0" max="14" data-template-strength-days data-template-meta-field="strength_days_per_week" />
-              </label>
-              <label class="program-builder-structure-field">
-                <span>Endurance Days / Week</span>
-                <input type="number" min="0" max="14" data-template-endurance-days data-template-meta-field="endurance_days_per_week" />
-              </label>
-              <label class="program-builder-structure-field">
-                <span>Mobility Days / Week</span>
-                <input type="number" min="0" max="14" data-template-mobility-days data-template-meta-field="mobility_days_per_week" />
-              </label>
-              <label class="program-builder-structure-field">
-                <span>Deload Frequency</span>
-                <select data-template-deload-frequency data-template-meta-field="deload_frequency">
-                  <option value="every_3">Every 3 Weeks</option>
-                  <option value="every_4">Every 4 Weeks</option>
-                  <option value="reactive">Reactive</option>
-                  <option value="taper_only">Taper Only</option>
-                </select>
-              </label>
-              <label class="program-builder-structure-field">
                 <span>Program Tags</span>
                 <input type="text" placeholder="comma-separated tags" data-template-tags data-template-meta-field="tags" />
               </label>
@@ -161,6 +136,50 @@
               <label class="program-builder-structure-field">
                 <span>Optional Worksheets (one per line, use Title | Description)</span>
                 <textarea rows="4" placeholder="Readiness Log | Complete before key sessions" data-template-program-worksheets data-template-meta-field="program_worksheets_text"></textarea>
+              </label>
+            </section>
+            <section class="program-builder-planner-card">
+              <div class="program-builder-planner-head">
+                <div>
+                  <h3>Framework Guidance</h3>
+                  <p>Control the educational section shown in the PDF before the program overview.</p>
+                </div>
+              </div>
+              <label class="program-builder-structure-field">
+                <span>Framework Heading</span>
+                <input type="text" placeholder="e.g., How to Use This Framework" data-template-framework-heading data-template-meta-field="framework_heading" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Framework Introduction</span>
+                <textarea rows="3" placeholder="Short explanation of the programming model" data-template-framework-intro data-template-meta-field="framework_intro"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Central Rule Title</span>
+                <input type="text" placeholder="e.g., The central rule" data-template-framework-rule-title data-template-meta-field="framework_rule_title" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Central Rule Body</span>
+                <textarea rows="2" placeholder="Core rule highlighted in the PDF callout" data-template-framework-rule-body data-template-meta-field="framework_rule_body"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Annual Priorities (one per line)</span>
+                <textarea rows="4" placeholder="Winter: ..." data-template-framework-priorities data-template-meta-field="framework_priorities_text"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Variables To Individualize (one per line)</span>
+                <textarea rows="4" placeholder="Primary sport and competition dates" data-template-framework-variables data-template-meta-field="framework_variables_text"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Loading Wave Heading</span>
+                <input type="text" placeholder="e.g., Default four-week loading wave" data-template-framework-wave-heading data-template-meta-field="framework_wave_heading" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Loading Wave Rows (one per line, use Week | Training target | Typical adjustment)</span>
+                <textarea rows="5" placeholder="1 | Establish | Choose working loads and leave 2-4 repetitions in reserve." data-template-framework-wave-rows data-template-meta-field="framework_wave_rows_text"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Loading Wave Footer</span>
+                <textarea rows="2" placeholder="Optional note below the loading wave table" data-template-framework-wave-footer data-template-meta-field="framework_wave_footer"></textarea>
               </label>
             </section>
             <section class="program-builder-planner-card">

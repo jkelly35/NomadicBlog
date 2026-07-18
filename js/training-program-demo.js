@@ -3341,6 +3341,15 @@
       program_principles_text: "",
       program_disclaimers_text: "",
       program_worksheets_text: "",
+      framework_heading: "",
+      framework_intro: "",
+      framework_rule_title: "",
+      framework_rule_body: "",
+      framework_priorities_text: "",
+      framework_variables_text: "",
+      framework_wave_heading: "",
+      framework_wave_rows_text: "",
+      framework_wave_footer: "",
       estimated_start_date: "",
       primary_goal: "",
       secondary_goal: "",
@@ -10712,6 +10721,15 @@
     setInputValue("[data-template-program-principles]", meta.program_principles_text);
     setInputValue("[data-template-program-disclaimers]", meta.program_disclaimers_text);
     setInputValue("[data-template-program-worksheets]", meta.program_worksheets_text);
+    setInputValue("[data-template-framework-heading]", meta.framework_heading);
+    setInputValue("[data-template-framework-intro]", meta.framework_intro);
+    setInputValue("[data-template-framework-rule-title]", meta.framework_rule_title);
+    setInputValue("[data-template-framework-rule-body]", meta.framework_rule_body);
+    setInputValue("[data-template-framework-priorities]", meta.framework_priorities_text);
+    setInputValue("[data-template-framework-variables]", meta.framework_variables_text);
+    setInputValue("[data-template-framework-wave-heading]", meta.framework_wave_heading);
+    setInputValue("[data-template-framework-wave-rows]", meta.framework_wave_rows_text);
+    setInputValue("[data-template-framework-wave-footer]", meta.framework_wave_footer);
     setInputValue("[data-template-peak-date]", meta.peak_date);
     setInputValue("[data-template-primary-goal]", meta.primary_goal);
     setInputValue("[data-template-secondary-goal]", meta.secondary_goal);
@@ -11518,6 +11536,15 @@
       program_principles_text: String(source.program_principles_text || "").trim(),
       program_disclaimers_text: String(source.program_disclaimers_text || "").trim(),
       program_worksheets_text: String(source.program_worksheets_text || "").trim(),
+      framework_heading: String(source.framework_heading || "").trim(),
+      framework_intro: String(source.framework_intro || "").trim(),
+      framework_rule_title: String(source.framework_rule_title || "").trim(),
+      framework_rule_body: String(source.framework_rule_body || "").trim(),
+      framework_priorities_text: String(source.framework_priorities_text || "").trim(),
+      framework_variables_text: String(source.framework_variables_text || "").trim(),
+      framework_wave_heading: String(source.framework_wave_heading || "").trim(),
+      framework_wave_rows_text: String(source.framework_wave_rows_text || "").trim(),
+      framework_wave_footer: String(source.framework_wave_footer || "").trim(),
       estimated_start_date: isIsoDate(source.estimated_start_date) ? String(source.estimated_start_date) : "",
       primary_goal: String(source.primary_goal || "").trim(),
       secondary_goal: String(source.secondary_goal || "").trim(),

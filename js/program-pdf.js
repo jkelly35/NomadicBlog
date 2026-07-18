@@ -73,6 +73,7 @@
           name: textOrFallback(source.brand_name, "Nomadic Performance"),
           tagline: cleanText(source.brand_tagline || "Move Free, Thrive Wild")
         },
+        framework: resolveFramework(meta),
         athlete: buildAthlete(source.athlete),
         dates: dates,
         goals: goals,
@@ -809,6 +810,34 @@
     return "v1";
   }
 
+  function resolveFramework(meta) {
+    var source = meta && typeof meta === "object" ? meta : {};
+    return {
+      heading: cleanText(source.framework_heading),
+      intro: cleanText(source.framework_intro),
+      ruleTitle: cleanText(source.framework_rule_title),
+      ruleBody: cleanText(source.framework_rule_body),
+      priorities: parseLines(cleanText(source.framework_priorities_text)),
+      variablesToIndividualize: parseLines(cleanText(source.framework_variables_text)),
+      waveHeading: cleanText(source.framework_wave_heading),
+      loadingWaveRows: parseWaveRows(source.framework_wave_rows_text),
+      waveFooter: cleanText(source.framework_wave_footer)
+    };
+  }
+
+  function parseWaveRows(value) {
+    return parseLines(value).map(function (line) {
+      var parts = String(line || "").split("|");
+      return {
+        week: cleanText(parts[0]),
+        target: cleanText(parts[1]),
+        adjustment: cleanText(parts.slice(2).join("|"))
+      };
+    }).filter(function (row) {
+      return !!row.week || !!row.target || !!row.adjustment;
+    });
+  }
+
   function buildAthlete(athlete) {
     var source = athlete && typeof athlete === "object" ? athlete : {};
     var name = cleanText(source.name);
@@ -977,22 +1006,61 @@
   }
 
   function renderHowToUsePage(program, warnings) {
+    var framework = program && program.framework ? program.framework : {};
+    var priorities = Array.isArray(framework.priorities) ? framework.priorities : [];
+    var variables = Array.isArray(framework.variablesToIndividualize) ? framework.variablesToIndividualize : [];
+    var waveRows = Array.isArray(framework.loadingWaveRows) ? framework.loadingWaveRows : [];
     var warningItems = Array.isArray(warnings) && warnings.length
       ? "<section class=\"npdf-section\"><h3>Data Warnings</h3><ul class=\"npdf-list\">" + warnings.map(function (warning) {
           return "<li>" + escapeHtml(warning) + "</li>";
         }).join("") + "</ul></section>"
       : "";
 
+    var frameworkIntro = framework.intro
+      ? "<p class=\"npdf-description\" style=\"max-width:100%;\">" + escapeHtml(framework.intro) + "</p>"
+      : "";
+
+    var ruleBlock = framework.ruleBody
+      ? [
+          "<section class=\"npdf-section\">",
+          "<div style=\"background:#edf3ef;border-left:4px solid #2f6655;padding:12px 14px;\">",
+          (framework.ruleTitle ? "<h3 style=\"font-size:14px;margin-bottom:6px;\">" + escapeHtml(framework.ruleTitle) + "</h3>" : ""),
+          "<p style=\"font-size:12px;\">" + escapeHtml(framework.ruleBody) + "</p>",
+          "</div>",
+          "</section>"
+        ].join("")
+      : "";
+
+    var prioritiesBlock = priorities.length
+      ? "<section class=\"npdf-section\"><h3>Annual Priorities</h3><ul class=\"npdf-list\">" + priorities.map(function (item) {
+          return "<li>" + escapeHtml(item) + "</li>";
+        }).join("") + "</ul></section>"
+      : "";
+
+    var variablesBlock = variables.length
+      ? "<section class=\"npdf-section\"><h3>Program Variables To Individualize</h3><ul class=\"npdf-list\">" + variables.map(function (item) {
+          return "<li>" + escapeHtml(item) + "</li>";
+        }).join("") + "</ul></section>"
+      : "";
+
+    var waveBlock = waveRows.length
+      ? "<section class=\"npdf-section\"><h3>" + escapeHtml(framework.waveHeading || "Default Loading Wave") + "</h3><table class=\"npdf-table\"><thead><tr><th>Week</th><th>Training Target</th><th>Typical Adjustment</th></tr></thead><tbody>" + waveRows.map(function (row) {
+          return "<tr><td>" + escapeHtml(row.week || "") + "</td><td>" + escapeHtml(row.target || "") + "</td><td>" + escapeHtml(row.adjustment || "") + "</td></tr>";
+        }).join("") + "</tbody></table>" + (framework.waveFooter ? "<p class=\"npdf-muted\" style=\"margin-top:8px;\">" + escapeHtml(framework.waveFooter) + "</p>" : "") + "</section>"
+      : "";
+
     return [
       "<section class=\"npdf-page\">",
       "<p class=\"npdf-kicker\">Guide</p>",
-      "<h1 class=\"npdf-title\" style=\"font-size:24px;\">How To Use This Program</h1>",
-      "<ul class=\"npdf-list\">",
-      "<li>Follow phase objectives first, then execute scheduled sessions.</li>",
-      "<li>Track effort, notes, and completion quality each session.</li>",
-      "<li>Progress only when adjustment rules and recovery markers allow.</li>",
-      "<li>Regenerate this PDF any time the program is updated.</li>",
-      "</ul>",
+      "<h1 class=\"npdf-title\" style=\"font-size:24px;\">" + escapeHtml(framework.heading || "How To Use This Program") + "</h1>",
+      frameworkIntro,
+      ruleBlock,
+      prioritiesBlock,
+      variablesBlock,
+      waveBlock,
+      (!frameworkIntro && !ruleBlock && !prioritiesBlock && !variablesBlock && !waveBlock
+        ? "<ul class=\"npdf-list\"><li>Follow phase objectives first, then execute scheduled sessions.</li><li>Track effort, notes, and completion quality each session.</li><li>Progress only when adjustment rules and recovery markers allow.</li><li>Regenerate this PDF any time the program is updated.</li></ul>"
+        : ""),
       warningItems,
       (Array.isArray(program.disclaimers) && program.disclaimers.length > 1
         ? "<section class=\"npdf-section\"><h3>Additional Notes</h3><ul class=\"npdf-list\">" + program.disclaimers.slice(1).map(function (item) {
