@@ -2,6 +2,109 @@
   "use strict";
 
   var PHASE_MATRIX_COLUMN_LIMIT = 6;
+  var CLIMBING_SESSION_META = {
+    technical_route: { adaptation: "Technical skill", recovery: "Low-Moderate", guidance: "Use before harder climbing days or on lower-load weeks." },
+    aerobic_capacity: { adaptation: "Aerobic capacity", recovery: "Low-Moderate", guidance: "Keep pump controlled; pair well ahead of higher-intensity days." },
+    short_strength_exposure: { adaptation: "Finger/pull strength", recovery: "Moderate", guidance: "Use as minimum-effective-dose on busy outdoor or ski weeks." },
+    limit_bouldering: { adaptation: "Max strength/power", recovery: "High", guidance: "Place after a recovery day and avoid stacking with other high-CNS sessions." },
+    climbing_power: { adaptation: "Explosive power", recovery: "Moderate-High", guidance: "Schedule with full rest before quality sets; stop when output drops." },
+    route_power_endurance: { adaptation: "Power endurance", recovery: "High", guidance: "Place before a lower-load or rest day to absorb fatigue." },
+    intensive_route: { adaptation: "Hard-route quality", recovery: "Moderate-High", guidance: "Use between technical volume and full project sessions." },
+    redpoint_project: { adaptation: "Performance", recovery: "High", guidance: "Protect skin and tissues; keep long rest between key attempts." },
+    outdoor_volume: { adaptation: "Outdoor volume/efficiency", recovery: "Moderate-High", guidance: "Control total route count and avoid converting into project intensity." },
+    outdoor_performance: { adaptation: "Outdoor peak performance", recovery: "High", guidance: "Judge by quality of priority attempts, not total climbing volume." },
+    outdoor_skills_exposure: { adaptation: "Outdoor systems skill", recovery: "Low-Moderate", guidance: "Prioritize safety and skill rehearsal over fatigue accumulation." },
+    recovery_climbing: { adaptation: "Recovery movement", recovery: "Very Low", guidance: "Use between hard sessions; athlete should finish fresher." },
+    fingerboard_only: { adaptation: "Finger strength", recovery: "Moderate", guidance: "Keep volume low and avoid layering onto already overloaded weeks." },
+    mixed_maintenance: { adaptation: "Maintenance blend", recovery: "Moderate", guidance: "Keep total dose low while touching multiple qualities." }
+  };
+  var MOUNTAIN_BIKE_SESSION_META = {
+    technical_skills: { adaptation: "Technical skill", recovery: "Low", guidance: "Use before hard physiological MTB sessions to improve movement economy." },
+    cornering_braking: { adaptation: "Cornering and braking skill", recovery: "Low-Moderate", guidance: "Place early in the week or before higher-output work." },
+    climbing_technique: { adaptation: "Climbing skill", recovery: "Moderate", guidance: "Prioritize traction and line quality over accumulating fatigue." },
+    descending_skills: { adaptation: "Descending skill", recovery: "Moderate", guidance: "Pair with lower metabolic days when concentration quality is high." },
+    recovery_ride: { adaptation: "Recovery", recovery: "Very Low", guidance: "Use between hard days to restore freshness without adding load." },
+    aerobic_endurance: { adaptation: "Aerobic endurance", recovery: "Low-Moderate", guidance: "Keep effort conversational and avoid turning climbs into intervals." },
+    long_trail_volume: { adaptation: "Durability", recovery: "Moderate-High", guidance: "Protect following day with easier load and strong fueling strategy." },
+    steady_climbing_tempo: { adaptation: "Tempo climbing", recovery: "Moderate", guidance: "Use as a bridge between easy endurance and threshold sessions." },
+    threshold_climbing: { adaptation: "Threshold power", recovery: "High", guidance: "Avoid stacking with another high-fatigue day immediately after." },
+    vo2_aerobic_power: { adaptation: "Aerobic power", recovery: "High", guidance: "Schedule with sufficient recovery before and after interval day." },
+    short_aerobic_power: { adaptation: "Repeatable surges", recovery: "High", guidance: "Best placed when neuromuscular freshness is available." },
+    sprint_acceleration: { adaptation: "Sprint power", recovery: "Moderate-High", guidance: "Keep sprint quality maximal and total volume controlled." },
+    technical_under_fatigue: { adaptation: "Skill under fatigue", recovery: "High", guidance: "Use on known terrain and follow with low-load recovery." },
+    race_simulation: { adaptation: "Race specificity", recovery: "High", guidance: "Replace other weekly hardest MTB session with this day." },
+    short_maintenance: { adaptation: "Maintenance", recovery: "Moderate", guidance: "Keep minimum-effective-dose so it does not compete with priority sport." },
+    mixed_development: { adaptation: "Mixed development", recovery: "Moderate-High", guidance: "Keep one dominant priority for the day despite mixed content." }
+  };
+  var CYCLING_SESSION_META = {
+    recovery_ride: { adaptation: "Restoration", recovery: "Very Low", guidance: "Keep truly easy and use between hard days to restore readiness." },
+    easy_endurance: { adaptation: "Aerobic development", recovery: "Low", guidance: "Keep conversational and avoid drifting into tempo work." },
+    long_endurance: { adaptation: "Durability and fueling", recovery: "Moderate-High", guidance: "Progress duration gradually and protect the next day." },
+    cadence_endurance: { adaptation: "Pedaling coordination", recovery: "Low", guidance: "Treat as coordination work, not maximal force development." },
+    steady_endurance: { adaptation: "Sustainable all-day pace", recovery: "Moderate", guidance: "Sustain controlled output below threshold for long sections." },
+    tempo: { adaptation: "Muscular endurance", recovery: "Moderate", guidance: "Keep output purposeful but controlled without threshold surges." },
+    subthreshold: { adaptation: "Near-threshold durability", recovery: "Moderate-High", guidance: "Increase interval duration before increasing intensity." },
+    threshold: { adaptation: "Sustainable high power", recovery: "High", guidance: "Space from other high-intensity days by about 48 hours when possible." },
+    over_unders: { adaptation: "Variable threshold tolerance", recovery: "High", guidance: "Keep overs controlled and regain breathing control in unders." },
+    vo2max: { adaptation: "Peak aerobic power", recovery: "High", guidance: "Place when fresh and avoid uncontrolled sprint starts." },
+    short_intervals: { adaptation: "Repeatable high power", recovery: "High", guidance: "Maintain repeatability and stop when output drops materially." },
+    anaerobic_capacity: { adaptation: "Severe short-duration power", recovery: "Very High", guidance: "Keep rep count modest and preserve quality with long rests." },
+    neuromuscular_sprints: { adaptation: "Peak acceleration", recovery: "Moderate", guidance: "Place early in session and end when sprint quality declines." },
+    repeated_sprints: { adaptation: "Repeated acceleration", recovery: "High", guidance: "Use incomplete recoveries strategically, not maximal opening reps." },
+    low_cadence_torque: { adaptation: "Cycling-specific force", recovery: "Moderate", guidance: "Avoid immediately after heavy lower-body lifting days." },
+    climbing_session: { adaptation: "Sustained uphill performance", recovery: "Moderate-High", guidance: "Use conservative early pacing on long climbs." },
+    time_trial: { adaptation: "Pacing and sustained race power", recovery: "Moderate-High", guidance: "Prioritize position quality and even pacing." },
+    group_ride: { adaptation: "Positioning and variable pace", recovery: "Variable", guidance: "Classify post-ride by actual intensity and treat hard rides as interval days." },
+    gravel_endurance: { adaptation: "Mixed-surface durability", recovery: "Moderate-High", guidance: "Practice fueling, handling, and pacing under terrain variability." },
+    race_simulation: { adaptation: "Integrated performance", recovery: "High", guidance: "Replace the week’s hardest workout instead of adding on top." },
+    short_maintenance: { adaptation: "Preserve cycling fitness", recovery: "Moderate", guidance: "Use minimum-effective-dose during non-cycling priority phases." },
+    mixed_development: { adaptation: "Combined cycling qualities", recovery: "Moderate-High", guidance: "Keep one dominant purpose for the day despite mixed content." }
+  };
+  var RUN_SESSION_META = {
+    recovery_run: { adaptation: "Restoration", recovery: "Very Low", guidance: "Keep easy enough to leave the athlete the same or better afterward." },
+    easy_aerobic: { adaptation: "Aerobic development", recovery: "Low", guidance: "Use to support harder days rather than creeping into moderate effort." },
+    easy_with_strides: { adaptation: "Aerobic + speed maintenance", recovery: "Low", guidance: "Place strides after easy running while mechanics are still crisp." },
+    aerobic_endurance: { adaptation: "Sustained aerobic capacity", recovery: "Low-Moderate", guidance: "Stay controlled and avoid unintended fast finishes." },
+    long_run: { adaptation: "Endurance and durability", recovery: "Moderate-High", guidance: "Follow with an easier day and progress only one load variable at a time." },
+    long_run_steady_finish: { adaptation: "Late-run durability", recovery: "High", guidance: "Treat as a quality session and avoid stacking next to another hard day." },
+    progression_run: { adaptation: "Pacing and aerobic strength", recovery: "Moderate", guidance: "Increase effort gradually without early surges." },
+    steady_state: { adaptation: "Moderate aerobic capacity", recovery: "Moderate", guidance: "Keep clearly below threshold with stable breathing." },
+    marathon_pace: { adaptation: "Marathon economy", recovery: "Moderate-High", guidance: "Use effort on terrain and avoid drift into threshold." },
+    tempo_run: { adaptation: "Strong sustained aerobic work", recovery: "Moderate-High", guidance: "Start conservatively and keep rhythm controlled." },
+    threshold_intervals: { adaptation: "Lactate-threshold performance", recovery: "High", guidance: "Keep reps consistent and separate from other hard days by about 48 hours when practical." },
+    half_marathon_pace: { adaptation: "Sustained race-specific power", recovery: "High", guidance: "Control opening pace and avoid sprint finishes." },
+    critical_velocity_10k: { adaptation: "High aerobic power", recovery: "High", guidance: "Prioritize even pacing across all repetitions." },
+    vo2max_intervals: { adaptation: "Peak aerobic capacity", recovery: "High", guidance: "Avoid maximal starts and stop before form degrades." },
+    fartlek: { adaptation: "Variable-speed endurance", recovery: "Moderate-High", guidance: "Use purposeful work/recovery structure, not random surging." },
+    short_hill_sprints: { adaptation: "Running power", recovery: "Moderate", guidance: "Keep quality high with full recovery between reps." },
+    long_hill_repeats: { adaptation: "Uphill aerobic power", recovery: "High", guidance: "Pace first reps conservatively and use effort over pace." },
+    run_hike_climbing: { adaptation: "Steep-terrain economy", recovery: "Moderate", guidance: "Use intentional run-hike transitions based on grade." },
+    downhill_technique: { adaptation: "Descending tolerance", recovery: "Moderate-High", guidance: "Introduce downhill loading progressively due to mechanical stress." },
+    technical_trail: { adaptation: "Trail skill and coordination", recovery: "Low-Moderate", guidance: "Prioritize skill quality over metabolic fatigue." },
+    trail_endurance: { adaptation: "Terrain-specific durability", recovery: "Moderate-High", guidance: "Track duration and elevation, not mileage alone." },
+    race_simulation: { adaptation: "Integrated event performance", recovery: "High", guidance: "Replace the week’s hardest long run or workout rather than adding on." },
+    run_walk_endurance: { adaptation: "Controlled durability", recovery: "Low-Moderate", guidance: "Use planned walk breaks as strategy, not failure." },
+    short_maintenance: { adaptation: "Preserve running readiness", recovery: "Low-Moderate", guidance: "Use minimum-effective-dose during non-running priority blocks." },
+    mixed_development: { adaptation: "Combined running qualities", recovery: "Moderate", guidance: "Keep one dominant adaptation despite mixed content." }
+  };
+  var HIKING_SESSION_META = {
+    recovery_hike: { adaptation: "Restoration", recovery: "Very Low", guidance: "Keep truly easy and use for recovery support." },
+    easy_aerobic_hike: { adaptation: "Aerobic development", recovery: "Low", guidance: "Build volume without pushing climbs hard." },
+    brisk_fitness_hike: { adaptation: "Sustained aerobic work", recovery: "Moderate", guidance: "Keep controlled and avoid threshold-like surges." },
+    long_endurance_hike: { adaptation: "Long-duration durability", recovery: "Moderate-High", guidance: "Track time and elevation, then protect the next day." },
+    vertical_gain_hike: { adaptation: "Uphill aerobic capacity", recovery: "Moderate-High", guidance: "Use effort over speed and pace climbs conservatively." },
+    steep_power_hiking: { adaptation: "Climbing strength-endurance", recovery: "High", guidance: "Use quality steep reps and avoid sprint starts." },
+    run_hike_transition: { adaptation: "Terrain transition efficiency", recovery: "Moderate", guidance: "Practice decision points for run-hike changes." },
+    loaded_pack_hike: { adaptation: "Load carriage tolerance", recovery: "Moderate-High", guidance: "Progress load gradually and monitor form under pack stress." },
+    progressive_pack_hike: { adaptation: "Pack progression", recovery: "Moderate", guidance: "Increase one variable at a time (load, duration, elevation)." },
+    technical_terrain_hike: { adaptation: "Technical footwork skill", recovery: "Low-Moderate", guidance: "Prioritize movement quality over speed." },
+    downhill_tolerance_hike: { adaptation: "Descending tolerance", recovery: "Moderate-High", guidance: "Introduce downhill load progressively due to eccentric stress." },
+    incline_stairs_treadmill: { adaptation: "Controlled vertical training", recovery: "Moderate", guidance: "Use for tightly controlled climbing dose." },
+    hiking_tempo_intervals: { adaptation: "Sustained hard climbing", recovery: "High", guidance: "Separate from other hard days by about 48 hours when practical." },
+    back_to_back_hiking: { adaptation: "Multi-day durability", recovery: "High", guidance: "Use as a key stressor and reduce adjacent weekly intensity." },
+    adventure_simulation: { adaptation: "Objective simulation", recovery: "High", guidance: "Replace the week’s hardest session rather than adding on top." },
+    short_maintenance: { adaptation: "Hiking readiness maintenance", recovery: "Low-Moderate", guidance: "Use minimum-effective-dose during other sport priorities." }
+  };
 
   function normalizeProgramForPdf(rawProgram) {
     var warnings = [];
@@ -119,6 +222,13 @@
       activityLookup: input.activityLookup
     });
 
+    var weeklyPlacementOptions = buildWeeklyPlacementOptions({
+      phaseWeeks: phaseWeeks,
+      rawWeeklyStructure: input.rawWeeklyStructure,
+      rawSessionPlans: input.rawSessionPlans,
+      customDayNames: input.customDayNames
+    });
+
     var activityEmphasis = buildPhaseActivityEmphasis(phase, input.activities, sessions);
     var activityPlans = buildPhaseActivityPlans(activityEmphasis, phaseWeeks);
 
@@ -140,11 +250,14 @@
       durationWeeks: parsedEndWeek - parsedStartWeek + 1,
       primaryObjective: objectives[0] || undefined,
       rationale: cleanText(phase.rationale),
+      generalTrainingOverviewText: cleanText(phase.general_training_overview_text),
+      generalWeeklyStructureText: cleanText(phase.general_weekly_structure_text),
       activityEmphasis: activityEmphasis.length ? activityEmphasis : undefined,
       objectives: objectives.length ? objectives : undefined,
       priorities: collectPhasePriorities(phase),
       qualitiesDeveloped: collectPhaseQualitiesDeveloped(phase),
       qualitiesMaintained: collectPhaseQualitiesMaintained(phase),
+      weeklyPlacementOptions: weeklyPlacementOptions,
       weeklySchedules: weeklySchedules.length ? weeklySchedules : undefined,
       sessions: sessions,
       activityPlans: activityPlans.length ? activityPlans : undefined,
@@ -392,7 +505,7 @@
 
   function buildWeeklySchedules(input) {
     var schedules = [];
-    var trainingDays = clampNumber(parseInt(input.phase && input.phase.training_days_per_week, 10), 1, 14, 3);
+    var trainingDays = 7;
 
     input.phaseWeeks.forEach(function (week) {
       var rows = [];
@@ -428,6 +541,258 @@
     });
 
     return schedules;
+  }
+
+  function buildWeeklyPlacementOptions(input) {
+    var phaseWeeks = Array.isArray(input.phaseWeeks) ? input.phaseWeeks : [];
+    if (!phaseWeeks.length) {
+      return undefined;
+    }
+
+    var sampleWeek = phaseWeeks[0];
+    var rows = [];
+    var specializedRows = [];
+
+    for (var day = 1; day <= 7; day++) {
+      var slotKey = "w" + String(sampleWeek) + "d" + String(day);
+      var plan = input.rawSessionPlans[slotKey] && typeof input.rawSessionPlans[slotKey] === "object"
+        ? input.rawSessionPlans[slotKey]
+        : {};
+      var fallback = Array.isArray(input.rawWeeklyStructure) ? input.rawWeeklyStructure[day - 1] : null;
+      var sessionType = cleanText(plan.session_type) || cleanText(fallback && fallback.session_type);
+      var sessionTitle = resolveSessionTitle(slotKey, plan, input.customDayNames);
+      var sessionMeta = resolveSpecializedSessionMeta(plan, sessionType);
+
+      var dayLabel = fallback && fallback.day_of_week
+        ? toTitleCase(String(fallback.day_of_week))
+        : dayNameFromIndex(day);
+
+      var adaptation = sessionMeta
+        ? sessionMeta.adaptation
+        : (activityNameFromSessionType(sessionType) || "Session");
+
+      var guidance = sessionMeta
+        ? sessionMeta.guidance
+        : defaultPlacementGuidance(sessionType);
+
+      rows.push({
+        day: dayLabel,
+        session: sessionTitle || prettySessionTitleFromType(sessionType),
+        adaptation: adaptation,
+        guidance: guidance
+      });
+
+      if (sessionMeta) {
+        specializedRows.push({
+          day: dayLabel,
+          recovery: sessionMeta.recovery,
+          category: sessionMeta.category
+        });
+      }
+    }
+
+    if (!specializedRows.length) {
+      return undefined;
+    }
+
+    return {
+      weekLabel: "Template Week Placement",
+      rows: rows,
+      rule: buildPlacementRule(specializedRows)
+    };
+  }
+
+  function resolveSpecializedSessionMeta(plan, sessionType) {
+    var normalizedType = cleanText(sessionType).toLowerCase();
+    if (normalizedType === "climbing") {
+      var climbingType = cleanText(plan && plan.climbing_session_type).toLowerCase();
+      var climbingMeta = resolveClimbingSessionMeta(climbingType);
+      climbingMeta.category = "climbing";
+      return climbingMeta;
+    }
+    if (normalizedType === "mountain_bike") {
+      var mountainBikeType = cleanText(plan && plan.mountain_bike_session_type).toLowerCase();
+      var mountainBikeMeta = resolveMountainBikeSessionMeta(mountainBikeType);
+      mountainBikeMeta.category = "mountain_bike";
+      return mountainBikeMeta;
+    }
+    if (normalizedType === "cycling") {
+      var cyclingType = cleanText(plan && plan.cycling_session_type).toLowerCase();
+      var cyclingMeta = resolveCyclingSessionMeta(cyclingType);
+      cyclingMeta.category = "cycling";
+      return cyclingMeta;
+    }
+    if (normalizedType === "run") {
+      var runType = cleanText(plan && plan.run_session_type).toLowerCase();
+      var runMeta = resolveRunSessionMeta(runType);
+      runMeta.category = "run";
+      return runMeta;
+    }
+    if (normalizedType === "hiking") {
+      var hikingType = cleanText(plan && plan.hiking_session_type).toLowerCase();
+      var hikingMeta = resolveHikingSessionMeta(hikingType);
+      hikingMeta.category = "hiking";
+      return hikingMeta;
+    }
+    return null;
+  }
+
+  function resolveClimbingSessionMeta(climbingType) {
+    var key = cleanText(climbingType).toLowerCase();
+    return CLIMBING_SESSION_META[key] || {
+      adaptation: "Climbing-specific",
+      recovery: "Moderate",
+      guidance: "Place relative to fatigue cost and preserve quality movement." 
+    };
+  }
+
+  function resolveMountainBikeSessionMeta(mountainBikeType) {
+    var key = cleanText(mountainBikeType).toLowerCase();
+    return MOUNTAIN_BIKE_SESSION_META[key] || {
+      adaptation: "Mountain bike-specific",
+      recovery: "Moderate",
+      guidance: "Place relative to intensity and technical concentration demand." 
+    };
+  }
+
+  function resolveCyclingSessionMeta(cyclingType) {
+    var key = cleanText(cyclingType).toLowerCase();
+    return CYCLING_SESSION_META[key] || {
+      adaptation: "Cycling-specific",
+      recovery: "Moderate",
+      guidance: "Place relative to key adaptation and manage high-intensity spacing." 
+    };
+  }
+
+  function resolveRunSessionMeta(runType) {
+    var key = cleanText(runType).toLowerCase();
+    return RUN_SESSION_META[key] || {
+      adaptation: "Run-specific",
+      recovery: "Moderate",
+      guidance: "Place relative to primary adaptation and preserve movement quality." 
+    };
+  }
+
+  function resolveHikingSessionMeta(hikingType) {
+    var key = cleanText(hikingType).toLowerCase();
+    return HIKING_SESSION_META[key] || {
+      adaptation: "Hiking-specific",
+      recovery: "Moderate",
+      guidance: "Place by terrain, elevation, load, and session objective." 
+    };
+  }
+
+  function dayNameFromIndex(dayNumber) {
+    var names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    return names[Math.max(1, Math.min(7, parseInt(dayNumber, 10) || 1)) - 1];
+  }
+
+  function prettySessionTitleFromType(sessionType) {
+    var text = cleanText(sessionType);
+    if (!text) {
+      return "Session";
+    }
+    return toTitleCase(text.replace(/[_-]+/g, " "));
+  }
+
+  function defaultPlacementGuidance(sessionType) {
+    var type = cleanText(sessionType).toLowerCase();
+    if (type.indexOf("rest") > -1 || type.indexOf("mobility") > -1) {
+      return "Use to improve recovery before key high-demand sessions.";
+    }
+    if (type.indexOf("strength") > -1 || type.indexOf("threshold") > -1 || type.indexOf("vo2") > -1) {
+      return "Keep quality high and avoid stacking multiple high-fatigue days back-to-back.";
+    }
+    if (type.indexOf("zone") > -1 || type.indexOf("endurance") > -1) {
+      return "Maintain aerobic quality without compromising the next priority session.";
+    }
+    return "Place relative to the week’s key performance objective.";
+  }
+
+  function buildPlacementRule(specializedRows) {
+    var hasHigh = specializedRows.some(function (item) {
+      return /high/i.test(String(item.recovery || ""));
+    });
+    var hasClimbing = specializedRows.some(function (item) {
+      return item.category === "climbing";
+    });
+    var hasMountainBike = specializedRows.some(function (item) {
+      return item.category === "mountain_bike";
+    });
+    var hasCycling = specializedRows.some(function (item) {
+      return item.category === "cycling";
+    });
+    var hasRun = specializedRows.some(function (item) {
+      return item.category === "run";
+    });
+    var hasHiking = specializedRows.some(function (item) {
+      return item.category === "hiking";
+    });
+
+    if (hasClimbing && hasMountainBike && hasCycling && hasRun && hasHiking) {
+      return hasHigh
+        ? "Separate high-recovery climbing, mountain-bike, cycling, run, and hiking quality days with easier sessions between when practical, and protect 24-48 hours after maximal work."
+        : "Place all specialized sessions by primary adaptation so adjacent stress remains complementary rather than competing.";
+    }
+    if (hasHiking && (hasClimbing || hasMountainBike || hasCycling || hasRun)) {
+      return hasHigh
+        ? "Separate high-load hiking days (steep intervals, loaded, back-to-back, simulation) from other high-demand sport days by about 48 hours when practical."
+        : "Place hiking days by adaptation (aerobic, vertical, load, technical, downhill, durability) so neighboring stress is complementary.";
+    }
+    if (hasHiking) {
+      return hasHigh
+        ? "Separate steep intervals, heavy loaded hikes, back-to-back days, and adventure simulations by about 48 hours when practical; keep recovery hikes easy."
+        : "Progress hiking through time, elevation, terrain, and pack load gradually without raising all variables at once.";
+    }
+    if (hasClimbing && hasMountainBike && hasCycling && hasRun) {
+      return hasHigh
+        ? "Separate high-recovery climbing, mountain-bike, cycling, and run quality days with easier sessions between when practical, and protect 24-48 hours after maximal work."
+        : "Place climbing, mountain-bike, cycling, and run sessions by adaptation so adjacent stress remains complementary rather than competing.";
+    }
+    if (hasRun && (hasClimbing || hasMountainBike || hasCycling)) {
+      return hasHigh
+        ? "Separate threshold/VO2/hill/race-simulation run sessions from other high-load sport days by about 48 hours when practical."
+        : "Place run sessions by primary adaptation and keep surrounding day stress complementary.";
+    }
+    if (hasRun) {
+      return hasHigh
+        ? "Separate threshold, VO2max, hard hill, and race-simulation run sessions by about 48 hours when practical, and keep recovery runs genuinely easy."
+        : "Progress run load by gradually building volume, then intensity, while controlling elevation and technical demand.";
+    }
+    if (hasClimbing && hasMountainBike && hasCycling) {
+      return hasHigh
+        ? "Separate high-recovery climbing, mountain-bike, and cycling quality days with lower-load sessions when possible, and protect the next 24-48 hours after maximal work."
+        : "Place climbing, mountain-bike, and cycling sessions by primary adaptation so adjacent day stress is complementary rather than competing.";
+    }
+    if (hasClimbing && hasMountainBike) {
+      return hasHigh
+        ? "Separate high-recovery climbing and mountain-bike days with lower-load sessions when possible, and protect the next 24-48 hours after maximal work."
+        : "Place climbing and mountain-bike sessions by primary adaptation so adjacent day stress is complementary rather than competing.";
+    }
+    if (hasClimbing && hasCycling) {
+      return hasHigh
+        ? "Separate high-recovery climbing and cycling quality sessions by about 48 hours when practical, and use easier sessions between them."
+        : "Place climbing and cycling days by adaptation so technical and metabolic stressors complement one another.";
+    }
+    if (hasMountainBike && hasCycling) {
+      return hasHigh
+        ? "Separate high-recovery mountain-bike and cycling interval days by about 48 hours when practical, and protect post-interval recovery windows."
+        : "Place mountain-bike and cycling sessions by adaptation so adjacent stress is complementary rather than competitive.";
+    }
+    if (hasCycling) {
+      return hasHigh
+        ? "Separate threshold, VO2max, anaerobic, and hard group-ride cycling sessions by about 48 hours when practical, and keep recovery rides genuinely easy."
+        : "Progress cycling load by building endurance volume and interval duration before adding more intensity.";
+    }
+    if (hasMountainBike) {
+      return hasHigh
+        ? "Place high-recovery-cost mountain-bike sessions after easier days when possible, and protect the following 24-48 hours with lower-load work or recovery rides."
+        : "Place mountain-bike sessions by primary adaptation and keep adjacent day stress complementary rather than competitive.";
+    }
+    if (hasHigh) {
+      return "Place high-recovery-cost climbing sessions after easier days when possible, and protect the following 24-48 hours with lower-load work or rest.";
+    }
+    return "Place climbing sessions by primary adaptation and keep adjacent day stress complementary rather than competitive.";
   }
 
   function buildPhaseActivityEmphasis(phase, activities, sessions) {
@@ -1168,10 +1533,25 @@
       "</section>"
     ].join("");
 
+    var generalTrainingOverviewRows = buildGeneralTrainingOverviewRows(program, phase);
+    var generalWeeklyStructureRows = buildGeneralWeeklyStructureRows(phase);
+
+    var generalTrainingOverviewHtml = generalTrainingOverviewRows.length
+      ? "<section class=\"npdf-section\"><div class=\"npdf-sub-banner\">General Training Overview</div><table class=\"npdf-table\"><thead><tr><th>Parameter</th><th>Guidance</th></tr></thead><tbody>" + generalTrainingOverviewRows.map(function (row) {
+          return "<tr><td>" + escapeHtml(row.parameter || "") + "</td><td>" + escapeHtml(row.guidance || "") + "</td></tr>";
+        }).join("") + "</tbody></table></section>"
+      : "";
+
     var activityRoleRows = Array.isArray(phase.activityEmphasis) && phase.activityEmphasis.length
       ? "<section class=\"npdf-section\"><div class=\"npdf-sub-banner\">Activity Roles And Frequency</div><table class=\"npdf-table\"><thead><tr><th>Activity</th><th>Status</th><th>Frequency</th><th>Notes</th></tr></thead><tbody>" + phase.activityEmphasis.map(function (item) {
           return "<tr><td>" + escapeHtml(resolveActivityName(program.activities, item.activityId)) + "</td><td>" + escapeHtml(item.status) + "</td><td>" + escapeHtml(item.frequency || "") + "</td><td>" + escapeHtml(item.notes || "") + "</td></tr>";
         }).join("") + "</tbody></table></section>"
+      : "";
+
+    var placementHtml = generalWeeklyStructureRows.length
+      ? "<section class=\"npdf-section\"><div class=\"npdf-sub-banner\">General Weekly Structure</div><table class=\"npdf-table\"><thead><tr><th>Day</th><th>Focus</th><th>Notes</th></tr></thead><tbody>" + generalWeeklyStructureRows.map(function (row) {
+          return "<tr><td>" + escapeHtml(row.day || "") + "</td><td>" + escapeHtml(row.focus || "") + "</td><td>" + escapeHtml(row.notes || "") + "</td></tr>";
+        }).join("") + "</tbody></table>" + (phase.weeklyPlacementOptions && phase.weeklyPlacementOptions.rule ? "<div class=\"npdf-warning\" style=\"margin-top:10px;\"><strong>Placement rule:</strong> " + escapeHtml(phase.weeklyPlacementOptions.rule) + "</div>" : "") + "</section>"
       : "";
 
     var scheduleHtml = Array.isArray(phase.weeklySchedules) && phase.weeklySchedules.length
@@ -1209,7 +1589,9 @@
       "<div class=\"npdf-phase-name\"><h2>" + escapeHtml(phase.name) + "</h2><div class=\"npdf-phase-meta\">" + escapeHtml(phase.dateLabel || "") + (phase.primaryObjective ? " | " + escapeHtml(phase.primaryObjective) : "") + "</div></div>",
       "</div>",
       overviewBlock,
+      generalTrainingOverviewHtml,
       activityRoleRows,
+      placementHtml,
       scheduleHtml,
       sessionsHtml,
       activityPlansHtml,
@@ -1218,6 +1600,121 @@
       renderFooter(program),
       "</section>"
     ].join("");
+  }
+
+  function buildGeneralTrainingOverviewRows(program, phase) {
+    var rows = [];
+    var customRows = parseLines(cleanText(phase && phase.generalTrainingOverviewText));
+
+    customRows.forEach(function (line) {
+      var parts = String(line || "").split("|");
+      var parameter = cleanText(parts[0]);
+      var guidance = cleanText(parts.slice(1).join("|"));
+      if (!parameter) {
+        return;
+      }
+      rows.push({
+        parameter: parameter,
+        guidance: guidance || ""
+      });
+    });
+
+    if (rows.length) {
+      return rows;
+    }
+
+    var activityPlans = Array.isArray(phase && phase.activityPlans) ? phase.activityPlans : [];
+
+    activityPlans.forEach(function (plan) {
+      var activityName = resolveActivityName(program.activities, plan.activityId) || "Training";
+      if (plan.frequency) {
+        rows.push({ parameter: activityName + " frequency", guidance: plan.frequency });
+      }
+      if (plan.intensityGuidance) {
+        rows.push({ parameter: activityName + " intensity", guidance: plan.intensityGuidance });
+      }
+      if (plan.volumeGuidance) {
+        rows.push({ parameter: activityName + " volume", guidance: plan.volumeGuidance });
+      }
+    });
+
+    if (!rows.length) {
+      var priorities = Array.isArray(phase && phase.priorities) ? phase.priorities : [];
+      priorities.slice(0, 6).forEach(function (item, index) {
+        rows.push({
+          parameter: index === 0 ? "Primary emphasis" : "Supporting emphasis",
+          guidance: item
+        });
+      });
+    }
+
+    if (!rows.length) {
+      rows.push({
+        parameter: "Primary objective",
+        guidance: cleanText(phase && phase.primaryObjective) || "Execute the phase objective with consistent quality."
+      });
+      rows.push({
+        parameter: "Duration",
+        guidance: (phase && phase.durationWeeks ? String(phase.durationWeeks) + " weeks" : "Planned phase duration")
+      });
+      rows.push({
+        parameter: "Progression",
+        guidance: "Progress when recovery and execution quality remain strong; reduce when fatigue markers rise."
+      });
+    }
+
+    return rows;
+  }
+
+  function buildGeneralWeeklyStructureRows(phase) {
+    var rows = [];
+    var customRows = parseLines(cleanText(phase && phase.generalWeeklyStructureText));
+
+    customRows.forEach(function (line) {
+      var parts = String(line || "").split("|");
+      var day = cleanText(parts[0]);
+      var focus = cleanText(parts[1]);
+      var notes = cleanText(parts.slice(2).join("|"));
+      if (!day) {
+        return;
+      }
+      rows.push({
+        day: day,
+        focus: focus || "Session",
+        notes: notes || ""
+      });
+    });
+
+    if (rows.length) {
+      return rows;
+    }
+
+    var placementRows = phase && phase.weeklyPlacementOptions && Array.isArray(phase.weeklyPlacementOptions.rows)
+      ? phase.weeklyPlacementOptions.rows
+      : [];
+
+    placementRows.forEach(function (row) {
+      rows.push({
+        day: row.day,
+        focus: row.session || row.adaptation || "Session",
+        notes: compact([row.adaptation, row.guidance]).join(" • ")
+      });
+    });
+
+    if (!rows.length) {
+      var schedules = Array.isArray(phase && phase.weeklySchedules) ? phase.weeklySchedules : [];
+      var sampleWeek = schedules.length ? schedules[0] : null;
+      var scheduleRows = sampleWeek && Array.isArray(sampleWeek.rows) ? sampleWeek.rows : [];
+      scheduleRows.forEach(function (row) {
+        rows.push({
+          day: row.day,
+          focus: row.session || row.activity || "Session",
+          notes: compact([row.activity, row.intensity, row.duration, row.notes]).join(" • ")
+        });
+      });
+    }
+
+    return rows;
   }
 
   function renderSessionCard(session) {
@@ -1503,7 +2000,7 @@
       },
       {
         key: "notes",
-        label: "Coaching Focus",
+        label: "Coaching Notes",
         value: function (exercise) { return Array.isArray(exercise.notes) ? exercise.notes.join(" • ") : ""; },
         enabled: hasAny(rows, function (exercise) { return Array.isArray(exercise.notes) && exercise.notes.length; })
       }
@@ -1620,7 +2117,7 @@
           rationale: cleanText(item.rationale),
           strength_rule: cleanText(item.strength_rule),
           endurance_rule: cleanText(item.endurance_rule),
-          training_days_per_week: clampNumber(parseInt(item.training_days_per_week, 10), 1, 14, 3),
+          training_days_per_week: 7,
           strength_days_per_week: clampNumber(parseInt(item.strength_days_per_week, 10), 0, 14, 0),
           cardio_days_per_week: clampNumber(parseInt(item.cardio_days_per_week != null ? item.cardio_days_per_week : item.endurance_days_per_week, 10), 0, 14, 0),
           skill_days_per_week: clampNumber(parseInt(item.skill_days_per_week != null ? item.skill_days_per_week : item.mobility_days_per_week, 10), 0, 14, 0)
@@ -1649,7 +2146,7 @@
         rationale: "",
         strength_rule: "",
         endurance_rule: "",
-        training_days_per_week: 3,
+        training_days_per_week: 7,
         strength_days_per_week: 1,
         cardio_days_per_week: 1,
         skill_days_per_week: 1
@@ -1679,6 +2176,21 @@
 
     if (value.indexOf("strength") > -1) {
       return "Strength";
+    }
+    if (value.indexOf("climbing") > -1) {
+      return "Climbing";
+    }
+    if (value.indexOf("mountain_bike") > -1 || value.indexOf("mountain bike") > -1 || value.indexOf("mtb") > -1) {
+      return "Mountain Bike";
+    }
+    if (value.indexOf("cycling") > -1 || value.indexOf("bike") > -1 || value.indexOf("velo") > -1) {
+      return "Cycling";
+    }
+    if (value.indexOf("run") > -1 || value.indexOf("running") > -1 || value.indexOf("jog") > -1) {
+      return "Run";
+    }
+    if (value.indexOf("hiking") > -1 || value.indexOf("hike") > -1 || value.indexOf("ruck") > -1 || value.indexOf("pack") > -1) {
+      return "Hiking";
     }
     if (value.indexOf("zone") > -1 || value.indexOf("endurance") > -1 || value.indexOf("threshold") > -1 || value.indexOf("vo2") > -1 || value.indexOf("interval") > -1) {
       return "Endurance";

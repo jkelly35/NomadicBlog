@@ -361,6 +361,11 @@
     { value: "strength_lower", label: "Strength Lower" },
     { value: "strength_upper", label: "Strength Upper" },
     { value: "strength_full", label: "Strength Full Body" },
+    { value: "climbing", label: "Climbing Session" },
+    { value: "mountain_bike", label: "Mountain Bike Session" },
+    { value: "cycling", label: "Cycling Session" },
+    { value: "run", label: "Run Session" },
+    { value: "hiking", label: "Hiking Session" },
     { value: "zone2", label: "Zone 2 Endurance" },
     { value: "threshold", label: "Threshold / Tempo" },
     { value: "vo2", label: "VO2 / High Intensity" },
@@ -369,6 +374,268 @@
     { value: "mobility", label: "Mobility / Recovery" },
     { value: "assessment", label: "Testing / Assessment" },
     { value: "rest", label: "Rest / Off" }
+  ];
+
+  var CLIMBING_SESSION_TYPE_OPTIONS = [
+    {
+      value: "technical_route",
+      label: "Technical Route Session",
+      primaryGoal: "Movement efficiency, route reading, pacing, and clipping quality.",
+      bestUsed: "General prep, transition blocks, recovery weeks, or before harder climbing days.",
+      durationMinutes: 75,
+      intensity: "RPE 4-6",
+      recovery: "Low to moderate",
+      primaryBlockType: "assessment",
+      blockPrescription: "4-8 submaximal routes 2-4 grades below max with 1-2 technique objectives.",
+      keyFocus: ["Quiet feet", "Straight-arm climbing", "Deliberate breathing", "Reduced grip tension"]
+    },
+    {
+      value: "aerobic_capacity",
+      label: "Aerobic Climbing Capacity (ARC)",
+      primaryGoal: "Forearm aerobic capacity and sustained low-pump wall time.",
+      bestUsed: "General preparation and early climbing-development phases.",
+      durationMinutes: 75,
+      intensity: "RPE 4-6",
+      recovery: "Low to moderate",
+      primaryBlockType: "zone2",
+      blockPrescription: "Option A: 2-3 x 15-30 min continuous easy climbing with 8-12 min rest.",
+      keyFocus: ["2-4/10 pump", "No repeated failure", "Relaxed hands", "Consistent movement rhythm"]
+    },
+    {
+      value: "short_strength_exposure",
+      label: "Short Climbing-Strength Exposure",
+      primaryGoal: "Maintain finger and pulling strength with low total volume.",
+      bestUsed: "Ski season, high outdoor volume weeks, deloads, or maintenance phases.",
+      durationMinutes: 50,
+      intensity: "High effort, low volume",
+      recovery: "Moderate",
+      primaryBlockType: "hangboarding",
+      blockPrescription: "4-6 hangs x 7-10s (RPE 8-9) + 3-4 x 3-5 heavy pulls with long rest.",
+      keyFocus: ["Strict grip positions", "Long rest 2.5-4 min", "Stop before form changes"]
+    },
+    {
+      value: "limit_bouldering",
+      label: "Limit Bouldering",
+      primaryGoal: "Maximal movement difficulty, recruitment, and problem-solving at limit.",
+      bestUsed: "Maximum-strength and climbing-power phases.",
+      durationMinutes: 90,
+      intensity: "RPE 8-10",
+      recovery: "High",
+      primaryBlockType: "assessment",
+      blockPrescription: "3-5 limit problems or sequences, 2-5 quality attempts each, rest 3-5 min.",
+      keyFocus: ["10-20 high-quality max attempts", "Long rest", "Stop when movement quality drops"]
+    },
+    {
+      value: "climbing_power",
+      label: "Climbing Power Session",
+      primaryGoal: "Explosive pulling, rapid force production, and dynamic coordination.",
+      bestUsed: "Conversion phases after a maximum-strength block.",
+      durationMinutes: 75,
+      intensity: "RPE 7-9",
+      recovery: "Moderate to high",
+      primaryBlockType: "power",
+      blockPrescription: "3-5 movements x 3-5 sets of 1-4 reps/moves with 2-4 min rest.",
+      keyFocus: ["Prioritize speed", "Low-rep quality", "End when power drops"]
+    },
+    {
+      value: "route_power_endurance",
+      label: "Route Power-Endurance",
+      primaryGoal: "Sustain hard climbing through repeated difficult moves under pump.",
+      bestUsed: "Specific preparation before sport-climbing performance periods.",
+      durationMinutes: 90,
+      intensity: "RPE 8-9",
+      recovery: "High",
+      primaryBlockType: "intervals",
+      blockPrescription: "Route intervals 3-5 reps at 1-3 grades below max redpoint with 6-12 min rest.",
+      keyFocus: ["Maintain technical quality", "Avoid unsafe grip breakdown", "Stop when fall points shift early"]
+    },
+    {
+      value: "intensive_route",
+      label: "Intensive Route Session",
+      primaryGoal: "Improve hard-route performance without full power-endurance exhaustion.",
+      bestUsed: "Climbing-development and pre-performance phases.",
+      durationMinutes: 95,
+      intensity: "RPE 7-9",
+      recovery: "Moderate to high",
+      primaryBlockType: "assessment",
+      blockPrescription: "3-6 routes around onsight/flash to slightly below redpoint with 8-15 min rest.",
+      keyFocus: ["High-quality efforts", "Long rest", "Avoid repeated severe fatigue attempts"]
+    },
+    {
+      value: "redpoint_project",
+      label: "Redpoint / Project Session",
+      primaryGoal: "Hardest possible route performance using tactics and rehearsed beta.",
+      bestUsed: "Performance phases.",
+      durationMinutes: 150,
+      intensity: "RPE 8-10",
+      recovery: "High",
+      primaryBlockType: "assessment",
+      blockPrescription: "2-4 serious redpoint attempts with 20-40 min rest and beta refinement.",
+      keyFocus: ["Protect skin and tissue", "Track high point and fall reason", "Only add attempts if quality holds"]
+    },
+    {
+      value: "outdoor_volume",
+      label: "Outdoor Climbing Volume Day",
+      primaryGoal: "Outdoor mileage, movement confidence, and terrain-specific efficiency.",
+      bestUsed: "General prep, early outdoor season, or lower-intensity weekends.",
+      durationMinutes: 240,
+      intensity: "Mostly RPE 4-7",
+      recovery: "Moderate to high",
+      primaryBlockType: "long_day",
+      blockPrescription: "6-12 total routes, mostly 2-4 grades below max, with pacing and fuel control.",
+      keyFocus: ["Track route count and vertical", "Manage skin", "Avoid turning volume day into project day"]
+    },
+    {
+      value: "outdoor_performance",
+      label: "Outdoor Performance Day",
+      primaryGoal: "Outdoor climbing at or near current highest level.",
+      bestUsed: "Peak climbing phases.",
+      durationMinutes: 240,
+      intensity: "RPE 8-10",
+      recovery: "High",
+      primaryBlockType: "assessment",
+      blockPrescription: "2-4 priority efforts (onsight, flash, or project) with long rest.",
+      keyFocus: ["Judge by quality of priority attempts", "Minimal extra climbing", "Keep warm-up volume controlled"]
+    },
+    {
+      value: "outdoor_skills_exposure",
+      label: "Outdoor Skills and Exposure",
+      primaryGoal: "Build outdoor competence without maximizing physical stress.",
+      bestUsed: "Early outdoor season and less experienced outdoor climbers.",
+      durationMinutes: 180,
+      intensity: "RPE 3-6",
+      recovery: "Low to moderate",
+      primaryBlockType: "assessment",
+      blockPrescription: "4-8 easy/moderate routes plus systems practice (belay, anchors, lead confidence).",
+      keyFocus: ["Long recovery", "Low fall volume", "Separate systems practice from severe fatigue"]
+    },
+    {
+      value: "recovery_climbing",
+      label: "Recovery Climbing",
+      primaryGoal: "Promote movement and confidence with minimal fatigue.",
+      bestUsed: "Deload weeks, between hard sessions, or after ski weekends.",
+      durationMinutes: 55,
+      intensity: "RPE 2-4",
+      recovery: "Very low",
+      primaryBlockType: "mobility",
+      blockPrescription: "20-40 min very easy climbing (4+ grades below max), full recovery, no hard finger work.",
+      keyFocus: ["Finish feeling better", "No repeated falls", "Avoid painful holds"]
+    },
+    {
+      value: "fingerboard_only",
+      label: "Fingerboard-Only Session",
+      primaryGoal: "Finger-strength development or maintenance when wall volume is limited.",
+      bestUsed: "Strength-development blocks or ski-dominant phases.",
+      durationMinutes: 45,
+      intensity: "Protocol dependent",
+      recovery: "Moderate",
+      primaryBlockType: "hangboarding",
+      blockPrescription: "4-6 hangs x 7-10s with 2.5-4 min rest plus optional low-volume assistance.",
+      keyFocus: ["Strict form", "Controlled loading", "Do not stack onto overloaded climbing weeks"]
+    },
+    {
+      value: "mixed_maintenance",
+      label: "Mixed Climbing Maintenance",
+      primaryGoal: "Maintain multiple climbing qualities with low total dose.",
+      bestUsed: "Ski season or non-climbing-priority phases.",
+      durationMinutes: 65,
+      intensity: "RPE 6-8",
+      recovery: "Moderate",
+      primaryBlockType: "assessment",
+      blockPrescription: "3-4 max hangs, 2-3 x 3-5 weighted pulls, 3-5 hard problems, plus 2-4 moderate routes.",
+      keyFocus: ["Minimum effective dose", "Full rest between hard efforts", "Avoid meaningful power-endurance fatigue"]
+    }
+  ];
+
+  var MOUNTAIN_BIKE_SESSION_TYPE_OPTIONS = [
+    { value: "technical_skills", label: "Technical Skills Session", primaryGoal: "Balance, body position, braking, and line selection.", bestUsed: "General prep, early season, and recovery weeks.", durationMinutes: 70, intensity: "RPE 3-5", recovery: "Low", primaryBlockType: "assessment", blockPrescription: "2-3 drills, 4-8 reps each, then easy trail integration.", keyFocus: ["Control", "Reset between reps", "Progress safely"] },
+    { value: "cornering_braking", label: "Cornering and Braking Session", primaryGoal: "Improve entry speed control, traction, and exit acceleration.", bestUsed: "Technical-development blocks and pre-race skill refinement.", durationMinutes: 75, intensity: "RPE 4-6", recovery: "Low to moderate", primaryBlockType: "assessment", blockPrescription: "Braking reps then cornering reps with full reset and video feedback.", keyFocus: ["Brake before apex", "Look through exit", "One change at a time"] },
+    { value: "climbing_technique", label: "Climbing Technique Session", primaryGoal: "Traction, cadence control, and efficient technical climbing.", bestUsed: "Base and early MTB-specific prep.", durationMinutes: 80, intensity: "RPE 4-7", recovery: "Moderate", primaryBlockType: "threshold", blockPrescription: "4-8 technical climb reps (30s-3min) with easy return and quality focus.", keyFocus: ["Line choice", "Rear-wheel traction", "Shift early"] },
+    { value: "descending_skills", label: "Descending Skills Session", primaryGoal: "Line choice, braking timing, and descending efficiency.", bestUsed: "Technical-development and gravity/enduro prep.", durationMinutes: 90, intensity: "RPE 4-6", recovery: "Moderate", primaryBlockType: "assessment", blockPrescription: "4-8 section repeats with full recovery, then full-trail controlled application.", keyFocus: ["Heavy feet, light hands", "Quiet braking", "Safe progression"] },
+    { value: "recovery_ride", label: "Recovery Ride", primaryGoal: "Promote recovery with minimal training stress.", bestUsed: "Between hard sessions, deloads, or post-strength days.", durationMinutes: 45, intensity: "RPE 2-3", recovery: "Very low", primaryBlockType: "zone2", blockPrescription: "Easy terrain spin with conversational breathing and no forced efforts.", keyFocus: ["Feel better after", "No creeping intensity", "Easy cadence"] },
+    { value: "aerobic_endurance", label: "Aerobic Endurance Ride", primaryGoal: "Build aerobic capacity and riding economy.", bestUsed: "Base phases and year-round support.", durationMinutes: 120, intensity: "RPE 3-4", recovery: "Low to moderate", primaryBlockType: "zone2", blockPrescription: "Continuous conversational ride with brief technique insertions every 20-30 min.", keyFocus: ["Steady pacing", "Fuel/hydration", "Relaxed upper body"] },
+    { value: "long_trail_volume", label: "Long Trail Volume / Adventure Ride", primaryGoal: "Durability, fueling tolerance, and long-duration technical execution.", bestUsed: "MTB base/build blocks.", durationMinutes: 210, intensity: "RPE 3-5", recovery: "Moderate to high", primaryBlockType: "long_day", blockPrescription: "Conservative first third, consistent middle, controlled final third.", keyFocus: ["Fuel early", "Track symptoms", "Avoid uncontrolled finish"] },
+    { value: "steady_climbing_tempo", label: "Steady Climbing / Tempo Session", primaryGoal: "Sustained climbing economy at subthreshold effort.", bestUsed: "Base-to-build transition.", durationMinutes: 85, intensity: "RPE 5-6", recovery: "Moderate", primaryBlockType: "threshold", blockPrescription: "2-3 x 12-20 min or 30-45 min continuous controlled climbing tempo.", keyFocus: ["Sustainable pacing", "Early shifting", "Limit spikes"] },
+    { value: "threshold_climbing", label: "Threshold Climbing Session", primaryGoal: "Sustained high-intensity climbing repeatability.", bestUsed: "Build and specific prep phases.", durationMinutes: 90, intensity: "RPE 7-8", recovery: "High", primaryBlockType: "threshold", blockPrescription: "3 x 8-12 min or 2 x 15-20 min threshold with full easy recovery.", keyFocus: ["Even interval quality", "No sprint starts", "Controlled finish"] },
+    { value: "vo2_aerobic_power", label: "VO2max / Aerobic-Power Intervals", primaryGoal: "Raise high-end aerobic power.", bestUsed: "Build and pre-performance phases.", durationMinutes: 75, intensity: "RPE 8-9", recovery: "High", primaryBlockType: "vo2", blockPrescription: "4-6 x 4 min or 4-5 x 5 min hard with controlled recovery.", keyFocus: ["Hard but controlled", "Near-VO2 time", "No all-out first rep"] },
+    { value: "short_aerobic_power", label: "Short Aerobic-Power Intervals", primaryGoal: "Repeatable short hard outputs for MTB surges.", bestUsed: "XC-specific build phases.", durationMinutes: 70, intensity: "RPE 8-9", recovery: "High", primaryBlockType: "vo2", blockPrescription: "30/30 or 40/20 sets, or repeated 1-min hard efforts.", keyFocus: ["Consistency", "Safe terrain", "No maximal first efforts"] },
+    { value: "sprint_acceleration", label: "Sprint and Repeated-Acceleration Session", primaryGoal: "Start power, acceleration, and anaerobic repeatability.", bestUsed: "Power and specific-prep phases.", durationMinutes: 60, intensity: "RPE 9-10", recovery: "Moderate to high", primaryBlockType: "power", blockPrescription: "6-10 short maximal sprints or repeated accelerations with long recovery.", keyFocus: ["Peak quality", "Full reset", "Stop when speed drops"] },
+    { value: "technical_under_fatigue", label: "Technical Riding Under Fatigue", primaryGoal: "Maintain technical execution after hard efforts.", bestUsed: "Late build and sport-specific phases.", durationMinutes: 95, intensity: "RPE 7-9", recovery: "High", primaryBlockType: "intervals", blockPrescription: "3-5 rounds: hard climb, short transition, technical descent, easy recovery.", keyFocus: ["Vision and braking timing", "Hand relaxation", "Safe known terrain"] },
+    { value: "race_simulation", label: "Race-Simulation / Hard Trail Session", primaryGoal: "Integrate pacing, technical execution, and fueling under race-like demand.", bestUsed: "Final MTB-specific prep.", durationMinutes: 120, intensity: "RPE 7-9", recovery: "High", primaryBlockType: "assessment", blockPrescription: "Loop-based simulation matching target event demands and conditions.", keyFocus: ["Pacing consistency", "Technical errors late", "Fuel execution"] },
+    { value: "short_maintenance", label: "Short MTB Maintenance Session", primaryGoal: "Maintain fitness and bike familiarity with low weekly cost.", bestUsed: "Non-MTB-priority seasons.", durationMinutes: 60, intensity: "RPE 4-8", recovery: "Moderate", primaryBlockType: "zone2", blockPrescription: "Short aerobic block + brief intensity exposure + technical touch points.", keyFocus: ["Minimum effective dose", "Do not compete with primary sport"] },
+    { value: "mixed_development", label: "Mixed MTB Development Session", primaryGoal: "Train multiple MTB qualities when ride days are limited.", bestUsed: "General multisport development.", durationMinutes: 95, intensity: "RPE 4-8", recovery: "Moderate to high", primaryBlockType: "threshold", blockPrescription: "Technical block + physiological block + trail integration.", keyFocus: ["One dominant priority", "Do not maximize everything at once"] }
+  ];
+
+  var CYCLING_SESSION_TYPE_OPTIONS = [
+    { value: "recovery_ride", label: "Recovery Ride", primaryGoal: "Promote recovery and circulation without adding fatigue.", bestUsed: "Deloads, after long rides, and between interval days.", durationMinutes: 45, intensity: "RPE 1-2 (<55% FTP)", recovery: "Very low", primaryBlockType: "zone2", blockPrescription: "25-60 min very easy continuous spin; optional short cadence ups with full easy recoveries.", keyFocus: ["Keep intensity easy", "No hard accelerations", "Finish feeling better"] },
+    { value: "easy_endurance", label: "Easy Aerobic Endurance Ride", primaryGoal: "Build aerobic capacity and efficiency.", bestUsed: "Nearly every training phase.", durationMinutes: 90, intensity: "RPE 2-3 (55-70% FTP)", recovery: "Low", primaryBlockType: "zone2", blockPrescription: "45-120 min conversational endurance with smooth pacing.", keyFocus: ["Steady output", "Control climbs", "Avoid drifting to tempo"] },
+    { value: "long_endurance", label: "Long Endurance Ride", primaryGoal: "Build durability, fueling tolerance, and fatigue resistance.", bestUsed: "Base/build and long-distance preparation.", durationMinutes: 240, intensity: "RPE 2-4 (55-75% FTP)", recovery: "Moderate to high", primaryBlockType: "long_day", blockPrescription: "2-6 hr endurance ride with conservative start and fueling practice.", keyFocus: ["Fuel early", "Pace first third", "Protect next day"] },
+    { value: "cadence_endurance", label: "Endurance With Cadence Drills", primaryGoal: "Improve cadence coordination while maintaining aerobic load.", bestUsed: "General prep and early base.", durationMinutes: 75, intensity: "RPE 2-4", recovery: "Low", primaryBlockType: "zone2", blockPrescription: "3-5 cadence rounds inside endurance ride at controlled power.", keyFocus: ["Stable hips", "No bouncing", "Smooth torque at low cadence"] },
+    { value: "steady_endurance", label: "Steady Endurance / All-Day Pace", primaryGoal: "Sustain moderately demanding pace for prolonged periods.", bestUsed: "Base-to-build transition and long-event prep.", durationMinutes: 150, intensity: "RPE 3-4 (65-78% FTP)", recovery: "Moderate", primaryBlockType: "zone2", blockPrescription: "Continuous upper-end endurance with controlled power changes.", keyFocus: ["Minimize coasting", "Pacing discipline", "Fuel like event day"] },
+    { value: "tempo", label: "Tempo Session", primaryGoal: "Build muscular endurance below threshold fatigue cost.", bestUsed: "Base, early build, and long-distance prep.", durationMinutes: 90, intensity: "RPE 5-6 (76-87% FTP)", recovery: "Moderate", primaryBlockType: "threshold", blockPrescription: "3 x 12-20 min tempo (or 2 x 25-35 min) with easy recovery.", keyFocus: ["Controlled breathing", "No opening surge", "Keep cadence purposeful"] },
+    { value: "subthreshold", label: "High Tempo / Subthreshold", primaryGoal: "Accumulate near-threshold work with manageable fatigue.", bestUsed: "Build phases and time-limited weeks.", durationMinutes: 95, intensity: "RPE 6-7 (85-95% FTP)", recovery: "Moderate to high", primaryBlockType: "threshold", blockPrescription: "3 x 10-20 min progressing toward longer subthreshold blocks.", keyFocus: ["Progress duration first", "Avoid threshold overshoot", "Consistent execution"] },
+    { value: "threshold", label: "Threshold Session", primaryGoal: "Improve sustainable high power and pacing.", bestUsed: "Build and event-specific phases.", durationMinutes: 90, intensity: "RPE 7-8 (95-105% FTP)", recovery: "High", primaryBlockType: "threshold", blockPrescription: "3 x 10-12 min or 2 x 15-20 min threshold with full easy recovery.", keyFocus: ["Controlled first rep", "Even power", "Stop if quality drops"] },
+    { value: "over_unders", label: "Over-Under Threshold Session", primaryGoal: "Improve tolerance and clearance around threshold shifts.", bestUsed: "Rolling-terrain and race-specific prep.", durationMinutes: 90, intensity: "RPE 7-9", recovery: "High", primaryBlockType: "intervals", blockPrescription: "3 sets of over-under changes with 6-8 min between sets.", keyFocus: ["No sprint in overs", "Regain control in unders", "Avoid coasting transitions"] },
+    { value: "vo2max", label: "VO2max / Aerobic Power Session", primaryGoal: "Increase peak aerobic power.", bestUsed: "Mid-to-late build phases.", durationMinutes: 80, intensity: "RPE 8-9 (106-125% FTP)", recovery: "High", primaryBlockType: "vo2", blockPrescription: "4-7 hard aerobic-power intervals (3-5 min typical) with controlled recovery.", keyFocus: ["Hard but repeatable", "Avoid all-out starts", "Maintain output quality"] },
+    { value: "short_intervals", label: "Short High-Intensity Intervals", primaryGoal: "Build repeatable high power for variable-speed demands.", bestUsed: "Crit, rolling road, gravel, and CX prep.", durationMinutes: 70, intensity: "RPE 8-9", recovery: "High", primaryBlockType: "vo2", blockPrescription: "30/30 or 40/20 interval sets with quality-focused recoveries.", keyFocus: ["Consistent reps", "Safe terrain", "Stop when power fades"] },
+    { value: "anaerobic_capacity", label: "Anaerobic-Capacity Session", primaryGoal: "Improve severe efforts from 30 seconds to 2 minutes.", bestUsed: "Short-climb, CX, crit, and track prep.", durationMinutes: 65, intensity: "RPE 9-10 (>125% FTP)", recovery: "Very high", primaryBlockType: "intervals", blockPrescription: "4-8 severe intervals (30s-2min) with long recovery between reps.", keyFocus: ["High but controlled output", "Preserve quality", "Terminate on form breakdown"] },
+    { value: "neuromuscular_sprints", label: "Neuromuscular Sprint Session", primaryGoal: "Develop peak acceleration and top-end sprint quality.", bestUsed: "Power and event-specific phases.", durationMinutes: 60, intensity: "Maximal (5-15s)", recovery: "Moderate", primaryBlockType: "power", blockPrescription: "6-10 short maximal sprints with 3-5 min easy recovery.", keyFocus: ["Explosive intent", "Full reset", "End session when peak power drops"] },
+    { value: "repeated_sprints", label: "Repeated-Sprint Session", primaryGoal: "Repeat accelerations with incomplete recovery.", bestUsed: "Crit, road-race, gravel, and CX prep.", durationMinutes: 70, intensity: "RPE 9-10", recovery: "High", primaryBlockType: "power", blockPrescription: "2-3 sets of short sprints with incomplete in-set recovery.", keyFocus: ["Hard but repeatable first rep", "Track drop-off", "Keep technique stable"] },
+    { value: "low_cadence_torque", label: "Low-Cadence Torque Session", primaryGoal: "Build cycling-specific force production at lower cadence.", bestUsed: "Base and early build, especially climbing preparation.", durationMinutes: 75, intensity: "RPE 5-8", recovery: "Moderate", primaryBlockType: "threshold", blockPrescription: "5-8 torque reps or alternating-cadence climbing blocks at controlled effort.", keyFocus: ["Stable knees", "No excessive grinding", "Stop on joint symptoms"] },
+    { value: "climbing_session", label: "Climbing-Specific Cycling Session", primaryGoal: "Improve sustained uphill pacing and cadence strategy.", bestUsed: "Mountainous event preparation.", durationMinutes: 110, intensity: "RPE 4-8", recovery: "Moderate to high", primaryBlockType: "threshold", blockPrescription: "2-4 sustained climbs or progressive long climb format with easy descents.", keyFocus: ["Shift before cadence collapse", "Sustainable starts", "Fuel during ascents"] },
+    { value: "time_trial", label: "Time-Trial / Sustained Race-Pace Session", primaryGoal: "Build pacing control and race-position tolerance.", bestUsed: "TT, triathlon, and long solo-event prep.", durationMinutes: 90, intensity: "RPE 6-9", recovery: "Moderate to high", primaryBlockType: "threshold", blockPrescription: "TT intervals or continuous race-pace simulation in event position.", keyFocus: ["Even pacing", "Position comfort", "Power over speed"] },
+    { value: "group_ride", label: "Group Ride / Peloton Skills Session", primaryGoal: "Develop drafting, positioning, and variable-pace management.", bestUsed: "Road and gravel-specific preparation.", durationMinutes: 150, intensity: "Variable", recovery: "Moderate to very high", primaryBlockType: "assessment", blockPrescription: "Define intent: aerobic group, skills-focused, or hard performance group ride.", keyFocus: ["Classify by actual load", "Practice communication", "Count hard rides as intensity"] },
+    { value: "gravel_endurance", label: "Gravel / Mixed-Surface Endurance Ride", primaryGoal: "Build endurance with terrain-specific pacing and handling.", bestUsed: "Gravel and adventure-event prep.", durationMinutes: 240, intensity: "RPE 3-5", recovery: "Moderate to high", primaryBlockType: "long_day", blockPrescription: "2-6 hr mixed-surface ride with conservative opening and controlled final block.", keyFocus: ["Smooth traction management", "Fuel on rough terrain", "Monitor upper-body fatigue"] },
+    { value: "race_simulation", label: "Race-Simulation Ride", primaryGoal: "Integrate pacing, fueling, equipment, and event demands.", bestUsed: "Final specific-preparation phases.", durationMinutes: 150, intensity: "RPE 7-9", recovery: "High", primaryBlockType: "assessment", blockPrescription: "Simulation matching event duration/intensity profile and key race demands.", keyFocus: ["Replace hardest weekly session", "Practice event execution", "Do not stack extra intensity"] },
+    { value: "short_maintenance", label: "Short Cycling Maintenance Session", primaryGoal: "Maintain cycling fitness during another sport priority phase.", bestUsed: "Climbing, skiing, running, or strength-priority seasons.", durationMinutes: 55, intensity: "RPE 3-8", recovery: "Moderate", primaryBlockType: "zone2", blockPrescription: "Short aerobic block plus brief quality exposure then easy cooldown.", keyFocus: ["Minimum effective dose", "Protect priority sport recovery", "Keep quality crisp"] },
+    { value: "mixed_development", label: "Mixed Cycling Development Session", primaryGoal: "Train multiple qualities when ride frequency is limited.", bestUsed: "General development and multisport programming.", durationMinutes: 95, intensity: "RPE 3-8", recovery: "Moderate to high", primaryBlockType: "threshold", blockPrescription: "Technique block + primary physiological block + endurance finish.", keyFocus: ["One dominant priority", "Avoid all-systems-max day", "Manage fatigue cost"] }
+  ];
+
+  var RUN_SESSION_TYPE_OPTIONS = [
+    { value: "recovery_run", label: "Recovery Run", primaryGoal: "Promote recovery while maintaining frequency with minimal stress.", bestUsed: "Deloads, post-long-run, and between quality days.", durationMinutes: 35, intensity: "RPE 1-2", recovery: "Very low", primaryBlockType: "zone2", blockPrescription: "20-45 min easy run, fully conversational, optional walk breaks.", keyFocus: ["Keep truly easy", "Relax mechanics", "Finish same or better"] },
+    { value: "easy_aerobic", label: "Easy Aerobic Run", primaryGoal: "Build aerobic capacity and tissue tolerance.", bestUsed: "Nearly every phase.", durationMinutes: 55, intensity: "RPE 2-4", recovery: "Low", primaryBlockType: "zone2", blockPrescription: "30-90 min easy aerobic run with controlled hills.", keyFocus: ["Conversational effort", "No unnecessary surges", "Support hard sessions"] },
+    { value: "easy_with_strides", label: "Easy Run With Strides", primaryGoal: "Maintain speed mechanics without full workout fatigue.", bestUsed: "Base, taper, and endurance-emphasis weeks.", durationMinutes: 55, intensity: "Mostly RPE 2-4; strides RPE 7-9", recovery: "Low", primaryBlockType: "intervals", blockPrescription: "Easy run plus 4-8 x 15-25s strides with full easy recovery.", keyFocus: ["Fast-relaxed strides", "Tall posture", "Not maximal sprinting"] },
+    { value: "aerobic_endurance", label: "Aerobic Endurance Run", primaryGoal: "Sustain aerobic efficiency over longer duration.", bestUsed: "Base and early development.", durationMinutes: 85, intensity: "RPE 3-4", recovery: "Low to moderate", primaryBlockType: "zone2", blockPrescription: "60-120 min steady aerobic run with controlled pacing throughout.", keyFocus: ["Conservative start", "Stable rhythm", "No forced fast finish"] },
+    { value: "long_run", label: "Long Run", primaryGoal: "Build durability, fueling tolerance, and fatigue resistance.", bestUsed: "Base, build, and event-specific phases.", durationMinutes: 120, intensity: "Mostly RPE 3-5", recovery: "Moderate to high", primaryBlockType: "long_day", blockPrescription: "75-210 min long run with fueling and terrain-specific pacing.", keyFocus: ["Fuel early", "Maintain form", "Control late fatigue"] },
+    { value: "long_run_steady_finish", label: "Long Run With Steady Finish", primaryGoal: "Maintain controlled performance under accumulated fatigue.", bestUsed: "Mid-to-late endurance development.", durationMinutes: 135, intensity: "Early RPE 3-4, finish RPE 5-6", recovery: "High", primaryBlockType: "long_day", blockPrescription: "Long run with final 25-40 min at steady effort.", keyFocus: ["No threshold surge", "Sustainable late effort", "Mechanics under fatigue"] },
+    { value: "progression_run", label: "Progression Run", primaryGoal: "Develop pacing control and gradual effort increase.", bestUsed: "Base-to-build transitions.", durationMinutes: 65, intensity: "RPE 3-7", recovery: "Moderate", primaryBlockType: "threshold", blockPrescription: "45-90 min progression from easy to controlled moderate/tempo finish.", keyFocus: ["Negative split feel", "No early surge", "Form stays stable"] },
+    { value: "steady_state", label: "Steady-State Run", primaryGoal: "Build moderate aerobic capacity below threshold.", bestUsed: "Base-to-build phases.", durationMinutes: 65, intensity: "RPE 4-5", recovery: "Moderate", primaryBlockType: "threshold", blockPrescription: "25-45 min continuous steady or 2 x 20-30 min with short easy reset.", keyFocus: ["Controlled breathing", "Consistent effort", "No racing hills"] },
+    { value: "marathon_pace", label: "Marathon-Pace Session", primaryGoal: "Improve marathon-effort economy and fueling execution.", bestUsed: "Marathon-specific preparation.", durationMinutes: 95, intensity: "RPE 5-6 on work segments", recovery: "Moderate to high", primaryBlockType: "threshold", blockPrescription: "Marathon-effort intervals or continuous block with easy recoveries.", keyFocus: ["Use effort over pace", "Practice fueling", "Stay below threshold"] },
+    { value: "tempo_run", label: "Tempo Run", primaryGoal: "Sustain strong aerobic effort for extended duration.", bestUsed: "General build and race prep.", durationMinutes: 70, intensity: "RPE 6-7", recovery: "Moderate to high", primaryBlockType: "threshold", blockPrescription: "Continuous 20-40 min tempo or broken tempo blocks.", keyFocus: ["Conservative opening", "Smooth breathing", "Strong controlled finish"] },
+    { value: "threshold_intervals", label: "Threshold / Cruise Intervals", primaryGoal: "Improve lactate-threshold performance.", bestUsed: "Build and race-specific phases.", durationMinutes: 75, intensity: "RPE 7-8", recovery: "High", primaryBlockType: "threshold", blockPrescription: "Cruise intervals (4-8 min reps or mile repeats) with short jog recoveries.", keyFocus: ["Consistent reps", "Controlled recoveries", "No early-race behavior"] },
+    { value: "half_marathon_pace", label: "Half-Marathon-Pace Session", primaryGoal: "Improve sustained race-effort comfort and rhythm.", bestUsed: "Half-marathon prep or high-aerobic development.", durationMinutes: 80, intensity: "RPE 6-8", recovery: "High", primaryBlockType: "threshold", blockPrescription: "2-3 longer HM-pace blocks with easy float recoveries.", keyFocus: ["Controlled opening", "Rhythm consistency", "No final sprinting"] },
+    { value: "critical_velocity_10k", label: "Critical Velocity / 10K-Pace Intervals", primaryGoal: "Develop high aerobic power above threshold.", bestUsed: "5K to HM performance phases.", durationMinutes: 70, intensity: "RPE 7-9", recovery: "High", primaryBlockType: "intervals", blockPrescription: "800-1200m reps or time-based CV reps with controlled recoveries.", keyFocus: ["Even pacing", "Quality volume", "No kick races each rep"] },
+    { value: "vo2max_intervals", label: "VO2max Intervals", primaryGoal: "Increase peak aerobic capacity and severe-intensity tolerance.", bestUsed: "Later build and shorter-distance prep.", durationMinutes: 65, intensity: "RPE 8-9", recovery: "High", primaryBlockType: "vo2", blockPrescription: "2-5 min VO2 reps with equal or slightly shorter easy recoveries.", keyFocus: ["No sprint starts", "Rep consistency", "Stop before mechanics collapse"] },
+    { value: "fartlek", label: "Fartlek Session", primaryGoal: "Build variable-speed endurance and pacing flexibility.", bestUsed: "General prep, trail prep, or reintroduction to intensity.", durationMinutes: 60, intensity: "Variable RPE 3-9", recovery: "Moderate to high", primaryBlockType: "intervals", blockPrescription: "Structured variable-duration hard/easy surges by time or landmarks.", keyFocus: ["Defined purpose", "Controlled hard segments", "Float recoveries"] },
+    { value: "short_hill_sprints", label: "Short Hill Repeats", primaryGoal: "Develop running power, stiffness, and acceleration.", bestUsed: "Base and early build.", durationMinutes: 50, intensity: "RPE 8-10 on reps", recovery: "Moderate", primaryBlockType: "power", blockPrescription: "6-12 x 8-15s hill sprints with full walk-back recovery.", keyFocus: ["Power not conditioning", "High quality reps", "Stop when speed drops"] },
+    { value: "long_hill_repeats", label: "Longer Hill Repeats", primaryGoal: "Improve uphill aerobic power and climbing pace control.", bestUsed: "Road/trail/mountain build phases.", durationMinutes: 70, intensity: "RPE 7-9", recovery: "High", primaryBlockType: "intervals", blockPrescription: "60s to 6min uphill reps with easy descents/jog recoveries.", keyFocus: ["Conservative early reps", "Cadence control", "Effort over pace"] },
+    { value: "run_hike_climbing", label: "Uphill Hiking + Running Session", primaryGoal: "Improve steep-climbing economy and transitions.", bestUsed: "Trail, mountain, and ultra preparation.", durationMinutes: 95, intensity: "RPE 3-7", recovery: "Moderate", primaryBlockType: "long_day", blockPrescription: "Alternate run/hike by gradient on sustained climbs.", keyFocus: ["Intentional transitions", "Efficient hiking mechanics", "Consistent rhythm"] },
+    { value: "downhill_technique", label: "Downhill Technique Session", primaryGoal: "Develop descending skill and mechanical tolerance.", bestUsed: "Trail and mountain-specific development.", durationMinutes: 60, intensity: "Cardio RPE 3-6", recovery: "Moderate to high", primaryBlockType: "assessment", blockPrescription: "4-8 controlled downhill reps with easy uphill recovery.", keyFocus: ["Quick contacts", "Control over speed", "Progress technicality gradually"] },
+    { value: "technical_trail", label: "Technical Trail-Running Session", primaryGoal: "Improve foot placement, rhythm, and terrain confidence.", bestUsed: "Early trail season and skill phases.", durationMinutes: 65, intensity: "RPE 3-6", recovery: "Low to moderate", primaryBlockType: "assessment", blockPrescription: "Skill-focused trail sections plus easy/moderate continuous application.", keyFocus: ["Look ahead", "Shorten stride", "Relax upper body"] },
+    { value: "trail_endurance", label: "Trail Endurance Run", primaryGoal: "Build terrain-specific durability with pacing and fueling practice.", bestUsed: "Trail base and build.", durationMinutes: 120, intensity: "Mostly RPE 3-5", recovery: "Moderate to high", primaryBlockType: "long_day", blockPrescription: "60-240 min trail endurance with controlled climbing/hiking choices.", keyFocus: ["Duration + elevation tracking", "Technical consistency", "Late-run descent control"] },
+    { value: "race_simulation", label: "Race-Simulation Run", primaryGoal: "Integrate pacing, fueling, terrain, and event execution.", bestUsed: "Final specific-preparation phases.", durationMinutes: 120, intensity: "RPE 5-8", recovery: "High", primaryBlockType: "assessment", blockPrescription: "Event-specific simulation on matching terrain and conditions.", keyFocus: ["Replace hardest weekly session", "Practice gear/fueling", "Assess late-session execution"] },
+    { value: "run_walk_endurance", label: "Run-Walk Endurance Session", primaryGoal: "Build durability while controlling tissue stress.", bestUsed: "Return to run, ultras, and long controlled sessions.", durationMinutes: 80, intensity: "RPE 2-5", recovery: "Low to moderate", primaryBlockType: "zone2", blockPrescription: "Structured run-walk intervals with planned walk breaks for fueling and reset.", keyFocus: ["Intentional walking", "Controlled fatigue", "Consistent rhythm"] },
+    { value: "short_maintenance", label: "Short Running Maintenance Session", primaryGoal: "Preserve running readiness during non-running priority phases.", bestUsed: "Cycling, climbing, skiing, or strength emphasis blocks.", durationMinutes: 45, intensity: "RPE 2-8", recovery: "Low to moderate", primaryBlockType: "zone2", blockPrescription: "Easy running with one brief quality exposure and easy finish.", keyFocus: ["Minimum effective dose", "One quality touch only", "Protect recovery"] },
+    { value: "mixed_development", label: "Mixed Running Development Session", primaryGoal: "Train compatible qualities when run days are limited.", bestUsed: "General development and multisport programming.", durationMinutes: 70, intensity: "RPE 2-8", recovery: "Moderate", primaryBlockType: "threshold", blockPrescription: "Warm-up + technique/speed block + primary aerobic block + easy finish.", keyFocus: ["One dominant adaptation", "Avoid all-systems-max", "Manage total load"] }
+  ];
+
+  var HIKING_SESSION_TYPE_OPTIONS = [
+    { value: "recovery_hike", label: "Recovery Hike", primaryGoal: "Low-stress movement and recovery support.", bestUsed: "Deloads or after demanding long/quality days.", durationMinutes: 45, intensity: "RPE 1-2", recovery: "Very low", primaryBlockType: "zone2", blockPrescription: "30-60 min easy flat or gently rolling hike with no load requirement.", keyFocus: ["Keep easy", "Relaxed gait", "Finish refreshed"] },
+    { value: "easy_aerobic_hike", label: "Easy Aerobic Hike", primaryGoal: "General aerobic development with low stress.", bestUsed: "Most phases as aerobic support.", durationMinutes: 75, intensity: "RPE 2-4", recovery: "Low", primaryBlockType: "zone2", blockPrescription: "45-120 min easy conversational hike on moderate terrain.", keyFocus: ["Steady effort", "Controlled climbing", "No surges"] },
+    { value: "brisk_fitness_hike", label: "Brisk Fitness Hike", primaryGoal: "Moderate sustained aerobic work.", bestUsed: "Base-to-build transitions.", durationMinutes: 80, intensity: "RPE 4-5", recovery: "Moderate", primaryBlockType: "threshold", blockPrescription: "40-90 min purposeful brisk hiking with stable breathing.", keyFocus: ["Consistent output", "Posture under pace", "Avoid threshold drift"] },
+    { value: "long_endurance_hike", label: "Long Endurance Hike", primaryGoal: "Time-on-feet durability and fueling practice.", bestUsed: "Base/build and objective prep.", durationMinutes: 180, intensity: "RPE 3-5", recovery: "Moderate to high", primaryBlockType: "long_day", blockPrescription: "2-6 hr hike tracking time, elevation, and fueling.", keyFocus: ["Durability", "Fuel early", "Pacing discipline"] },
+    { value: "vertical_gain_hike", label: "Vertical-Gain Hike", primaryGoal: "Uphill aerobic capacity and climbing economy.", bestUsed: "Uphill-focused blocks.", durationMinutes: 105, intensity: "RPE 4-7", recovery: "Moderate to high", primaryBlockType: "threshold", blockPrescription: "Repeated sustained climbs or one continuous ascent focus session.", keyFocus: ["Steady climbing", "Effort over speed", "Cadence consistency"] },
+    { value: "steep_power_hiking", label: "Steep Power-Hiking Intervals", primaryGoal: "Climbing strength-endurance on steep grades.", bestUsed: "Build and mountain-specific phases.", durationMinutes: 75, intensity: "RPE 7-8", recovery: "High", primaryBlockType: "intervals", blockPrescription: "6-12 uphill intervals on steep grade with easy descents between reps.", keyFocus: ["Strong drive", "No sprint starts", "Rep consistency"] },
+    { value: "run_hike_transition", label: "Run-Hike Transition Session", primaryGoal: "Efficient terrain-based pace transitions.", bestUsed: "Trail and mountain race preparation.", durationMinutes: 90, intensity: "RPE 3-7", recovery: "Moderate", primaryBlockType: "assessment", blockPrescription: "Alternate hiking and running by grade and terrain cues.", keyFocus: ["Decision quality", "Rhythm changes", "Efficient transitions"] },
+    { value: "loaded_pack_hike", label: "Loaded-Pack Hike", primaryGoal: "Load-carriage tolerance and trunk durability.", bestUsed: "Backpacking, hunting, and mountaineering prep.", durationMinutes: 105, intensity: "RPE 4-7", recovery: "Moderate to high", primaryBlockType: "long_day", blockPrescription: "60-180 min hike with prescribed pack load and terrain.", keyFocus: ["Posture under load", "Foot comfort", "Controlled downhill"] },
+    { value: "progressive_pack_hike", label: "Progressive Pack Hike", primaryGoal: "Gradual pack-weight progression without overload.", bestUsed: "Early-to-mid load carriage build.", durationMinutes: 95, intensity: "RPE 4-6", recovery: "Moderate", primaryBlockType: "long_day", blockPrescription: "Steady hike with planned pack increments across weeks.", keyFocus: ["One variable progression", "Symptom monitoring", "Technique consistency"] },
+    { value: "technical_terrain_hike", label: "Technical-Terrain Hike", primaryGoal: "Foot placement, balance, and terrain confidence.", bestUsed: "Skill and objective preparation phases.", durationMinutes: 90, intensity: "RPE 3-6", recovery: "Low to moderate", primaryBlockType: "assessment", blockPrescription: "Skill-focused technical terrain repeats plus continuous application.", keyFocus: ["Line choice", "Balance", "Confident footwork"] },
+    { value: "downhill_tolerance_hike", label: "Downhill-Tolerance Hike", primaryGoal: "Descending tolerance and eccentric quadriceps capacity.", bestUsed: "Mountain and long-descent objectives.", durationMinutes: 80, intensity: "RPE 4-7", recovery: "Moderate to high", primaryBlockType: "assessment", blockPrescription: "Controlled downhill repetitions with easy uphill recovery.", keyFocus: ["Progress downhill load", "Control mechanics", "Limit braking fatigue"] },
+    { value: "incline_stairs_treadmill", label: "Stair / Incline Treadmill Session", primaryGoal: "Controlled vertical training in repeatable conditions.", bestUsed: "Weather-limited periods or precise uphill dosing.", durationMinutes: 65, intensity: "RPE 4-7", recovery: "Moderate", primaryBlockType: "intervals", blockPrescription: "Structured incline/stair intervals with easy resets.", keyFocus: ["Controlled grade", "Repeatability", "Progression control"] },
+    { value: "hiking_tempo_intervals", label: "Hiking Tempo Intervals", primaryGoal: "Sustained moderate-hard climbing tolerance.", bestUsed: "Build phases for steep objectives.", durationMinutes: 75, intensity: "RPE 6-8", recovery: "High", primaryBlockType: "threshold", blockPrescription: "3-6 sustained uphill tempo intervals with easy descents.", keyFocus: ["Strong controlled output", "No early burn", "Consistent intervals"] },
+    { value: "back_to_back_hiking", label: "Back-to-Back Hiking Days", primaryGoal: "Multi-day durability and recovery management.", bestUsed: "Objective-specific preparation.", durationMinutes: 120, intensity: "RPE 3-6", recovery: "High", primaryBlockType: "long_day", blockPrescription: "Day 1 + Day 2 cumulative hiking load with controlled second-day effort.", keyFocus: ["Durability across days", "Fuel/recover between days", "Pacing restraint"] },
+    { value: "adventure_simulation", label: "Adventure / Objective Simulation", primaryGoal: "Integrate terrain, pack, fueling, and pacing demands.", bestUsed: "Final specific preparation.", durationMinutes: 210, intensity: "RPE 5-8", recovery: "High", primaryBlockType: "assessment", blockPrescription: "Simulation matching objective terrain, elevation, gear, and fueling plan.", keyFocus: ["Execution rehearsal", "Load specificity", "Late-session decision making"] },
+    { value: "short_maintenance", label: "Short Hiking Maintenance", primaryGoal: "Preserve hiking readiness during another sport priority.", bestUsed: "Non-hiking-priority seasons.", durationMinutes: 55, intensity: "RPE 3-6", recovery: "Low to moderate", primaryBlockType: "zone2", blockPrescription: "Short hike with optional incline block to retain hiking-specific readiness.", keyFocus: ["Minimum effective dose", "Do not compete with priority sport", "Movement quality"] }
   ];
 
   var PHASE_PRESETS_BY_PROGRAM_TYPE = {
@@ -426,6 +693,62 @@
     zone2: { type: "zone2", title: "Zone 2", prescription: "60-90 min Zone 2", notes: "Can include terrain / vertical targets." },
     long_day: { type: "long_day", title: "Long Mountain Day", prescription: "2-4 hr aerobic mountain session", notes: "Prescribe terrain, vertical gain, and fueling." },
     cooldown: { type: "cooldown", title: "Cooldown", prescription: "8-10 min easy cooldown", notes: "Restore range and downregulate." }
+  };
+
+  var STRUCTURED_EDITOR_SCHEMAS = {
+    program_worksheets_text: {
+      emptyMessage: "No worksheets added yet.",
+      addLabel: "Add Worksheet",
+      columns: [
+        { key: "title", label: "Title", placeholder: "Readiness Log" },
+        { key: "description", label: "Description", placeholder: "Complete before key sessions" }
+      ]
+    },
+    framework_wave_rows_text: {
+      emptyMessage: "No loading-guideline rows added yet.",
+      addLabel: "Add Guideline Row",
+      columns: [
+        { key: "week", label: "Week", placeholder: "1" },
+        { key: "target", label: "Training Target", placeholder: "Establish" },
+        { key: "adjustment", label: "Typical Adjustment", placeholder: "Choose working loads and leave 2-4 repetitions in reserve." }
+      ]
+    },
+    monitoring_metrics_text: {
+      emptyMessage: "No monitoring metrics added yet.",
+      addLabel: "Add Monitoring Metric",
+      columns: [
+        { key: "metric", label: "Metric", placeholder: "Sleep" },
+        { key: "frequency", label: "Frequency", placeholder: "Daily" },
+        { key: "target", label: "Target", placeholder: "7+ hours" },
+        { key: "notes", label: "Notes", placeholder: "Improves within 24-48 hours after hard blocks" }
+      ]
+    },
+    phase_assessments_text: {
+      emptyMessage: "No phase assessments added yet.",
+      addLabel: "Add Assessment",
+      columns: [
+        { key: "title", label: "Assessment", placeholder: "Single-leg squat video review" },
+        { key: "benchmark", label: "Benchmark", placeholder: "Pain <= 2/10" },
+        { key: "notes", label: "Notes", placeholder: "Compare to week 1 baseline" }
+      ]
+    },
+    general_training_overview_text: {
+      emptyMessage: "No general training overview rows added yet.",
+      addLabel: "Add Overview Row",
+      columns: [
+        { key: "parameter", label: "Parameter", placeholder: "Strength frequency" },
+        { key: "guidance", label: "Guidance", placeholder: "2 sessions per week with one heavier lower-body exposure" }
+      ]
+    },
+    general_weekly_structure_text: {
+      emptyMessage: "No weekly structure rows added yet.",
+      addLabel: "Add Weekly Row",
+      columns: [
+        { key: "day", label: "Day", placeholder: "Monday" },
+        { key: "focus", label: "Focus", placeholder: "Heavy strength" },
+        { key: "notes", label: "Notes", placeholder: "Freshest day for lower-body loading" }
+      ]
+    }
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -1151,8 +1474,7 @@
   }
 
   function getEffectivePhaseTrainingDays(phase) {
-    var configured = clampNumber(parseInt(phase && phase.training_days_per_week, 10), 1, 14, state.structure.workoutsPerWeek || 1);
-    return Math.max(1, Math.min(configured, state.structure.workoutsPerWeek || configured));
+    return 7;
   }
 
   function ensureDailyNavigatorState() {
@@ -1340,6 +1662,17 @@
     var focusedFieldState = captureFocusedFieldState();
 
     var plan = getCurrentSessionPlan();
+    if (isClimbingSessionType(plan.session_type)) {
+      plan = applyClimbingSessionTemplate(plan, plan.climbing_session_type, false);
+    } else if (isMountainBikeSessionType(plan.session_type)) {
+      plan = applyMountainBikeSessionTemplate(plan, plan.mountain_bike_session_type, false);
+    } else if (isCyclingSessionType(plan.session_type)) {
+      plan = applyCyclingSessionTemplate(plan, plan.cycling_session_type, false);
+    } else if (isRunSessionType(plan.session_type)) {
+      plan = applyRunSessionTemplate(plan, plan.run_session_type, false);
+    } else if (isHikingSessionType(plan.session_type)) {
+      plan = applyHikingSessionTemplate(plan, plan.hiking_session_type, false);
+    }
     state.sessionPlans[state.day] = plan;
 
     setInputValue("[data-session-plan-field='title']", plan.title);
@@ -1498,19 +1831,9 @@
       return null;
     }
 
-    var weeklyEntry = Array.isArray(state.weeklyStructure) ? state.weeklyStructure[parsed.workout - 1] : null;
-    var dayValue = normalizeWeeklyDayOfWeek(weeklyEntry && weeklyEntry.day_of_week, getDefaultWeeklyWorkoutDay(parsed.workout - 1, state.structure.workoutsPerWeek));
-    var targetIndex = getWeekdayIndex(dayValue);
-    var weekAnchor = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    weekAnchor.setDate(weekAnchor.getDate() + ((parsed.week - 1) * 7));
-
-    var offset = targetIndex - weekAnchor.getDay();
-    if (offset < 0) {
-      offset += 7;
-    }
-
-    var estimated = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate());
-    estimated.setDate(estimated.getDate() + offset);
+    var estimated = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    var slotOffset = ((parsed.week - 1) * 7) + (parsed.workout - 1);
+    estimated.setDate(estimated.getDate() + slotOffset);
     return estimated;
   }
 
@@ -1545,7 +1868,7 @@
 
     var estimatedDate = getEstimatedWorkoutDateForSlot(state.day);
     if (!estimatedDate) {
-      panel.textContent = "Set workout weekdays in Program Phases to project workout dates.";
+      panel.textContent = "Add an estimated start date in Overview to project program day dates automatically.";
       return;
     }
 
@@ -1758,6 +2081,61 @@
         buildSessionTypeSelectOptions(plan.session_type),
         '</select>',
         '</label>',
+        (isClimbingSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Climbing Session Focus</span>',
+            '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="climbing_session_type">',
+            buildClimbingSessionTypeOptions(plan.climbing_session_type),
+            '</select>',
+            '</label>',
+            renderClimbingSessionInfo(plan, slotKey)
+          ].join('')
+          : ''),
+        (isMountainBikeSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Mountain Bike Focus</span>',
+            '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="mountain_bike_session_type">',
+            buildMountainBikeSessionTypeOptions(plan.mountain_bike_session_type),
+            '</select>',
+            '</label>',
+            renderMountainBikeSessionInfo(plan)
+          ].join('')
+          : ''),
+        (isCyclingSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Cycling Focus</span>',
+            '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="cycling_session_type">',
+            buildCyclingSessionTypeOptions(plan.cycling_session_type),
+            '</select>',
+            '</label>',
+            renderCyclingSessionInfo(plan)
+          ].join('')
+          : ''),
+        (isRunSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Run Focus</span>',
+            '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="run_session_type">',
+            buildRunSessionTypeOptions(plan.run_session_type),
+            '</select>',
+            '</label>',
+            renderRunSessionInfo(plan)
+          ].join('')
+          : ''),
+        (isHikingSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Hiking Focus</span>',
+            '<select data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="hiking_session_type">',
+            buildHikingSessionTypeOptions(plan.hiking_session_type),
+            '</select>',
+            '</label>',
+            renderHikingSessionInfo(plan)
+          ].join('')
+          : ''),
         '<label class="program-builder-structure-field">',
         '<span>Session Goal</span>',
         '<input type="text" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-field="session_goal" value="' + escapeAttribute(plan.session_goal || "") + '" />',
@@ -2388,6 +2766,11 @@
       strength_lower: ['warmup', 'main_strength', 'secondary_strength', 'cooldown'],
       strength_upper: ['warmup', 'main_strength', 'secondary_strength', 'cooldown'],
       strength_full: ['warmup', 'activation', 'main_strength', 'cooldown'],
+      climbing: ['warmup', 'assessment', 'cooldown'],
+      mountain_bike: ['warmup', 'zone2', 'cooldown'],
+      cycling: ['warmup', 'zone2', 'cooldown'],
+      run: ['warmup', 'zone2', 'cooldown'],
+      hiking: ['warmup', 'zone2', 'cooldown'],
       zone2: ['warmup', 'zone2', 'cooldown'],
       threshold: ['warmup', 'activation', 'intervals', 'cooldown'],
       vo2: ['warmup', 'activation', 'intervals', 'cooldown'],
@@ -2399,6 +2782,507 @@
     };
 
     return sequences[type] || ['warmup', 'main_strength', 'cooldown'];
+  }
+
+  function isClimbingSessionType(sessionType) {
+    return normalizeWeeklySessionType(sessionType) === 'climbing';
+  }
+
+  function normalizeClimbingSessionType(value) {
+    var target = String(value || '').trim().toLowerCase();
+    var match = CLIMBING_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === target;
+    });
+    return match ? match.value : CLIMBING_SESSION_TYPE_OPTIONS[0].value;
+  }
+
+  function findClimbingSessionTemplate(value) {
+    var normalized = normalizeClimbingSessionType(value);
+    return CLIMBING_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === normalized;
+    }) || CLIMBING_SESSION_TYPE_OPTIONS[0];
+  }
+
+  function buildClimbingSessionTypeOptions(selectedValue) {
+    var selected = normalizeClimbingSessionType(selectedValue);
+    return CLIMBING_SESSION_TYPE_OPTIONS.map(function (option) {
+      var isSelected = option.value === selected ? ' selected' : '';
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join('');
+  }
+
+  function buildClimbingSessionTemplateBlocks(template) {
+    var focus = template && typeof template === 'object' ? template : CLIMBING_SESSION_TYPE_OPTIONS[0];
+    var mainType = normalizeSessionBlockType(focus.primaryBlockType || 'assessment');
+    return [
+      Object.assign({
+        type: 'warmup',
+        title: 'Climbing Warm-Up',
+        prescription: '15-25 min progressive warm-up from easy movement to session-specific readiness.',
+        notes: 'Prepare shoulders, wrists, fingers, hips, and trunk before harder work.'
+      }, getDefaultBlockFieldsForType('warmup')),
+      Object.assign({
+        type: mainType,
+        title: focus.label,
+        prescription: focus.blockPrescription,
+        notes: 'Primary adaptation: ' + focus.primaryGoal
+      }, getDefaultBlockFieldsForType(mainType)),
+      Object.assign({
+        type: 'cooldown',
+        title: 'Climbing Cooldown',
+        prescription: '1-2 easy routes or easy movement, then brief tissue check.',
+        notes: 'Stop if finger or elbow discomfort escalates.'
+      }, getDefaultBlockFieldsForType('cooldown'))
+    ];
+  }
+
+  function applyClimbingSessionTemplate(plan, climbingType, forceOverwrite) {
+    var nextPlan = plan && typeof plan === 'object' ? plan : {};
+    var template = findClimbingSessionTemplate(climbingType || nextPlan.climbing_session_type);
+    var shouldOverwrite = !!forceOverwrite;
+    nextPlan.session_type = 'climbing';
+    nextPlan.climbing_session_type = template.value;
+
+    if (shouldOverwrite || !String(nextPlan.title || '').trim() || /^week\s+\d+\s+-\s+workout\s+\d+/i.test(String(nextPlan.title || ''))) {
+      nextPlan.title = template.label;
+    }
+    if (shouldOverwrite || !String(nextPlan.session_goal || '').trim()) {
+      nextPlan.session_goal = template.primaryGoal;
+    }
+    if (shouldOverwrite || !Number.isFinite(parseInt(nextPlan.duration_minutes, 10)) || parseInt(nextPlan.duration_minutes, 10) <= 0) {
+      nextPlan.duration_minutes = template.durationMinutes;
+    }
+    if (shouldOverwrite || !String(nextPlan.intensity_target || '').trim()) {
+      nextPlan.intensity_target = template.intensity;
+    }
+    if (shouldOverwrite || !String(nextPlan.coach_notes || '').trim()) {
+      nextPlan.coach_notes = [
+        'Best used: ' + template.bestUsed,
+        'Recovery cost: ' + template.recovery,
+        'Focus: ' + template.keyFocus.join(', ')
+      ].join(' | ');
+    }
+    if (shouldOverwrite || !Array.isArray(nextPlan.blocks) || !nextPlan.blocks.length) {
+      nextPlan.blocks = buildClimbingSessionTemplateBlocks(template);
+    }
+
+    return nextPlan;
+  }
+
+  function renderClimbingSessionInfo(plan, slotKey) {
+    if (!isClimbingSessionType(plan && plan.session_type)) {
+      return '';
+    }
+
+    var template = findClimbingSessionTemplate(plan && plan.climbing_session_type);
+    return [
+      '<div class="program-builder-axis-flow-badge is-circuit" style="margin:8px 0 0;">',
+      '<strong>' + escapeHtml(template.label) + '</strong> • ' + escapeHtml(template.intensity) + ' • ' + escapeHtml(String(template.durationMinutes) + ' min') + ' • Recovery: ' + escapeHtml(template.recovery),
+      '<div style="margin-top:4px; font-weight:500;">Goal: ' + escapeHtml(template.primaryGoal) + '</div>',
+      '<div style="margin-top:4px;">Best Used: ' + escapeHtml(template.bestUsed) + '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function isMountainBikeSessionType(sessionType) {
+    return normalizeWeeklySessionType(sessionType) === 'mountain_bike';
+  }
+
+  function normalizeMountainBikeSessionType(value) {
+    var target = String(value || '').trim().toLowerCase();
+    var match = MOUNTAIN_BIKE_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === target;
+    });
+    return match ? match.value : MOUNTAIN_BIKE_SESSION_TYPE_OPTIONS[0].value;
+  }
+
+  function findMountainBikeSessionTemplate(value) {
+    var normalized = normalizeMountainBikeSessionType(value);
+    return MOUNTAIN_BIKE_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === normalized;
+    }) || MOUNTAIN_BIKE_SESSION_TYPE_OPTIONS[0];
+  }
+
+  function buildMountainBikeSessionTypeOptions(selectedValue) {
+    var selected = normalizeMountainBikeSessionType(selectedValue);
+    return MOUNTAIN_BIKE_SESSION_TYPE_OPTIONS.map(function (option) {
+      var isSelected = option.value === selected ? ' selected' : '';
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join('');
+  }
+
+  function buildMountainBikeSessionTemplateBlocks(template) {
+    var focus = template && typeof template === 'object' ? template : MOUNTAIN_BIKE_SESSION_TYPE_OPTIONS[0];
+    var mainType = normalizeSessionBlockType(focus.primaryBlockType || 'zone2');
+    return [
+      Object.assign({
+        type: 'warmup',
+        title: 'MTB Warm-Up',
+        prescription: '10-20 min progressive warm-up with easy terrain and cadence prep.',
+        notes: 'Build control before intensity or technical demands.'
+      }, getDefaultBlockFieldsForType('warmup')),
+      Object.assign({
+        type: mainType,
+        title: focus.label,
+        prescription: focus.blockPrescription,
+        notes: 'Primary adaptation: ' + focus.primaryGoal
+      }, getDefaultBlockFieldsForType(mainType)),
+      Object.assign({
+        type: 'cooldown',
+        title: 'MTB Cooldown',
+        prescription: '8-15 min easy roll to downregulate breathing and tension.',
+        notes: 'Finish with control and note any grip, back, or knee symptoms.'
+      }, getDefaultBlockFieldsForType('cooldown'))
+    ];
+  }
+
+  function applyMountainBikeSessionTemplate(plan, mountainBikeType, forceOverwrite) {
+    var nextPlan = plan && typeof plan === 'object' ? plan : {};
+    var template = findMountainBikeSessionTemplate(mountainBikeType || nextPlan.mountain_bike_session_type);
+    var shouldOverwrite = !!forceOverwrite;
+    nextPlan.session_type = 'mountain_bike';
+    nextPlan.mountain_bike_session_type = template.value;
+
+    if (shouldOverwrite || !String(nextPlan.title || '').trim() || /^week\s+\d+\s+-\s+workout\s+\d+/i.test(String(nextPlan.title || ''))) {
+      nextPlan.title = template.label;
+    }
+    if (shouldOverwrite || !String(nextPlan.session_goal || '').trim()) {
+      nextPlan.session_goal = template.primaryGoal;
+    }
+    if (shouldOverwrite || !Number.isFinite(parseInt(nextPlan.duration_minutes, 10)) || parseInt(nextPlan.duration_minutes, 10) <= 0) {
+      nextPlan.duration_minutes = template.durationMinutes;
+    }
+    if (shouldOverwrite || !String(nextPlan.intensity_target || '').trim()) {
+      nextPlan.intensity_target = template.intensity;
+    }
+    if (shouldOverwrite || !String(nextPlan.coach_notes || '').trim()) {
+      nextPlan.coach_notes = [
+        'Best used: ' + template.bestUsed,
+        'Recovery cost: ' + template.recovery,
+        'Focus: ' + template.keyFocus.join(', ')
+      ].join(' | ');
+    }
+    if (shouldOverwrite || !Array.isArray(nextPlan.blocks) || !nextPlan.blocks.length) {
+      nextPlan.blocks = buildMountainBikeSessionTemplateBlocks(template);
+    }
+
+    return nextPlan;
+  }
+
+  function renderMountainBikeSessionInfo(plan) {
+    if (!isMountainBikeSessionType(plan && plan.session_type)) {
+      return '';
+    }
+
+    var template = findMountainBikeSessionTemplate(plan && plan.mountain_bike_session_type);
+    return [
+      '<div class="program-builder-axis-flow-badge is-superset" style="margin:8px 0 0;">',
+      '<strong>' + escapeHtml(template.label) + '</strong> • ' + escapeHtml(template.intensity) + ' • ' + escapeHtml(String(template.durationMinutes) + ' min') + ' • Recovery: ' + escapeHtml(template.recovery),
+      '<div style="margin-top:4px; font-weight:500;">Goal: ' + escapeHtml(template.primaryGoal) + '</div>',
+      '<div style="margin-top:4px;">Best Used: ' + escapeHtml(template.bestUsed) + '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function isCyclingSessionType(sessionType) {
+    return normalizeWeeklySessionType(sessionType) === 'cycling';
+  }
+
+  function normalizeCyclingSessionType(value) {
+    var target = String(value || '').trim().toLowerCase();
+    var match = CYCLING_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === target;
+    });
+    return match ? match.value : CYCLING_SESSION_TYPE_OPTIONS[0].value;
+  }
+
+  function findCyclingSessionTemplate(value) {
+    var normalized = normalizeCyclingSessionType(value);
+    return CYCLING_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === normalized;
+    }) || CYCLING_SESSION_TYPE_OPTIONS[0];
+  }
+
+  function buildCyclingSessionTypeOptions(selectedValue) {
+    var selected = normalizeCyclingSessionType(selectedValue);
+    return CYCLING_SESSION_TYPE_OPTIONS.map(function (option) {
+      var isSelected = option.value === selected ? ' selected' : '';
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join('');
+  }
+
+  function buildCyclingSessionTemplateBlocks(template) {
+    var focus = template && typeof template === 'object' ? template : CYCLING_SESSION_TYPE_OPTIONS[0];
+    var mainType = normalizeSessionBlockType(focus.primaryBlockType || 'zone2');
+    return [
+      Object.assign({
+        type: 'warmup',
+        title: 'Cycling Warm-Up',
+        prescription: '10-20 min progressive warm-up with cadence changes and smooth load build.',
+        notes: 'Prepare respiration, cadence control, and position comfort before quality work.'
+      }, getDefaultBlockFieldsForType('warmup')),
+      Object.assign({
+        type: mainType,
+        title: focus.label,
+        prescription: focus.blockPrescription,
+        notes: 'Primary adaptation: ' + focus.primaryGoal
+      }, getDefaultBlockFieldsForType(mainType)),
+      Object.assign({
+        type: 'cooldown',
+        title: 'Cycling Cooldown',
+        prescription: '8-15 min easy spinning with relaxed upper body and breathing downshift.',
+        notes: 'Note late-session pacing drift and fueling execution quality.'
+      }, getDefaultBlockFieldsForType('cooldown'))
+    ];
+  }
+
+  function applyCyclingSessionTemplate(plan, cyclingType, forceOverwrite) {
+    var nextPlan = plan && typeof plan === 'object' ? plan : {};
+    var template = findCyclingSessionTemplate(cyclingType || nextPlan.cycling_session_type);
+    var shouldOverwrite = !!forceOverwrite;
+    nextPlan.session_type = 'cycling';
+    nextPlan.cycling_session_type = template.value;
+
+    if (shouldOverwrite || !String(nextPlan.title || '').trim() || /^week\s+\d+\s+-\s+workout\s+\d+/i.test(String(nextPlan.title || ''))) {
+      nextPlan.title = template.label;
+    }
+    if (shouldOverwrite || !String(nextPlan.session_goal || '').trim()) {
+      nextPlan.session_goal = template.primaryGoal;
+    }
+    if (shouldOverwrite || !Number.isFinite(parseInt(nextPlan.duration_minutes, 10)) || parseInt(nextPlan.duration_minutes, 10) <= 0) {
+      nextPlan.duration_minutes = template.durationMinutes;
+    }
+    if (shouldOverwrite || !String(nextPlan.intensity_target || '').trim()) {
+      nextPlan.intensity_target = template.intensity;
+    }
+    if (shouldOverwrite || !String(nextPlan.coach_notes || '').trim()) {
+      nextPlan.coach_notes = [
+        'Best used: ' + template.bestUsed,
+        'Recovery cost: ' + template.recovery,
+        'Focus: ' + template.keyFocus.join(', ')
+      ].join(' | ');
+    }
+    if (shouldOverwrite || !Array.isArray(nextPlan.blocks) || !nextPlan.blocks.length) {
+      nextPlan.blocks = buildCyclingSessionTemplateBlocks(template);
+    }
+
+    return nextPlan;
+  }
+
+  function renderCyclingSessionInfo(plan) {
+    if (!isCyclingSessionType(plan && plan.session_type)) {
+      return '';
+    }
+
+    var template = findCyclingSessionTemplate(plan && plan.cycling_session_type);
+    return [
+      '<div class="program-builder-axis-flow-badge" style="margin:8px 0 0;">',
+      '<strong>' + escapeHtml(template.label) + '</strong> • ' + escapeHtml(template.intensity) + ' • ' + escapeHtml(String(template.durationMinutes) + ' min') + ' • Recovery: ' + escapeHtml(template.recovery),
+      '<div style="margin-top:4px; font-weight:500;">Goal: ' + escapeHtml(template.primaryGoal) + '</div>',
+      '<div style="margin-top:4px;">Best Used: ' + escapeHtml(template.bestUsed) + '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function isRunSessionType(sessionType) {
+    return normalizeWeeklySessionType(sessionType) === 'run';
+  }
+
+  function normalizeRunSessionType(value) {
+    var target = String(value || '').trim().toLowerCase();
+    var match = RUN_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === target;
+    });
+    return match ? match.value : RUN_SESSION_TYPE_OPTIONS[0].value;
+  }
+
+  function findRunSessionTemplate(value) {
+    var normalized = normalizeRunSessionType(value);
+    return RUN_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === normalized;
+    }) || RUN_SESSION_TYPE_OPTIONS[0];
+  }
+
+  function buildRunSessionTypeOptions(selectedValue) {
+    var selected = normalizeRunSessionType(selectedValue);
+    return RUN_SESSION_TYPE_OPTIONS.map(function (option) {
+      var isSelected = option.value === selected ? ' selected' : '';
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join('');
+  }
+
+  function buildRunSessionTemplateBlocks(template) {
+    var focus = template && typeof template === 'object' ? template : RUN_SESSION_TYPE_OPTIONS[0];
+    var mainType = normalizeSessionBlockType(focus.primaryBlockType || 'zone2');
+    return [
+      Object.assign({
+        type: 'warmup',
+        title: 'Run Warm-Up',
+        prescription: '10-15 min easy running plus movement prep and optional strides.',
+        notes: 'Build rhythm before introducing terrain or intensity demands.'
+      }, getDefaultBlockFieldsForType('warmup')),
+      Object.assign({
+        type: mainType,
+        title: focus.label,
+        prescription: focus.blockPrescription,
+        notes: 'Primary adaptation: ' + focus.primaryGoal
+      }, getDefaultBlockFieldsForType(mainType)),
+      Object.assign({
+        type: 'cooldown',
+        title: 'Run Cooldown',
+        prescription: '8-12 min easy running or walk-jog downregulation.',
+        notes: 'Check posture, cadence stability, and any tissue symptoms.'
+      }, getDefaultBlockFieldsForType('cooldown'))
+    ];
+  }
+
+  function applyRunSessionTemplate(plan, runType, forceOverwrite) {
+    var nextPlan = plan && typeof plan === 'object' ? plan : {};
+    var template = findRunSessionTemplate(runType || nextPlan.run_session_type);
+    var shouldOverwrite = !!forceOverwrite;
+    nextPlan.session_type = 'run';
+    nextPlan.run_session_type = template.value;
+
+    if (shouldOverwrite || !String(nextPlan.title || '').trim() || /^week\s+\d+\s+-\s+workout\s+\d+/i.test(String(nextPlan.title || ''))) {
+      nextPlan.title = template.label;
+    }
+    if (shouldOverwrite || !String(nextPlan.session_goal || '').trim()) {
+      nextPlan.session_goal = template.primaryGoal;
+    }
+    if (shouldOverwrite || !Number.isFinite(parseInt(nextPlan.duration_minutes, 10)) || parseInt(nextPlan.duration_minutes, 10) <= 0) {
+      nextPlan.duration_minutes = template.durationMinutes;
+    }
+    if (shouldOverwrite || !String(nextPlan.intensity_target || '').trim()) {
+      nextPlan.intensity_target = template.intensity;
+    }
+    if (shouldOverwrite || !String(nextPlan.coach_notes || '').trim()) {
+      nextPlan.coach_notes = [
+        'Best used: ' + template.bestUsed,
+        'Recovery cost: ' + template.recovery,
+        'Focus: ' + template.keyFocus.join(', ')
+      ].join(' | ');
+    }
+    if (shouldOverwrite || !Array.isArray(nextPlan.blocks) || !nextPlan.blocks.length) {
+      nextPlan.blocks = buildRunSessionTemplateBlocks(template);
+    }
+
+    return nextPlan;
+  }
+
+  function renderRunSessionInfo(plan) {
+    if (!isRunSessionType(plan && plan.session_type)) {
+      return '';
+    }
+
+    var template = findRunSessionTemplate(plan && plan.run_session_type);
+    return [
+      '<div class="program-builder-axis-flow-badge" style="margin:8px 0 0;">',
+      '<strong>' + escapeHtml(template.label) + '</strong> • ' + escapeHtml(template.intensity) + ' • ' + escapeHtml(String(template.durationMinutes) + ' min') + ' • Recovery: ' + escapeHtml(template.recovery),
+      '<div style="margin-top:4px; font-weight:500;">Goal: ' + escapeHtml(template.primaryGoal) + '</div>',
+      '<div style="margin-top:4px;">Best Used: ' + escapeHtml(template.bestUsed) + '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function isHikingSessionType(sessionType) {
+    return normalizeWeeklySessionType(sessionType) === 'hiking';
+  }
+
+  function normalizeHikingSessionType(value) {
+    var target = String(value || '').trim().toLowerCase();
+    var match = HIKING_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === target;
+    });
+    return match ? match.value : HIKING_SESSION_TYPE_OPTIONS[0].value;
+  }
+
+  function findHikingSessionTemplate(value) {
+    var normalized = normalizeHikingSessionType(value);
+    return HIKING_SESSION_TYPE_OPTIONS.find(function (item) {
+      return item.value === normalized;
+    }) || HIKING_SESSION_TYPE_OPTIONS[0];
+  }
+
+  function buildHikingSessionTypeOptions(selectedValue) {
+    var selected = normalizeHikingSessionType(selectedValue);
+    return HIKING_SESSION_TYPE_OPTIONS.map(function (option) {
+      var isSelected = option.value === selected ? ' selected' : '';
+      return '<option value="' + escapeAttribute(option.value) + '"' + isSelected + '>' + escapeHtml(option.label) + '</option>';
+    }).join('');
+  }
+
+  function buildHikingSessionTemplateBlocks(template) {
+    var focus = template && typeof template === 'object' ? template : HIKING_SESSION_TYPE_OPTIONS[0];
+    var mainType = normalizeSessionBlockType(focus.primaryBlockType || 'zone2');
+    return [
+      Object.assign({
+        type: 'warmup',
+        title: 'Hiking Warm-Up',
+        prescription: '10-15 min easy movement prep plus gradual terrain load-in.',
+        notes: 'Prepare ankles, calves, hips, and trunk before climbs/descents or loaded work.'
+      }, getDefaultBlockFieldsForType('warmup')),
+      Object.assign({
+        type: mainType,
+        title: focus.label,
+        prescription: focus.blockPrescription,
+        notes: 'Primary adaptation: ' + focus.primaryGoal
+      }, getDefaultBlockFieldsForType(mainType)),
+      Object.assign({
+        type: 'cooldown',
+        title: 'Hiking Cooldown',
+        prescription: '8-12 min easy downregulation with gait reset and tissue check.',
+        notes: 'Log elevation, load, terrain, and RPE for progression decisions.'
+      }, getDefaultBlockFieldsForType('cooldown'))
+    ];
+  }
+
+  function applyHikingSessionTemplate(plan, hikingType, forceOverwrite) {
+    var nextPlan = plan && typeof plan === 'object' ? plan : {};
+    var template = findHikingSessionTemplate(hikingType || nextPlan.hiking_session_type);
+    var shouldOverwrite = !!forceOverwrite;
+    nextPlan.session_type = 'hiking';
+    nextPlan.hiking_session_type = template.value;
+
+    if (shouldOverwrite || !String(nextPlan.title || '').trim() || /^week\s+\d+\s+-\s+workout\s+\d+/i.test(String(nextPlan.title || ''))) {
+      nextPlan.title = template.label;
+    }
+    if (shouldOverwrite || !String(nextPlan.session_goal || '').trim()) {
+      nextPlan.session_goal = template.primaryGoal;
+    }
+    if (shouldOverwrite || !Number.isFinite(parseInt(nextPlan.duration_minutes, 10)) || parseInt(nextPlan.duration_minutes, 10) <= 0) {
+      nextPlan.duration_minutes = template.durationMinutes;
+    }
+    if (shouldOverwrite || !String(nextPlan.intensity_target || '').trim()) {
+      nextPlan.intensity_target = template.intensity;
+    }
+    if (shouldOverwrite || !String(nextPlan.coach_notes || '').trim()) {
+      nextPlan.coach_notes = [
+        'Best used: ' + template.bestUsed,
+        'Recovery cost: ' + template.recovery,
+        'Focus: ' + template.keyFocus.join(', '),
+        'Track: time, elevation gain/loss, terrain, load, and RPE'
+      ].join(' | ');
+    }
+    if (shouldOverwrite || !Array.isArray(nextPlan.blocks) || !nextPlan.blocks.length) {
+      nextPlan.blocks = buildHikingSessionTemplateBlocks(template);
+    }
+
+    return nextPlan;
+  }
+
+  function renderHikingSessionInfo(plan) {
+    if (!isHikingSessionType(plan && plan.session_type)) {
+      return '';
+    }
+
+    var template = findHikingSessionTemplate(plan && plan.hiking_session_type);
+    return [
+      '<div class="program-builder-axis-flow-badge" style="margin:8px 0 0;">',
+      '<strong>' + escapeHtml(template.label) + '</strong> • ' + escapeHtml(template.intensity) + ' • ' + escapeHtml(String(template.durationMinutes) + ' min') + ' • Recovery: ' + escapeHtml(template.recovery),
+      '<div style="margin-top:4px; font-weight:500;">Goal: ' + escapeHtml(template.primaryGoal) + '</div>',
+      '<div style="margin-top:4px;">Best Used: ' + escapeHtml(template.bestUsed) + '</div>',
+      '</div>'
+    ].join('');
   }
 
   function renderSessionPlanBlocks(plan) {
@@ -2458,14 +3342,66 @@
     var axisSlot = String(target.getAttribute("data-axis-slot") || "").trim();
     if (axisField && axisSlot) {
       var axisPlan = getSessionPlanForSlot(axisSlot);
-      axisPlan[axisField] = axisField === "duration_minutes"
-        ? clampNumber(parseInt(target.value, 10), 0, 1440, axisPlan.duration_minutes || 0)
-        : String(target.value || '').trim();
+      if (axisField === 'session_type') {
+        axisPlan.session_type = normalizeWeeklySessionType(target.value);
+        if (isClimbingSessionType(axisPlan.session_type)) {
+          axisPlan = applyClimbingSessionTemplate(axisPlan, axisPlan.climbing_session_type, true);
+          axisPlan.mountain_bike_session_type = '';
+          axisPlan.cycling_session_type = '';
+          axisPlan.run_session_type = '';
+          axisPlan.hiking_session_type = '';
+        } else if (isMountainBikeSessionType(axisPlan.session_type)) {
+          axisPlan = applyMountainBikeSessionTemplate(axisPlan, axisPlan.mountain_bike_session_type, true);
+          axisPlan.climbing_session_type = '';
+          axisPlan.cycling_session_type = '';
+          axisPlan.run_session_type = '';
+          axisPlan.hiking_session_type = '';
+        } else if (isCyclingSessionType(axisPlan.session_type)) {
+          axisPlan = applyCyclingSessionTemplate(axisPlan, axisPlan.cycling_session_type, true);
+          axisPlan.climbing_session_type = '';
+          axisPlan.mountain_bike_session_type = '';
+          axisPlan.run_session_type = '';
+          axisPlan.hiking_session_type = '';
+        } else if (isRunSessionType(axisPlan.session_type)) {
+          axisPlan = applyRunSessionTemplate(axisPlan, axisPlan.run_session_type, true);
+          axisPlan.climbing_session_type = '';
+          axisPlan.mountain_bike_session_type = '';
+          axisPlan.cycling_session_type = '';
+          axisPlan.hiking_session_type = '';
+        } else if (isHikingSessionType(axisPlan.session_type)) {
+          axisPlan = applyHikingSessionTemplate(axisPlan, axisPlan.hiking_session_type, true);
+          axisPlan.climbing_session_type = '';
+          axisPlan.mountain_bike_session_type = '';
+          axisPlan.cycling_session_type = '';
+          axisPlan.run_session_type = '';
+        } else {
+          axisPlan.climbing_session_type = '';
+          axisPlan.mountain_bike_session_type = '';
+          axisPlan.cycling_session_type = '';
+          axisPlan.run_session_type = '';
+          axisPlan.hiking_session_type = '';
+        }
+      } else if (axisField === 'climbing_session_type') {
+        axisPlan = applyClimbingSessionTemplate(axisPlan, target.value, true);
+      } else if (axisField === 'mountain_bike_session_type') {
+        axisPlan = applyMountainBikeSessionTemplate(axisPlan, target.value, true);
+      } else if (axisField === 'cycling_session_type') {
+        axisPlan = applyCyclingSessionTemplate(axisPlan, target.value, true);
+      } else if (axisField === 'run_session_type') {
+        axisPlan = applyRunSessionTemplate(axisPlan, target.value, true);
+      } else if (axisField === 'hiking_session_type') {
+        axisPlan = applyHikingSessionTemplate(axisPlan, target.value, true);
+      } else {
+        axisPlan[axisField] = axisField === "duration_minutes"
+          ? clampNumber(parseInt(target.value, 10), 0, 1440, axisPlan.duration_minutes || 0)
+          : String(target.value || '').trim();
+      }
       state.sessionPlans[axisSlot] = axisPlan;
       saveExercisesForDay(true);
       if (axisSlot === state.day) {
         renderDailyProgrammingSummary(axisPlan);
       }
+      renderDailyAxisEditorCards();
       return;
     }
 
@@ -2612,12 +3548,64 @@
     var planField = String(target.getAttribute("data-session-plan-field") || "").trim();
     if (planField) {
       var plan = getCurrentSessionPlan();
-      plan[planField] = planField === "duration_minutes"
-        ? clampNumber(parseInt(target.value, 10), 0, 1440, plan.duration_minutes || 0)
-        : String(target.value || '').trim();
+      if (planField === 'session_type') {
+        plan.session_type = normalizeWeeklySessionType(target.value);
+        if (isClimbingSessionType(plan.session_type)) {
+          plan = applyClimbingSessionTemplate(plan, plan.climbing_session_type, true);
+          plan.mountain_bike_session_type = '';
+          plan.cycling_session_type = '';
+          plan.run_session_type = '';
+          plan.hiking_session_type = '';
+        } else if (isMountainBikeSessionType(plan.session_type)) {
+          plan = applyMountainBikeSessionTemplate(plan, plan.mountain_bike_session_type, true);
+          plan.climbing_session_type = '';
+          plan.cycling_session_type = '';
+          plan.run_session_type = '';
+          plan.hiking_session_type = '';
+        } else if (isCyclingSessionType(plan.session_type)) {
+          plan = applyCyclingSessionTemplate(plan, plan.cycling_session_type, true);
+          plan.climbing_session_type = '';
+          plan.mountain_bike_session_type = '';
+          plan.run_session_type = '';
+          plan.hiking_session_type = '';
+        } else if (isRunSessionType(plan.session_type)) {
+          plan = applyRunSessionTemplate(plan, plan.run_session_type, true);
+          plan.climbing_session_type = '';
+          plan.mountain_bike_session_type = '';
+          plan.cycling_session_type = '';
+          plan.hiking_session_type = '';
+        } else if (isHikingSessionType(plan.session_type)) {
+          plan = applyHikingSessionTemplate(plan, plan.hiking_session_type, true);
+          plan.climbing_session_type = '';
+          plan.mountain_bike_session_type = '';
+          plan.cycling_session_type = '';
+          plan.run_session_type = '';
+        } else {
+          plan.climbing_session_type = '';
+          plan.mountain_bike_session_type = '';
+          plan.cycling_session_type = '';
+          plan.run_session_type = '';
+          plan.hiking_session_type = '';
+        }
+      } else if (planField === 'climbing_session_type') {
+        plan = applyClimbingSessionTemplate(plan, target.value, true);
+      } else if (planField === 'mountain_bike_session_type') {
+        plan = applyMountainBikeSessionTemplate(plan, target.value, true);
+      } else if (planField === 'cycling_session_type') {
+        plan = applyCyclingSessionTemplate(plan, target.value, true);
+      } else if (planField === 'run_session_type') {
+        plan = applyRunSessionTemplate(plan, target.value, true);
+      } else if (planField === 'hiking_session_type') {
+        plan = applyHikingSessionTemplate(plan, target.value, true);
+      } else {
+        plan[planField] = planField === "duration_minutes"
+          ? clampNumber(parseInt(target.value, 10), 0, 1440, plan.duration_minutes || 0)
+          : String(target.value || '').trim();
+      }
       state.sessionPlans[state.day] = plan;
       saveExercisesForDay(true);
       renderDailyProgrammingSummary(plan);
+      renderDailyProgrammingDesigner();
       return;
     }
 
@@ -2661,6 +3649,11 @@
     return normalizeSessionPlan({
       title: weeklyEntry && weeklyEntry.name ? weeklyEntry.name : labelForSlot(slotKey),
       session_type: weeklyEntry && weeklyEntry.session_type ? weeklyEntry.session_type : 'strength_full',
+      climbing_session_type: '',
+      mountain_bike_session_type: '',
+      cycling_session_type: '',
+      run_session_type: '',
+      hiking_session_type: '',
       phase_name: phase ? phase.name : '',
       objective_label: objective ? objective.label : '',
       session_goal: objective ? objective.primary_goal || '' : '',
@@ -2677,9 +3670,25 @@
   function normalizeSessionPlan(plan, slotKey) {
     var source = plan && typeof plan === 'object' ? plan : {};
     var fallback = buildSessionPlanFallback(slotKey);
+    var normalizedSessionType = normalizeWeeklySessionType(source.session_type || fallback.session_type);
     return {
       title: String(source.title || fallback.title).trim(),
-      session_type: normalizeWeeklySessionType(source.session_type || fallback.session_type),
+      session_type: normalizedSessionType,
+      climbing_session_type: normalizedSessionType === 'climbing'
+        ? normalizeClimbingSessionType(source.climbing_session_type || fallback.climbing_session_type)
+        : '',
+      mountain_bike_session_type: normalizedSessionType === 'mountain_bike'
+        ? normalizeMountainBikeSessionType(source.mountain_bike_session_type || fallback.mountain_bike_session_type)
+        : '',
+      cycling_session_type: normalizedSessionType === 'cycling'
+        ? normalizeCyclingSessionType(source.cycling_session_type || fallback.cycling_session_type)
+        : '',
+      run_session_type: normalizedSessionType === 'run'
+        ? normalizeRunSessionType(source.run_session_type || fallback.run_session_type)
+        : '',
+      hiking_session_type: normalizedSessionType === 'hiking'
+        ? normalizeHikingSessionType(source.hiking_session_type || fallback.hiking_session_type)
+        : '',
       phase_name: String(source.phase_name || fallback.phase_name).trim(),
       objective_label: String(source.objective_label || fallback.objective_label).trim(),
       session_goal: String(source.session_goal || fallback.session_goal).trim(),
@@ -2701,6 +3710,11 @@
     return {
       title: weeklyEntry && weeklyEntry.name ? weeklyEntry.name : labelForSlot(slotKey),
       session_type: weeklyEntry && weeklyEntry.session_type ? weeklyEntry.session_type : 'strength_full',
+      climbing_session_type: '',
+      mountain_bike_session_type: '',
+      cycling_session_type: '',
+      run_session_type: '',
+      hiking_session_type: '',
       phase_name: phase ? phase.name : '',
       objective_label: objective ? objective.label : '',
       session_goal: objective ? objective.primary_goal || '' : '',
@@ -2924,7 +3938,7 @@
       return [];
     }
 
-    return blocks.map(function (block) {
+    return blocks.reduce(function (allExercises, block) {
       var section = mapSessionBlockToSection(block.type);
       var mode = mapSessionBlockToMode(block.type);
       var flow = normalizeExerciseFlow(block.exercise_flow);
@@ -2934,6 +3948,7 @@
       var restLabel = restStrategyLabel(flow, restStrategy);
       var restNote = restInterval ? (restLabel + ': ' + restInterval) : '';
       var intervalNote = '';
+      var blockType = normalizeSessionBlockType(block.type);
       if (normalizeSessionBlockType(block.type) === 'intervals') {
         var intervalMode = normalizeIntervalExerciseMode(block.interval_exercise_mode);
         var intervalWorkType = normalizeIntervalIntensityType(block.interval_work_intensity_type, false);
@@ -2975,6 +3990,62 @@
           block.amrap_intensity ? ('Intensity (' + amrapIntensityType.toUpperCase() + '): ' + String(block.amrap_intensity)) : ''
         ].filter(Boolean).join(' • ');
       }
+
+      if (isExerciseConfiguredBlockType(blockType)) {
+        var exerciseCount = clampNumber(parseInt(block.exercise_count, 10), 1, 20, 1);
+        var names = normalizeExerciseNames(block.exercise_names, exerciseCount);
+        var setCounts = normalizeExerciseValues(block.exercise_sets, exerciseCount, 3);
+        var setReps = normalizeExerciseNestedValues(block.exercise_set_reps, exerciseCount, '5', setCounts);
+        var setIntensities = normalizeExerciseNestedValues(block.exercise_set_intensities, exerciseCount, '7', setCounts);
+        var setRests = normalizeExerciseNestedValues(block.exercise_set_rests, exerciseCount, '', setCounts);
+        var setRepTypes = normalizeExerciseSetRepTypes(block.exercise_set_rep_types, exerciseCount, setCounts, block.exercise_rep_types);
+        var setIntensityTypes = normalizeExerciseSetIntensityTypes(block.exercise_set_intensity_types, exerciseCount, setCounts, block.exercise_intensity_types);
+
+        for (var exerciseIndex = 0; exerciseIndex < exerciseCount; exerciseIndex++) {
+          var exerciseName = String(names[exerciseIndex] || '').trim() || (block.title ? (block.title + ' ' + String(exerciseIndex + 1)) : ('Exercise ' + String(exerciseIndex + 1)));
+          var setCount = clampNumber(parseInt(setCounts[exerciseIndex], 10), 1, 20, 1);
+          var repsRow = Array.isArray(setReps[exerciseIndex]) ? setReps[exerciseIndex] : [];
+          var intensityRow = Array.isArray(setIntensities[exerciseIndex]) ? setIntensities[exerciseIndex] : [];
+          var restRow = Array.isArray(setRests[exerciseIndex]) ? setRests[exerciseIndex] : [];
+          var repTypeRow = Array.isArray(setRepTypes[exerciseIndex]) ? setRepTypes[exerciseIndex] : [];
+          var intensityTypeRow = Array.isArray(setIntensityTypes[exerciseIndex]) ? setIntensityTypes[exerciseIndex] : [];
+          var sets = [];
+
+          for (var setIndex = 0; setIndex < setCount; setIndex++) {
+            var repType = normalizeRepTypeValue(repTypeRow[setIndex]);
+            var intensityType = normalizeIntensityTypeValue(intensityTypeRow[setIndex]);
+            var rawReps = String(repsRow[setIndex] || '').trim();
+            var rawIntensity = String(intensityRow[setIndex] || '').trim();
+            var rawRest = String(restRow[setIndex] || '').trim();
+            var formattedReps = formatConfiguredRepValue(rawReps, repType);
+            var formattedIntensity = formatConfiguredIntensityValue(rawIntensity, intensityType);
+
+            sets.push({
+              reps: formattedReps,
+              target_reps: formattedReps,
+              target_intensity: formattedIntensity,
+              target_rpe: intensityType === 'rpe' ? formattedIntensity : '',
+              rest: rawRest,
+              target_rest: rawRest,
+              notes: '',
+              done: false
+            });
+          }
+
+          allExercises.push({
+            name: exerciseName,
+            section: section,
+            mode: mode,
+            superset_group: null,
+            field_toggles: normalizeExerciseFieldToggles(null, mode),
+            notes: [flowNote, restNote, block.notes, sessionPlan.coach_notes].filter(Boolean).join(' • '),
+            sets: sets
+          });
+        }
+
+        return allExercises;
+      }
+
       var setData = {
         reps: mode === 'endurance' ? (block.prescription || sessionPlan.duration_minutes || '') : (block.prescription || ''),
         weight: mode === 'endurance' ? (sessionPlan.vertical_gain || sessionPlan.terrain || '') : '',
@@ -2984,7 +4055,7 @@
         done: false
       };
 
-      return {
+      allExercises.push({
         name: block.title || prettySessionBlockLabel(block.type),
         section: section,
         mode: mode,
@@ -2992,8 +4063,43 @@
         field_toggles: normalizeExerciseFieldToggles(null, mode),
         notes: [sessionPlan.phase_name, sessionPlan.objective_label, sessionPlan.sport_focus].filter(Boolean).join(' • '),
         sets: [setData]
-      };
-    });
+      });
+
+      return allExercises;
+    }, []);
+  }
+
+  function formatConfiguredRepValue(value, repType) {
+    var text = String(value || '').trim();
+    if (!text) {
+      return '';
+    }
+    if (normalizeRepTypeValue(repType) !== 'sec') {
+      return text;
+    }
+    if (/(^|\s)(s|sec|secs|second|seconds|min|mins|minute|minutes)$/i.test(text) || /\d+:\d+/.test(text)) {
+      return text;
+    }
+    return text + ' sec';
+  }
+
+  function formatConfiguredIntensityValue(value, intensityType) {
+    var text = String(value || '').trim();
+    if (!text) {
+      return '';
+    }
+
+    var normalizedType = normalizeIntensityTypeValue(intensityType);
+    if (normalizedType === '%rm') {
+      if (/%\s*rm/i.test(text) || /%/.test(text)) {
+        return text;
+      }
+      return text + '%RM';
+    }
+    if (normalizedType === 'rir') {
+      return /^rir\b/i.test(text) ? text : ('RIR ' + text);
+    }
+    return /^rpe\b/i.test(text) ? text : ('RPE ' + text);
   }
 
   function mapSessionBlockToSection(blockType) {
@@ -3432,14 +4538,55 @@
         if (Number.isFinite(phaseIndex) && phaseIndex >= 0 && phaseIndex < state.programPhases.length) {
           state.programPhases.splice(phaseIndex, 1);
           renderProgramPhases();
+          renderStructuredEditors();
           renderProgramBuilderAlerts();
         }
+        return;
+      }
+
+      var addStructuredRowBtn = event.target && event.target.closest('[data-structured-add-row]');
+      if (addStructuredRowBtn) {
+        var addStructuredContainer = addStructuredRowBtn.closest('[data-structured-editor]');
+        var addStructuredScope = getStructuredEditorScope(addStructuredContainer);
+        var addStructuredSchema = addStructuredScope ? getStructuredEditorSchema(addStructuredScope.fieldName) : null;
+        var addRows = collectStructuredEditorRows(addStructuredContainer);
+        var blankRow = {};
+        if (addStructuredSchema) {
+          addStructuredSchema.columns.forEach(function (column) {
+            blankRow[column.key] = '';
+          });
+        }
+        addRows.push(blankRow);
+        renderStructuredEditorContainer(addStructuredContainer, addRows);
+        syncStructuredEditorState(addStructuredContainer);
+        return;
+      }
+
+      var removeStructuredRowBtn = event.target && event.target.closest('[data-structured-remove-row]');
+      if (removeStructuredRowBtn) {
+        var removeStructuredContainer = removeStructuredRowBtn.closest('[data-structured-editor]');
+        var removeStructuredIndex = parseInt(String(removeStructuredRowBtn.getAttribute('data-structured-remove-row') || '-1'), 10);
+        var removeRows = collectStructuredEditorRows(removeStructuredContainer);
+        if (Number.isFinite(removeStructuredIndex) && removeStructuredIndex >= 0 && removeStructuredIndex < removeRows.length) {
+          removeRows.splice(removeStructuredIndex, 1);
+        }
+        renderStructuredEditorContainer(removeStructuredContainer, removeRows);
+        syncStructuredEditorState(removeStructuredContainer);
+        return;
       }
     });
 
     document.addEventListener("input", function (event) {
       var target = event.target;
       if (!target || !target.getAttribute) {
+        return;
+      }
+
+      if (target.hasAttribute('data-structured-cell')) {
+        var structuredContainer = target.closest('[data-structured-editor]');
+        if (structuredContainer) {
+          syncStructuredEditorState(structuredContainer);
+        }
         return;
       }
 
@@ -3489,6 +4636,14 @@
     document.addEventListener("change", function (event) {
       var target = event.target;
       if (!target || !target.getAttribute) {
+        return;
+      }
+
+      if (target.hasAttribute('data-structured-cell')) {
+        var structuredContainer = target.closest('[data-structured-editor]');
+        if (structuredContainer) {
+          syncStructuredEditorState(structuredContainer);
+        }
         return;
       }
 
@@ -4553,7 +5708,7 @@
 
     if (subtitle) {
       subtitle.textContent = nextStep === 1
-        ? "Set the high-level program overview, training frequency, and key peak dates first."
+        ? "Set the high-level program overview and training frequency first."
         : (nextStep === 2
           ? "Define phase count, phase lengths, training days per phase, and each phase goal before daily programming."
           : "Program the exact daily sessions, sets, endurance blocks, and workout details for each workout slot.");
@@ -4596,9 +5751,60 @@
       var plan = getSessionPlanForSlot(slotKey);
 
       if (field) {
-        plan[field] = field === "duration_minutes"
-          ? clampNumber(parseInt(target.value, 10), 0, 1440, plan.duration_minutes || 0)
-          : String(target.value || "").trim();
+        if (field === 'session_type') {
+          plan.session_type = normalizeWeeklySessionType(target.value);
+          if (isClimbingSessionType(plan.session_type)) {
+            plan = applyClimbingSessionTemplate(plan, plan.climbing_session_type, true);
+            plan.mountain_bike_session_type = '';
+            plan.cycling_session_type = '';
+            plan.run_session_type = '';
+            plan.hiking_session_type = '';
+          } else if (isMountainBikeSessionType(plan.session_type)) {
+            plan = applyMountainBikeSessionTemplate(plan, plan.mountain_bike_session_type, true);
+            plan.climbing_session_type = '';
+            plan.cycling_session_type = '';
+            plan.run_session_type = '';
+            plan.hiking_session_type = '';
+          } else if (isCyclingSessionType(plan.session_type)) {
+            plan = applyCyclingSessionTemplate(plan, plan.cycling_session_type, true);
+            plan.climbing_session_type = '';
+            plan.mountain_bike_session_type = '';
+            plan.run_session_type = '';
+            plan.hiking_session_type = '';
+          } else if (isRunSessionType(plan.session_type)) {
+            plan = applyRunSessionTemplate(plan, plan.run_session_type, true);
+            plan.climbing_session_type = '';
+            plan.mountain_bike_session_type = '';
+            plan.cycling_session_type = '';
+            plan.hiking_session_type = '';
+          } else if (isHikingSessionType(plan.session_type)) {
+            plan = applyHikingSessionTemplate(plan, plan.hiking_session_type, true);
+            plan.climbing_session_type = '';
+            plan.mountain_bike_session_type = '';
+            plan.cycling_session_type = '';
+            plan.run_session_type = '';
+          } else {
+            plan.climbing_session_type = '';
+            plan.mountain_bike_session_type = '';
+            plan.cycling_session_type = '';
+            plan.run_session_type = '';
+            plan.hiking_session_type = '';
+          }
+        } else if (field === 'climbing_session_type') {
+          plan = applyClimbingSessionTemplate(plan, target.value, true);
+        } else if (field === 'mountain_bike_session_type') {
+          plan = applyMountainBikeSessionTemplate(plan, target.value, true);
+        } else if (field === 'cycling_session_type') {
+          plan = applyCyclingSessionTemplate(plan, target.value, true);
+        } else if (field === 'run_session_type') {
+          plan = applyRunSessionTemplate(plan, target.value, true);
+        } else if (field === 'hiking_session_type') {
+          plan = applyHikingSessionTemplate(plan, target.value, true);
+        } else {
+          plan[field] = field === "duration_minutes"
+            ? clampNumber(parseInt(target.value, 10), 0, 1440, plan.duration_minutes || 0)
+            : String(target.value || "").trim();
+        }
       }
 
       if (blockField) {
@@ -4719,6 +5925,56 @@
         buildSessionTypeSelectOptions(plan.session_type),
         '</select>',
         '</label>',
+        (isClimbingSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Climbing Focus</span>',
+            '<select data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-field="climbing_session_type">',
+            buildClimbingSessionTypeOptions(plan.climbing_session_type),
+            '</select>',
+            '</label>'
+          ].join('')
+          : ''),
+        (isMountainBikeSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Mountain Bike Focus</span>',
+            '<select data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-field="mountain_bike_session_type">',
+            buildMountainBikeSessionTypeOptions(plan.mountain_bike_session_type),
+            '</select>',
+            '</label>'
+          ].join('')
+          : ''),
+        (isCyclingSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Cycling Focus</span>',
+            '<select data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-field="cycling_session_type">',
+            buildCyclingSessionTypeOptions(plan.cycling_session_type),
+            '</select>',
+            '</label>'
+          ].join('')
+          : ''),
+        (isRunSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Run Focus</span>',
+            '<select data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-field="run_session_type">',
+            buildRunSessionTypeOptions(plan.run_session_type),
+            '</select>',
+            '</label>'
+          ].join('')
+          : ''),
+        (isHikingSessionType(plan.session_type)
+          ? [
+            '<label class="program-builder-structure-field">',
+            '<span>Hiking Focus</span>',
+            '<select data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-field="hiking_session_type">',
+            buildHikingSessionTypeOptions(plan.hiking_session_type),
+            '</select>',
+            '</label>'
+          ].join('')
+          : ''),
         '<label class="program-builder-structure-field program-builder-structure-field-wide">',
         '<span>Coach Notes</span>',
         '<input type="text" data-overview-slot="' + escapeAttribute(slotKey) + '" data-overview-field="coach_notes" value="' + escapeAttribute(plan.coach_notes || "") + '" />',
@@ -6787,7 +8043,7 @@
     saveExercisesForDay(true);
 
     var copiedCount = 0;
-    for (var workout = 1; workout <= state.structure.workoutsPerWeek; workout++) {
+    for (var workout = 1; workout <= getSlotsPerWeek(); workout++) {
       var sourceKey = "w" + sourceWeek + "d" + workout;
       var targetKey = "w" + targetWeek + "d" + workout;
       var sourcePayload = readFromStorage(state.storagePrefix + sourceKey);
@@ -6828,7 +8084,7 @@
       return;
     }
 
-    for (var workout = 1; workout <= state.structure.workoutsPerWeek; workout++) {
+    for (var workout = 1; workout <= getSlotsPerWeek(); workout++) {
       var slotKey = "w" + parsed.week + "d" + workout;
       try {
         window.localStorage.removeItem(state.storagePrefix + slotKey);
@@ -6855,7 +8111,7 @@
       return;
     }
 
-    for (var workout = 1; workout <= state.structure.workoutsPerWeek; workout++) {
+    for (var workout = 1; workout <= getSlotsPerWeek(); workout++) {
       state.daySessionTypes["w" + parsed.week + "d" + workout] = currentDayType;
     }
 
@@ -8236,7 +9492,7 @@
     var slots = [];
 
     for (var week = 1; week <= structure.weeks; week++) {
-      for (var workout = 1; workout <= structure.workoutsPerWeek; workout++) {
+      for (var workout = 1; workout <= getSlotsPerWeek(); workout++) {
         var slotKey = "w" + week + "d" + workout;
         var exercises = Array.isArray(days[slotKey]) ? days[slotKey] : [];
         if (!exercises.length) {
@@ -10741,11 +11997,225 @@
     setInputValue("[data-template-tags]", (meta.tags || []).join(", "));
   }
 
+  function getStructuredEditorSchema(fieldName) {
+    return STRUCTURED_EDITOR_SCHEMAS[fieldName] || null;
+  }
+
+  function cleanText(value) {
+    return String(value == null ? "" : value).trim();
+  }
+
+  function parseLines(value) {
+    return String(value == null ? "" : value)
+      .split(/\r?\n/)
+      .map(function (line) {
+        return cleanText(line);
+      })
+      .filter(function (line) {
+        return !!line;
+      });
+  }
+
+  function parseStructuredEditorRows(fieldName, textValue) {
+    var schema = getStructuredEditorSchema(fieldName);
+    if (!schema) {
+      return [];
+    }
+
+    return parseLines(cleanText(textValue)).map(function (line) {
+      var parts = String(line || "").split("|");
+      var row = {};
+      schema.columns.forEach(function (column, index) {
+        row[column.key] = cleanText(index === schema.columns.length - 1
+          ? parts.slice(index).join("|")
+          : parts[index]);
+      });
+      return row;
+    }).filter(function (row) {
+      return schema.columns.some(function (column) {
+        return !!cleanText(row[column.key]);
+      });
+    });
+  }
+
+  function serializeStructuredEditorRows(fieldName, rows) {
+    var schema = getStructuredEditorSchema(fieldName);
+    if (!schema) {
+      return "";
+    }
+
+    return (Array.isArray(rows) ? rows : []).map(function (row) {
+      var parts = schema.columns.map(function (column) {
+        return cleanText(row && row[column.key]);
+      });
+      while (parts.length && !parts[parts.length - 1]) {
+        parts.pop();
+      }
+      return parts.join(" | ");
+    }).filter(function (line) {
+      return !!cleanText(line);
+    }).join("\n");
+  }
+
+  function getStructuredEditorScope(container) {
+    if (!container || !container.getAttribute) {
+      return null;
+    }
+
+    var fieldName = String(container.getAttribute("data-structured-editor") || container.getAttribute("data-structured-field") || "").trim();
+    if (!fieldName) {
+      return null;
+    }
+
+    var phaseIndex = container.hasAttribute("data-template-phase-index")
+      ? parseInt(String(container.getAttribute("data-template-phase-index") || "-1"), 10)
+      : null;
+
+    return {
+      fieldName: fieldName,
+      phaseIndex: Number.isFinite(phaseIndex) ? phaseIndex : null
+    };
+  }
+
+  function getStructuredEditorTextarea(scope) {
+    if (!scope || !scope.fieldName) {
+      return null;
+    }
+
+    if (scope.phaseIndex !== null) {
+      return document.querySelector('[data-template-phase-field="' + scope.fieldName + '"][data-template-phase-index="' + String(scope.phaseIndex) + '"]');
+    }
+
+    return document.querySelector('[data-template-meta-field="' + scope.fieldName + '"]');
+  }
+
+  function buildStructuredEditorScopeAttributes(scope) {
+    if (!scope) {
+      return "";
+    }
+
+    var attrs = [
+      ' data-structured-field="' + escapeAttribute(scope.fieldName) + '"'
+    ];
+
+    if (scope.phaseIndex !== null) {
+      attrs.push(' data-template-phase-index="' + escapeAttribute(String(scope.phaseIndex)) + '"');
+    }
+
+    return attrs.join("");
+  }
+
+  function buildStructuredEditorRowHtml(scope, row, rowIndex) {
+    var schema = getStructuredEditorSchema(scope.fieldName);
+    if (!schema) {
+      return "";
+    }
+
+    var scopeAttrs = buildStructuredEditorScopeAttributes(scope);
+    return [
+      '<div class="program-builder-structured-editor-row" style="--structured-columns:' + String(schema.columns.length) + ';">',
+      schema.columns.map(function (column) {
+        return [
+          '<div class="program-builder-structured-editor-cell">',
+          '<input type="text" data-structured-cell="' + escapeAttribute(column.key) + '" data-structured-row-index="' + String(rowIndex) + '"' + scopeAttrs + ' value="' + escapeAttribute(row && row[column.key] || "") + '" placeholder="' + escapeAttribute(column.placeholder || column.label) + '" />',
+          '</div>'
+        ].join('');
+      }).join(''),
+      '<div class="program-builder-structured-editor-actions">',
+      '<button type="button" class="btn admin-btn-small" data-structured-remove-row="' + String(rowIndex) + '"' + scopeAttrs + '>Remove</button>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderStructuredEditorContainer(container, rows) {
+    var scope = getStructuredEditorScope(container);
+    var schema = scope ? getStructuredEditorSchema(scope.fieldName) : null;
+    if (!scope || !schema) {
+      return;
+    }
+
+    var scopeAttrs = buildStructuredEditorScopeAttributes(scope);
+    var safeRows = Array.isArray(rows) ? rows : [];
+    container.innerHTML = [
+      '<div class="program-builder-structured-editor-head" style="--structured-columns:' + String(schema.columns.length) + ';">',
+      schema.columns.map(function (column) {
+        return '<span>' + escapeHtml(column.label) + '</span>';
+      }).join(''),
+      '<span></span>',
+      '</div>',
+      safeRows.length
+        ? safeRows.map(function (row, rowIndex) {
+            return buildStructuredEditorRowHtml(scope, row, rowIndex);
+          }).join('')
+        : '<p class="program-builder-structured-editor-empty">' + escapeHtml(schema.emptyMessage || 'No rows added yet.') + '</p>',
+      '<div class="program-builder-structured-editor-actions">',
+      '<button type="button" class="btn admin-btn-small" data-structured-add-row="1"' + scopeAttrs + '>' + escapeHtml(schema.addLabel || 'Add Row') + '</button>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderStructuredEditors(root) {
+    var scopeRoot = root && root.querySelectorAll ? root : document;
+    scopeRoot.querySelectorAll('[data-structured-editor]').forEach(function (container) {
+      var scope = getStructuredEditorScope(container);
+      var textarea = getStructuredEditorTextarea(scope);
+      var value = textarea ? String(textarea.value || '') : '';
+      renderStructuredEditorContainer(container, parseStructuredEditorRows(scope && scope.fieldName, value));
+    });
+  }
+
+  function collectStructuredEditorRows(container) {
+    var scope = getStructuredEditorScope(container);
+    var schema = scope ? getStructuredEditorSchema(scope.fieldName) : null;
+    if (!scope || !schema) {
+      return [];
+    }
+
+    var rowMap = {};
+    container.querySelectorAll('[data-structured-cell]').forEach(function (input) {
+      var rowIndex = parseInt(String(input.getAttribute('data-structured-row-index') || '-1'), 10);
+      var columnKey = String(input.getAttribute('data-structured-cell') || '').trim();
+      if (!Number.isFinite(rowIndex) || rowIndex < 0 || !columnKey) {
+        return;
+      }
+      if (!rowMap[rowIndex]) {
+        rowMap[rowIndex] = {};
+      }
+      rowMap[rowIndex][columnKey] = String(input.value || '').trim();
+    });
+
+    return Object.keys(rowMap).map(function (key) {
+      return rowMap[key];
+    });
+  }
+
+  function syncStructuredEditorState(container) {
+    var scope = getStructuredEditorScope(container);
+    if (!scope) {
+      return;
+    }
+
+    var rows = collectStructuredEditorRows(container);
+    var serialized = serializeStructuredEditorRows(scope.fieldName, rows);
+    var textarea = getStructuredEditorTextarea(scope);
+    if (textarea) {
+      textarea.value = serialized;
+    }
+
+    if (scope.phaseIndex !== null) {
+      syncProgramPhaseField(scope.phaseIndex, scope.fieldName, serialized);
+    } else {
+      syncProgramMetaField(scope.fieldName, serialized);
+    }
+  }
+
   function refreshBuilderPlannerUi() {
     try {
       renderProgramMetaInputs();
       renderSeasonObjectives();
       renderProgramPhases();
+      renderStructuredEditors();
       renderPhaseBuilderPeakPanel();
       renderDailyBuilderPeakPanel();
       renderWeeklyStructure();
@@ -10824,7 +12294,13 @@
     container.innerHTML = state.programPhases.map(function (phase, index) {
       return [
         '<div class="program-builder-phase-item">',
-        '<div class="program-builder-phase-grid">',
+        '<div class="program-builder-phase-shell">',
+        '<section class="program-builder-phase-section">',
+        '<div class="program-builder-phase-section-head">',
+        '<h4>Phase Setup</h4>',
+        '<p>Name the block, define its length, and state the primary adaptation target. Daily programming assumes seven sequential program days per week.</p>',
+        '</div>',
+        '<div class="program-builder-phase-meta-grid">',
         '<label class="program-builder-structure-field">',
         '<span>Phase Name</span>',
         '<input type="text" data-template-phase-field="name" data-template-phase-index="' + index + '" value="' + escapeAttribute(phase.name || '') + '" />',
@@ -10833,77 +12309,100 @@
         '<span>Length (Weeks)</span>',
         '<input type="number" min="1" max="' + escapeAttribute(String(state.structure.weeks)) + '" data-template-phase-field="length_weeks" data-template-phase-index="' + index + '" value="' + escapeAttribute(String(getPhaseLengthWeeks(phase))) + '" />',
         '</label>',
-        '<label class="program-builder-structure-field">',
-        '<span>Training Days / Week</span>',
-        '<input type="number" min="1" max="14" data-template-phase-field="training_days_per_week" data-template-phase-index="' + index + '" value="' + escapeAttribute(String(phase.training_days_per_week || 1)) + '" />',
-        '</label>',
         '</div>',
         '<label class="program-builder-structure-field">',
         '<span>Phase Goal</span>',
         '<input type="text" data-template-phase-field="focus" data-template-phase-index="' + index + '" value="' + escapeAttribute(phase.focus || '') + '" placeholder="What this phase is trying to build" />',
+        '<small class="program-builder-phase-field-note">Use a short outcome statement, not a full paragraph.</small>',
         '</label>',
         '<label class="program-builder-structure-field">',
-        '<span>Phase Rationale</span>',
-        '<textarea rows="2" data-template-phase-field="rationale" data-template-phase-index="' + index + '" placeholder="Why this phase exists in the larger progression">' + escapeHtml(phase.rationale || '') + '</textarea>',
+        '<span>Phase Purpose</span>',
+        '<textarea rows="3" data-template-phase-field="rationale" data-template-phase-index="' + index + '" placeholder="Why this phase exists in the larger progression">' + escapeHtml(phase.rationale || '') + '</textarea>',
         '</label>',
         '<label class="program-builder-structure-field">',
-        '<span>Phase Priorities (one per line)</span>',
-        '<textarea rows="2" data-template-phase-field="priorities_text" data-template-phase-index="' + index + '" placeholder="Priority items shown on phase page">' + escapeHtml(phase.priorities_text || '') + '</textarea>',
+        '<span>Phase Objectives</span>',
+        '<textarea rows="3" data-template-phase-field="priorities_text" data-template-phase-index="' + index + '" placeholder="One priority per line">' + escapeHtml(phase.priorities_text || '') + '</textarea>',
+        '<small class="program-builder-phase-field-note">List the 2-5 things this phase must accomplish.</small>',
         '</label>',
-        '<div class="program-builder-phase-grid">',
-        '<label class="program-builder-structure-field">',
-        '<span>Strength Days</span>',
-        '<input type="number" min="0" max="14" data-template-phase-field="strength_days_per_week" data-template-phase-index="' + index + '" value="' + escapeAttribute(String(phase.strength_days_per_week || 0)) + '" />',
-        '</label>',
-        '<label class="program-builder-structure-field">',
-        '<span>Cardio Days</span>',
-        '<input type="number" min="0" max="14" data-template-phase-field="cardio_days_per_week" data-template-phase-index="' + index + '" value="' + escapeAttribute(String(phase.cardio_days_per_week || 0)) + '" />',
-        '</label>',
-        '<label class="program-builder-structure-field">',
-        '<span>Skill Days</span>',
-        '<input type="number" min="0" max="14" data-template-phase-field="skill_days_per_week" data-template-phase-index="' + index + '" value="' + escapeAttribute(String(phase.skill_days_per_week || 0)) + '" />',
-        '</label>',
-        '<label class="program-builder-structure-field">',
-        '<span>Multi-Focus Days</span>',
-        '<input type="number" min="0" max="14" data-template-phase-field="multi_focus_days_per_week" data-template-phase-index="' + index + '" value="' + escapeAttribute(String(phase.multi_focus_days_per_week || 0)) + '" />',
-        '</label>',
+        '</section>',
+        '<section class="program-builder-phase-section">',
+        '<div class="program-builder-phase-section-head">',
+        '<h4>General Training Overview</h4>',
+        '<p>Define the default training parameters for this phase and the basic weekly structure the coach should follow.</p>',
         '</div>',
-        '<div class="program-builder-phase-grid">',
-        '<label class="program-builder-structure-field">',
-        '<span>Monitoring Metrics (one per line)</span>',
-        '<textarea rows="3" data-template-phase-field="monitoring_metrics_text" data-template-phase-index="' + index + '" placeholder="Sleep score | daily | target 7+ hours">' + escapeHtml(phase.monitoring_metrics_text || '') + '</textarea>',
-        '</label>',
+        '<div class="program-builder-phase-grid program-builder-phase-grid-2">',
+        '<div class="program-builder-structure-field">',
+        '<span>General Training Overview</span>',
+        '<div class="program-builder-structured-editor" data-structured-editor="general_training_overview_text" data-template-phase-index="' + index + '"></div>',
+        '<textarea rows="5" hidden data-template-phase-field="general_training_overview_text" data-template-phase-index="' + index + '">' + escapeHtml(phase.general_training_overview_text || '') + '</textarea>',
+        '<small class="program-builder-phase-field-note">Example: Strength frequency | 2 sessions per week with one heavier lower-body exposure.</small>',
+        '</div>',
+        '<div class="program-builder-structure-field">',
+        '<span>General Weekly Structure</span>',
+        '<div class="program-builder-structured-editor" data-structured-editor="general_weekly_structure_text" data-template-phase-index="' + index + '"></div>',
+        '<textarea rows="5" hidden data-template-phase-field="general_weekly_structure_text" data-template-phase-index="' + index + '">' + escapeHtml(phase.general_weekly_structure_text || '') + '</textarea>',
+        '<small class="program-builder-phase-field-note">Use Day | Focus | Notes, for example: Monday | Heavy strength | Freshest day for lower-body loading.</small>',
+        '</div>',
+        '</div>',
+        '</section>',
+        '<section class="program-builder-phase-section">',
+        '<div class="program-builder-phase-section-head">',
+        '<h4>Monitoring and Decision Rules</h4>',
+        '<p>Set the metrics, progression rules, reduction triggers, and stop points for this phase.</p>',
+        '</div>',
+        '<div class="program-builder-phase-rule-grid">',
+        '<div class="program-builder-structure-field">',
+        '<span>Monitoring Metrics</span>',
+        '<div class="program-builder-structured-editor" data-structured-editor="monitoring_metrics_text" data-template-phase-index="' + index + '"></div>',
+        '<textarea rows="4" hidden data-template-phase-field="monitoring_metrics_text" data-template-phase-index="' + index + '">' + escapeHtml(phase.monitoring_metrics_text || '') + '</textarea>',
+        '<small class="program-builder-phase-field-note">Example: soreness, sleep, session RPE, grip strength, pace drift, or tissue symptoms.</small>',
+        '</div>',
         '<label class="program-builder-structure-field">',
         '<span>Progress Rules (one per line)</span>',
-        '<textarea rows="3" data-template-phase-field="progress_rules_text" data-template-phase-index="' + index + '" placeholder="Progress when">' + escapeHtml(phase.progress_rules_text || '') + '</textarea>',
+        '<textarea rows="4" data-template-phase-field="progress_rules_text" data-template-phase-index="' + index + '" placeholder="One progression rule per line">' + escapeHtml(phase.progress_rules_text || '') + '</textarea>',
+        '<small class="program-builder-phase-field-note">Define the conditions that allow more volume, load, complexity, or intensity.</small>',
         '</label>',
         '<label class="program-builder-structure-field">',
         '<span>Reduce / Modify Rules (one per line)</span>',
-        '<textarea rows="3" data-template-phase-field="reduce_rules_text" data-template-phase-index="' + index + '" placeholder="Reduce when">' + escapeHtml(phase.reduce_rules_text || '') + '</textarea>',
+        '<textarea rows="4" data-template-phase-field="reduce_rules_text" data-template-phase-index="' + index + '" placeholder="One reduction rule per line">' + escapeHtml(phase.reduce_rules_text || '') + '</textarea>',
+        '<small class="program-builder-phase-field-note">Capture early warning signs that call for backing off before the week unravels.</small>',
         '</label>',
         '<label class="program-builder-structure-field">',
         '<span>Stop &amp; Reassess Rules (one per line)</span>',
-        '<textarea rows="3" data-template-phase-field="stop_rules_text" data-template-phase-index="' + index + '" placeholder="Stop when">' + escapeHtml(phase.stop_rules_text || '') + '</textarea>',
+        '<textarea rows="4" data-template-phase-field="stop_rules_text" data-template-phase-index="' + index + '" placeholder="One stop rule per line">' + escapeHtml(phase.stop_rules_text || '') + '</textarea>',
+        '<small class="program-builder-phase-field-note">Use for red-flag pain, unresolved fatigue, or objective markers that require a plan reset.</small>',
         '</label>',
         '</div>',
-        '<div class="program-builder-phase-grid">',
-        '<label class="program-builder-structure-field">',
-        '<span>Phase Assessments (one per line)</span>',
-        '<textarea rows="2" data-template-phase-field="phase_assessments_text" data-template-phase-index="' + index + '" placeholder="Assessment title | benchmark | notes">' + escapeHtml(phase.phase_assessments_text || '') + '</textarea>',
-        '</label>',
+        '</section>',
+        '<section class="program-builder-phase-section">',
+        '<div class="program-builder-phase-section-head">',
+        '<h4>Assessment and Exit</h4>',
+        '<p>Define the benchmarks and exit criteria that determine whether the athlete is ready to move on.</p>',
+        '</div>',
+        '<div class="program-builder-phase-grid program-builder-phase-grid-2">',
+        '<div class="program-builder-structure-field">',
+        '<span>Phase Assessments</span>',
+        '<div class="program-builder-structured-editor" data-structured-editor="phase_assessments_text" data-template-phase-index="' + index + '"></div>',
+        '<textarea rows="3" hidden data-template-phase-field="phase_assessments_text" data-template-phase-index="' + index + '">' + escapeHtml(phase.phase_assessments_text || '') + '</textarea>',
+        '<small class="program-builder-phase-field-note">Benchmark tests, route checks, route counts, time trials, or skill checkpoints.</small>',
+        '</div>',
         '<label class="program-builder-structure-field">',
         '<span>Exit Criteria (one per line)</span>',
-        '<textarea rows="2" data-template-phase-field="exit_criteria_text" data-template-phase-index="' + index + '" placeholder="Criteria for advancing">' + escapeHtml(phase.exit_criteria_text || '') + '</textarea>',
+        '<textarea rows="3" data-template-phase-field="exit_criteria_text" data-template-phase-index="' + index + '" placeholder="One exit criterion per line">' + escapeHtml(phase.exit_criteria_text || '') + '</textarea>',
+        '<small class="program-builder-phase-field-note">State what has to be true before advancing, not just what should be trained.</small>',
         '</label>',
         '</div>',
+        '</section>',
         '<div class="program-builder-phase-actions">',
         '<button type="button" class="btn admin-btn-small" data-template-phase-remove="' + index + '">Remove Phase</button>',
+        '</div>',
         '</div>',
         '</div>'
       ].join('');
     }).join('');
 
     renderProgramPhaseWeeksWarning();
+    renderStructuredEditors(container);
     renderPhaseBuilderPeakPanel();
   }
 
@@ -11015,6 +12514,7 @@
     var alerts = [];
     var weekly = Array.isArray(state.weeklyStructure) ? state.weeklyStructure : [];
     var phases = Array.isArray(state.programPhases) ? state.programPhases : [];
+    var meta = normalizeProgramMeta(state.programMeta, state.structure);
     var seasonObjectives = deriveSeasonObjectiveWindows(Array.isArray(meta.season_objectives) ? meta.season_objectives : []);
     var hardTypes = { threshold: true, vo2: true, uphill: true, strength_lower: true, strength_full: true, assessment: true };
     var hasRestLikeDay = weekly.some(function (entry) {
@@ -11038,11 +12538,12 @@
         return;
       }
       var label = String(phase.name || 'Unnamed phase').trim() || 'Unnamed phase';
-      var trainingDays = clampNumber(parseInt(phase.training_days_per_week, 10), 1, 14, 1);
-      var strengthDays = clampNumber(parseInt(phase.strength_days_per_week, 10), 0, 14, 0);
-      var cardioDays = clampNumber(parseInt(phase.cardio_days_per_week != null ? phase.cardio_days_per_week : phase.endurance_days_per_week, 10), 0, 14, 0);
-      var skillDays = clampNumber(parseInt(phase.skill_days_per_week != null ? phase.skill_days_per_week : phase.mobility_days_per_week, 10), 0, 14, 0);
-      var multiFocusDays = clampNumber(parseInt(phase.multi_focus_days_per_week, 10), 0, 14, 0);
+      var trainingDays = 7;
+      var inferred = summarizePhaseProgrammedDays(phase);
+      var strengthDays = inferred.strength;
+      var cardioDays = inferred.cardio;
+      var skillDays = inferred.skill;
+      var multiFocusDays = inferred.multi;
 
       if (trainingDays >= 6 && skillDays === 0) {
         alerts.push(label + ': high training frequency with no mobility day.');
@@ -11073,6 +12574,86 @@
     }
 
     return alerts;
+  }
+
+  function summarizePhaseProgrammedDays(phase) {
+    var startWeek = clampNumber(parseInt(phase && phase.start_week, 10), 1, state.structure.weeks, 1);
+    var endWeek = clampNumber(parseInt(phase && phase.end_week, 10), startWeek, state.structure.weeks, startWeek);
+    var effectiveDays = getEffectivePhaseTrainingDays(phase);
+    var weekCount = Math.max(1, endWeek - startWeek + 1);
+    var counts = {
+      strength: 0,
+      cardio: 0,
+      skill: 0,
+      multi: 0
+    };
+
+    for (var week = startWeek; week <= endWeek; week++) {
+      for (var day = 1; day <= effectiveDays; day++) {
+        var slotKey = 'w' + String(week) + 'd' + String(day);
+        var sessionType = resolveProgrammedSessionTypeForSlot(slotKey);
+        var bucket = classifySessionTypeBucket(sessionType);
+        if (bucket === 'strength') {
+          counts.strength += 1;
+        } else if (bucket === 'cardio') {
+          counts.cardio += 1;
+        } else if (bucket === 'skill') {
+          counts.skill += 1;
+        } else if (bucket === 'multi') {
+          counts.multi += 1;
+        }
+      }
+    }
+
+    return {
+      strength: Math.round((counts.strength / weekCount) * 100) / 100,
+      cardio: Math.round((counts.cardio / weekCount) * 100) / 100,
+      skill: Math.round((counts.skill / weekCount) * 100) / 100,
+      multi: Math.round((counts.multi / weekCount) * 100) / 100
+    };
+  }
+
+  function resolveProgrammedSessionTypeForSlot(slotKey) {
+    var plan = getSessionPlanForSlot(slotKey);
+    if (plan && plan.session_type) {
+      return normalizeWeeklySessionType(plan.session_type);
+    }
+
+    var parsed = parseSlotKey(slotKey) || { workout: 1 };
+    var weeklyEntry = Array.isArray(state.weeklyStructure) ? state.weeklyStructure[parsed.workout - 1] : null;
+    return normalizeWeeklySessionType(weeklyEntry && weeklyEntry.session_type ? weeklyEntry.session_type : 'strength_full');
+  }
+
+  function classifySessionTypeBucket(sessionType) {
+    var type = normalizeWeeklySessionType(sessionType);
+    if (type === 'strength_lower' || type === 'strength_upper' || type === 'strength_full') {
+      return 'strength';
+    }
+    if (type === 'climbing') {
+      return 'multi';
+    }
+    if (type === 'mountain_bike') {
+      return 'cardio';
+    }
+    if (type === 'cycling') {
+      return 'cardio';
+    }
+    if (type === 'run') {
+      return 'cardio';
+    }
+    if (type === 'hiking') {
+      return 'cardio';
+    }
+    if (type === 'zone2' || type === 'threshold' || type === 'vo2' || type === 'uphill' || type === 'long_endurance') {
+      return 'cardio';
+    }
+    if (type === 'mobility') {
+      return 'skill';
+    }
+    if (type === 'rest') {
+      return 'rest';
+    }
+    return 'multi';
   }
 
   function buildWeeklySessionTypeOptions(selectedValue) {
@@ -11152,8 +12733,6 @@
     } else if (field === 'length_weeks') {
       phaseLength = clampNumber(parseInt(value, 10), 1, state.structure.weeks, phaseLength);
       phase.end_week = clampNumber((phase.start_week || 1) + phaseLength - 1, 1, state.structure.weeks, phase.end_week || phase.start_week || 1);
-    } else if (field === 'training_days_per_week') {
-      phase.training_days_per_week = clampNumber(parseInt(value, 10), 1, 14, phase.training_days_per_week || state.structure.workoutsPerWeek);
     } else if (
       field === 'strength_days_per_week' ||
       field === 'cardio_days_per_week' ||
@@ -11249,7 +12828,6 @@
 
   function createDefaultPhase(index, totalWeeks, programType) {
     var defaults = buildDefaultProgramPhases(totalWeeks, programType);
-    var defaultTrainingDays = state && state.structure ? state.structure.workoutsPerWeek : 3;
     return defaults[index] || {
       name: 'Phase ' + String(index + 1),
       start_week: Math.min(index + 1, totalWeeks),
@@ -11257,6 +12835,8 @@
       focus: '',
       rationale: '',
       priorities_text: '',
+      general_training_overview_text: '',
+      general_weekly_structure_text: '',
       strength_rule: '',
       endurance_rule: '',
       monitoring_metrics_text: '',
@@ -11265,12 +12845,12 @@
       stop_rules_text: '',
       phase_assessments_text: '',
       exit_criteria_text: '',
-      training_days_per_week: defaultTrainingDays,
-      strength_days_per_week: Math.min(2, defaultTrainingDays),
-      cardio_days_per_week: Math.min(1, defaultTrainingDays),
+      training_days_per_week: 7,
+      strength_days_per_week: 2,
+      cardio_days_per_week: 1,
       skill_days_per_week: 1,
       multi_focus_days_per_week: 0,
-      endurance_days_per_week: Math.min(1, defaultTrainingDays),
+      endurance_days_per_week: 1,
       mobility_days_per_week: 1
     };
   }
@@ -11411,7 +12991,7 @@
       focus: focusParts.join(' • '),
       strength_rule: strengthRule,
       endurance_rule: enduranceRule,
-      training_days_per_week: state && state.structure ? state.structure.workoutsPerWeek : 3,
+      training_days_per_week: 7,
       strength_days_per_week: 2,
       cardio_days_per_week: 1,
       skill_days_per_week: 1,
@@ -11584,8 +13164,7 @@
     var source = Array.isArray(phases) ? phases : [];
     var normalized = source.map(function (phase, index) {
       var item = phase && typeof phase === "object" ? phase : {};
-      var fallbackTraining = Math.max(1, parseInt(item.training_days_per_week, 10) || state.structure.workoutsPerWeek || 3);
-      var normalizedTraining = clampNumber(parseInt(item.training_days_per_week, 10), 1, 14, fallbackTraining);
+      var normalizedTraining = 7;
       var normalizedStrength = clampNumber(parseInt(item.strength_days_per_week, 10), 0, 14, Math.min(2, normalizedTraining));
       var normalizedCardio = clampNumber(
         parseInt(item.cardio_days_per_week != null ? item.cardio_days_per_week : item.endurance_days_per_week, 10),
@@ -11607,6 +13186,8 @@
         focus: String(item.focus || "").trim(),
         rationale: String(item.rationale || "").trim(),
         priorities_text: String(item.priorities_text || "").trim(),
+        general_training_overview_text: String(item.general_training_overview_text || "").trim(),
+        general_weekly_structure_text: String(item.general_weekly_structure_text || "").trim(),
         strength_rule: String(item.strength_rule || "").trim(),
         endurance_rule: String(item.endurance_rule || "").trim(),
         monitoring_metrics_text: String(item.monitoring_metrics_text || "").trim(),
@@ -11668,7 +13249,6 @@
     var weeks = Math.max(1, parseInt(totalWeeks, 10) || 1);
     var count = presets.length;
     var currentWeek = 1;
-    var defaultTrainingDays = state && state.structure ? state.structure.workoutsPerWeek : 3;
 
     return presets.map(function (preset, index) {
       var remainingWeeks = weeks - currentWeek + 1;
@@ -11682,6 +13262,8 @@
         focus: preset.focus,
         rationale: '',
         priorities_text: '',
+        general_training_overview_text: '',
+        general_weekly_structure_text: '',
         strength_rule: preset.strength_rule,
         endurance_rule: preset.endurance_rule,
         monitoring_metrics_text: '',
@@ -11690,12 +13272,12 @@
         stop_rules_text: '',
         phase_assessments_text: '',
         exit_criteria_text: '',
-        training_days_per_week: defaultTrainingDays,
-        strength_days_per_week: Math.min(2, defaultTrainingDays),
-        cardio_days_per_week: Math.min(1, defaultTrainingDays),
+        training_days_per_week: 7,
+        strength_days_per_week: 2,
+        cardio_days_per_week: 1,
         skill_days_per_week: 1,
         multi_focus_days_per_week: 0,
-        endurance_days_per_week: Math.min(1, defaultTrainingDays),
+        endurance_days_per_week: 1,
         mobility_days_per_week: 1
       };
       currentWeek = endWeek + 1;
@@ -11756,10 +13338,17 @@
     return result;
   }
 
+  function getSlotsPerWeek() {
+    if (state.isTemplateBuilder || state.isCoachAssignedProgramEdit) {
+      return 7;
+    }
+    return Math.max(1, parseInt(state.structure && state.structure.workoutsPerWeek, 10) || 1);
+  }
+
   function getAllSlotKeys() {
     var slots = [];
     for (var week = 1; week <= state.structure.weeks; week++) {
-      for (var workout = 1; workout <= state.structure.workoutsPerWeek; workout++) {
+      for (var workout = 1; workout <= getSlotsPerWeek(); workout++) {
         slots.push("w" + week + "d" + workout);
       }
     }

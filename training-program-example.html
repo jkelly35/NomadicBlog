@@ -133,10 +133,11 @@
                 <span>Additional Disclaimers (one per line)</span>
                 <textarea rows="3" placeholder="Optional disclaimer lines for PDF" data-template-program-disclaimers data-template-meta-field="program_disclaimers_text"></textarea>
               </label>
-              <label class="program-builder-structure-field">
+              <div class="program-builder-structure-field">
                 <span>Optional Worksheets (one per line, use Title | Description)</span>
-                <textarea rows="4" placeholder="Readiness Log | Complete before key sessions" data-template-program-worksheets data-template-meta-field="program_worksheets_text"></textarea>
-              </label>
+                <div class="program-builder-structured-editor" data-structured-editor="program_worksheets_text"></div>
+                <textarea rows="4" hidden data-template-program-worksheets data-template-meta-field="program_worksheets_text"></textarea>
+              </div>
             </section>
             <section class="program-builder-planner-card">
               <div class="program-builder-planner-head">
@@ -170,34 +171,18 @@
                 <textarea rows="4" placeholder="Primary sport and competition dates" data-template-framework-variables data-template-meta-field="framework_variables_text"></textarea>
               </label>
               <label class="program-builder-structure-field">
-                <span>Loading Wave Heading</span>
-                <input type="text" placeholder="e.g., Default four-week loading wave" data-template-framework-wave-heading data-template-meta-field="framework_wave_heading" />
+                <span>Loading Guidelines Heading</span>
+                <input type="text" placeholder="e.g., Default four-week loading guidelines" data-template-framework-wave-heading data-template-meta-field="framework_wave_heading" />
               </label>
-              <label class="program-builder-structure-field">
-                <span>Loading Wave Rows (one per line, use Week | Training target | Typical adjustment)</span>
-                <textarea rows="5" placeholder="1 | Establish | Choose working loads and leave 2-4 repetitions in reserve." data-template-framework-wave-rows data-template-meta-field="framework_wave_rows_text"></textarea>
-              </label>
-              <label class="program-builder-structure-field">
-                <span>Loading Wave Footer</span>
-                <textarea rows="2" placeholder="Optional note below the loading wave table" data-template-framework-wave-footer data-template-meta-field="framework_wave_footer"></textarea>
-              </label>
-            </section>
-            <section class="program-builder-planner-card">
-              <div class="program-builder-planner-head">
-                <div>
-                  <h3>Peaks &amp; Key Events</h3>
-                <div class="program-builder-day-tools" data-template-day-tools>
-                  <button type="button" class="btn admin-btn-primary" data-template-day-copy-forward>
-                    Copy Day Forward
-                  </button>
-                </div>
-                  <p>Add peak dates and a description of what each peak is for.</p>
-                </div>
-                <button type="button" class="btn admin-btn-small" data-template-add-objective>Add Peak</button>
+              <div class="program-builder-structure-field">
+                <span>Loading Guidelines Rows (one per line, use Week | Training target | Typical adjustment)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="framework_wave_rows_text"></div>
+                <textarea rows="5" hidden data-template-framework-wave-rows data-template-meta-field="framework_wave_rows_text"></textarea>
               </div>
-              <div class="program-builder-objective-list" data-template-objective-list>
-                <p class="admin-loading">No peak dates added yet.</p>
-              </div>
+              <label class="program-builder-structure-field">
+                <span>Loading Guidelines Footer</span>
+                <textarea rows="2" placeholder="Optional note below the loading guidelines table" data-template-framework-wave-footer data-template-meta-field="framework_wave_footer"></textarea>
+              </label>
             </section>
             <div class="program-builder-step-actions">
               <button type="button" class="btn admin-btn-primary" data-template-next-step-overview>Next: Program Phases</button>
@@ -222,8 +207,8 @@
               </label>
               <button type="button" class="btn admin-btn-small" data-template-phase-count-apply>Set Phase Count</button>
             </div>
-            <div class="program-builder-planner-grid">
-              <section class="program-builder-planner-card">
+            <div class="program-builder-planner-grid program-builder-planner-grid-single">
+              <section class="program-builder-planner-card program-builder-planner-card-full">
               <div class="program-builder-planner-head">
                 <div>
                   <h3>Program Phases</h3>
@@ -237,28 +222,6 @@
                 <p class="admin-loading">No phases added yet.</p>
               </div>
               <p class="program-builder-phase-warning" data-template-phase-warning hidden></p>
-            </section>
-              <section class="program-builder-planner-card">
-                <div class="program-builder-planner-head">
-                  <div>
-                    <h3>Peaks In View</h3>
-                    <p>Keep key events visible while mapping phase focus and loading.</p>
-                  </div>
-                </div>
-                <div class="program-builder-peak-visibility" data-template-phase-peak-panel>
-                  <p class="admin-loading">No peak dates added yet.</p>
-                </div>
-              </section>
-              <section class="program-builder-planner-card">
-                <div class="program-builder-planner-head">
-                  <div>
-                    <h3>Weekly Training Days</h3>
-                    <p>Select which weekday each workout slot should occur so daily programming can project calendar dates.</p>
-                  </div>
-                </div>
-                <div class="program-builder-week-list" data-template-week-structure-list>
-                  <p class="admin-loading">Weekly structure unavailable.</p>
-                </div>
               </section>
             </div>
           </section>
@@ -329,9 +292,6 @@
           <select id="workout-day-select" class="day-select-dropdown" data-workout-day></select>
           <div class="day-info" data-day-info>Select a workout day to build</div>
           <p class="program-builder-estimated-date" data-template-estimated-workout-date></p>
-          <div class="program-builder-daily-peak-panel" data-template-daily-peak-panel>
-            <p class="admin-loading">No peak dates added yet.</p>
-          </div>
         </div>
         <div class="program-builder-axis-grid" data-daily-axis-grid></div>
       </div>

@@ -11349,11 +11349,19 @@ body.template-builder-mode .program-demo-container {
   gap: 0.85rem;
 }
 
+.program-builder-planner-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .program-builder-planner-card {
   border: 1px solid #dfd3c4;
   border-radius: 14px;
   background: #fffdf9;
   padding: 0.9rem;
+}
+
+.program-builder-planner-card-full {
+  width: 100%;
 }
 
 .program-builder-planner-head {
@@ -11388,7 +11396,8 @@ body.template-builder-mode .program-demo-container {
   border: 1px solid #eadfce;
   border-radius: 12px;
   background: #fff;
-  padding: 0.75rem;
+  padding: 0.95rem;
+  box-shadow: 0 1px 0 rgba(15, 45, 45, 0.03);
 }
 
 .program-builder-phase-grid {
@@ -11400,6 +11409,109 @@ body.template-builder-mode .program-demo-container {
 
 .program-builder-phase-grid > * {
   min-width: 0;
+}
+
+.program-builder-phase-grid.program-builder-phase-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.program-builder-phase-shell {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.program-builder-phase-section {
+  border: 1px solid #eee3d4;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fffdfa 0%, #fff8f1 100%);
+  padding: 0.8rem;
+}
+
+.program-builder-phase-section-head {
+  margin-bottom: 0.6rem;
+}
+
+.program-builder-phase-section-head h4 {
+  margin: 0;
+  color: #163636;
+  font-size: 0.9rem;
+}
+
+.program-builder-phase-section-head p {
+  margin: 0.2rem 0 0;
+  color: #5f7373;
+  font-size: 0.8rem;
+}
+
+.program-builder-phase-meta-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(160px, 0.8fr);
+  gap: 0.65rem;
+}
+
+.program-builder-phase-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.program-builder-phase-field-note {
+  display: block;
+  margin-top: 0.2rem;
+  color: #6d8080;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.program-builder-structured-editor {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.program-builder-structured-editor-head,
+.program-builder-structured-editor-row {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.program-builder-structured-editor-head {
+  align-items: end;
+}
+
+.program-builder-structured-editor-row {
+  grid-template-columns: repeat(var(--structured-columns, 2), minmax(0, 1fr)) auto;
+  align-items: start;
+}
+
+.program-builder-structured-editor-head {
+  grid-template-columns: repeat(var(--structured-columns, 2), minmax(0, 1fr)) auto;
+}
+
+.program-builder-structured-editor-head span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #476565;
+}
+
+.program-builder-structured-editor-cell input {
+  width: 100%;
+}
+
+.program-builder-structured-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.program-builder-structured-editor-empty {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px dashed #d8c9b6;
+  border-radius: 10px;
+  color: #6d8080;
+  font-size: 0.82rem;
+  background: #fffdfa;
 }
 
 .program-builder-phase-actions {
@@ -11551,7 +11663,14 @@ body.template-builder-mode .program-demo-container {
   .program-builder-meta-grid,
   .program-builder-planner-grid,
   .program-builder-phase-grid,
+  .program-builder-phase-meta-grid,
+  .program-builder-phase-rule-grid,
   .program-builder-daily-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .program-builder-structured-editor-head,
+  .program-builder-structured-editor-row {
     grid-template-columns: 1fr;
   }
 
