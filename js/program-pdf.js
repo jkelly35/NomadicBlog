@@ -170,12 +170,15 @@
         id: textOrFallback(source.id, "program"),
         title: programTitle,
         subtitle: cleanText(source.subtitle || meta.program_subtitle || meta.program_type),
+        templateKind: resolveTemplateKind(source, meta, programTitle),
         description: cleanText(source.description || meta.program_description || meta.primary_goal),
         version: version,
         brand: {
           name: textOrFallback(source.brand_name, "Nomadic Performance"),
-          tagline: cleanText(source.brand_tagline || "Move Free, Thrive Wild")
+          tagline: cleanText(source.brand_tagline || "Move Free, Thrive Wild"),
+          logoUrl: resolvePdfLogoUrl(source, meta)
         },
+        yearlyTemplate: resolveYearlyTemplateMeta(meta),
         framework: resolveFramework(meta),
         athlete: buildAthlete(source.athlete),
         dates: dates,
@@ -197,11 +200,46 @@
     };
   }
 
+  function resolveTemplateKind(source, meta, title) {
+    var explicit = cleanText(
+      source && (source.template_kind || source.templateKind || source.pdf_template_kind || source.pdfTemplateKind)
+    ).toLowerCase();
+
+    if (explicit) {
+      return explicit;
+    }
+
+    var programType = cleanText(meta && meta.program_type).toLowerCase();
+    var joined = [
+      cleanText(title),
+      cleanText(source && source.subtitle),
+      cleanText(meta && meta.program_subtitle)
+    ].join(" ").toLowerCase();
+
+    if (programType === "yearly" || programType === "annual") {
+      return "yearly_template";
+    }
+
+    if (/yearly|annual|12[- ]?month|periodized training template/i.test(joined)) {
+      return "yearly_template";
+    }
+
+    return "default";
+  }
+
   function normalizePhaseForPdf(input) {
     var phase = input.phase;
     var parsedStartWeek = clampNumber(parseInt(phase.start_week, 10), 1, input.structure.weeks, 1);
     var parsedEndWeek = clampNumber(parseInt(phase.end_week, 10), parsedStartWeek, input.structure.weeks, parsedStartWeek);
     var phaseWeeks = range(parsedStartWeek, parsedEndWeek);
+    var phaseLabelKey = normalizePhaseLabelKey(phase.name);
+
+    if (phaseLabelKey) {
+      var matchedWeeks = collectWeeksFromPhaseLabel(input.rawSessionPlans, phaseLabelKey);
+      if (matchedWeeks.length) {
+        phaseWeeks = dedupe(phaseWeeks.concat(matchedWeeks));
+      }
+    }
 
     var sessions = collectPhaseSessions({
       phase: phase,
@@ -245,7 +283,9 @@
     return {
       id: "phase-" + String(input.order),
       order: input.order,
-      name: textOrFallback(phase.name, "Phase " + String(input.order)),
+      name: normalizePhaseNameForPdf(phase.name, input.order),
+      startWeek: parsedStartWeek,
+      endWeek: parsedEndWeek,
       dateLabel: buildPhaseDateLabel(parsedStartWeek, parsedEndWeek, input.programStartDate),
       durationWeeks: parsedEndWeek - parsedStartWeek + 1,
       primaryObjective: objectives[0] || undefined,
@@ -266,6 +306,38 @@
       exitCriteria: collectExitCriteria(phase),
       assessments: phaseAssessments.length ? phaseAssessments : undefined
     };
+  }
+
+  function normalizePhaseLabelKey(value) {
+    var text = cleanText(value).toLowerCase();
+    if (!text) {
+      return "";
+    }
+
+    return text
+      .split(/[:\-]/)[0]
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function collectWeeksFromPhaseLabel(rawSessionPlans, phaseLabelKey) {
+    var weeks = [];
+    var plans = rawSessionPlans && typeof rawSessionPlans === "object" ? rawSessionPlans : {};
+
+    Object.keys(plans).forEach(function (slotKey) {
+      var parsed = parseSlotKey(slotKey);
+      if (!parsed) {
+        return;
+      }
+
+      var plan = plans[slotKey] && typeof plans[slotKey] === "object" ? plans[slotKey] : {};
+      var planPhaseKey = normalizePhaseLabelKey(plan.phase_name);
+      if (planPhaseKey && planPhaseKey === phaseLabelKey) {
+        weeks.push(parsed.week);
+      }
+    });
+
+    return dedupe(weeks).sort(function (a, b) { return a - b; });
   }
 
   function collectPhaseSessions(input) {
@@ -338,8 +410,9 @@
 
     var sessionTitle = resolveSessionTitle(input.slotKey, plan, input.customDayNames);
     var sessionType = cleanText(plan.session_type) || inferSessionTypeFromExercises(exercises) || "session";
+    var hasSessionTitle = !!cleanText(sessionTitle);
 
-    if (!normalizedSections.length && !cleanText(plan.session_goal) && !cleanText(plan.coach_notes)) {
+    if (!normalizedSections.length && !hasSessionTitle && !cleanText(plan.session_goal) && !cleanText(plan.coach_notes)) {
       return null;
     }
 
@@ -961,31 +1034,8 @@
   }
 
   function collectPhasePriorities(phase) {
-    var list = [];
     var custom = parseLines(cleanText(phase && phase.priorities_text));
-    if (custom.length) {
-      list = list.concat(custom);
-    }
-
-    var trainingDays = parseInt(phase && phase.training_days_per_week, 10);
-    var strengthDays = parseInt(phase && phase.strength_days_per_week, 10);
-    var cardioDays = parseInt(phase && (phase.cardio_days_per_week != null ? phase.cardio_days_per_week : phase.endurance_days_per_week), 10);
-    var skillDays = parseInt(phase && (phase.skill_days_per_week != null ? phase.skill_days_per_week : phase.mobility_days_per_week), 10);
-
-    if (Number.isFinite(trainingDays)) {
-      list.push(String(trainingDays) + " total sessions/week");
-    }
-    if (Number.isFinite(strengthDays)) {
-      list.push(String(strengthDays) + " strength sessions/week");
-    }
-    if (Number.isFinite(cardioDays)) {
-      list.push(String(cardioDays) + " endurance sessions/week");
-    }
-    if (Number.isFinite(skillDays)) {
-      list.push(String(skillDays) + " skill/mobility sessions/week");
-    }
-
-    return list;
+    return custom;
   }
 
   function collectPhaseQualitiesDeveloped(phase) {
@@ -1190,6 +1240,455 @@
     };
   }
 
+  function resolveYearlyTemplateMeta(meta) {
+    var source = meta && typeof meta === "object" ? meta : {};
+    return {
+      athleteName: cleanText(source.yearly_athlete_name),
+      programYear: cleanText(source.yearly_program_year),
+      primarySport: cleanText(source.yearly_primary_sport),
+      secondarySports: cleanText(source.yearly_secondary_sports),
+      coachProvider: cleanText(source.yearly_coach_provider),
+      planStartDate: cleanText(source.yearly_plan_start_date),
+      trainingAge: cleanText(source.yearly_training_age),
+      currentWeeklyVolume: cleanText(source.yearly_current_weekly_volume),
+      currentStrengthFrequency: cleanText(source.yearly_current_strength_frequency),
+      currentEnduranceFrequency: cleanText(source.yearly_current_endurance_frequency),
+      availableTrainingDays: cleanText(source.yearly_available_training_days),
+      typicalSessionDuration: cleanText(source.yearly_typical_session_duration),
+      relevantInjuryHistory: cleanText(source.yearly_relevant_injury_history),
+      equipmentAccess: cleanText(source.yearly_equipment_access),
+      travelWorkConstraints: cleanText(source.yearly_travel_work_constraints),
+      preferredRecoveryDay: cleanText(source.yearly_preferred_recovery_day),
+      description: cleanText(source.yearly_description),
+      assumption: cleanText(source.yearly_assumption),
+      tagline: cleanText(source.yearly_tagline),
+      progressionRule: cleanText(source.yearly_progression_rule),
+      concurrentRule: cleanText(source.yearly_concurrent_rule),
+      annualGoalsRows: parsePipeRows(source.yearly_annual_goals_rows_text, ["goal", "target_window", "success_measure", "priority"]),
+      programmingPhilosophy: cleanText(source.yearly_programming_philosophy),
+      calendarRows: parsePipeRows(source.yearly_calendar_rows_text, ["month", "primary", "secondary", "event", "priority", "constraints", "notes"]),
+      phaseMapRows: parsePipeRows(source.yearly_phase_map_rows_text, ["phase", "months", "purpose", "primary", "secondary", "entry", "exit"]),
+      transitionRows: parsePipeRows(source.yearly_transition_rows_text, ["timing", "reason", "adjustment", "return"]),
+      testingRows: parsePipeRows(source.yearly_testing_rows_text, ["metric", "baseline", "mid", "pre_peak", "post", "rule"]),
+      monthOverviewRows: parsePipeRows(source.yearly_month_overview_rows_text, ["month", "phase", "emphasis", "dates", "primary", "secondary", "event", "access", "load"]),
+      monthPriorityRows: parsePipeRows(source.yearly_month_priority_rows_text, ["month", "primary", "secondary", "maintain"]),
+      monthTargetRows: parsePipeRows(source.yearly_month_target_rows_text, ["month", "volume_frequency", "intensity_density", "strength_power", "aerobic_conditioning", "sport_skill", "mobility_recovery", "testing_logistics", "adjustment_criteria"]),
+      monthWeekRows: parsePipeRows(source.yearly_month_week_rows_text, ["month", "week", "primary_focus", "volume_target", "intensity_target", "key_sessions", "strength_secondary", "recovery_review"]),
+      monthReviewRows: parsePipeRows(source.yearly_month_review_rows_text, ["month", "review"]),
+      calendarInterpretation: cleanText(source.yearly_calendar_interpretation),
+      halfYearReviewRows: parsePipeRows(source.yearly_half_year_review_rows_text, ["progress", "working", "modify", "decision"]),
+      endYearReviewRows: parsePipeRows(source.yearly_end_year_review_rows_text, ["achievement", "best", "persistent", "next"]),
+      capabilityMatrixRows: parsePipeRows(source.yearly_capability_matrix_rows_text, ["month", "strength", "power", "aerobic", "threshold", "anaerobic", "skill", "mobility", "recovery"]),
+      monitoringRows: parsePipeRows(source.yearly_monitoring_rows_text, ["metric", "scale", "threshold"]),
+      adjustmentOrder: cleanText(source.yearly_adjustment_order),
+      defaultWeekRows: parsePipeRows(source.yearly_default_week_rows_text, ["day", "primary_session", "secondary_session", "target_load", "purpose", "modification_rule"]),
+      strengthFrameworkRows: parsePipeRows(source.yearly_strength_framework_rows_text, ["quality", "build", "peak", "maintenance", "progression"]),
+      annualReviewGoalRows: parsePipeRows(source.yearly_annual_review_goal_rows_text, ["goal", "outcome", "evidence", "influenced", "next_decision"]),
+      annualReviewLessonRows: parsePipeRows(source.yearly_annual_review_lessons_rows_text, ["continue", "modify", "stop"]),
+      nextYearStartRows: parsePipeRows(source.yearly_next_year_start_rows_text, ["category", "current", "next", "action"]),
+      coachAthleteSummary: cleanText(source.yearly_coach_athlete_summary),
+      planningNotesRows: parsePipeRows(source.yearly_planning_notes_rows_text, ["note"])
+    };
+  }
+
+  function parsePipeRows(value, keys) {
+    var columns = Array.isArray(keys) ? keys : [];
+    if (!columns.length) {
+      return [];
+    }
+
+    return parseLines(value).map(function (line) {
+      var parts = String(line || "").split("|");
+      var row = {};
+      columns.forEach(function (key, index) {
+        row[key] = cleanText(index === columns.length - 1 ? parts.slice(index).join("|") : parts[index]);
+      });
+      return row;
+    }).filter(function (row) {
+      return columns.some(function (key) {
+        return !!cleanText(row[key]);
+      });
+    });
+  }
+
+  function renderYearlyValue(value, placeholder) {
+    var text = cleanText(value);
+    if (text) {
+      return escapeHtml(text);
+    }
+    return '<span class="npdf-yearly-italic">[' + escapeHtml(placeholder) + ']</span>';
+  }
+
+  function findYearlyMonthOverviewRow(yearly, monthName) {
+    var rows = Array.isArray(yearly && yearly.monthOverviewRows) ? yearly.monthOverviewRows : [];
+    return findYearlyMonthRow(rows, monthName);
+  }
+
+  function findYearlyMonthRow(rows, monthName) {
+    var source = Array.isArray(rows) ? rows : [];
+    var target = cleanText(monthName).toLowerCase();
+    if (!target) {
+      return null;
+    }
+
+    return source.find(function (row) {
+      var month = cleanText(row && row.month).toLowerCase();
+      return month === target || month.indexOf(target) === 0;
+    }) || null;
+  }
+
+  function findYearlyMonthRows(rows, monthName) {
+    var source = Array.isArray(rows) ? rows : [];
+    var target = cleanText(monthName).toLowerCase();
+    if (!target) {
+      return [];
+    }
+
+    return source.filter(function (row) {
+      var month = cleanText(row && row.month).toLowerCase();
+      return month === target || month.indexOf(target) === 0;
+    });
+  }
+
+  function parseYearlyWeekNumber(value, fallback) {
+    var text = cleanText(value);
+    var match = text.match(/(\d+)/);
+    if (match) {
+      var num = parseInt(match[1], 10);
+      if (Number.isFinite(num) && num > 0) {
+        return num;
+      }
+    }
+    return fallback;
+  }
+
+  function splitYearlyItems(value) {
+    return String(value == null ? "" : value)
+      .split(/\n|;/)
+      .map(function (item) { return cleanText(item); })
+      .filter(Boolean);
+  }
+
+  function deriveYearlyCalendarInterpretation(yearly) {
+    var explicit = cleanText(yearly && yearly.calendarInterpretation);
+    if (explicit) {
+      return explicit;
+    }
+
+    var rows = Array.isArray(yearly && yearly.calendarRows) ? yearly.calendarRows : [];
+    if (!rows.length) {
+      return "";
+    }
+
+    var priorityMonths = [];
+    var constrainedMonths = [];
+    rows.forEach(function (row) {
+      var month = cleanText(row && row.month);
+      var priority = cleanText(row && row.priority).toLowerCase();
+      var constraints = cleanText(row && row.constraints);
+      if (month && /high|peak|event|race|priority/i.test(priority)) {
+        priorityMonths.push(month);
+      }
+      if (month && constraints) {
+        constrainedMonths.push(month);
+      }
+    });
+
+    var parts = [];
+    if (priorityMonths.length) {
+      parts.push("Highest-priority windows: " + priorityMonths.join(", ") + ".");
+    }
+    if (constrainedMonths.length) {
+      parts.push("Constraint-heavy months: " + constrainedMonths.join(", ") + ".");
+    }
+    if (!parts.length) {
+      parts.push("Use the calendar rows to identify peak windows, constrained months, and where sports compete for available training time.");
+    }
+    return parts.join(" ");
+  }
+
+  function buildYearlyReviewRows(yearly, months, reviewCols, reviewKey) {
+    var cols = Array.isArray(reviewCols) ? reviewCols : [];
+    var sourceRows = [];
+    if (reviewKey === "half") {
+      sourceRows = Array.isArray(yearly && yearly.halfYearReviewRows) ? yearly.halfYearReviewRows : [];
+    } else if (reviewKey === "end") {
+      sourceRows = Array.isArray(yearly && yearly.endYearReviewRows) ? yearly.endYearReviewRows : [];
+    }
+
+    if (sourceRows.length) {
+      var explicitRows = sourceRows.slice(0, 2).map(function (row) {
+        return {
+          cells: cols.map(function (_col, idx) {
+            var values = Object.values(row || {}).map(function (value) {
+              return cleanText(value);
+            });
+            return values[idx] || "";
+          })
+        };
+      });
+
+      while (explicitRows.length < 2) {
+        explicitRows.push({ cells: cols.map(function () { return ""; }) });
+      }
+      return explicitRows;
+    }
+
+    var monthNames = Array.isArray(months) ? months : [];
+    var reviews = monthNames.map(function (month) {
+      var row = findYearlyMonthRow(yearly && yearly.monthReviewRows, month) || {};
+      return {
+        month: month,
+        review: cleanText(row.review)
+      };
+    }).filter(function (item) {
+      return !!item.review;
+    });
+
+    var rows = reviews.slice(0, 2).map(function (item) {
+      var segments = splitYearlyItems(item.review);
+      var cells = cols.map(function (_col, idx) {
+        if (idx === 0) {
+          return segments[0] || item.review;
+        }
+        return segments[idx] || "";
+      });
+      return { cells: cells };
+    });
+
+    while (rows.length < 2) {
+      rows.push({
+        cells: cols.map(function () { return ""; })
+      });
+    }
+
+    return rows;
+  }
+
+  function buildYearlyCapabilityMatrixRows(yearly, months) {
+    var explicitRows = Array.isArray(yearly && yearly.capabilityMatrixRows) ? yearly.capabilityMatrixRows : [];
+    if (explicitRows.length) {
+      var byMonth = {};
+      explicitRows.forEach(function (row) {
+        var key = cleanText(row && row.month).toLowerCase();
+        if (key) {
+          byMonth[key] = row;
+        }
+      });
+
+      return (Array.isArray(months) ? months : []).map(function (month) {
+        var row = byMonth[cleanText(month).toLowerCase()] || {};
+        return {
+          month: month,
+          strength: cleanText(row.strength),
+          power: cleanText(row.power),
+          aerobic: cleanText(row.aerobic),
+          threshold: cleanText(row.threshold),
+          anaerobic: cleanText(row.anaerobic),
+          skill: cleanText(row.skill),
+          mobility: cleanText(row.mobility),
+          recovery: cleanText(row.recovery)
+        };
+      });
+    }
+
+    return (Array.isArray(months) ? months : []).map(function (month) {
+      var target = findYearlyMonthRow(yearly && yearly.monthTargetRows, month) || {};
+      return {
+        month: month,
+        strength: cleanText(target.strength_power),
+        power: cleanText(target.strength_power),
+        aerobic: cleanText(target.aerobic_conditioning),
+        threshold: cleanText(target.intensity_density),
+        anaerobic: cleanText(target.intensity_density),
+        skill: cleanText(target.sport_skill),
+        mobility: cleanText(target.mobility_recovery),
+        recovery: cleanText(target.adjustment_criteria)
+      };
+    });
+  }
+
+  function collectYearlyMonitoringRows(program) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var explicit = Array.isArray(yearly && yearly.monitoringRows) ? yearly.monitoringRows : [];
+    if (explicit.length) {
+      return explicit.map(function (row) {
+        return {
+          metric: cleanText(row.metric),
+          scale: cleanText(row.scale),
+          threshold: cleanText(row.threshold)
+        };
+      }).filter(function (row) {
+        return row.metric || row.scale || row.threshold;
+      }).slice(0, 8);
+    }
+
+    var rows = [];
+    var seen = {};
+    (Array.isArray(program && program.phases) ? program.phases : []).forEach(function (phase) {
+      (Array.isArray(phase && phase.monitoring) ? phase.monitoring : []).forEach(function (item) {
+        var metric = cleanText(item && item.metric);
+        if (!metric) {
+          return;
+        }
+        var key = metric.toLowerCase();
+        if (seen[key]) {
+          return;
+        }
+        seen[key] = true;
+        rows.push({
+          metric: metric,
+          scale: cleanText(item && item.frequency),
+          threshold: cleanText(item && item.target)
+        });
+      });
+    });
+    return rows.slice(0, 8);
+  }
+
+  function deriveYearlyAdjustmentOrder(program, yearly) {
+    var explicit = cleanText(yearly && yearly.adjustmentOrder);
+    if (explicit) {
+      return explicit;
+    }
+
+    var rules = [];
+    (Array.isArray(program && program.phases) ? program.phases : []).forEach(function (phase) {
+      (Array.isArray(phase && phase.adjustmentRules) ? phase.adjustmentRules : []).forEach(function (item) {
+        var ruleText = cleanText(item && item.rule);
+        if (ruleText) {
+          rules.push(ruleText);
+        }
+      });
+    });
+
+    rules = dedupe(rules);
+    if (rules.length) {
+      return rules.slice(0, 4).join(" | ");
+    }
+
+    return cleanText(yearly && yearly.progressionRule) || cleanText(yearly && yearly.concurrentRule);
+  }
+
+  function buildYearlyDefaultWeekRows(program) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var explicitRows = Array.isArray(yearly && yearly.defaultWeekRows) ? yearly.defaultWeekRows : [];
+    if (explicitRows.length) {
+      return explicitRows.map(function (row) {
+        return {
+          day: cleanText(row.day),
+          primarySession: cleanText(row.primary_session),
+          secondarySession: cleanText(row.secondary_session),
+          targetLoad: cleanText(row.target_load),
+          purpose: cleanText(row.purpose),
+          modificationRule: cleanText(row.modification_rule)
+        };
+      });
+    }
+
+    var dayLabels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    var firstPhase = Array.isArray(program && program.phases) && program.phases.length ? program.phases[0] : null;
+    var scheduleRows = firstPhase && Array.isArray(firstPhase.weeklySchedules) && firstPhase.weeklySchedules.length
+      ? firstPhase.weeklySchedules[0].rows || []
+      : [];
+
+    var byDay = {};
+    scheduleRows.forEach(function (row) {
+      var key = cleanText(row && row.day).toLowerCase();
+      if (key) {
+        byDay[key] = row;
+      }
+    });
+
+    return dayLabels.map(function (day) {
+      var row = byDay[day.toLowerCase()] || {};
+      return {
+        day: day,
+        primarySession: cleanText(row.session),
+        secondarySession: cleanText(row.activity),
+        targetLoad: cleanText(row.intensity),
+        purpose: cleanText(row.notes),
+        modificationRule: ""
+      };
+    });
+  }
+
+  function buildYearlyStrengthFrameworkRows(program, yearly) {
+    var explicitRows = Array.isArray(yearly && yearly.strengthFrameworkRows) ? yearly.strengthFrameworkRows : [];
+    if (explicitRows.length) {
+      return explicitRows.map(function (row) {
+        return {
+          quality: cleanText(row.quality),
+          build: cleanText(row.build),
+          peak: cleanText(row.peak),
+          maintain: cleanText(row.maintenance),
+          progression: cleanText(row.progression)
+        };
+      });
+    }
+
+    var targetRows = Array.isArray(yearly && yearly.monthTargetRows) ? yearly.monthTargetRows : [];
+    var firstTarget = targetRows.length ? targetRows[0] : {};
+    var lastTarget = targetRows.length ? targetRows[targetRows.length - 1] : {};
+    var maintainHint = (Array.isArray(yearly && yearly.monthPriorityRows) ? yearly.monthPriorityRows : []).map(function (row) {
+      return cleanText(row && row.maintain);
+    }).filter(Boolean)[0] || "";
+
+    return [
+      {
+        quality: "Max strength",
+        build: cleanText(firstTarget.strength_power),
+        peak: cleanText(lastTarget.strength_power),
+        maintain: maintainHint,
+        progression: cleanText(yearly && yearly.progressionRule)
+      },
+      {
+        quality: "Power / plyometrics",
+        build: cleanText(firstTarget.intensity_density),
+        peak: cleanText(lastTarget.intensity_density),
+        maintain: maintainHint,
+        progression: cleanText(yearly && yearly.progressionRule)
+      },
+      {
+        quality: "Muscular endurance",
+        build: cleanText(firstTarget.volume_frequency),
+        peak: cleanText(lastTarget.volume_frequency),
+        maintain: maintainHint,
+        progression: cleanText(yearly && yearly.progressionRule)
+      },
+      {
+        quality: "Aerobic conditioning",
+        build: cleanText(firstTarget.aerobic_conditioning),
+        peak: cleanText(lastTarget.aerobic_conditioning),
+        maintain: maintainHint,
+        progression: cleanText(yearly && yearly.progressionRule)
+      },
+      {
+        quality: "Mobility / resilience",
+        build: cleanText(firstTarget.mobility_recovery),
+        peak: cleanText(lastTarget.mobility_recovery),
+        maintain: maintainHint,
+        progression: cleanText(yearly && yearly.progressionRule)
+      }
+    ];
+  }
+
+  function buildYearlyFallbackWeekRows(program) {
+    var defaultRows = buildYearlyDefaultWeekRows(program);
+    return [1, 2, 3, 4].map(function (weekNumber) {
+      var row = defaultRows[Math.min(weekNumber - 1, defaultRows.length - 1)] || {};
+      return {
+        week: "Week " + String(weekNumber),
+        primary_focus: cleanText(row.primarySession),
+        volume_target: cleanText(row.purpose),
+        intensity_target: cleanText(row.targetLoad),
+        key_sessions: cleanText(row.primarySession),
+        strength_secondary: cleanText(row.secondarySession),
+        recovery_review: ""
+      };
+    });
+  }
+
   function parseWaveRows(value) {
     return parseLines(value).map(function (line) {
       var parts = String(line || "").split("|");
@@ -1223,36 +1722,27 @@
   function buildProgramPdfDocument(program, warnings) {
     var pages = [];
 
-    pages.push(renderCoverPage(program));
-    pages.push(renderHowToUsePage(program, warnings));
-    pages.push(renderProgramAtGlancePage(program));
+    if (String(program && program.templateKind || "").toLowerCase() === "yearly_template") {
+      pages = buildYearlyTemplatePages(program);
+    } else {
+      pages.push(renderCoverPage(program));
+      pages.push(renderHowToUsePage(program, warnings));
+      pages.push(renderProgramAtGlancePage(program));
 
-    var matrixPages = renderActivityMatrixPages(program);
-    matrixPages.forEach(function (page) {
-      pages.push(page);
-    });
+      (Array.isArray(program.phases) ? program.phases : []).forEach(function (phase) {
+        pages.push(renderPhasePage(program, phase));
+      });
 
-    if (Array.isArray(program.principles) && program.principles.length) {
-      pages.push(renderPrinciplesPage(program));
+      if (Array.isArray(program.assessments) && program.assessments.length) {
+        pages.push(renderAssessmentsPage(program));
+      }
+
+      if (Array.isArray(program.worksheets) && program.worksheets.length) {
+        pages.push(renderWorksheetsPage(program));
+      }
+
+      // Coach Notes and Final Summary pages intentionally omitted.
     }
-
-    (Array.isArray(program.phases) ? program.phases : []).forEach(function (phase) {
-      pages.push(renderPhasePage(program, phase));
-    });
-
-    if (Array.isArray(program.assessments) && program.assessments.length) {
-      pages.push(renderAssessmentsPage(program));
-    }
-
-    if (Array.isArray(program.worksheets) && program.worksheets.length) {
-      pages.push(renderWorksheetsPage(program));
-    }
-
-    if (Array.isArray(program.coachNotes) && program.coachNotes.length) {
-      pages.push(renderCoachNotesPage(program));
-    }
-
-    pages.push(renderFinalSummaryPage(program, warnings));
 
     return [
       "<!DOCTYPE html>",
@@ -1280,6 +1770,402 @@
     ].join("");
   }
 
+  function buildYearlyTemplatePages(program) {
+    var pages = [];
+    var monthNames = [
+      "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+      "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+    ];
+
+    pages.push(renderYearlyCoverPage(program, 1));
+    pages.push(renderYearlyHowToUseTemplatePage(program, 2));
+    pages.push(renderYearlyAthleteProfilePage(program, 3));
+    pages.push(renderYearlyCalendarPage(program, 4));
+    pages.push(renderYearlyAtAGlancePage(program, 5, "January through June", ["January", "February", "March", "April", "May", "June"], "Half-Year Review", ["Progress toward goals", "What is working", "What needs modification", "Second-half decision"], "half"));
+    pages.push(renderYearlyAtAGlancePage(program, 6, "July through December", ["July", "August", "September", "October", "November", "December"], "End-of-Year Review", ["Goal achievement", "Best adaptations", "Persistent limitations", "Next-year priority"], "end"));
+    pages.push(renderYearlyPhaseMapPage(program, 7));
+    pages.push(renderYearlyCapabilityMatrixPage(program, 8));
+    pages.push(renderYearlyTestingPage(program, 9));
+    pages.push(renderYearlyDefaultWeekPage(program, 10));
+
+    monthNames.forEach(function (monthName, index) {
+      var pageNumber = 11 + (index * 2);
+      pages.push(renderYearlyMonthPage(program, pageNumber, index + 1, monthName));
+      if (index < monthNames.length - 1) {
+        pages.push(renderYearlySpacerPage(program, pageNumber + 1));
+      }
+    });
+
+    pages.push(renderYearlySpacerPage(program, 34));
+    pages.push(renderYearlyAnnualReviewPage(program, 35));
+    pages.push(renderYearlyPlanningNotesPage(program, 36));
+
+    return pages;
+  }
+
+  function renderYearlyPage(program, pageNumber, bodyHtml) {
+    return [
+      "<section class=\"npdf-page npdf-yearly-page\">",
+      "<div class=\"npdf-yearly-topline\">YEARLY PERIODIZED TRAINING PLAN | EDITABLE TEMPLATE</div>",
+      bodyHtml,
+      "<footer class=\"npdf-yearly-footer\">Nomadic Performance - Yearly Training Plan Template | " + String(pageNumber) + "</footer>",
+      "</section>"
+    ].join("");
+  }
+
+  function renderYearlyCoverPage(program, pageNumber) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    return renderYearlyPage(program, pageNumber, [
+      "<div class=\"npdf-yearly-hero\">",
+      "<h1>YEARLY PERFORMANCE PLAN</h1>",
+      "<h2>12-Month Periodized Training Template</h2>",
+      "<p class=\"npdf-yearly-italic\">" + renderYearlyValue(yearly.description, "Enter a one- to two-sentence description of the athlete, sports, annual goals, and planning philosophy.") + "</p>",
+      "<div class=\"npdf-yearly-markers\">/\\ /\\ /\\</div>",
+      "</div>",
+      "<div class=\"npdf-yearly-note\"><strong>Annual planning assumption</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(yearly.assumption, "Describe the athlete profile, current training base, sport participation, major constraints, and assumptions used to build the annual plan.") + "</span></div>",
+      "<table class=\"npdf-table npdf-yearly-table\"><tbody>",
+      "<tr><th>Athlete</th><th>Program year</th></tr>",
+      "<tr><td>" + renderYearlyValue(yearly.athleteName, "Click or type here") + "</td><td>" + renderYearlyValue(yearly.programYear, "Click or type here") + "</td></tr>",
+      "<tr><th>Primary sport / goal</th><th>Secondary sports</th></tr>",
+      "<tr><td>" + renderYearlyValue(yearly.primarySport, "Click or type here") + "</td><td>" + renderYearlyValue(yearly.secondarySports, "Click or type here") + "</td></tr>",
+      "<tr><th>Coach / provider</th><th>Plan start date</th></tr>",
+      "<tr><td>" + renderYearlyValue(yearly.coachProvider, "Click or type here") + "</td><td>" + renderYearlyValue(yearly.planStartDate, "Click or type here") + "</td></tr>",
+      "</tbody></table>",
+      "<p class=\"npdf-yearly-center npdf-yearly-italic\">" + renderYearlyValue(yearly.tagline, "Enter annual program tagline or guiding principle") + "</p>"
+    ].join(""));
+  }
+
+  function renderYearlyHowToUseTemplatePage(program, pageNumber) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">How to Use the Template</h1>",
+      "<p class=\"npdf-yearly-subtitle\">Treat each month as a training block while preserving the logic of the full year.</p>",
+      "<h2 class=\"npdf-yearly-section\">Monthly Block Hierarchy</h2>",
+      "<ol class=\"npdf-yearly-tight-list\"><li><strong>Primary priorities:</strong> One to two capabilities or outcomes intentionally developed, expressed, or peaked.</li><li><strong>Secondary priorities:</strong> One to two qualities that support the primary goal but receive less training emphasis.</li><li><strong>Maintenance priorities:</strong> One to two qualities preserved with the minimum effective dose.</li><li><strong>Recovery and transition:</strong> Planned reduction, reassessment, or shift in emphasis before the next block.</li></ol>",
+      "<h2 class=\"npdf-yearly-section\">Recommended Planning Sequence</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Step</th><th>Planning decision</th><th>Editable output</th></tr></thead><tbody>" + [
+        ["1", "Map events, trips, seasons, work, travel, and access constraints.", "Annual performance calendar"],
+        ["2", "Identify performance windows and transition / recovery periods.", "Phase map"],
+        ["3", "Assign primary, secondary, and maintenance priorities to each month.", "Annual plan at a glance"],
+        ["4", "Set monthly volume, intensity, frequency, testing, and recovery targets.", "Monthly programming targets"],
+        ["5", "Break each month into three to five weekly microcycles.", "Week-by-week progression"],
+        ["6", "Review the athlete response and update the next block.", "Monthly review and decision"]
+      ].map(function (row) { return "<tr><td>" + row[0] + "</td><td>" + row[1] + "</td><td>" + row[2] + "</td></tr>"; }).join("") + "</tbody></table>",
+      "<div class=\"npdf-yearly-note\"><strong>Progression rule</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(yearly.progressionRule, "Define which variables may progress together and which should remain stable: training volume, intensity, frequency, technical difficulty, sport specificity, strength load, and recovery demand.") + "</span></div>",
+      "<div class=\"npdf-yearly-note npdf-yearly-note-cream\"><strong>Template editing</strong><br /><span class=\"npdf-yearly-italic\">Replace gray bracketed text, rename sports and capabilities, add or delete rows, and adjust the month order when the training year does not begin in January.</span></div>"
+    ].join(""));
+  }
+
+  function renderYearlyAthleteProfilePage(program, pageNumber) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var profileRows = [
+      ["Primary sport(s)", "Secondary sport(s)", yearly.primarySport, yearly.secondarySports],
+      ["Training age", "Current weekly volume", yearly.trainingAge, yearly.currentWeeklyVolume],
+      ["Current strength frequency", "Current endurance frequency", yearly.currentStrengthFrequency, yearly.currentEnduranceFrequency],
+      ["Available training days", "Typical session duration", yearly.availableTrainingDays, yearly.typicalSessionDuration],
+      ["Relevant injury / medical history", "Equipment / facility access", yearly.relevantInjuryHistory, yearly.equipmentAccess],
+      ["Travel / work constraints", "Preferred recovery day", yearly.travelWorkConstraints, yearly.preferredRecoveryDay]
+    ];
+
+    var annualGoalsRows = Array.isArray(yearly.annualGoalsRows) && yearly.annualGoalsRows.length
+      ? yearly.annualGoalsRows.slice(0, 5)
+      : new Array(5).fill({});
+
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">Athlete Profile and Annual Goals</h1>",
+      "<p class=\"npdf-yearly-subtitle\">Define the athlete before defining the calendar.</p>",
+      "<h2 class=\"npdf-yearly-section\">Athlete Profile</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><tbody>" + profileRows.map(function (row) {
+        return "<tr><th>" + row[0] + "</th><th>" + row[1] + "</th></tr><tr><td>" + renderYearlyValue(row[2], "Click or type here") + "</td><td>" + renderYearlyValue(row[3], "Click or type here") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">Annual Performance Goals</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Goal / outcome</th><th>Target date / window</th><th>Success measure</th><th>Priority</th></tr></thead><tbody>" + annualGoalsRows.map(function (row) {
+        return "<tr><td>" + renderYearlyValue(row.goal, "Enter") + "</td><td>" + renderYearlyValue(row.target_window, "Enter") + "</td><td>" + renderYearlyValue(row.success_measure, "Enter") + "</td><td>" + renderYearlyValue(row.priority, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<div class=\"npdf-yearly-note\"><strong>Programming philosophy</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(yearly.programmingPhilosophy, "Describe the principles that should guide the year: specificity, overload, recovery, consistency, minimum effective dose, multisport balance, and athlete preference.") + "</span></div>"
+    ].join(""));
+  }
+
+  function renderYearlyCalendarPage(program, pageNumber) {
+    var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var calendarRows = Array.isArray(yearly.calendarRows) ? yearly.calendarRows : [];
+    var byMonth = {};
+    calendarRows.forEach(function (row) {
+      var key = cleanText(row && row.month).toLowerCase();
+      if (key) {
+        byMonth[key] = row;
+      }
+    });
+
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">Annual Performance Calendar</h1>",
+      "<p class=\"npdf-yearly-subtitle\">Map sport priority, events, travel, access, and life constraints before assigning training emphasis.</p>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Month</th><th>Primary sport</th><th>Secondary sport(s)</th><th>Key event / trip</th><th>Priority</th><th>Access / constraints</th><th>Notes</th></tr></thead><tbody>" + months.map(function (month) {
+        var row = byMonth[month.toLowerCase()] || {};
+        return "<tr><td>" + month + "</td><td>" + renderYearlyValue(row.primary, "Enter") + "</td><td>" + renderYearlyValue(row.secondary, "Enter") + "</td><td>" + renderYearlyValue(row.event, "Enter") + "</td><td>" + renderYearlyValue(row.priority, "Enter") + "</td><td>" + renderYearlyValue(row.constraints, "Enter") + "</td><td>" + renderYearlyValue(row.notes, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<div class=\"npdf-yearly-note\"><strong>Calendar interpretation</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(deriveYearlyCalendarInterpretation(yearly), "Identify the highest-priority performance windows, months that require conservative loading, and periods where multiple sports compete for training time.") + "</span></div>"
+    ].join(""));
+  }
+
+  function renderYearlyAtAGlancePage(program, pageNumber, subtitle, months, reviewTitle, reviewCols, reviewKey) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var reviewRows = buildYearlyReviewRows(yearly, months, reviewCols, reviewKey);
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">Annual Plan at a Glance</h1>",
+      "<p class=\"npdf-yearly-subtitle\">" + escapeHtml(subtitle) + "</p>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Month</th><th>Phase / block</th><th>Primary priorities</th><th>Secondary priorities</th><th>Maintain</th><th>Volume</th><th>Intensity</th><th>Strength</th><th>Key outcome</th></tr></thead><tbody>" + months.map(function (month) {
+        var row = findYearlyMonthOverviewRow(yearly, month) || {};
+        var priorityRow = findYearlyMonthRow(yearly.monthPriorityRows, month) || {};
+        var targetRow = findYearlyMonthRow(yearly.monthTargetRows, month) || {};
+        return "<tr><td>" + month + "</td><td>" + renderYearlyValue(row.phase, "Enter") + "</td><td>" + renderYearlyValue(priorityRow.primary || row.emphasis, "Enter") + "</td><td>" + renderYearlyValue(priorityRow.secondary || row.secondary, "Enter") + "</td><td>" + renderYearlyValue(priorityRow.maintain, "Enter") + "</td><td>" + renderYearlyValue(targetRow.volume_frequency || row.load, "Enter") + "</td><td>" + renderYearlyValue(targetRow.intensity_density, "Enter") + "</td><td>" + renderYearlyValue(targetRow.strength_power, "Enter") + "</td><td>" + renderYearlyValue(row.event, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">" + escapeHtml(reviewTitle) + "</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr>" + reviewCols.map(function (col) { return "<th>" + escapeHtml(col) + "</th>"; }).join("") + "</tr></thead><tbody>" + reviewRows.map(function (row) {
+        return "<tr>" + reviewCols.map(function (_col, idx) { return "<td>" + renderYearlyValue(row.cells[idx], "Enter") + "</td>"; }).join("") + "</tr>";
+      }).join("") + "</tbody></table>",
+      "<div class=\"npdf-yearly-note\"><strong>Calendar interpretation</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(yearly.calendarInterpretation || deriveYearlyCalendarInterpretation(yearly), "Identify the highest-priority performance windows, months that require conservative loading, and periods where multiple sports compete for training time.") + "</span></div>"
+    ].join(""));
+  }
+
+  function renderYearlyPhaseMapPage(program, pageNumber) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var phaseRows = Array.isArray(yearly.phaseMapRows) && yearly.phaseMapRows.length
+      ? yearly.phaseMapRows
+      : new Array(6).fill("").map(function (_, idx) {
+          return { phase: "Phase " + String(idx + 1) };
+        });
+    var transitionRows = Array.isArray(yearly.transitionRows) && yearly.transitionRows.length
+      ? yearly.transitionRows
+      : new Array(4).fill("").map(function () { return {}; });
+
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">Annual Phase Map</h1>",
+      "<p class=\"npdf-yearly-subtitle\">Group monthly blocks into larger periods with a common purpose.</p>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Phase</th><th>Months</th><th>Purpose</th><th>Primary adaptations</th><th>Secondary / maintain</th><th>Entry criteria</th><th>Exit criteria</th></tr></thead><tbody>" + phaseRows.map(function (row, idx) {
+        return "<tr><td>" + renderYearlyValue(row.phase || ("Phase " + String(idx + 1)), "Phase") + "</td><td>" + renderYearlyValue(row.months, "Enter") + "</td><td>" + renderYearlyValue(row.purpose, "Enter") + "</td><td>" + renderYearlyValue(row.primary, "Enter") + "</td><td>" + renderYearlyValue(row.secondary, "Enter") + "</td><td>" + renderYearlyValue(row.entry, "Enter") + "</td><td>" + renderYearlyValue(row.exit, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">Transition and Recovery Periods</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Timing</th><th>Reason</th><th>Volume / intensity change</th><th>Return-to-build criteria</th></tr></thead><tbody>" + transitionRows.map(function (row) {
+        return "<tr><td>" + renderYearlyValue(row.timing, "Enter") + "</td><td>" + renderYearlyValue(row.reason, "Enter") + "</td><td>" + renderYearlyValue(row.adjustment, "Enter") + "</td><td>" + renderYearlyValue(row.return, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>"
+    ].join(""));
+  }
+
+  function renderYearlyCapabilityMatrixPage(program, pageNumber) {
+    var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var rows = buildYearlyCapabilityMatrixRows(yearly, months);
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">Annual Capability Emphasis Matrix</h1>",
+      "<p class=\"npdf-yearly-subtitle\">Use low, moderate, high, peak, or maintain to show how each quality changes across the year.</p>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Month</th><th>Strength</th><th>Power</th><th>Aerobic base</th><th>Threshold / tempo</th><th>Anaerobic</th><th>Sport skill</th><th>Mobility</th><th>Recovery</th></tr></thead><tbody>" + rows.map(function (row) {
+        return "<tr><td>" + row.month + "</td><td>" + renderYearlyValue(row.strength, "Enter") + "</td><td>" + renderYearlyValue(row.power, "Enter") + "</td><td>" + renderYearlyValue(row.aerobic, "Enter") + "</td><td>" + renderYearlyValue(row.threshold, "Enter") + "</td><td>" + renderYearlyValue(row.anaerobic, "Enter") + "</td><td>" + renderYearlyValue(row.skill, "Enter") + "</td><td>" + renderYearlyValue(row.mobility, "Enter") + "</td><td>" + renderYearlyValue(row.recovery, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<div class=\"npdf-yearly-note\"><strong>Matrix rule</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(yearly.progressionRule, "A high emphasis should be supported by enough training frequency and recovery. Maintenance qualities should receive the minimum effective dose rather than disappearing from the plan.") + "</span></div>"
+    ].join(""));
+  }
+
+  function renderYearlyTestingPage(program, pageNumber) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var testingRows = Array.isArray(yearly.testingRows) && yearly.testingRows.length
+      ? yearly.testingRows
+      : new Array(10).fill("").map(function () { return {}; });
+    var monitoringRows = collectYearlyMonitoringRows(program);
+    var adjustmentOrder = deriveYearlyAdjustmentOrder(program, yearly);
+
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">Testing, Monitoring, and Adjustment</h1>",
+      "<p class=\"npdf-yearly-subtitle\">Schedule reassessment where the results can meaningfully change the next block.</p>",
+      "<h2 class=\"npdf-yearly-section\">Annual Testing Schedule</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Metric / test</th><th>Baseline</th><th>Mid-year</th><th>Pre-peak</th><th>Post-season</th><th>Decision rule</th></tr></thead><tbody>" + testingRows.map(function (row) {
+        return "<tr><td>" + renderYearlyValue(row.metric, "Enter") + "</td><td>" + renderYearlyValue(row.baseline, "Enter") + "</td><td>" + renderYearlyValue(row.mid, "Enter") + "</td><td>" + renderYearlyValue(row.pre_peak, "Enter") + "</td><td>" + renderYearlyValue(row.post, "Enter") + "</td><td>" + renderYearlyValue(row.rule, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">Monitoring Dashboard</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Metric</th><th>Scale / method</th><th>Action threshold</th></tr></thead><tbody>" + (monitoringRows.length ? monitoringRows : [
+        { metric: "Readiness / fatigue" },
+        { metric: "Pain / symptoms" },
+        { metric: "Sleep" },
+        { metric: "Motivation" },
+        { metric: "Session RPE x duration" },
+        { metric: "Weekly volume / monotony" }
+      ]).map(function (row) {
+        return "<tr><td>" + renderYearlyValue(row.metric, "Enter") + "</td><td>" + renderYearlyValue(row.scale, "Enter") + "</td><td>" + renderYearlyValue(row.threshold, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<div class=\"npdf-yearly-note\"><strong>Adjustment order</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(adjustmentOrder, "List the order in which optional work, secondary sports, accessory training, volume, intensity, and key sessions should be modified when recovery declines.") + "</span></div>"
+    ].join(""));
+  }
+
+  function renderYearlyDefaultWeekPage(program, pageNumber) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var weeklyRows = buildYearlyDefaultWeekRows(program);
+    var frameworkRows = buildYearlyStrengthFrameworkRows(program, yearly);
+    var adjustmentOrder = deriveYearlyAdjustmentOrder(program, yearly);
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">Default Weekly Structure</h1>",
+      "<p class=\"npdf-yearly-subtitle\">Create a reusable weekly framework, then adjust it inside each monthly block.</p>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Day</th><th>Primary session</th><th>Secondary session</th><th>Target load</th><th>Purpose</th><th>Modification rule</th></tr></thead><tbody>" + weeklyRows.map(function (row) {
+        return "<tr><td>" + renderYearlyValue(row.day, "Day") + "</td><td>" + renderYearlyValue(row.primarySession, "Enter") + "</td><td>" + renderYearlyValue(row.secondarySession, "Enter") + "</td><td>" + renderYearlyValue(row.targetLoad, "Enter") + "</td><td>" + renderYearlyValue(row.purpose, "Enter") + "</td><td>" + renderYearlyValue(row.modificationRule || adjustmentOrder, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">Strength and Conditioning Framework</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Training quality</th><th>Build phase</th><th>Peak / in-season</th><th>Maintenance dose</th><th>Progression rule</th></tr></thead><tbody>" + frameworkRows.map(function (item) {
+        return "<tr><td>" + item.quality + "</td><td>" + renderYearlyValue(item.build, "Enter") + "</td><td>" + renderYearlyValue(item.peak, "Enter") + "</td><td>" + renderYearlyValue(item.maintain, "Enter") + "</td><td>" + renderYearlyValue(item.progression, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<div class=\"npdf-yearly-note\"><strong>Concurrent-training rule</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(yearly.concurrentRule, "Define how hard endurance, strength, power, climbing, cycling, or other sport sessions should be sequenced when multiple modalities share the week.") + "</span></div>"
+    ].join(""));
+  }
+
+  function renderYearlyMonthPage(program, pageNumber, monthIndex, monthName) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var monthRow = findYearlyMonthOverviewRow(yearly, monthName) || {};
+    var priorityRow = findYearlyMonthRow(yearly.monthPriorityRows, monthName) || {};
+    var targetRow = findYearlyMonthRow(yearly.monthTargetRows, monthName) || {};
+    var monthWeekRows = findYearlyMonthRows(yearly.monthWeekRows, monthName)
+      .sort(function (a, b) {
+        return parseYearlyWeekNumber(a && a.week, 999) - parseYearlyWeekNumber(b && b.week, 999);
+      });
+    var monthReviewRow = findYearlyMonthRow(yearly.monthReviewRows, monthName) || {};
+
+    var primaryItems = splitYearlyItems(priorityRow.primary || monthRow.emphasis);
+    var secondaryItems = splitYearlyItems(priorityRow.secondary || monthRow.secondary);
+    var maintainItems = splitYearlyItems(priorityRow.maintain);
+
+    var maxPriorityRows = Math.max(3, primaryItems.length, secondaryItems.length, maintainItems.length);
+    var priorityRows = new Array(maxPriorityRows).fill("").map(function (_, idx) {
+      return "<tr><td>" + renderYearlyValue(primaryItems[idx], "Enter capability, outcome, or behavior") + "</td><td>" + renderYearlyValue(secondaryItems[idx], "Enter capability, outcome, or behavior") + "</td><td>" + renderYearlyValue(maintainItems[idx], "Enter capability, outcome, or behavior") + "</td></tr>";
+    }).join("");
+
+    var weekRows = monthWeekRows.length
+      ? monthWeekRows.map(function (row, idx) {
+          var weekLabel = cleanText(row && row.week);
+          if (!weekLabel) {
+            weekLabel = "Week " + String(idx + 1);
+          } else if (!/^week\s*/i.test(weekLabel)) {
+            weekLabel = "Week " + weekLabel;
+          }
+          return "<tr><td>" + escapeHtml(weekLabel) + "</td><td>" + renderYearlyValue(row.primary_focus, "Enter") + "</td><td>" + renderYearlyValue(row.volume_target, "Enter") + "</td><td>" + renderYearlyValue(row.intensity_target, "Enter") + "</td><td>" + renderYearlyValue(row.key_sessions, "Enter") + "</td><td>" + renderYearlyValue(row.strength_secondary, "Enter") + "</td><td>" + renderYearlyValue(row.recovery_review, "Enter") + "</td></tr>";
+        }).join("")
+        : buildYearlyFallbackWeekRows(program).map(function (row) {
+          return "<tr><td>" + escapeHtml(row.week) + "</td><td>" + renderYearlyValue(row.primary_focus, "Enter") + "</td><td>" + renderYearlyValue(row.volume_target, "Enter") + "</td><td>" + renderYearlyValue(row.intensity_target, "Enter") + "</td><td>" + renderYearlyValue(row.key_sessions, "Enter") + "</td><td>" + renderYearlyValue(row.strength_secondary, "Enter") + "</td><td>" + renderYearlyValue(row.recovery_review, "Enter") + "</td></tr>";
+        }).join("");
+
+    return renderYearlyPage(program, pageNumber, [
+      "<div class=\"npdf-yearly-month-head\"><div class=\"npdf-yearly-month-pill\">MONTH " + String(monthIndex) + "</div><div><h1 class=\"npdf-yearly-month-title\">" + escapeHtml(monthName) + "</h1><p class=\"npdf-yearly-italic\">" + renderYearlyValue(monthRow.phase, "Phase / block") + " | " + renderYearlyValue(monthRow.emphasis, "Primary emphasis") + " | " + renderYearlyValue(monthRow.dates, "Dates") + "</p></div></div>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Primary sport</th><th>Secondary sport(s)</th><th>Key event / trip</th><th>Training access</th><th>Monthly load target</th></tr></thead><tbody><tr><td>" + renderYearlyValue(monthRow.primary, "Enter") + "</td><td>" + renderYearlyValue(monthRow.secondary, "Enter") + "</td><td>" + renderYearlyValue(monthRow.event, "Enter") + "</td><td>" + renderYearlyValue(monthRow.access, "Enter") + "</td><td>" + renderYearlyValue(monthRow.load, "Enter") + "</td></tr></tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">Monthly Priorities</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>PRIMARY: develop / peak</th><th>SECONDARY: support</th><th>MAINTAIN: preserve</th></tr></thead><tbody>" + priorityRows + "</tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">Monthly Programming Targets</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Programming area</th><th>Target / prescription</th><th>Programming area</th><th>Target / prescription</th></tr></thead><tbody>" + [
+        ["Volume / frequency", targetRow.volume_frequency, "Intensity / density", targetRow.intensity_density],
+        ["Strength / power", targetRow.strength_power, "Aerobic / conditioning", targetRow.aerobic_conditioning],
+        ["Sport skill / technique", targetRow.sport_skill, "Mobility / recovery", targetRow.mobility_recovery],
+        ["Testing / nutrition / logistics", targetRow.testing_logistics, "Adjustment criteria", targetRow.adjustment_criteria]
+      ].map(function (pair) {
+        return "<tr><td>" + pair[0] + "</td><td>" + renderYearlyValue(pair[1], "Enter target") + "</td><td>" + pair[2] + "</td><td>" + renderYearlyValue(pair[3], "Enter target") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">Week-by-Week Progression</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Week</th><th>Primary focus</th><th>Volume target</th><th>Intensity target</th><th>Key sessions</th><th>Strength / secondary sport</th><th>Recovery / review</th></tr></thead><tbody>" + weekRows + "</tbody></table>",
+      "<div class=\"npdf-yearly-note\"><strong>Monthly review and next-block decision</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(monthReviewRow.review, "Summarize adherence, adaptation, symptoms, testing, athlete feedback, and the specific changes that should carry into the next month.") + "</span></div>"
+    ].join(""));
+  }
+
+  function renderYearlySpacerPage(program, pageNumber) {
+    return renderYearlyPage(program, pageNumber, "");
+  }
+
+  function renderYearlyAnnualReviewPage(program, pageNumber) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var annualGoals = Array.isArray(yearly.annualReviewGoalRows) && yearly.annualReviewGoalRows.length
+      ? yearly.annualReviewGoalRows.slice(0, 6)
+      : (Array.isArray(yearly.annualGoalsRows) ? yearly.annualGoalsRows.slice(0, 6) : []);
+    while (annualGoals.length < 6) {
+      annualGoals.push({});
+    }
+
+    var reviewRows = (Array.isArray(yearly.monthReviewRows) ? yearly.monthReviewRows : [])
+      .map(function (row) {
+        return cleanText(row && row.review);
+      })
+      .filter(Boolean);
+
+    var keyLessons = Array.isArray(yearly.annualReviewLessonRows) && yearly.annualReviewLessonRows.length
+      ? yearly.annualReviewLessonRows.slice(0, 3).map(function (row) {
+          return {
+            continueText: cleanText(row && row.continue),
+            modifyText: cleanText(row && row.modify),
+            stopText: cleanText(row && row.stop)
+          };
+        })
+      : reviewRows.slice(0, 3).map(function (text) {
+          var parts = splitYearlyItems(text);
+          return {
+            continueText: parts[0] || text,
+            modifyText: parts[1] || "",
+            stopText: parts[2] || ""
+          };
+        });
+    while (keyLessons.length < 3) {
+      keyLessons.push({ continueText: "", modifyText: "", stopText: "" });
+    }
+
+    var nextYearRows = Array.isArray(yearly.nextYearStartRows) && yearly.nextYearStartRows.length
+      ? yearly.nextYearStartRows.slice(0, 6)
+      : [
+          { category: "Primary sport", current: yearly.primarySport, next: yearly.primarySport, action: yearly.progressionRule },
+          { category: "Secondary sport(s)", current: yearly.secondarySports, next: yearly.secondarySports, action: yearly.concurrentRule },
+          { category: "Training access", current: yearly.equipmentAccess, next: yearly.availableTrainingDays, action: yearly.travelWorkConstraints },
+          { category: "Recovery focus", current: yearly.preferredRecoveryDay, next: yearly.preferredRecoveryDay, action: yearly.programmingPhilosophy }
+        ];
+
+    var summaryText = cleanText(yearly.coachAthleteSummary) || (reviewRows.length ? reviewRows.slice(0, 4).join(" | ") : "");
+
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">Annual Review and Next-Year Handoff</h1>",
+      "<p class=\"npdf-yearly-subtitle\">Capture what happened, why it happened, and how the next yearly plan should change.</p>",
+      "<h2 class=\"npdf-yearly-section\">Goal Review</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Goal</th><th>Outcome</th><th>Evidence / testing</th><th>What influenced it</th><th>Next decision</th></tr></thead><tbody>" + annualGoals.map(function (row) {
+        return "<tr><td>" + renderYearlyValue(row.goal, "Enter") + "</td><td>" + renderYearlyValue(row.outcome || row.success_measure, "Enter") + "</td><td>" + renderYearlyValue(row.evidence || row.success_measure, "Enter") + "</td><td>" + renderYearlyValue(row.influenced || row.target_window, "Enter") + "</td><td>" + renderYearlyValue(row.next_decision || row.priority, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">Key Lessons</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Continue</th><th>Modify</th><th>Stop / avoid</th></tr></thead><tbody>" + keyLessons.map(function (row) {
+        return "<tr><td>" + renderYearlyValue(row.continueText, "Enter lesson") + "</td><td>" + renderYearlyValue(row.modifyText, "Enter lesson") + "</td><td>" + renderYearlyValue(row.stopText, "Enter lesson") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<h2 class=\"npdf-yearly-section\">Next-Year Starting Point</h2>",
+      "<table class=\"npdf-table npdf-yearly-table\"><thead><tr><th>Category</th><th>Current status</th><th>Next-year priority</th><th>Immediate action</th></tr></thead><tbody>" + nextYearRows.map(function (row) {
+        return "<tr><td>" + renderYearlyValue(row.category, "Category") + "</td><td>" + renderYearlyValue(row.current, "Enter") + "</td><td>" + renderYearlyValue(row.next, "Enter") + "</td><td>" + renderYearlyValue(row.action, "Enter") + "</td></tr>";
+      }).join("") + "</tbody></table>",
+      "<div class=\"npdf-yearly-note\"><strong>Coach / athlete summary</strong><br /><span class=\"npdf-yearly-italic\">" + renderYearlyValue(summaryText, "Write the concise narrative that should guide the next annual plan, including the athlete response, successful loading patterns, recurring constraints, and most important future opportunity.") + "</span></div>"
+    ].join(""));
+  }
+
+  function renderYearlyPlanningNotesPage(program, pageNumber) {
+    var yearly = program && program.yearlyTemplate ? program.yearlyTemplate : {};
+    var notes = [];
+    var explicitRows = Array.isArray(yearly.planningNotesRows) ? yearly.planningNotesRows : [];
+    if (explicitRows.length) {
+      explicitRows.forEach(function (row) {
+        addIfText(notes, cleanText(row && row.note));
+      });
+    } else {
+      addIfText(notes, cleanText(yearly.programmingPhilosophy));
+      addIfText(notes, cleanText(yearly.assumption));
+      addIfText(notes, cleanText(yearly.progressionRule));
+      addIfText(notes, cleanText(yearly.concurrentRule));
+      (Array.isArray(yearly.monthReviewRows) ? yearly.monthReviewRows : []).forEach(function (row) {
+        addIfText(notes, cleanText(row && row.review));
+      });
+    }
+
+    return renderYearlyPage(program, pageNumber, [
+      "<h1 class=\"npdf-yearly-title\">Yearly Planning Notes</h1>",
+      "<p class=\"npdf-yearly-subtitle\">Use this page for programming rationale, references, assumptions, or additional planning details.</p>",
+      "<table class=\"npdf-table npdf-yearly-table\"><tbody>" + new Array(14).fill("").map(function (_item, idx) {
+        return "<tr><td>" + renderYearlyValue(notes[idx], "Click or type here") + "</td></tr>";
+      }).join("") + "</tbody></table>"
+    ].join(""));
+  }
+
   function renderPdfStyles() {
     return [
       "<style>",
@@ -1300,6 +2186,38 @@
       ".npdf-page h1, .npdf-page h2, .npdf-page h3, .npdf-page h4 { margin: 0; color: var(--np-forest); }",
       ".npdf-page p { margin: 0; line-height: 1.45; }",
       ".npdf-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: 0.11em; color: var(--np-moss); font-weight: 700; margin-top: 2mm; }",
+      ".npdf-cover-brand { margin-top: 4mm; margin-bottom: 2mm; display: flex; align-items: center; }",
+      ".npdf-cover-logo { display: block; max-width: 70mm; max-height: 18mm; width: auto; height: auto; object-fit: contain; }",
+      ".npdf-cover-shell { margin-top: 6mm; border: 1px solid #d3dfd5; border-radius: 14px; padding: 12px 12px 10px; background: linear-gradient(145deg, #ffffff 0%, #f6fbf7 68%, #edf5ef 100%); position: relative; overflow: hidden; }",
+      ".npdf-cover-shell::after { content: ''; position: absolute; right: -30mm; top: -28mm; width: 82mm; height: 82mm; border-radius: 50%; background: radial-gradient(circle, rgba(47,102,85,0.14) 0%, rgba(47,102,85,0) 72%); pointer-events: none; }",
+      ".npdf-cover-hero { display: grid; grid-template-columns: minmax(26mm, 34mm) 1fr; gap: 10px; align-items: start; }",
+      ".npdf-cover-brand-col { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }",
+      ".npdf-cover-brand-col .npdf-kicker { margin-top: 0; font-size: 9px; letter-spacing: 0.12em; }",
+      ".npdf-cover-title-wrap { position: relative; z-index: 1; }",
+      ".npdf-cover-title-wrap .npdf-title { margin-top: 0; font-size: 51px; letter-spacing: -0.02em; line-height: 1.02; }",
+      ".npdf-cover-title-wrap .npdf-subtitle { margin-top: 6px; font-size: 15px; color: #2c6755; font-weight: 600; }",
+      ".npdf-cover-title-wrap .npdf-description { margin-top: 8px; max-width: 100%; font-size: 12.2px; color: #2c3f38; line-height: 1.5; }",
+      ".npdf-cover-meta-wrap { margin-top: 10px; }",
+      ".npdf-cover-meta-wrap .npdf-meta-grid { margin-top: 0; gap: 8px; }",
+      ".npdf-cover-meta-wrap .npdf-meta-card { border-radius: 9px; border-color: #cddacf; background: linear-gradient(180deg, #f9fcfa 0%, #eff6f0 100%); }",
+      ".npdf-cover-bottom { margin-top: 10px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 9px; }",
+      ".npdf-cover-card { border: 1px solid #d3dfd4; border-radius: 11px; background: #fbfdfb; padding: 8px 10px; }",
+      ".npdf-cover-card h2, .npdf-cover-card h3 { margin: 0; font-size: 14px; color: #1d4a3d; letter-spacing: -0.01em; }",
+      ".npdf-cover-card .npdf-list { margin-top: 6px; }",
+      ".npdf-cover-card .npdf-list li { margin: 3px 0; font-size: 11.2px; line-height: 1.35; }",
+      ".npdf-cover-card .npdf-muted { margin-top: 6px; font-size: 11px; line-height: 1.4; color: #46665a; }",
+      ".npdf-cover-snapshot { margin-top: 10px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }",
+      ".npdf-cover-stat { border: 1px solid #d0ddd2; border-radius: 10px; background: #f9fcf9; padding: 7px 8px; }",
+      ".npdf-cover-stat-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: #5a786d; font-weight: 700; }",
+      ".npdf-cover-stat-value { margin-top: 4px; font-size: 16px; font-weight: 800; color: #173f34; line-height: 1.1; }",
+      ".npdf-cover-phases { margin-top: 10px; border: 1px solid #d4dfd5; border-radius: 11px; background: #fbfdfb; padding: 8px 9px; }",
+      ".npdf-cover-phases h3 { margin: 0; font-size: 14px; color: #1f4d40; }",
+      ".npdf-cover-phase-grid { margin-top: 7px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }",
+      ".npdf-cover-phase-item { border: 1px solid #d8e3da; border-radius: 9px; background: #ffffff; padding: 6px 7px; }",
+      ".npdf-cover-phase-name { font-size: 11px; font-weight: 700; color: #1f4a3d; }",
+      ".npdf-cover-phase-meta { margin-top: 2px; font-size: 10px; color: #567467; }",
+      ".npdf-cover-activities { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; }",
+      ".npdf-cover-activity-chip { display: inline-flex; align-items: center; border: 1px solid #cfe0d2; border-radius: 999px; background: #f3faf4; color: #2e5a4c; font-size: 10px; font-weight: 600; padding: 3px 8px; }",
       ".npdf-title { font-size: 30px; line-height: 1.1; margin-top: 8px; }",
       ".npdf-subtitle { font-size: 15px; margin-top: 8px; color: var(--np-moss); }",
       ".npdf-description { margin-top: 12px; font-size: 13px; color: #2f3f3a; max-width: 88%; }",
@@ -1311,7 +2229,7 @@
       ".npdf-list li { margin: 5px 0; font-size: 12px; color: #203a32; }",
       ".npdf-section { margin-top: 16px; }",
       ".npdf-table { width: 100%; border-collapse: collapse; margin-top: 8px; table-layout: fixed; }",
-      ".npdf-table th, .npdf-table td { border: 1px solid #d7dfd8; padding: 6px 7px; vertical-align: top; font-size: 11px; line-height: 1.3; }",
+      ".npdf-table th, .npdf-table td { border: 1px solid #d7dfd8; padding: 6px 7px; vertical-align: top; font-size: 11px; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }",
       ".npdf-table th { background: var(--np-sage); color: #254b3f; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }",
       ".npdf-table tbody tr:nth-child(even) { background: #fafcf9; }",
       ".npdf-muted { color: var(--np-muted); font-size: 11px; }",
@@ -1327,10 +2245,32 @@
       ".npdf-session-meta { font-size: 11px; color: #4d6e61; }",
       ".npdf-session-body { padding: 8px 10px 10px; }",
       ".npdf-exercise-table th, .npdf-exercise-table td { font-size: 10.5px; }",
+      ".npdf-exercise-table td:nth-child(2) { min-width: 34mm; }",
       ".npdf-note-chip { display: inline-block; border: 1px solid #cfddd4; border-radius: 999px; padding: 2px 8px; margin: 4px 5px 0 0; font-size: 10px; color: #2f5a4b; background: #f3faf5; }",
       ".npdf-footer { position: absolute; left: 14mm; right: 14mm; bottom: 9mm; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #5a766a; border-top: 1px solid #dbe4dd; padding-top: 5px; background: linear-gradient(90deg, rgba(237,244,239,0.7) 0%, rgba(255,255,255,0.2) 100%); }",
       ".npdf-page-number::before { content: counter(page); }",
       ".npdf-page-break { page-break-before: always; break-before: page; }",
+      ".npdf-yearly-page { padding-bottom: 16mm; }",
+      ".npdf-yearly-topline { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #2c5f54; border-bottom: 1px solid #d6e2dc; padding-bottom: 6px; margin-bottom: 8px; }",
+      ".npdf-yearly-footer { position: absolute; left: 14mm; right: 14mm; bottom: 8mm; text-align: center; font-size: 10px; color: #55746a; border-top: 1px solid #d6e2dc; padding-top: 5px; }",
+      ".npdf-yearly-hero { text-align: center; margin-top: 8px; }",
+      ".npdf-yearly-hero h1 { font-size: 34px; letter-spacing: 0.03em; color: #123c31; margin: 0; }",
+      ".npdf-yearly-hero h2 { font-size: 18px; color: #2a5a4d; margin: 6px 0 0; }",
+      ".npdf-yearly-markers { margin-top: 8px; color: #2f695b; font-weight: 700; letter-spacing: 0.2em; }",
+      ".npdf-yearly-title { font-size: 24px; margin: 2px 0 0; color: #173f34; }",
+      ".npdf-yearly-subtitle { margin: 5px 0 10px; font-size: 12px; color: #48675d; }",
+      ".npdf-yearly-section { font-size: 14px; margin: 12px 0 6px; color: #1f4d40; }",
+      ".npdf-yearly-italic { font-style: italic; color: #586f67; }",
+      ".npdf-yearly-note { margin-top: 9px; border: 1px solid #d8e3dd; background: #f3f8f4; border-radius: 9px; padding: 8px 10px; font-size: 11px; line-height: 1.35; color: #294e43; }",
+      ".npdf-yearly-note-cream { background: #f8f5ea; border-color: #e4dcc0; }",
+      ".npdf-yearly-center { text-align: center; margin-top: 10px; }",
+      ".npdf-yearly-table th, .npdf-yearly-table td { font-size: 10px; padding: 5px 6px; }",
+      ".npdf-yearly-table th { background: #e7f0ea; }",
+      ".npdf-yearly-tight-list { margin: 6px 0 0 18px; padding-left: 8px; }",
+      ".npdf-yearly-tight-list li { margin: 4px 0; font-size: 11px; color: #26493f; }",
+      ".npdf-yearly-month-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }",
+      ".npdf-yearly-month-pill { background: #194e40; color: #f2f8f5; border-radius: 999px; padding: 5px 10px; font-size: 10px; letter-spacing: 0.06em; font-weight: 700; }",
+      ".npdf-yearly-month-title { margin: 0; font-size: 22px; color: #173f34; line-height: 1.1; }",
       "@media print {",
       "  body { background: #fff; }",
       "  .npdf-toolbar { display: none !important; }",
@@ -1344,27 +2284,69 @@
 
   function renderCoverPage(program) {
     var goals = Array.isArray(program.goals) ? program.goals.slice(0, 4) : [];
+    var logoUrl = cleanText(program && program.brand && program.brand.logoUrl);
+    var assumption = Array.isArray(program.disclaimers) && program.disclaimers.length
+      ? cleanText(program.disclaimers[0])
+      : "";
+    var phases = Array.isArray(program.phases) ? program.phases.slice(0, 4) : [];
+    var activities = Array.isArray(program.activities) ? program.activities.slice(0, 8) : [];
+    var summary = program && program.summary ? program.summary : {};
+    var durationWeeks = summary.durationWeeks != null ? String(summary.durationWeeks) : "";
+    var totalSessions = summary.totalSessions != null ? String(summary.totalSessions) : "";
+    var totalPhases = summary.totalPhases != null ? String(summary.totalPhases) : "";
 
     return [
       "<section class=\"npdf-page\">",
+      "<div class=\"npdf-cover-shell\">",
+      "<div class=\"npdf-cover-hero\">",
+      "<div class=\"npdf-cover-brand-col\">",
+      (logoUrl
+        ? "<div class=\"npdf-cover-brand\"><img class=\"npdf-cover-logo\" src=\"" + escapeHtml(logoUrl) + "\" alt=\"" + escapeHtml((program.brand && program.brand.name) || "Logo") + "\" onerror=\"this.style.display='none'\" /></div>"
+        : ""),
       "<p class=\"npdf-kicker\">" + escapeHtml(program.brand.name) + "</p>",
+      "</div>",
+      "<div class=\"npdf-cover-title-wrap\">",
       "<h1 class=\"npdf-title\">" + escapeHtml(program.title) + "</h1>",
       (program.subtitle ? "<p class=\"npdf-subtitle\">" + escapeHtml(program.subtitle) + "</p>" : ""),
       (program.description ? "<p class=\"npdf-description\">" + escapeHtml(program.description) + "</p>" : ""),
+      "</div>",
+      "</div>",
+      "<div class=\"npdf-cover-meta-wrap\">",
       "<div class=\"npdf-meta-grid\">",
       renderMetaCard("Athlete", program.athlete && program.athlete.name ? program.athlete.name : "Unassigned"),
       renderMetaCard("Program Dates", program.dates && program.dates.displayLabel ? program.dates.displayLabel : "TBD"),
       renderMetaCard("Version", program.version || "v1"),
       renderMetaCard("Tagline", program.brand.tagline || ""),
       "</div>",
-      (goals.length
-        ? "<section class=\"npdf-section\"><h2>Primary Goals</h2><ul class=\"npdf-list\">" + goals.map(function (goal) {
-            return "<li>" + escapeHtml(goal.label) + "</li>";
-          }).join("") + "</ul></section>"
+      "</div>",
+      ((goals.length || assumption)
+        ? "<div class=\"npdf-cover-bottom\">"
+          + (goals.length
+            ? "<section class=\"npdf-cover-card\"><h2>Primary Goals</h2><ul class=\"npdf-list\">" + goals.map(function (goal) {
+                return "<li>" + escapeHtml(goal.label) + "</li>";
+              }).join("") + "</ul></section>"
+            : "")
+          + (assumption
+            ? "<section class=\"npdf-cover-card\"><h3>Important Assumption</h3><p class=\"npdf-muted\">" + escapeHtml(assumption) + "</p></section>"
+            : "")
+          + "</div>"
         : ""),
-      (Array.isArray(program.disclaimers) && program.disclaimers.length
-        ? "<section class=\"npdf-section\"><h3>Important Assumption</h3><p class=\"npdf-muted\">" + escapeHtml(program.disclaimers[0]) + "</p></section>"
+      "<div class=\"npdf-cover-snapshot\">",
+      "<article class=\"npdf-cover-stat\"><div class=\"npdf-cover-stat-label\">Program Length</div><div class=\"npdf-cover-stat-value\">" + escapeHtml(durationWeeks ? (durationWeeks + " weeks") : "TBD") + "</div></article>",
+      "<article class=\"npdf-cover-stat\"><div class=\"npdf-cover-stat-label\">Total Phases</div><div class=\"npdf-cover-stat-value\">" + escapeHtml(totalPhases || "-") + "</div></article>",
+      "<article class=\"npdf-cover-stat\"><div class=\"npdf-cover-stat-label\">Planned Sessions</div><div class=\"npdf-cover-stat-value\">" + escapeHtml(totalSessions || "-") + "</div></article>",
+      "</div>",
+      (phases.length
+        ? "<section class=\"npdf-cover-phases\"><h3>Phase Roadmap</h3><div class=\"npdf-cover-phase-grid\">" + phases.map(function (phase) {
+            return "<article class=\"npdf-cover-phase-item\"><div class=\"npdf-cover-phase-name\">" + escapeHtml(phase.name || "Phase") + "</div><div class=\"npdf-cover-phase-meta\">" + escapeHtml(phase.dateLabel || "") + "</div></article>";
+          }).join("") + "</div></section>"
         : ""),
+      (activities.length
+        ? "<div class=\"npdf-cover-activities\">" + activities.map(function (activity) {
+            return "<span class=\"npdf-cover-activity-chip\">" + escapeHtml(activity && activity.name ? activity.name : "Activity") + "</span>";
+          }).join("") + "</div>"
+        : ""),
+      "</div>",
       renderFooter(program),
       "</section>"
     ].join("");
@@ -1439,21 +2421,12 @@
 
   function renderProgramAtGlancePage(program) {
     var rows = (Array.isArray(program.phases) ? program.phases : []).map(function (phase) {
-      var emphasis = Array.isArray(phase.activityEmphasis)
-        ? phase.activityEmphasis.filter(function (item) { return item.status === "primary"; })
-        : [];
-      var supporting = Array.isArray(phase.activityEmphasis)
-        ? phase.activityEmphasis.filter(function (item) { return item.status !== "primary" && item.status !== "optional"; })
-        : [];
-
       return [
         "<tr>",
         "<td>Phase " + String(phase.order) + " - " + escapeHtml(phase.name) + "</td>",
         "<td>" + escapeHtml(phase.dateLabel || "") + "</td>",
         "<td>" + escapeHtml(phase.durationWeeks ? String(phase.durationWeeks) + " weeks" : "") + "</td>",
         "<td>" + escapeHtml(phase.primaryObjective || "") + "</td>",
-        "<td>" + escapeHtml(joinActivityLabels(program.activities, emphasis)) + "</td>",
-        "<td>" + escapeHtml(joinActivityLabels(program.activities, supporting)) + "</td>",
         "<td>" + escapeHtml(extractStrengthFrequency(phase)) + "</td>",
         "</tr>"
       ].join("");
@@ -1464,7 +2437,7 @@
       "<p class=\"npdf-kicker\">Overview</p>",
       "<h1 class=\"npdf-title\" style=\"font-size:24px;\">Program At A Glance</h1>",
       "<table class=\"npdf-table\">",
-      "<thead><tr><th>Phase</th><th>Date Range</th><th>Duration</th><th>Primary Objective</th><th>Primary Activity</th><th>Supporting Activities</th><th>Strength Frequency</th></tr></thead>",
+      "<thead><tr><th>Phase</th><th>Date Range</th><th>Duration</th><th>Primary Objective</th><th>Strength Frequency</th></tr></thead>",
       "<tbody>" + rows + "</tbody>",
       "</table>",
       renderFooter(program),
@@ -1554,19 +2527,7 @@
         }).join("") + "</tbody></table>" + (phase.weeklyPlacementOptions && phase.weeklyPlacementOptions.rule ? "<div class=\"npdf-warning\" style=\"margin-top:10px;\"><strong>Placement rule:</strong> " + escapeHtml(phase.weeklyPlacementOptions.rule) + "</div>" : "") + "</section>"
       : "";
 
-    var scheduleHtml = Array.isArray(phase.weeklySchedules) && phase.weeklySchedules.length
-      ? "<section class=\"npdf-section\"><div class=\"npdf-sub-banner\">Weekly Schedule</div>" + phase.weeklySchedules.map(function (schedule) {
-          return "<h4 style=\"margin-top:8px;font-size:13px;\">" + escapeHtml(schedule.label) + "</h4><table class=\"npdf-table\"><thead><tr><th>Day</th><th>Session</th><th>Activity</th><th>Intensity</th><th>Duration</th><th>Notes</th></tr></thead><tbody>" + schedule.rows.map(function (row) {
-            return "<tr><td>" + escapeHtml(row.day) + "</td><td>" + escapeHtml(row.session) + "</td><td>" + escapeHtml(row.activity || "") + "</td><td>" + escapeHtml(row.intensity || "") + "</td><td>" + escapeHtml(row.duration || "") + "</td><td>" + escapeHtml(row.notes || "") + "</td></tr>";
-          }).join("") + "</tbody></table>";
-        }).join("") + "</section>"
-      : "";
-
-    var sessionsHtml = Array.isArray(phase.sessions) && phase.sessions.length
-      ? "<section class=\"npdf-section\"><div class=\"npdf-sub-banner\">Complete Training Sessions</div>" + phase.sessions.map(function (session) {
-          return renderSessionCard(session);
-        }).join("") + "</section>"
-      : "";
+    var sessionsHtml = renderCondensedPhaseSessions(phase);
 
     var activityPlansHtml = Array.isArray(phase.activityPlans) && phase.activityPlans.length
       ? "<section class=\"npdf-section\"><div class=\"npdf-sub-banner\">Activity-Specific Plans</div>" + phase.activityPlans.map(function (plan) {
@@ -1592,7 +2553,6 @@
       generalTrainingOverviewHtml,
       activityRoleRows,
       placementHtml,
-      scheduleHtml,
       sessionsHtml,
       activityPlansHtml,
       monitoringHtml,
@@ -1668,25 +2628,47 @@
 
   function buildGeneralWeeklyStructureRows(phase) {
     var rows = [];
+    var dayLabels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     var customRows = parseLines(cleanText(phase && phase.generalWeeklyStructureText));
 
-    customRows.forEach(function (line) {
-      var parts = String(line || "").split("|");
-      var day = cleanText(parts[0]);
-      var focus = cleanText(parts[1]);
-      var notes = cleanText(parts.slice(2).join("|"));
-      if (!day) {
-        return;
-      }
-      rows.push({
-        day: day,
-        focus: focus || "Session",
-        notes: notes || ""
-      });
-    });
+    if (customRows.length) {
+      var byDay = {};
+      var extras = [];
 
-    if (rows.length) {
-      return rows;
+      customRows.forEach(function (line) {
+        var parts = String(line || "").split("|");
+        var day = cleanText(parts[0]);
+        var focus = cleanText(parts[1]);
+        var notes = cleanText(parts.slice(2).join("|"));
+        var normalized = {
+          focus: focus || "",
+          notes: notes || ""
+        };
+        var dayKey = day.toLowerCase();
+
+        if (dayKey && dayLabels.some(function (label) { return label.toLowerCase() === dayKey; })) {
+          if (!byDay[dayKey]) {
+            byDay[dayKey] = normalized;
+          }
+          return;
+        }
+
+        extras.push(normalized);
+      });
+
+      var hasNamedWeekday = dayLabels.some(function (dayLabel) {
+        return !!byDay[dayLabel.toLowerCase()];
+      });
+
+      return dayLabels.map(function (dayLabel) {
+        var dayKey = dayLabel.toLowerCase();
+        var sourceRow = byDay[dayKey] || (!hasNamedWeekday ? extras.shift() : null) || {};
+        return {
+          day: dayLabel,
+          focus: cleanText(sourceRow.focus) || "",
+          notes: cleanText(sourceRow.notes) || ""
+        };
+      });
     }
 
     var placementRows = phase && phase.weeklyPlacementOptions && Array.isArray(phase.weeklyPlacementOptions.rows)
@@ -1717,56 +2699,302 @@
     return rows;
   }
 
-  function renderSessionCard(session) {
-    var sections = Array.isArray(session.sections) ? session.sections : [];
+  function renderCondensedPhaseSessions(phase) {
+    var sessions = Array.isArray(phase && phase.sessions) ? phase.sessions : [];
+    var schedules = Array.isArray(phase && phase.weeklySchedules) ? phase.weeklySchedules : [];
+    if (!sessions.length && !schedules.length) {
+      return "";
+    }
 
-    var exercisesHtml = sections.map(function (section) {
-      var rows = Array.isArray(section.exercises) ? section.exercises : [];
-      var columns = resolveExerciseColumns(rows);
+    var startWeek = parseInt(phase && phase.startWeek, 10);
+    var endWeek = parseInt(phase && phase.endWeek, 10);
+    var weekList = Number.isFinite(startWeek) && Number.isFinite(endWeek) && endWeek >= startWeek
+      ? range(startWeek, endWeek)
+      : [];
 
-      var header = columns.map(function (col) {
-        return "<th>" + escapeHtml(col.label) + "</th>";
-      }).join("");
+    if (!weekList.length) {
+      weekList = dedupe(
+        schedules.map(function (schedule) {
+          return parseWeekFromSchedule(schedule);
+        }).filter(function (week) {
+          return Number.isFinite(week);
+        })
+      );
+    }
 
-      var body = rows.map(function (exercise) {
-        return "<tr>" + columns.map(function (col) {
-          var value = col.value(exercise);
-          return "<td>" + escapeHtml(value || "") + "</td>";
-        }).join("") + "</tr>";
-      }).join("");
+    if (!weekList.length) {
+      weekList = dedupe(
+        sessions.map(function (session) {
+          var slot = parseSlotKey(String((session && session.id) || "").replace(/^session-/, ""));
+          return slot ? slot.week : NaN;
+        }).filter(function (week) {
+          return Number.isFinite(week);
+        })
+      );
+    }
+
+    weekList.sort(function (a, b) { return a - b; });
+
+    var dayNumbers = range(1, 7);
+    var dayWeekMap = {};
+    dayNumbers.forEach(function (day) {
+      dayWeekMap[day] = {};
+      weekList.forEach(function (week) {
+        dayWeekMap[day][week] = {};
+      });
+    });
+
+    schedules.forEach(function (schedule) {
+      var week = parseWeekFromSchedule(schedule);
+      if (!Number.isFinite(week)) {
+        return;
+      }
+      if (!dayWeekMap[1][week]) {
+        weekList.push(week);
+        dayNumbers.forEach(function (day) {
+          dayWeekMap[day][week] = {};
+        });
+      }
+
+      var scheduleRows = Array.isArray(schedule && schedule.rows) ? schedule.rows : [];
+      scheduleRows.forEach(function (row, rowIndex) {
+        // Schedule rows are generated in slot order (day 1..7), which is more reliable
+        // than legacy weekday labels that may have been seeded with a different week start.
+        var day = clampNumber(rowIndex + 1, 1, 7, 1);
+        var entry = dayWeekMap[day] && dayWeekMap[day][week] ? dayWeekMap[day][week] : null;
+        if (!entry) {
+          return;
+        }
+        entry.title = cleanText(row && row.session) || entry.title;
+      });
+    });
+
+    sessions.forEach(function (session) {
+      var slot = parseSlotKey(String((session && session.id) || "").replace(/^session-/, ""));
+      if (!slot || !dayWeekMap[slot.workout]) {
+        return;
+      }
+
+      if (!dayWeekMap[slot.workout][slot.week]) {
+        weekList.push(slot.week);
+        dayNumbers.forEach(function (day) {
+          dayWeekMap[day][slot.week] = dayWeekMap[day][slot.week] || {};
+        });
+      }
+
+      var entry = dayWeekMap[slot.workout][slot.week];
+      entry.session = session;
+      entry.title = cleanText(session && session.title) || entry.title;
+    });
+
+    weekList = dedupe(weekList).sort(function (a, b) { return a - b; });
+
+    var cards = dayNumbers.map(function (dayNumber) {
+      var entriesByWeek = {};
+      weekList.forEach(function (week) {
+        entriesByWeek[week] = (dayWeekMap[dayNumber] && dayWeekMap[dayNumber][week]) ? dayWeekMap[dayNumber][week] : {};
+      });
+
+      var rows = [];
+      var rowLookup = {};
+
+      weekList.forEach(function (week) {
+        var entry = entriesByWeek[week] || {};
+        var detailedSession = entry.session;
+        if (!detailedSession) {
+          return;
+        }
+
+        var sectionOccurrence = {};
+
+        (Array.isArray(detailedSession.sections) ? detailedSession.sections : []).forEach(function (section) {
+          var blockName = textOrFallback(section && section.title, "Block");
+          (Array.isArray(section && section.exercises) ? section.exercises : []).forEach(function (exercise) {
+            var exerciseName = textOrFallback(exercise && exercise.name, "Exercise");
+            var occurrenceKey = blockName + "::" + exerciseName;
+            sectionOccurrence[occurrenceKey] = (sectionOccurrence[occurrenceKey] || 0) + 1;
+            var rowKey = occurrenceKey + "::" + String(sectionOccurrence[occurrenceKey]);
+
+            if (!rowLookup[rowKey]) {
+              rowLookup[rowKey] = {
+                block: blockName,
+                exercise: exerciseName,
+                weekCells: {}
+              };
+              rows.push(rowLookup[rowKey]);
+            }
+
+            rowLookup[rowKey].weekCells[week] = summarizeExerciseDose(exercise);
+          });
+        });
+      });
+
+      if (!rows.length) {
+        rows.push({
+          block: "Session",
+          exercise: "Session Title",
+          weekCells: {}
+        });
+        weekList.forEach(function (week) {
+          var entry = entriesByWeek[week] || {};
+          var title = cleanText(entry.title);
+          var purpose = cleanText(entry.session && entry.session.purpose);
+          rows[0].weekCells[week] = title || purpose || "-";
+        });
+      }
+
+      var firstDetailed = null;
+      for (var i = 0; i < weekList.length; i += 1) {
+        var candidate = entriesByWeek[weekList[i]];
+        if (candidate && candidate.session) {
+          firstDetailed = candidate.session;
+          break;
+        }
+      }
+      var firstWithTitle = null;
+      for (var j = 0; j < weekList.length; j += 1) {
+        var titled = entriesByWeek[weekList[j]];
+        if (titled && cleanText(titled.title)) {
+          firstWithTitle = titled;
+          break;
+        }
+      }
+
+      var headerTitle = cleanText(firstWithTitle && firstWithTitle.title) || cleanText(firstDetailed && firstDetailed.title) || ("Day " + String(dayNumber));
+      var dayMeta = joinCompact([
+        firstDetailed && firstDetailed.type,
+        firstDetailed && firstDetailed.duration,
+        firstDetailed && firstDetailed.targetRpe ? ("RPE " + firstDetailed.targetRpe) : ""
+      ]);
 
       return [
-        "<h4 style=\"margin-top:8px;font-size:12px;\">" + escapeHtml(section.title) + "</h4>",
+        "<article class=\"npdf-session\">",
+        "<div class=\"npdf-session-head\">",
+        "<div><div class=\"npdf-session-title\">Day " + String(dayNumber) + " - " + escapeHtml(headerTitle) + "</div><div class=\"npdf-session-meta\">" + escapeHtml(dayMeta) + "</div></div>",
+        "</div>",
+        "<div class=\"npdf-session-body\">",
         "<table class=\"npdf-table npdf-exercise-table\">",
-        "<thead><tr>" + header + "</tr></thead>",
-        "<tbody>" + body + "</tbody>",
-        "</table>"
+        "<thead><tr><th>Block</th><th>Exercise</th>" + weekList.map(function (week) {
+          return "<th>Week " + String(week) + "</th>";
+        }).join("") + "</tr></thead>",
+        "<tbody>" + rows.map(function (row) {
+          return "<tr><td>" + escapeHtml(row.block) + "</td><td>" + escapeHtml(row.exercise) + "</td>" + weekList.map(function (week) {
+            return "<td>" + escapeHtml(row.weekCells[week] || "-") + "</td>";
+          }).join("") + "</tr>";
+        }).join("") + "</tbody>",
+        "</table>",
+        "</div>",
+        "</article>"
       ].join("");
     }).join("");
 
-    var notesHtml = Array.isArray(session.coachingNotes) && session.coachingNotes.length
-      ? "<div style=\"margin-top:8px;\">" + session.coachingNotes.map(function (note) {
-          return "<span class=\"npdf-note-chip\">" + escapeHtml(note) + "</span>";
-        }).join("") + "</div>"
+    return cards
+      ? "<section class=\"npdf-section\"><div class=\"npdf-sub-banner\">Complete Training Sessions</div>" + cards + "</section>"
       : "";
+  }
 
-    var progressionHtml = Array.isArray(session.progressionRules) && session.progressionRules.length
-      ? "<div style=\"margin-top:8px;\"><strong style=\"font-size:11px;\">Progression Rules:</strong> " + escapeHtml(session.progressionRules.join(" • ")) + "</div>"
-      : "";
+  function summarizeExerciseDose(exercise) {
+    var sets = Array.isArray(exercise && exercise.sets) ? exercise.sets : [];
+    var firstSet = sets.length ? (sets[0] && typeof sets[0] === "object" ? sets[0] : {}) : {};
+    var setCount = sets.length || parseInt(exercise && exercise.set_count, 10) || parseInt(exercise && exercise.sets, 10) || 0;
+    var reps = firstNonEmpty(
+      extractPrintableDoseText(firstSet.target_reps),
+      extractPrintableDoseText(firstSet.reps),
+      extractPrintableDoseText(exercise && exercise.target_reps),
+      extractPrintableDoseText(exercise && exercise.reps),
+      extractPrintableDoseText(exercise && exercise.duration),
+      extractPrintableDoseText(exercise && exercise.distance)
+    );
+    var intensity = firstNonEmpty(
+      extractPrintableDoseText(firstSet.target_rpe),
+      extractPrintableDoseText(firstSet.rpe),
+      extractPrintableDoseText(firstSet.target_intensity),
+      extractPrintableDoseText(firstSet.intensity),
+      extractPrintableDoseText(exercise && exercise.target_rpe),
+      extractPrintableDoseText(exercise && exercise.rpe),
+      extractPrintableDoseText(exercise && exercise.target_intensity),
+      extractPrintableDoseText(exercise && exercise.intensity),
+      extractPrintableDoseText(exercise && exercise.load),
+      cleanText(exercise && exercise.rir) ? ("RIR " + String(exercise.rir)) : ""
+    );
+    var doseParts = [];
 
-    return [
-      "<article class=\"npdf-session\">",
-      "<div class=\"npdf-session-head\">",
-      "<div><div class=\"npdf-session-title\">" + escapeHtml(session.title) + "</div><div class=\"npdf-session-meta\">" + escapeHtml(session.type) + (session.purpose ? " | " + escapeHtml(session.purpose) : "") + "</div></div>",
-      "<div class=\"npdf-session-meta\">" + escapeHtml(joinCompact([session.duration, session.targetRpe ? ("RPE " + session.targetRpe) : "", session.targetRir ? ("RIR " + session.targetRir) : ""])) + "</div>",
-      "</div>",
-      "<div class=\"npdf-session-body\">",
-      exercisesHtml,
-      notesHtml,
-      progressionHtml,
-      "</div>",
-      "</article>"
-    ].join("");
+    if (setCount > 0 && reps) {
+      doseParts.push(String(setCount) + " x " + reps);
+    } else if (reps) {
+      doseParts.push(reps);
+    } else if (setCount > 0) {
+      doseParts.push(String(setCount) + " sets");
+    }
+
+    if (intensity) {
+      doseParts.push(intensity);
+    }
+
+    var details = doseParts.join(" | ");
+    return details || "-";
+  }
+
+  function extractPrintableDoseText(value) {
+    var text = cleanText(value);
+    if (!text) {
+      return "";
+    }
+
+    var patterns = [
+      /^\d+\s*x\s*\d+(?:\s*[-–]\s*\d+)?(?:\s*(?:sec|secs|s|min|mins|minute|minutes|reps?|rounds?|km|m|yd|yards|meters|metres))?/i,
+      /^\d+(?:\s*[-–]\s*\d+)?(?:\s*(?:sec|secs|s|min|mins|minute|minutes|reps?|rounds?|km|m|yd|yards|meters|metres))?/i,
+      /^\d+\s*(?:sec|secs|s|min|mins|minute|minutes)/i
+    ];
+
+    for (var i = 0; i < patterns.length; i += 1) {
+      var match = patterns[i].exec(text);
+      if (match && match[0]) {
+        return cleanText(match[0]);
+      }
+    }
+
+    return text;
+  }
+
+  function parseWeekFromSchedule(schedule) {
+    var id = cleanText(schedule && schedule.id);
+    var fromId = id.match(/^week-(\d+)$/i);
+    if (fromId) {
+      return parseInt(fromId[1], 10);
+    }
+
+    var label = cleanText(schedule && schedule.label);
+    var fromLabel = label.match(/week\s*(\d+)/i);
+    if (fromLabel) {
+      return parseInt(fromLabel[1], 10);
+    }
+
+    return NaN;
+  }
+
+  function resolveDayNumberFromLabel(dayLabel, fallbackDay) {
+    var text = cleanText(dayLabel).toLowerCase();
+    var byName = {
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
+      sunday: 7
+    };
+
+    if (byName[text]) {
+      return byName[text];
+    }
+
+    var match = text.match(/day\s*(\d+)/i);
+    if (match) {
+      return clampNumber(parseInt(match[1], 10), 1, 7, fallbackDay || 1);
+    }
+
+    return clampNumber(parseInt(fallbackDay, 10), 1, 7, 1);
   }
 
   function renderActivityPlan(program, plan) {
@@ -2104,19 +3332,57 @@
     return String(total) + " sessions / week";
   }
 
+  function normalizePhaseNameForPdf(rawName, order) {
+    var fallback = "Phase " + String(order);
+    var name = cleanText(rawName);
+    if (!name) {
+      return fallback;
+    }
+
+    var match = name.match(/^phase\s*\d+\s*(?:[:\-]\s*)?(.*)$/i);
+    if (!match) {
+      return name;
+    }
+
+    var descriptor = cleanText(match[1]);
+    return descriptor ? (fallback + ": " + descriptor) : fallback;
+  }
+
   function normalizePhases(rawPhases, totalWeeks, warnings) {
     var source = Array.isArray(rawPhases) ? rawPhases : [];
     var normalized = source
       .map(function (phase, index) {
         var item = phase && typeof phase === "object" ? phase : {};
+        var explicitOrder = parsePhaseOrder(item);
         return {
+          __sourceIndex: index,
+          __explicitOrder: explicitOrder,
           name: cleanText(item.name) || ("Phase " + String(index + 1)),
-          start_week: clampNumber(parseInt(item.start_week, 10), 1, totalWeeks, Math.min(index + 1, totalWeeks)),
-          end_week: clampNumber(parseInt(item.end_week, 10), 1, totalWeeks, Math.min(index + 1, totalWeeks)),
+          start_week: clampNumber(
+            parseInt(item.start_week != null ? item.start_week : (item.phase_start_week != null ? item.phase_start_week : item.startWeek), 10),
+            1,
+            totalWeeks,
+            Math.min(index + 1, totalWeeks)
+          ),
+          end_week: clampNumber(
+            parseInt(item.end_week != null ? item.end_week : (item.phase_end_week != null ? item.phase_end_week : item.endWeek), 10),
+            1,
+            totalWeeks,
+            Math.min(index + 1, totalWeeks)
+          ),
           focus: cleanText(item.focus),
           rationale: cleanText(item.rationale),
+          priorities_text: cleanText(item.priorities_text),
+          general_training_overview_text: cleanText(item.general_training_overview_text),
+          general_weekly_structure_text: cleanText(item.general_weekly_structure_text),
           strength_rule: cleanText(item.strength_rule),
           endurance_rule: cleanText(item.endurance_rule),
+          monitoring_metrics_text: cleanText(item.monitoring_metrics_text),
+          progress_rules_text: cleanText(item.progress_rules_text),
+          reduce_rules_text: cleanText(item.reduce_rules_text),
+          stop_rules_text: cleanText(item.stop_rules_text),
+          phase_assessments_text: cleanText(item.phase_assessments_text),
+          exit_criteria_text: cleanText(item.exit_criteria_text),
           training_days_per_week: 7,
           strength_days_per_week: clampNumber(parseInt(item.strength_days_per_week, 10), 0, 14, 0),
           cardio_days_per_week: clampNumber(parseInt(item.cardio_days_per_week != null ? item.cardio_days_per_week : item.endurance_days_per_week, 10), 0, 14, 0),
@@ -2124,11 +3390,21 @@
         };
       })
       .sort(function (a, b) {
+        var aHasExplicit = Number.isFinite(a.__explicitOrder);
+        var bHasExplicit = Number.isFinite(b.__explicitOrder);
+        if (aHasExplicit && bHasExplicit && a.__explicitOrder !== b.__explicitOrder) {
+          return a.__explicitOrder - b.__explicitOrder;
+        }
         if (a.start_week !== b.start_week) {
           return a.start_week - b.start_week;
         }
-        return a.end_week - b.end_week;
+        if (a.end_week !== b.end_week) {
+          return a.end_week - b.end_week;
+        }
+        return a.__sourceIndex - b.__sourceIndex;
       });
+
+    normalized = realignPhaseWeeksIfNeeded(normalized, totalWeeks, warnings);
 
     normalized.forEach(function (phase) {
       if (phase.end_week < phase.start_week) {
@@ -2155,6 +3431,79 @@
     }
 
     return normalized;
+  }
+
+  function realignPhaseWeeksIfNeeded(phases, totalWeeks, warnings) {
+    var source = Array.isArray(phases) ? phases : [];
+    if (!source.length) {
+      return source;
+    }
+
+    var overlapCount = 0;
+    var repeatedStartWeekOne = 0;
+    var previousEnd = 0;
+
+    source.forEach(function (phase) {
+      if (!phase || typeof phase !== "object") {
+        return;
+      }
+      if (Number(phase.start_week) === 1) {
+        repeatedStartWeekOne += 1;
+      }
+      if (Number(phase.start_week) <= previousEnd) {
+        overlapCount += 1;
+      }
+      previousEnd = Math.max(previousEnd, Number(phase.end_week) || previousEnd);
+    });
+
+    var needsRealign = overlapCount > 1 || repeatedStartWeekOne > 1;
+    if (!needsRealign) {
+      return source;
+    }
+
+    warnings.push("Phase week ranges overlapped; PDF re-aligned phases sequentially from week 1.");
+
+    var cursor = 1;
+    return source.map(function (phase) {
+      var copy = Object.assign({}, phase);
+      var originalStart = clampNumber(parseInt(copy.start_week, 10), 1, totalWeeks, cursor);
+      var originalEnd = clampNumber(parseInt(copy.end_week, 10), originalStart, totalWeeks, originalStart);
+      var duration = Math.max(1, originalEnd - originalStart + 1);
+
+      var nextStart = clampNumber(cursor, 1, totalWeeks, 1);
+      var nextEnd = clampNumber(nextStart + duration - 1, nextStart, totalWeeks, nextStart);
+      copy.start_week = nextStart;
+      copy.end_week = nextEnd;
+      cursor = nextEnd + 1;
+
+      return copy;
+    });
+  }
+
+  function parsePhaseOrder(phase) {
+    var item = phase && typeof phase === "object" ? phase : {};
+    var explicit = parseInt(
+      item.order != null
+        ? item.order
+        : (item.phase_order != null ? item.phase_order : item.phaseOrder),
+      10
+    );
+    if (Number.isFinite(explicit) && explicit > 0) {
+      return explicit;
+    }
+
+    var name = cleanText(item.name);
+    if (!name) {
+      return NaN;
+    }
+
+    var match = name.match(/^phase\s*(\d+)/i);
+    if (!match) {
+      return NaN;
+    }
+
+    var fromName = parseInt(match[1], 10);
+    return Number.isFinite(fromName) && fromName > 0 ? fromName : NaN;
   }
 
   function normalizeStructure(structure) {
@@ -2412,6 +3761,37 @@
       type: type || "custom",
       activityId: sportFocus ? toId(sportFocus) : undefined
     });
+  }
+
+  function resolvePdfLogoUrl(source, meta) {
+    var explicit = cleanText(
+      (source && (
+        source.brand_logo_url ||
+        source.brandLogoUrl ||
+        source.logo_url ||
+        source.logoUrl
+      )) ||
+      (meta && (
+        meta.brand_logo_url ||
+        meta.brandLogoUrl ||
+        meta.logo_url ||
+        meta.logoUrl
+      ))
+    );
+
+    if (explicit) {
+      return explicit;
+    }
+
+    try {
+      if (global && global.location && global.location.href) {
+        return new URL("img/nomadicPerformanceLogo.png", global.location.href).href;
+      }
+    } catch (_error) {
+      // Fall through to relative path fallback.
+    }
+
+    return "img/nomadicPerformanceLogo.png";
   }
 
   function escapeHtml(value) {

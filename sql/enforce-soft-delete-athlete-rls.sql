@@ -318,7 +318,13 @@ create policy "onboarding_intake_select_own_or_coach"
 on public.athlete_onboarding_intake_assignments
 for select
 using (
-  (auth.uid() = athlete_user_id and public.nomadic_athlete_account_is_accessible(athlete_user_id))
+  (
+    auth.uid() = athlete_user_id
+    and (
+      form_id = 'default-liability-waiver-v1'
+      or public.nomadic_athlete_account_is_accessible(athlete_user_id)
+    )
+  )
   or public.is_nomadic_admin()
 );
 
@@ -327,11 +333,23 @@ create policy "onboarding_intake_update_athlete_or_coach"
 on public.athlete_onboarding_intake_assignments
 for update
 using (
-  (auth.uid() = athlete_user_id and public.nomadic_athlete_account_is_accessible(athlete_user_id))
+  (
+    auth.uid() = athlete_user_id
+    and (
+      form_id = 'default-liability-waiver-v1'
+      or public.nomadic_athlete_account_is_accessible(athlete_user_id)
+    )
+  )
   or public.is_nomadic_admin()
 )
 with check (
-  (auth.uid() = athlete_user_id and public.nomadic_athlete_account_is_accessible(athlete_user_id))
+  (
+    auth.uid() = athlete_user_id
+    and (
+      form_id = 'default-liability-waiver-v1'
+      or public.nomadic_athlete_account_is_accessible(athlete_user_id)
+    )
+  )
   or public.is_nomadic_admin()
 );
 

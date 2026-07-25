@@ -53,6 +53,26 @@
               placeholder="Template name (e.g., 8-Week Ski Power Build)"
               data-template-name
             />
+            <section class="program-builder-planner-card">
+              <div class="program-builder-planner-head">
+                <div>
+                  <h3>AI Template Generator</h3>
+                  <p>Describe the program you want, and AI will draft the template so you can edit everything afterward.</p>
+                </div>
+              </div>
+              <label class="program-builder-structure-field">
+                <span>Prompt</span>
+                <textarea
+                  rows="3"
+                  data-template-ai-prompt
+                  placeholder="Example: Build a 16-week hybrid ski + climbing plan for an intermediate athlete, 7 sessions/week, with 4 phases and weekly progression."
+                ></textarea>
+              </label>
+              <div class="admin-request-actions">
+                <button type="button" class="btn btn-secondary" data-template-save-progress>Save Progress</button>
+                <button type="button" class="btn admin-btn-primary" data-template-ai-generate>Generate With AI</button>
+              </div>
+            </section>
             <div class="program-builder-structure-row">
               <label class="program-builder-structure-field">
                 <span>Weeks</span>
@@ -71,6 +91,7 @@
                   <option value="strength">Strength Program</option>
                   <option value="endurance">Endurance Program</option>
                   <option value="return_to_sport">Return-to-Sport Program</option>
+                  <option value="yearly">Yearly Periodized Template</option>
                   <option value="premade">Pre-Made Program</option>
                   <option value="group">Group Program</option>
                   <option value="individualized">Individualized Athlete Program</option>
@@ -81,23 +102,6 @@
                 <input type="text" placeholder="e.g., Ski touring" data-template-sport-focus data-template-meta-field="sport_focus" />
               </label>
               <label class="program-builder-structure-field">
-                <span>Athlete Level</span>
-                <select data-template-athlete-level data-template-meta-field="athlete_level">
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                  <option value="elite">Elite</option>
-                </select>
-              </label>
-              <label class="program-builder-structure-field">
-                <span>Program Version</span>
-                <input type="text" placeholder="e.g., v1.2" data-template-program-version data-template-meta-field="program_version" />
-              </label>
-              <label class="program-builder-structure-field">
-                <span>Program Subtitle</span>
-                <input type="text" placeholder="e.g., 16-Week Alpine Performance Build" data-template-program-subtitle data-template-meta-field="program_subtitle" />
-              </label>
-              <label class="program-builder-structure-field">
                 <span>Primary Goal</span>
                 <input type="text" placeholder="Primary outcome this program targets" data-template-primary-goal data-template-meta-field="primary_goal" />
               </label>
@@ -105,16 +109,12 @@
                 <span>Secondary Goal</span>
                 <input type="text" placeholder="Secondary outcome" data-template-secondary-goal data-template-meta-field="secondary_goal" />
               </label>
-              <label class="program-builder-structure-field">
-                <span>Program Tags</span>
-                <input type="text" placeholder="comma-separated tags" data-template-tags data-template-meta-field="tags" />
-              </label>
             </div>
             <label class="program-builder-structure-field">
               <span>Program Description</span>
               <textarea rows="3" placeholder="High-level program summary shown in cover/overview" data-template-program-description data-template-meta-field="program_description"></textarea>
             </label>
-            <section class="program-builder-planner-card">
+            <section class="program-builder-planner-card" data-template-pdf-only-content hidden>
               <div class="program-builder-planner-head">
                 <div>
                   <h3>PDF-Specific Content</h3>
@@ -139,7 +139,7 @@
                 <textarea rows="4" hidden data-template-program-worksheets data-template-meta-field="program_worksheets_text"></textarea>
               </div>
             </section>
-            <section class="program-builder-planner-card">
+            <section class="program-builder-planner-card" data-template-pdf-framework-content hidden>
               <div class="program-builder-planner-head">
                 <div>
                   <h3>Framework Guidance</h3>
@@ -184,6 +184,216 @@
                 <textarea rows="2" placeholder="Optional note below the loading guidelines table" data-template-framework-wave-footer data-template-meta-field="framework_wave_footer"></textarea>
               </label>
             </section>
+            <section class="program-builder-planner-card" data-template-yearly-content hidden>
+              <div class="program-builder-planner-head">
+                <div>
+                  <h3>Yearly Template Content</h3>
+                  <p>Populate the annual-template PDF pages directly from the builder (cover, annual map, testing, and monthly overview).</p>
+                </div>
+              </div>
+              <div class="program-builder-phase-grid program-builder-phase-grid-2">
+                <label class="program-builder-structure-field">
+                  <span>Athlete Name</span>
+                  <input type="text" placeholder="Athlete full name" data-template-yearly-athlete-name data-template-meta-field="yearly_athlete_name" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Program Year</span>
+                  <input type="text" placeholder="e.g., 2027" data-template-yearly-program-year data-template-meta-field="yearly_program_year" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Primary Sport / Goal</span>
+                  <input type="text" placeholder="e.g., Ski Mountaineering Peak" data-template-yearly-primary-sport data-template-meta-field="yearly_primary_sport" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Secondary Sports</span>
+                  <input type="text" placeholder="e.g., Climbing, MTB" data-template-yearly-secondary-sports data-template-meta-field="yearly_secondary_sports" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Coach / Provider</span>
+                  <input type="text" placeholder="e.g., Nomadic Performance" data-template-yearly-coach-provider data-template-meta-field="yearly_coach_provider" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Plan Start Date</span>
+                  <input type="text" placeholder="e.g., Jan 1, 2027" data-template-yearly-plan-start-date data-template-meta-field="yearly_plan_start_date" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Training Age</span>
+                  <input type="text" placeholder="e.g., 6 years" data-template-yearly-training-age data-template-meta-field="yearly_training_age" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Current Weekly Volume</span>
+                  <input type="text" placeholder="e.g., 7 sessions / week" data-template-yearly-current-weekly-volume data-template-meta-field="yearly_current_weekly_volume" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Current Strength Frequency</span>
+                  <input type="text" placeholder="e.g., 2 sessions / week" data-template-yearly-current-strength-frequency data-template-meta-field="yearly_current_strength_frequency" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Current Endurance Frequency</span>
+                  <input type="text" placeholder="e.g., 3 sessions / week" data-template-yearly-current-endurance-frequency data-template-meta-field="yearly_current_endurance_frequency" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Available Training Days</span>
+                  <input type="text" placeholder="e.g., Mon-Sat" data-template-yearly-available-training-days data-template-meta-field="yearly_available_training_days" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Typical Session Duration</span>
+                  <input type="text" placeholder="e.g., 60-90 min" data-template-yearly-typical-session-duration data-template-meta-field="yearly_typical_session_duration" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Relevant Injury / Medical History</span>
+                  <input type="text" placeholder="e.g., Prior Achilles tendinopathy" data-template-yearly-relevant-injury-history data-template-meta-field="yearly_relevant_injury_history" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Equipment / Facility Access</span>
+                  <input type="text" placeholder="e.g., Full gym + climbing wall" data-template-yearly-equipment-access data-template-meta-field="yearly_equipment_access" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Travel / Work Constraints</span>
+                  <input type="text" placeholder="e.g., Travel every 2nd week" data-template-yearly-travel-work-constraints data-template-meta-field="yearly_travel_work_constraints" />
+                </label>
+                <label class="program-builder-structure-field">
+                  <span>Preferred Recovery Day</span>
+                  <input type="text" placeholder="e.g., Friday" data-template-yearly-preferred-recovery-day data-template-meta-field="yearly_preferred_recovery_day" />
+                </label>
+              </div>
+              <label class="program-builder-structure-field">
+                <span>Cover Description</span>
+                <textarea rows="2" placeholder="One to two sentences describing the athlete, annual goals, and planning approach" data-template-yearly-description data-template-meta-field="yearly_description"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Annual Planning Assumption</span>
+                <textarea rows="2" placeholder="Core assumptions used for this yearly plan" data-template-yearly-assumption data-template-meta-field="yearly_assumption"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Annual Tagline / Guiding Principle</span>
+                <input type="text" placeholder="e.g., Build capacity first, sharpen late" data-template-yearly-tagline data-template-meta-field="yearly_tagline" />
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Progression Rule</span>
+                <textarea rows="2" placeholder="How variables should progress across the year" data-template-yearly-progression-rule data-template-meta-field="yearly_progression_rule"></textarea>
+              </label>
+              <label class="program-builder-structure-field">
+                <span>Concurrent-Training Rule</span>
+                <textarea rows="2" placeholder="How hard sessions are sequenced when modalities overlap" data-template-yearly-concurrent-rule data-template-meta-field="yearly_concurrent_rule"></textarea>
+              </label>
+              <div class="program-builder-structure-field">
+                <span>Annual Performance Goals (Goal / Outcome | Target Date / Window | Success Measure | Priority)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_annual_goals_rows_text"></div>
+                <textarea rows="6" hidden data-template-yearly-annual-goals-rows data-template-meta-field="yearly_annual_goals_rows_text"></textarea>
+              </div>
+              <label class="program-builder-structure-field">
+                <span>Programming Philosophy</span>
+                <textarea rows="3" placeholder="Principles that should guide the year: specificity, overload, recovery, consistency, minimum effective dose, multisport balance, and athlete preference" data-template-yearly-programming-philosophy data-template-meta-field="yearly_programming_philosophy"></textarea>
+              </label>
+              <div class="program-builder-structure-field">
+                <span>Annual Performance Calendar (Month | Primary Sport | Secondary Sport | Key Event / Trip | Priority | Access / Constraints | Notes)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_calendar_rows_text"></div>
+                <textarea rows="6" hidden data-template-yearly-calendar-rows data-template-meta-field="yearly_calendar_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Annual Phase Map (Phase | Months | Purpose | Primary Adaptations | Secondary / Maintain | Entry Criteria | Exit Criteria)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_phase_map_rows_text"></div>
+                <textarea rows="6" hidden data-template-yearly-phase-map-rows data-template-meta-field="yearly_phase_map_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Transition & Recovery Rows (Timing | Reason | Volume / Intensity Change | Return Criteria)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_transition_rows_text"></div>
+                <textarea rows="4" hidden data-template-yearly-transition-rows data-template-meta-field="yearly_transition_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Testing Schedule (Metric / Test | Baseline | Mid-Year | Pre-Peak | Post-Season | Decision Rule)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_testing_rows_text"></div>
+                <textarea rows="6" hidden data-template-yearly-testing-rows data-template-meta-field="yearly_testing_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Monthly Overview (Month | Phase / Block | Primary Emphasis | Dates | Primary Sport | Secondary Sport | Event / Trip | Training Access | Monthly Load Target)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_month_overview_rows_text"></div>
+                <textarea rows="8" hidden data-template-yearly-month-overview-rows data-template-meta-field="yearly_month_overview_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Monthly Priorities (Month | Primary Priorities | Secondary Priorities | Maintain Priorities) - use semicolons to separate multiple items in each column</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_month_priority_rows_text"></div>
+                <textarea rows="8" hidden data-template-yearly-month-priority-rows data-template-meta-field="yearly_month_priority_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Monthly Programming Targets (Month | Volume/Frequency | Intensity/Density | Strength/Power | Aerobic/Conditioning | Sport Skill/Technique | Mobility/Recovery | Testing/Nutrition/Logistics | Adjustment Criteria)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_month_target_rows_text"></div>
+                <textarea rows="10" hidden data-template-yearly-month-target-rows data-template-meta-field="yearly_month_target_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Month Week Progression (Month | Week | Primary Focus | Volume Target | Intensity Target | Key Sessions | Strength/Secondary Sport | Recovery/Review)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_month_week_rows_text"></div>
+                <textarea rows="10" hidden data-template-yearly-month-week-rows data-template-meta-field="yearly_month_week_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Monthly Review Summary (Month | Monthly Review and Next-Block Decision)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_month_review_rows_text"></div>
+                <textarea rows="6" hidden data-template-yearly-month-review-rows data-template-meta-field="yearly_month_review_rows_text"></textarea>
+              </div>
+              <label class="program-builder-structure-field">
+                <span>Calendar Interpretation</span>
+                <textarea rows="2" placeholder="Interpret peak windows, constrained months, and sport conflicts" data-template-yearly-calendar-interpretation data-template-meta-field="yearly_calendar_interpretation"></textarea>
+              </label>
+              <div class="program-builder-structure-field">
+                <span>Half-Year Review Rows (Progress toward goals | What is working | What needs modification | Second-half decision)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_half_year_review_rows_text"></div>
+                <textarea rows="4" hidden data-template-yearly-half-year-review-rows data-template-meta-field="yearly_half_year_review_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>End-of-Year Review Rows (Goal achievement | Best adaptations | Persistent limitations | Next-year priority)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_end_year_review_rows_text"></div>
+                <textarea rows="4" hidden data-template-yearly-end-year-review-rows data-template-meta-field="yearly_end_year_review_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Capability Matrix Rows (Month | Strength | Power | Aerobic base | Threshold/tempo | Anaerobic | Sport skill | Mobility | Recovery)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_capability_matrix_rows_text"></div>
+                <textarea rows="10" hidden data-template-yearly-capability-matrix-rows data-template-meta-field="yearly_capability_matrix_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Monitoring Dashboard Rows (Metric | Scale / Method | Action Threshold)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_monitoring_rows_text"></div>
+                <textarea rows="6" hidden data-template-yearly-monitoring-rows data-template-meta-field="yearly_monitoring_rows_text"></textarea>
+              </div>
+              <label class="program-builder-structure-field">
+                <span>Adjustment Order</span>
+                <textarea rows="2" placeholder="Order to modify training when recovery declines" data-template-yearly-adjustment-order data-template-meta-field="yearly_adjustment_order"></textarea>
+              </label>
+              <div class="program-builder-structure-field">
+                <span>Default Weekly Structure Rows (Day | Primary session | Secondary session | Target load | Purpose | Modification rule)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_default_week_rows_text"></div>
+                <textarea rows="8" hidden data-template-yearly-default-week-rows data-template-meta-field="yearly_default_week_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Strength &amp; Conditioning Framework Rows (Training quality | Build phase | Peak/in-season | Maintenance dose | Progression rule)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_strength_framework_rows_text"></div>
+                <textarea rows="6" hidden data-template-yearly-strength-framework-rows data-template-meta-field="yearly_strength_framework_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Annual Review Goal Rows (Goal | Outcome | Evidence/testing | What influenced it | Next decision)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_annual_review_goal_rows_text"></div>
+                <textarea rows="8" hidden data-template-yearly-annual-review-goal-rows data-template-meta-field="yearly_annual_review_goal_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Key Lessons Rows (Continue | Modify | Stop/avoid)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_annual_review_lessons_rows_text"></div>
+                <textarea rows="5" hidden data-template-yearly-annual-review-lessons-rows data-template-meta-field="yearly_annual_review_lessons_rows_text"></textarea>
+              </div>
+              <div class="program-builder-structure-field">
+                <span>Next-Year Starting Point Rows (Category | Current status | Next-year priority | Immediate action)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_next_year_start_rows_text"></div>
+                <textarea rows="6" hidden data-template-yearly-next-year-start-rows data-template-meta-field="yearly_next_year_start_rows_text"></textarea>
+              </div>
+              <label class="program-builder-structure-field">
+                <span>Coach / Athlete Summary</span>
+                <textarea rows="3" placeholder="Concise annual summary and next-year guidance" data-template-yearly-coach-athlete-summary data-template-meta-field="yearly_coach_athlete_summary"></textarea>
+              </label>
+              <div class="program-builder-structure-field">
+                <span>Planning Notes Rows (one line per row)</span>
+                <div class="program-builder-structured-editor" data-structured-editor="yearly_planning_notes_rows_text"></div>
+                <textarea rows="10" hidden data-template-yearly-planning-notes-rows data-template-meta-field="yearly_planning_notes_rows_text"></textarea>
+              </div>
+            </section>
             <div class="program-builder-step-actions">
               <button type="button" class="btn admin-btn-primary" data-template-next-step-overview>Next: Program Phases</button>
             </div>
@@ -196,6 +406,7 @@
                 <p>Define how many phases this plan has, the length of each phase, training days per phase, and the goal for each phase.</p>
               </div>
               <div class="admin-request-actions">
+                <button type="button" class="btn btn-secondary" data-template-save-progress>Save Progress</button>
                 <button type="button" class="btn btn-secondary" data-template-prev-step-phases>Back to Overview</button>
                 <button type="button" class="btn admin-btn-primary" data-template-next-step-phases>Next: Daily Workout Programming</button>
               </div>
@@ -308,6 +519,9 @@
         </button>
         <button type="button" class="btn btn-secondary" data-print-workout>
           Workout PDF
+        </button>
+        <button type="button" class="btn btn-secondary" data-template-save-progress>
+          Save Progress
         </button>
         <button type="button" class="btn btn-secondary" data-save-workout>
           <span>💾</span> Save Daily Programming

@@ -65,10 +65,18 @@ on public.athlete_onboarding_intake_assignments
 for update
 using (
   auth.uid() = athlete_user_id
+  and (
+    form_id = 'default-liability-waiver-v1'
+    or public.nomadic_athlete_account_is_accessible(athlete_user_id)
+  )
   or (auth.jwt() ->> 'email') = 'joe@nomadicperformance.com'
 )
 with check (
   auth.uid() = athlete_user_id
+  and (
+    form_id = 'default-liability-waiver-v1'
+    or public.nomadic_athlete_account_is_accessible(athlete_user_id)
+  )
   or (auth.jwt() ->> 'email') = 'joe@nomadicperformance.com'
 );
 

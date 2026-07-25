@@ -62,6 +62,11 @@ It also contains nutrition catalog enrichment used by `athlete-nutrition.html` /
   - Pulls additional matches from USDA FoodData Central and Open Food Facts
   - Normalizes and upserts rows into `nutrition_foods` + default serving in `nutrition_food_servings`
   - Returns merged foods for typeahead search
+- `ai-generate-program-template`
+  - Auth required
+  - Accepts a natural-language program request prompt
+  - Uses OpenAI to generate a structured template payload for the training program builder
+  - Returns `templateName` + `payload` that can be loaded into the builder and edited
 
 ## Required Secrets
 
@@ -99,6 +104,8 @@ Set these in Supabase project secrets:
 - `STRIPE_CANCEL_URL` (optional, default: `https://nomadicperformance.com/founding-member.html?checkout=cancelled`)
 - `USDA_FOODDATA_API_KEY` (required for USDA import; function still works without it)
 - `OPENFOODFACTS_USER_AGENT` (optional but recommended, e.g. `NomadicPerformance/1.0 (support@nomadicperformance.com)`)
+- `OPENAI_API_KEY` (required for `ai-generate-program-template`)
+- `OPENAI_MODEL` (optional, default `gpt-4o-mini`)
 
 ## Local Setup
 
@@ -126,6 +133,7 @@ supabase functions deploy stripe-create-checkout
 supabase functions deploy stripe-webhook
 supabase functions deploy stripe-reconcile-payment
 supabase functions deploy nutrition-food-search
+supabase functions deploy ai-generate-program-template
 ```
 
 ## SQL Setup

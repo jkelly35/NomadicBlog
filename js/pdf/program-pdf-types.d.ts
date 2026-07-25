@@ -1,6 +1,7 @@
 export interface PdfBrand {
   name: string;
   tagline?: string;
+  logoUrl?: string;
 }
 
 export interface PdfAthlete {

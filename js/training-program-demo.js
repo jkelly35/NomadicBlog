@@ -354,7 +354,8 @@
     "return_to_sport",
     "premade",
     "group",
-    "individualized"
+    "individualized",
+    "yearly"
   ];
 
   var WEEKLY_SESSION_TYPE_OPTIONS = [
@@ -748,6 +749,230 @@
         { key: "focus", label: "Focus", placeholder: "Heavy strength" },
         { key: "notes", label: "Notes", placeholder: "Freshest day for lower-body loading" }
       ]
+    },
+    yearly_annual_goals_rows_text: {
+      emptyMessage: "No annual goal rows yet.",
+      addLabel: "Add Goal Row",
+      columns: [
+        { key: "goal", label: "Goal / Outcome", placeholder: "Primary race outcome" },
+        { key: "target_window", label: "Target Date / Window", placeholder: "Sep-Oct" },
+        { key: "success_measure", label: "Success Measure", placeholder: "Top-10 result or benchmark" },
+        { key: "priority", label: "Priority", placeholder: "Primary" }
+      ]
+    },
+    yearly_calendar_rows_text: {
+      emptyMessage: "No yearly calendar rows yet.",
+      addLabel: "Add Month Row",
+      columns: [
+        { key: "month", label: "Month", placeholder: "January" },
+        { key: "primary", label: "Primary Sport", placeholder: "Ski touring" },
+        { key: "secondary", label: "Secondary Sport", placeholder: "Climbing" },
+        { key: "event", label: "Key Event / Trip", placeholder: "Spring objective" },
+        { key: "priority", label: "Priority", placeholder: "Build" },
+        { key: "constraints", label: "Access / Constraints", placeholder: "Travel weekends" },
+        { key: "notes", label: "Notes", placeholder: "Weather variability" }
+      ]
+    },
+    yearly_phase_map_rows_text: {
+      emptyMessage: "No annual phase rows yet.",
+      addLabel: "Add Phase Row",
+      columns: [
+        { key: "phase", label: "Phase", placeholder: "Phase 1" },
+        { key: "months", label: "Months", placeholder: "Jan-Feb" },
+        { key: "purpose", label: "Purpose", placeholder: "Base build" },
+        { key: "primary", label: "Primary Adaptations", placeholder: "Aerobic base" },
+        { key: "secondary", label: "Secondary / Maintain", placeholder: "Mobility" },
+        { key: "entry", label: "Entry Criteria", placeholder: "Recovered from transition" },
+        { key: "exit", label: "Exit Criteria", placeholder: "Volume target achieved" }
+      ]
+    },
+    yearly_transition_rows_text: {
+      emptyMessage: "No transition rows yet.",
+      addLabel: "Add Transition Row",
+      columns: [
+        { key: "timing", label: "Timing", placeholder: "Week 13" },
+        { key: "reason", label: "Reason", placeholder: "Travel + recovery" },
+        { key: "adjustment", label: "Volume / Intensity Change", placeholder: "-30% volume" },
+        { key: "return", label: "Return Criteria", placeholder: "Readiness markers stable" }
+      ]
+    },
+    yearly_testing_rows_text: {
+      emptyMessage: "No testing rows yet.",
+      addLabel: "Add Testing Row",
+      columns: [
+        { key: "metric", label: "Metric / Test", placeholder: "CMJ" },
+        { key: "baseline", label: "Baseline", placeholder: "Week 1" },
+        { key: "mid", label: "Mid-Year", placeholder: "Week 24" },
+        { key: "pre_peak", label: "Pre-Peak", placeholder: "Week 40" },
+        { key: "post", label: "Post-Season", placeholder: "Week 52" },
+        { key: "rule", label: "Decision Rule", placeholder: "If down >10%, reduce load" }
+      ]
+    },
+    yearly_month_overview_rows_text: {
+      emptyMessage: "No month overview rows yet.",
+      addLabel: "Add Month Overview",
+      columns: [
+        { key: "month", label: "Month", placeholder: "January" },
+        { key: "phase", label: "Phase / Block", placeholder: "Base" },
+        { key: "emphasis", label: "Primary Emphasis", placeholder: "Aerobic volume" },
+        { key: "dates", label: "Dates", placeholder: "Jan 1-31" },
+        { key: "primary", label: "Primary Sport", placeholder: "Ski touring" },
+        { key: "secondary", label: "Secondary Sport", placeholder: "Climbing" },
+        { key: "event", label: "Event / Trip", placeholder: "No key event" },
+        { key: "access", label: "Training Access", placeholder: "Gym + trails" },
+        { key: "load", label: "Monthly Load Target", placeholder: "Build +10%" }
+      ]
+    },
+    yearly_month_priority_rows_text: {
+      emptyMessage: "No month priority rows yet.",
+      addLabel: "Add Month Priority Row",
+      columns: [
+        { key: "month", label: "Month", placeholder: "January" },
+        { key: "primary", label: "Primary Priorities", placeholder: "Aerobic base; Lower-body strength" },
+        { key: "secondary", label: "Secondary Priorities", placeholder: "Climbing volume; Core endurance" },
+        { key: "maintain", label: "Maintain Priorities", placeholder: "Mobility; Tendon tolerance" }
+      ]
+    },
+    yearly_month_target_rows_text: {
+      emptyMessage: "No month target rows yet.",
+      addLabel: "Add Month Target Row",
+      columns: [
+        { key: "month", label: "Month", placeholder: "January" },
+        { key: "volume_frequency", label: "Volume / Frequency", placeholder: "4-5 sessions / week" },
+        { key: "intensity_density", label: "Intensity / Density", placeholder: "Mostly Zone 2, one threshold" },
+        { key: "strength_power", label: "Strength / Power", placeholder: "2 lower sessions + plyo prep" },
+        { key: "aerobic_conditioning", label: "Aerobic / Conditioning", placeholder: "3 aerobic exposures" },
+        { key: "sport_skill", label: "Sport Skill / Technique", placeholder: "1 technique session" },
+        { key: "mobility_recovery", label: "Mobility / Recovery", placeholder: "Daily 10-15 min" },
+        { key: "testing_logistics", label: "Testing / Nutrition / Logistics", placeholder: "CMJ baseline + fueling setup" },
+        { key: "adjustment_criteria", label: "Adjustment Criteria", placeholder: "If fatigue high 3+ days, reduce load" }
+      ]
+    },
+    yearly_month_week_rows_text: {
+      emptyMessage: "No month week-progression rows yet.",
+      addLabel: "Add Week Progression Row",
+      columns: [
+        { key: "month", label: "Month", placeholder: "January" },
+        { key: "week", label: "Week", placeholder: "1" },
+        { key: "primary_focus", label: "Primary Focus", placeholder: "Build baseline" },
+        { key: "volume_target", label: "Volume Target", placeholder: "+5%" },
+        { key: "intensity_target", label: "Intensity Target", placeholder: "Low-Moderate" },
+        { key: "key_sessions", label: "Key Sessions", placeholder: "Long run + heavy lower" },
+        { key: "strength_secondary", label: "Strength / Secondary Sport", placeholder: "2 strength + 1 climb" },
+        { key: "recovery_review", label: "Recovery / Review", placeholder: "Sunday review + mobility" }
+      ]
+    },
+    yearly_month_review_rows_text: {
+      emptyMessage: "No month review rows yet.",
+      addLabel: "Add Month Review Row",
+      columns: [
+        { key: "month", label: "Month", placeholder: "January" },
+        { key: "review", label: "Monthly Review", placeholder: "Adherence, adaptation, symptom trends, and next-month decisions" }
+      ]
+    },
+    yearly_half_year_review_rows_text: {
+      emptyMessage: "No half-year review rows yet.",
+      addLabel: "Add Half-Year Review Row",
+      columns: [
+        { key: "progress", label: "Progress Toward Goals", placeholder: "Progress summary" },
+        { key: "working", label: "What Is Working", placeholder: "Successful elements" },
+        { key: "modify", label: "What Needs Modification", placeholder: "Required changes" },
+        { key: "decision", label: "Second-Half Decision", placeholder: "Decision for next blocks" }
+      ]
+    },
+    yearly_end_year_review_rows_text: {
+      emptyMessage: "No end-year review rows yet.",
+      addLabel: "Add End-Year Review Row",
+      columns: [
+        { key: "achievement", label: "Goal Achievement", placeholder: "Outcome summary" },
+        { key: "best", label: "Best Adaptations", placeholder: "Best adaptations" },
+        { key: "persistent", label: "Persistent Limitations", placeholder: "Remaining constraints" },
+        { key: "next", label: "Next-Year Priority", placeholder: "Primary next-year focus" }
+      ]
+    },
+    yearly_capability_matrix_rows_text: {
+      emptyMessage: "No capability matrix rows yet.",
+      addLabel: "Add Matrix Row",
+      columns: [
+        { key: "month", label: "Month", placeholder: "January" },
+        { key: "strength", label: "Strength", placeholder: "High" },
+        { key: "power", label: "Power", placeholder: "Moderate" },
+        { key: "aerobic", label: "Aerobic Base", placeholder: "High" },
+        { key: "threshold", label: "Threshold / Tempo", placeholder: "Low" },
+        { key: "anaerobic", label: "Anaerobic", placeholder: "Low" },
+        { key: "skill", label: "Sport Skill", placeholder: "Moderate" },
+        { key: "mobility", label: "Mobility", placeholder: "Maintain" },
+        { key: "recovery", label: "Recovery", placeholder: "High" }
+      ]
+    },
+    yearly_monitoring_rows_text: {
+      emptyMessage: "No monitoring dashboard rows yet.",
+      addLabel: "Add Monitoring Row",
+      columns: [
+        { key: "metric", label: "Metric", placeholder: "Sleep" },
+        { key: "scale", label: "Scale / Method", placeholder: "Daily hours + quality" },
+        { key: "threshold", label: "Action Threshold", placeholder: "<6h for 3 days" }
+      ]
+    },
+    yearly_default_week_rows_text: {
+      emptyMessage: "No default week rows yet.",
+      addLabel: "Add Default Week Row",
+      columns: [
+        { key: "day", label: "Day", placeholder: "Monday" },
+        { key: "primary_session", label: "Primary Session", placeholder: "Strength lower" },
+        { key: "secondary_session", label: "Secondary Session", placeholder: "Mobility" },
+        { key: "target_load", label: "Target Load", placeholder: "Moderate" },
+        { key: "purpose", label: "Purpose", placeholder: "Main lower-body strength dose" },
+        { key: "modification_rule", label: "Modification Rule", placeholder: "Reduce volume if recovery markers drop" }
+      ]
+    },
+    yearly_strength_framework_rows_text: {
+      emptyMessage: "No strength framework rows yet.",
+      addLabel: "Add Framework Row",
+      columns: [
+        { key: "quality", label: "Training Quality", placeholder: "Max strength" },
+        { key: "build", label: "Build Phase", placeholder: "2x/week" },
+        { key: "peak", label: "Peak / In-Season", placeholder: "1x/week" },
+        { key: "maintenance", label: "Maintenance Dose", placeholder: "1 session every 7-10 days" },
+        { key: "progression", label: "Progression Rule", placeholder: "Increase only with quality + recovery" }
+      ]
+    },
+    yearly_annual_review_goal_rows_text: {
+      emptyMessage: "No annual review goal rows yet.",
+      addLabel: "Add Review Goal Row",
+      columns: [
+        { key: "goal", label: "Goal", placeholder: "Primary annual objective" },
+        { key: "outcome", label: "Outcome", placeholder: "Achieved / partial / not achieved" },
+        { key: "evidence", label: "Evidence / Testing", placeholder: "Benchmark or result" },
+        { key: "influenced", label: "What Influenced It", placeholder: "Key factors" },
+        { key: "next_decision", label: "Next Decision", placeholder: "What changes next year" }
+      ]
+    },
+    yearly_annual_review_lessons_rows_text: {
+      emptyMessage: "No key lesson rows yet.",
+      addLabel: "Add Lesson Row",
+      columns: [
+        { key: "continue", label: "Continue", placeholder: "What to continue" },
+        { key: "modify", label: "Modify", placeholder: "What to modify" },
+        { key: "stop", label: "Stop / Avoid", placeholder: "What to stop" }
+      ]
+    },
+    yearly_next_year_start_rows_text: {
+      emptyMessage: "No next-year starting rows yet.",
+      addLabel: "Add Next-Year Row",
+      columns: [
+        { key: "category", label: "Category", placeholder: "Primary sport" },
+        { key: "current", label: "Current Status", placeholder: "Current baseline" },
+        { key: "next", label: "Next-Year Priority", placeholder: "Top next-year priority" },
+        { key: "action", label: "Immediate Action", placeholder: "First action to start" }
+      ]
+    },
+    yearly_planning_notes_rows_text: {
+      emptyMessage: "No planning note rows yet.",
+      addLabel: "Add Planning Note",
+      columns: [
+        { key: "note", label: "Planning Note", placeholder: "Additional annual planning note" }
+      ]
     }
   };
 
@@ -818,7 +1043,7 @@
       state.workoutCompletionSummary = null;
 
       if (state.isTemplateBuilder) {
-        saveExercisesForDay(true);
+        autoSaveTemplateBuilderDraftState();
       }
 
       if (shouldUsePhaseDailyNavigator()) {
@@ -1079,6 +1304,15 @@
         return;
       }
 
+      var aiAxisDayBtn = event.target && event.target.closest("[data-axis-ai-generate]");
+      if (aiAxisDayBtn) {
+        var aiAxisSlot = String(aiAxisDayBtn.getAttribute("data-axis-ai-generate") || "").trim();
+        if (aiAxisSlot) {
+          generateAxisDayWithAi(aiAxisSlot, aiAxisDayBtn);
+        }
+        return;
+      }
+
       var copyAxisWeekBtn = event.target && event.target.closest("[data-axis-copy-week-forward]");
       if (copyAxisWeekBtn) {
         var copyAxisWeekSlot = String(copyAxisWeekBtn.getAttribute("data-axis-copy-week-forward") || "").trim();
@@ -1106,7 +1340,10 @@
           if (removeBlockIndex >= 0 && removeBlockIndex < removeBlockPlan.blocks.length) {
             removeBlockPlan.blocks.splice(removeBlockIndex, 1);
             state.sessionPlans[removeBlockSlot] = removeBlockPlan;
-            saveExercisesForDay(true);
+            persistSessionPlanForSlot(removeBlockSlot, removeBlockPlan);
+            if (removeBlockSlot === state.day) {
+              saveExercisesForDay(true);
+            }
             renderDailyAxisEditorCards();
             if (removeBlockSlot === state.day) {
               renderSessionPlanBlocks(removeBlockPlan);
@@ -1393,6 +1630,8 @@
         if (Number.isFinite(blockIndex) && blockIndex >= 0 && blockIndex < currentPlan.blocks.length) {
           currentPlan.blocks.splice(blockIndex, 1);
           state.sessionPlans[state.day] = currentPlan;
+          persistSessionPlanForSlot(state.day, currentPlan);
+          saveExercisesForDay(true);
           renderDailyProgrammingDesigner();
         }
         return;
@@ -1407,12 +1646,8 @@
       }
     });
 
-    document.addEventListener("input", function (event) {
-      syncDailyProgrammingInput(event.target);
-    });
-
     document.addEventListener("change", function (event) {
-      syncDailyProgrammingInput(event.target);
+      syncDailyProgrammingInput(event.target, "change");
     });
   }
 
@@ -1440,7 +1675,7 @@
         return;
       }
 
-      saveExercisesForDay(true);
+      autoSaveTemplateBuilderDraftState();
       syncDailyNavigatorStateFromControls();
       var daySelect = document.querySelector("[data-workout-day]");
       if (daySelect) {
@@ -2162,12 +2397,334 @@
         renderAxisSessionPlanBlocks(slotKey, plan),
         '<button type="button" class="btn admin-btn-small" data-axis-plan-add-block="' + escapeAttribute(slotKey) + '">Add Block</button>',
         (shouldUsePhaseDailyNavigator() && state.dailyProgrammingViewMode === "phase"
+          ? [
+            '<label class="program-builder-structure-field" style="margin-top:12px;">',
+            '<span>AI Day Prompt</span>',
+            '<textarea rows="3" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-ai-prompt placeholder="Describe the day you want (blocks, exercises, sets/reps/RPE). Example: Warm Up. A Block: Back Squat 3x10 RPE 5-6 + Pull Ups 3x5 RPE 6-7. B Block: Push Up 3x4 + Dead Bug 3x10. Cool Down."></textarea>',
+            '</label>',
+            '<button type="button" class="btn btn-secondary" data-axis-ai-generate="' + escapeAttribute(slotKey) + '">Generate Day With AI</button>'
+          ].join('')
+          : ''),
+        (shouldUsePhaseDailyNavigator() && state.dailyProgrammingViewMode === "phase"
           ? '<button type="button" class="btn admin-btn-primary" data-axis-copy-forward="' + escapeAttribute(slotKey) + '">Copy Day Forward</button>'
           : ''),
         '</div>',
         '</article>'
       ].join('');
     }).join('');
+  }
+
+  function generateAxisDayWithAi(slotKey, button) {
+    if (!state.client || !state.client.functions || typeof state.client.functions.invoke !== "function") {
+      setStatus("Supabase client is unavailable. Reload and try again.", "error");
+      return;
+    }
+
+    var key = String(slotKey || "").trim();
+    if (!key) {
+      setStatus("Missing slot for AI generation.", "error");
+      return;
+    }
+
+    var promptField = document.querySelector('[data-axis-slot="' + escapeAttribute(key) + '"][data-axis-ai-prompt]');
+    var coachPrompt = String(promptField && promptField.value || "").trim();
+    if (!coachPrompt) {
+      setStatus("Add an AI day prompt first.", "info");
+      if (promptField && typeof promptField.focus === "function") {
+        promptField.focus();
+      }
+      return;
+    }
+
+    var parsed = parseSlotKey(key) || { week: 1, workout: 1 };
+    var currentPlan = getSessionPlanForSlot(key);
+    var phase = resolvePhaseForWeek(parsed.week);
+    var objective = resolveObjectiveForWeek(parsed.week);
+    var weeklyEntry = Array.isArray(state.weeklyStructure) ? state.weeklyStructure[parsed.workout - 1] : null;
+
+    var dayPrompt = [
+      "Generate only one training day and keep all other template days unchanged.",
+      "Target slot: " + key + " (week " + String(parsed.week) + ", day " + String(parsed.workout) + ").",
+      "Current title: " + String(currentPlan && currentPlan.title || ""),
+      "Current session type: " + String(currentPlan && currentPlan.session_type || ""),
+      "Current phase: " + String(phase && phase.name || ""),
+      "Weekly slot baseline: " + String(weeklyEntry && weeklyEntry.name || ""),
+      "Objective: " + String(objective && objective.label || ""),
+      "Coach request:",
+      coachPrompt,
+      "Return complete day programming with session plan fields and detailed blocks/exercises/sets/reps/intensity."
+    ].join("\n");
+
+    var requestBody = {
+      prompt: dayPrompt,
+      context: Object.assign({}, buildAiTemplateContextSnapshot(), {
+        target_slot: key,
+        target_week: parsed.week,
+        target_day: parsed.workout,
+        target_phase_name: String(phase && phase.name || ""),
+        target_objective_label: String(objective && objective.label || ""),
+        target_session_plan: currentPlan,
+        target_weekly_entry: weeklyEntry || null,
+        generation_mode: "single_day"
+      })
+    };
+
+    var actionBtn = button || null;
+    var originalLabel = actionBtn && actionBtn.textContent ? actionBtn.textContent : "Generate Day With AI";
+    if (actionBtn) {
+      actionBtn.disabled = true;
+      actionBtn.textContent = "Generating...";
+    }
+    setStatus("Generating day programming with AI...", "info");
+
+    state.client.functions
+      .invoke("ai-generate-program-template", {
+        body: requestBody
+      })
+      .then(function (result) {
+        var error = result && result.error;
+        var data = result && result.data;
+        if (error) {
+          throw new Error(error.message || "AI day generation failed.");
+        }
+
+        var payload = data && data.payload ? data.payload : null;
+        if (!payload || typeof payload !== "object") {
+          throw new Error("AI response did not include a valid payload.");
+        }
+
+        var generatedPlans = payload.session_plans && typeof payload.session_plans === "object"
+          ? payload.session_plans
+          : {};
+        var generatedDays = payload.days && typeof payload.days === "object"
+          ? payload.days
+          : {};
+
+        var generatedPlan = generatedPlans[key] && typeof generatedPlans[key] === "object"
+          ? generatedPlans[key]
+          : null;
+        var generatedExercises = Array.isArray(generatedDays[key])
+          ? normalizeExercisesArray(generatedDays[key])
+          : null;
+
+        var promptDerivedPlan = buildSessionPlanFromPromptText(coachPrompt, key, currentPlan);
+        if (promptDerivedPlan && Array.isArray(promptDerivedPlan.blocks) && promptDerivedPlan.blocks.length) {
+          if (generatedPlan) {
+            generatedPlan = Object.assign({}, generatedPlan, {
+              title: promptDerivedPlan.title || generatedPlan.title,
+              session_goal: promptDerivedPlan.session_goal || generatedPlan.session_goal,
+              blocks: promptDerivedPlan.blocks
+            });
+          } else {
+            generatedPlan = promptDerivedPlan;
+          }
+          generatedExercises = normalizeExercisesArray(convertSessionPlanToExercises(normalizeSessionPlan(generatedPlan, key)));
+        }
+
+        if (!generatedPlan && !generatedExercises) {
+          throw new Error("AI did not return content for " + key + ". Try adding a more specific prompt.");
+        }
+
+        if (generatedPlan) {
+          state.sessionPlans[key] = normalizeSessionPlan(generatedPlan, key);
+        }
+
+        var storageKey = state.storagePrefix + key;
+        var existing = readFromStorage(storageKey) || {};
+        var planForStorage = state.sessionPlans[key] || normalizeSessionPlan(getSessionPlanForSlot(key), key);
+        existing.session_plan = planForStorage;
+        existing.exercises = generatedExercises || convertSessionPlanToExercises(planForStorage);
+        existing.saved_at = new Date().toISOString();
+        writeToStorage(storageKey, existing);
+
+        if (key === state.day) {
+          loadExercisesForDay();
+          renderRows();
+          renderDailyProgrammingDesigner();
+          updateDayInfo();
+        } else {
+          renderDailyAxisEditorCards();
+        }
+
+        setStatus("AI day programming applied to " + labelForSlot(key) + ".", "success");
+      })
+      .catch(function (invokeError) {
+        setStatus(invokeError && invokeError.message ? invokeError.message : "AI day generation failed.", "error");
+      })
+      .finally(function () {
+        if (actionBtn) {
+          actionBtn.disabled = false;
+          actionBtn.textContent = originalLabel;
+        }
+      });
+  }
+
+  function buildSessionPlanFromPromptText(promptText, slotKey, basePlan) {
+    var text = String(promptText || "").trim();
+    if (!text) {
+      return null;
+    }
+
+    var plan = normalizeSessionPlan(basePlan || getSessionPlanForSlot(slotKey), slotKey);
+    var lines = text
+      .split(/\r?\n/)
+      .map(function (line) { return String(line || "").trim(); })
+      .filter(function (line) { return !!line; });
+
+    var blocks = [];
+    var currentBlock = null;
+
+    lines.forEach(function (line) {
+      var blockMeta = parsePromptBlockHeader(line);
+      if (blockMeta) {
+        currentBlock = createPromptBlock(blockMeta);
+        blocks.push(currentBlock);
+        return;
+      }
+
+      var exercise = parsePromptExerciseLine(line);
+      if (!exercise) {
+        return;
+      }
+
+      if (!currentBlock) {
+        currentBlock = createPromptBlock({ type: "main_strength", title: "A Block" });
+        blocks.push(currentBlock);
+      }
+
+      appendExerciseToPromptBlock(currentBlock, exercise);
+    });
+
+    blocks = blocks
+      .map(function (block) {
+        return normalizeSessionBlocks([block])[0];
+      })
+      .filter(function (block) {
+        return !!block;
+      });
+
+    if (!blocks.length) {
+      return null;
+    }
+
+    plan.blocks = blocks;
+    return plan;
+  }
+
+  function parsePromptBlockHeader(line) {
+    var text = String(line || "").trim();
+    if (!text) {
+      return null;
+    }
+
+    var normalized = text.toLowerCase();
+    if (/^warm\s*up\b/.test(normalized)) {
+      return { type: "warmup", title: text.replace(/^warm\s*up\s*:?\s*/i, "") || "Warm-Up" };
+    }
+    if (/^cool\s*down\b/.test(normalized)) {
+      return { type: "cooldown", title: text.replace(/^cool\s*down\s*:?\s*/i, "") || "Cool Down" };
+    }
+
+    var blockMatch = /^([abc])\s*block\s*:?(.*)$/i.exec(text);
+    if (blockMatch) {
+      var key = String(blockMatch[1] || "").toUpperCase();
+      var remainder = String(blockMatch[2] || "").trim();
+      var blockType = key === "A" ? "main_strength" : key === "B" ? "secondary_strength" : "accessory";
+      return {
+        type: blockType,
+        title: remainder || (key + " Block")
+      };
+    }
+
+    return null;
+  }
+
+  function createPromptBlock(meta) {
+    var type = normalizeSessionBlockType(meta && meta.type);
+    var defaults = getDefaultBlockFieldsForType(type);
+    return Object.assign({
+      type: type,
+      title: String(meta && meta.title || prettySessionBlockLabel(type)).trim(),
+      prescription: "",
+      notes: "",
+      exercise_count: 0,
+      exercise_names: [],
+      exercise_sets: [],
+      exercise_intensity_types: [],
+      exercise_set_reps: [],
+      exercise_set_intensities: [],
+      exercise_set_rests: [],
+      exercise_set_rep_types: [],
+      exercise_set_intensity_types: []
+    }, defaults);
+  }
+
+  function parsePromptExerciseLine(line) {
+    var text = String(line || "").trim();
+    if (!text) {
+      return null;
+    }
+
+    var stripped = text
+      .replace(/^[-*]\s*/, "")
+      .replace(/^\d+[\.)]\s*/, "");
+
+    var setRepMatch = /(\d+)\s*x\s*([\w:\-\.]+)/i.exec(stripped);
+    var rpeMatch = /\bRPE\s*([\d.\-]+)/i.exec(stripped);
+
+    var name = stripped;
+    if (setRepMatch) {
+      name = stripped.slice(0, setRepMatch.index).trim();
+    }
+    if (!name) {
+      return null;
+    }
+
+    var setCount = setRepMatch ? clampNumber(parseInt(setRepMatch[1], 10), 1, 20, 3) : 1;
+    var repValue = setRepMatch ? String(setRepMatch[2] || "").trim() : "";
+    var intensityValue = rpeMatch ? String(rpeMatch[1] || "").trim() : "";
+
+    return {
+      name: name,
+      setCount: setCount,
+      reps: repValue || "5",
+      intensity: intensityValue || "7",
+      repType: detectPromptRepType(repValue)
+    };
+  }
+
+  function detectPromptRepType(repValue) {
+    var text = String(repValue || "").trim().toLowerCase();
+    if (!text) {
+      return "reps";
+    }
+    if (/(sec|secs|second|seconds|min|mins|minute|minutes|:|s$)/i.test(text)) {
+      return "sec";
+    }
+    return "reps";
+  }
+
+  function appendExerciseToPromptBlock(block, exercise) {
+    if (!block || !exercise) {
+      return;
+    }
+
+    var setTotal = clampNumber(parseInt(exercise.setCount, 10), 1, 20, 1);
+    var repsRow = new Array(setTotal).fill(String(exercise.reps || "5"));
+    var intensityRow = new Array(setTotal).fill(String(exercise.intensity || "7"));
+    var restRow = new Array(setTotal).fill("");
+    var repTypeRow = new Array(setTotal).fill(exercise.repType || "reps");
+    var intensityTypeRow = new Array(setTotal).fill("rpe");
+
+    block.exercise_names = (Array.isArray(block.exercise_names) ? block.exercise_names : []).concat([String(exercise.name || "Exercise").trim()]);
+    block.exercise_sets = (Array.isArray(block.exercise_sets) ? block.exercise_sets : []).concat([String(setTotal)]);
+    block.exercise_intensity_types = (Array.isArray(block.exercise_intensity_types) ? block.exercise_intensity_types : []).concat(["rpe"]);
+    block.exercise_set_reps = (Array.isArray(block.exercise_set_reps) ? block.exercise_set_reps : []).concat([repsRow]);
+    block.exercise_set_intensities = (Array.isArray(block.exercise_set_intensities) ? block.exercise_set_intensities : []).concat([intensityRow]);
+    block.exercise_set_rests = (Array.isArray(block.exercise_set_rests) ? block.exercise_set_rests : []).concat([restRow]);
+    block.exercise_set_rep_types = (Array.isArray(block.exercise_set_rep_types) ? block.exercise_set_rep_types : []).concat([repTypeRow]);
+    block.exercise_set_intensity_types = (Array.isArray(block.exercise_set_intensity_types) ? block.exercise_set_intensity_types : []).concat([intensityTypeRow]);
+    block.exercise_count = (Array.isArray(block.exercise_names) ? block.exercise_names.length : 0);
   }
 
   function applyDailyAxisSelectValues(container, slotKeys) {
@@ -2420,6 +2977,10 @@
   }
 
   function renderAxisExerciseRows(slotKey, block, index) {
+    var blockType = normalizeSessionBlockType(block && block.type);
+    var setFallback = defaultExerciseSetFallbackForBlockType(blockType);
+    var repsFallback = defaultExerciseRepFallbackForBlockType(blockType);
+    var intensityFallback = defaultExerciseIntensityFallbackForBlockType(blockType);
     var sourceNames = Array.isArray(block && block.exercise_names) ? block.exercise_names : [];
     var sourceSets = Array.isArray(block && block.exercise_sets) ? block.exercise_sets : [];
     var sourceIntensityTypes = Array.isArray(block && block.exercise_intensity_types) ? block.exercise_intensity_types : [];
@@ -2432,10 +2993,10 @@
     );
     var count = clampNumber(inferredCount, 1, 20, 1);
     var names = normalizeExerciseNames(block && block.exercise_names, count);
-    var sets = normalizeExerciseValues(block && block.exercise_sets, count, 3);
+    var sets = normalizeExerciseValues(block && block.exercise_sets, count, setFallback);
     var intensityTypes = normalizeExerciseValues(block && block.exercise_intensity_types, count, "rpe").map(normalizeIntensityTypeValue);
-    var setReps = normalizeExerciseNestedValues(block && block.exercise_set_reps, count, '5', sets);
-    var setIntensities = normalizeExerciseNestedValues(block && block.exercise_set_intensities, count, '7', sets);
+    var setReps = normalizeExerciseNestedValues(block && block.exercise_set_reps, count, repsFallback, sets);
+    var setIntensities = normalizeExerciseNestedValues(block && block.exercise_set_intensities, count, intensityFallback, sets);
     var setRests = normalizeExerciseNestedValues(block && block.exercise_set_rests, count, '', sets);
     var setRepTypes = normalizeExerciseSetRepTypes(block && block.exercise_set_rep_types, count, sets, block && block.exercise_rep_types);
     var setIntensityTypes = normalizeExerciseSetIntensityTypes(block && block.exercise_set_intensity_types, count, sets, intensityTypes);
@@ -2492,6 +3053,36 @@
     fields.push('<div class="program-builder-axis-exercise-actions"><button type="button" class="btn admin-btn-small axis-btn-compact" data-axis-slot="' + escapeAttribute(slotKey) + '" data-axis-block-index="' + index + '" data-axis-add-exercise="1">+ Exercise</button></div>');
     fields.push('</div>');
     return fields.join('');
+  }
+
+  function defaultExerciseSetFallbackForBlockType(blockType) {
+    var type = normalizeSessionBlockType(blockType);
+    if (type === 'warmup' || type === 'activation' || type === 'cooldown' || type === 'mobility' || type === 'assessment') {
+      return 1;
+    }
+    return 3;
+  }
+
+  function defaultExerciseRepFallbackForBlockType(blockType) {
+    var type = normalizeSessionBlockType(blockType);
+    if (type === 'warmup' || type === 'activation' || type === 'cooldown' || type === 'mobility') {
+      return '5';
+    }
+    if (type === 'assessment') {
+      return '8';
+    }
+    return '5';
+  }
+
+  function defaultExerciseIntensityFallbackForBlockType(blockType) {
+    var type = normalizeSessionBlockType(blockType);
+    if (type === 'warmup' || type === 'activation' || type === 'cooldown' || type === 'mobility') {
+      return '3';
+    }
+    if (type === 'assessment') {
+      return '6';
+    }
+    return '7';
   }
 
   function renderAxisExerciseSetRows(slotKey, block, blockIndex, exerciseIndex, setCount, setReps, setIntensities, setRests, setRepTypes, setIntensityTypes, flow) {
@@ -2704,7 +3295,13 @@
       || normalized === 'strength_full'
       || normalized === 'main_strength'
       || normalized === 'secondary_strength'
-      || normalized === 'power';
+      || normalized === 'power'
+      || normalized === 'accessory'
+      || normalized === 'warmup'
+      || normalized === 'activation'
+      || normalized === 'cooldown'
+      || normalized === 'mobility'
+      || normalized === 'assessment';
   }
 
   function buildExerciseFlowOptions(selectedValue) {
@@ -3333,7 +3930,12 @@
     setTextContent("[data-session-summary-type]", prettySessionTypeLabel(plan.session_type));
   }
 
-  function syncDailyProgrammingInput(target) {
+  function normalizeLiveTextInput(value, eventType) {
+    var raw = String(value == null ? '' : value);
+    return eventType === 'change' ? raw.trim() : raw;
+  }
+
+  function syncDailyProgrammingInput(target, eventType) {
     if ((!state.isTemplateBuilder && !state.isCoachAssignedProgramEdit) || state.builderStep !== 3 || !target || !target.getAttribute) {
       return;
     }
@@ -3394,9 +3996,10 @@
       } else {
         axisPlan[axisField] = axisField === "duration_minutes"
           ? clampNumber(parseInt(target.value, 10), 0, 1440, axisPlan.duration_minutes || 0)
-          : String(target.value || '').trim();
+          : normalizeLiveTextInput(target.value, eventType);
       }
       state.sessionPlans[axisSlot] = axisPlan;
+      persistSessionPlanForSlot(axisSlot, state.sessionPlans[axisSlot]);
       saveExercisesForDay(true);
       if (axisSlot === state.day) {
         renderDailyProgrammingSummary(axisPlan);
@@ -3417,7 +4020,7 @@
         var exerciseNameIndex = parseInt(String(target.getAttribute("data-axis-exercise-index") || "-1"), 10);
         var currentNames = normalizeExerciseNames(axisBlock.exercise_names, axisBlock.exercise_count);
         if (Number.isFinite(exerciseNameIndex) && exerciseNameIndex >= 0 && exerciseNameIndex < currentNames.length) {
-          currentNames[exerciseNameIndex] = String(target.value || '').trim();
+          currentNames[exerciseNameIndex] = normalizeLiveTextInput(target.value, eventType);
           axisBlock.exercise_names = currentNames;
         }
       } else if (axisBlockField === 'exercise_sets') {
@@ -3487,7 +4090,7 @@
               ? normalizeIntensityTypeValue(target.value)
               : axisBlockField === 'exercise_set_rep_types'
                 ? normalizeRepTypeValue(target.value)
-              : String(target.value || '').trim();
+              : normalizeLiveTextInput(target.value, eventType);
             if (axisBlockField === 'exercise_set_intensity_types') {
               axisBlock.exercise_set_intensity_types = nestedValues;
             } else if (axisBlockField === 'exercise_set_rep_types') {
@@ -3500,7 +4103,7 @@
           }
         }
       } else {
-        axisBlock[axisBlockField] = String(target.value || '').trim();
+        axisBlock[axisBlockField] = normalizeLiveTextInput(target.value, eventType);
       }
 
       if (axisBlockField === 'exercise_count') {
@@ -3540,6 +4143,7 @@
         });
       }
       state.sessionPlans[axisSlot] = axisBlockPlan;
+      persistSessionPlanForSlot(axisSlot, state.sessionPlans[axisSlot]);
       saveExercisesForDay(true);
       renderDailyAxisEditorCards();
       return;
@@ -3600,7 +4204,7 @@
       } else {
         plan[planField] = planField === "duration_minutes"
           ? clampNumber(parseInt(target.value, 10), 0, 1440, plan.duration_minutes || 0)
-          : String(target.value || '').trim();
+          : normalizeLiveTextInput(target.value, eventType);
       }
       state.sessionPlans[state.day] = plan;
       saveExercisesForDay(true);
@@ -3616,7 +4220,7 @@
       if (!Number.isFinite(blockIndex) || blockIndex < 0 || blockIndex >= currentPlan.blocks.length) {
         return;
       }
-      currentPlan.blocks[blockIndex][blockField] = String(target.value || '').trim();
+      currentPlan.blocks[blockIndex][blockField] = normalizeLiveTextInput(target.value, eventType);
       if (blockField === 'type' && (!currentPlan.blocks[blockIndex].title || currentPlan.blocks[blockIndex].title === 'New Block')) {
         currentPlan.blocks[blockIndex].title = prettySessionBlockLabel(currentPlan.blocks[blockIndex].type);
       }
@@ -3632,7 +4236,15 @@
     }
     var existing = state.sessionPlans && state.sessionPlans[key];
     if (existing) {
-      return normalizeSessionPlan(existing, key);
+      var normalized = normalizeSessionPlan(existing, key);
+      var hasBlocks = Array.isArray(normalized.blocks) && normalized.blocks.length > 0;
+      var hasMeaningfulTitle = !!cleanText(normalized.title) && !/^session\s*title$/i.test(cleanText(normalized.title));
+
+      if ((state.isTemplateBuilder || state.isCoachAssignedProgramEdit) && !hasBlocks && !hasMeaningfulTitle) {
+        return buildDefaultSessionPlan(key);
+      }
+
+      return normalized;
     }
     return buildDefaultSessionPlan(key);
   }
@@ -3672,7 +4284,7 @@
     var fallback = buildSessionPlanFallback(slotKey);
     var normalizedSessionType = normalizeWeeklySessionType(source.session_type || fallback.session_type);
     return {
-      title: String(source.title || fallback.title).trim(),
+      title: String(source.title || fallback.title),
       session_type: normalizedSessionType,
       climbing_session_type: normalizedSessionType === 'climbing'
         ? normalizeClimbingSessionType(source.climbing_session_type || fallback.climbing_session_type)
@@ -4149,6 +4761,21 @@
 
   function getDefaultBlockFieldsForType(blockType) {
     var type = normalizeSessionBlockType(blockType);
+    if (type === 'warmup' || type === 'activation' || type === 'cooldown' || type === 'mobility' || type === 'assessment') {
+      var timed = type === 'warmup' || type === 'activation' || type === 'cooldown' || type === 'mobility';
+      return {
+        exercise_flow: 'straight',
+        exercise_rest_strategy: 'between_exercises',
+        exercise_rest_interval: '',
+        exercise_count: 1,
+        exercise_names: [''],
+        exercise_sets: ['1'],
+        exercise_rep_type: timed ? 'sec' : 'reps',
+        exercise_intensity_type: 'rpe',
+        exercise_reps: [timed ? '300' : '8'],
+        exercise_intensities: [timed ? '3' : '6']
+      };
+    }
     if (isExerciseConfiguredBlockType(type)) {
       return {
         exercise_flow: 'straight',
@@ -4484,6 +5111,18 @@
 
   function bindTemplatePlannerEvents() {
     document.addEventListener("click", function (event) {
+      var aiGenerateBtn = event.target && event.target.closest("[data-template-ai-generate]");
+      if (aiGenerateBtn) {
+        generateTemplateWithAi(aiGenerateBtn);
+        return;
+      }
+
+      var saveProgressBtn = event.target && event.target.closest("[data-template-save-progress]");
+      if (saveProgressBtn) {
+        saveTemplateProgressInPlace(saveProgressBtn);
+        return;
+      }
+
       var addObjectiveBtn = event.target && event.target.closest("[data-template-add-objective]");
       if (addObjectiveBtn) {
         var seasonObjectives = Array.isArray(state.programMeta && state.programMeta.season_objectives)
@@ -4659,6 +5298,97 @@
         renderProgramBuilderAlerts();
       }
     });
+  }
+
+  function buildAiTemplateContextSnapshot() {
+    return {
+      template_name: String(state.templateName || "").trim(),
+      focus: normalizeTemplateFocus(state.templateFocus),
+      structure: normalizeStructure(state.structure),
+      program_meta: normalizeProgramMeta(state.programMeta, state.structure),
+      program_phases: normalizeProgramPhases(
+        state.programPhases,
+        normalizeStructure(state.structure).weeks,
+        state.programMeta && state.programMeta.program_type
+      ),
+      weekly_structure: normalizeWeeklyStructure(
+        state.weeklyStructure,
+        normalizeStructure(state.structure).workoutsPerWeek,
+        state.templateFocus,
+        state.programMeta && state.programMeta.program_type
+      )
+    };
+  }
+
+  function generateTemplateWithAi(button) {
+    if (!state.isTemplateBuilder) {
+      setStatus("AI template generation is only available in template builder mode.", "info");
+      return;
+    }
+
+    if (!state.client || !state.client.functions || typeof state.client.functions.invoke !== "function") {
+      setStatus("Supabase client is unavailable. Reload and try again.", "error");
+      return;
+    }
+
+    var promptInput = document.querySelector("[data-template-ai-prompt]");
+    var prompt = String(promptInput && promptInput.value || "").trim();
+    if (!prompt) {
+      setStatus("Add a prompt before generating with AI.", "info");
+      if (promptInput && typeof promptInput.focus === "function") {
+        promptInput.focus();
+      }
+      return;
+    }
+
+    var originalLabel = button && button.textContent ? button.textContent : "Generate With AI";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Generating...";
+    }
+    setStatus("Generating template draft with AI...", "info");
+
+    var requestBody = {
+      prompt: prompt,
+      context: buildAiTemplateContextSnapshot()
+    };
+
+    state.client.functions
+      .invoke("ai-generate-program-template", {
+        body: requestBody
+      })
+      .then(function (result) {
+        var error = result && result.error;
+        var data = result && result.data;
+
+        if (error) {
+          throw new Error(error.message || "AI generation request failed.");
+        }
+
+        var payload = data && data.payload ? data.payload : null;
+        if (!payload || typeof payload !== "object") {
+          throw new Error("AI response did not include a valid template payload.");
+        }
+
+        var aiTemplateName = String(data && data.templateName || "").trim() || String(state.templateName || "").trim() || "AI Generated Template";
+        loadTemplatePayloadIntoBuilder(aiTemplateName, payload);
+
+        if (Array.isArray(data && data.warnings) && data.warnings.length) {
+          setStatus("AI draft loaded with " + String(data.warnings.length) + " warning(s). Review and edit as needed.", "info");
+          return;
+        }
+
+        setStatus("AI draft loaded. Review and edit before saving.", "success");
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "AI generation failed.", "error");
+      })
+      .finally(function () {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalLabel;
+        }
+      });
   }
 
   function resolveTemplateBuilderCoachAccess() {
@@ -5803,7 +6533,7 @@
         } else {
           plan[field] = field === "duration_minutes"
             ? clampNumber(parseInt(target.value, 10), 0, 1440, plan.duration_minutes || 0)
-            : String(target.value || "").trim();
+            : normalizeLiveTextInput(target.value, event && event.type);
         }
       }
 
@@ -5819,7 +6549,7 @@
               title: existingTitle && existingTitle !== "New Block" ? existingTitle : prettySessionBlockLabel(nextType)
             });
           } else {
-            plan.blocks[blockIndex][blockField] = String(target.value || "").trim();
+            plan.blocks[blockIndex][blockField] = normalizeLiveTextInput(target.value, event && event.type);
           }
         }
       }
@@ -6650,8 +7380,6 @@
       return;
     }
 
-    saveExercisesForDay(true);
-
     var slotKeys = getAllSlotKeys();
     var currentIndex = slotKeys.indexOf(state.day);
     if (currentIndex === -1 || currentIndex >= slotKeys.length - 1) {
@@ -6668,7 +7396,8 @@
       }
     }
 
-    var sourceExercises = cloneExercises(state.exercises);
+    var sourcePlan = getCurrentSessionPlan();
+    var sourceExercises = cloneExercises(Array.isArray(state.exercises) ? state.exercises : []);
     var copied = 0;
 
     for (var i = currentIndex + 1; i < slotKeys.length; i++) {
@@ -6680,7 +7409,7 @@
 
       var targetPayload = {
         exercises: cloneExercises(sourceExercises),
-        session_plan: cloneSessionPlan(getCurrentSessionPlan(), slotKey),
+        session_plan: cloneSessionPlan(sourcePlan, slotKey),
         saved_at: new Date().toISOString()
       };
 
@@ -6734,13 +7463,11 @@
       return;
     }
 
-    saveExercisesForDay(true);
-
     var sourcePayload = readFromStorage(state.storagePrefix + sourceKey) || {};
-    var sourcePlan = sourcePayload.session_plan || state.sessionPlans[sourceKey] || getCurrentSessionPlan();
-    var sourceExercises = Array.isArray(sourcePayload.exercises)
-      ? cloneExercises(sourcePayload.exercises)
-      : cloneExercises(state.exercises || []);
+    var sourcePlan = state.sessionPlans[sourceKey] || sourcePayload.session_plan || getCurrentSessionPlan();
+    var sourceExercises = sourceKey === state.day
+      ? cloneExercises(Array.isArray(state.exercises) ? state.exercises : [])
+      : convertSessionPlanToExercises(sourcePlan);
     var copiedCount = 0;
 
     for (var week = sourceWeek + 1; week <= phaseEndWeek; week++) {
@@ -6812,8 +7539,6 @@
       return;
     }
 
-    saveExercisesForDay(true);
-
     var copiedWeeks = 0;
     for (var week = sourceWeek + 1; week <= phaseEndWeek; week++) {
       slotKeys.forEach(function (weekSourceKey) {
@@ -6825,8 +7550,8 @@
         var targetKey = "w" + String(week) + "d" + String(weekSourceParsed.workout);
         var sourcePayload = readFromStorage(state.storagePrefix + weekSourceKey) || {};
         var sourcePlan = state.sessionPlans[weekSourceKey] || sourcePayload.session_plan || getSessionPlanForSlot(weekSourceKey);
-        var sourceExercises = Array.isArray(sourcePayload.exercises) && sourcePayload.exercises.length
-          ? cloneExercises(sourcePayload.exercises)
+        var sourceExercises = weekSourceKey === state.day
+          ? cloneExercises(Array.isArray(state.exercises) ? state.exercises : [])
           : convertSessionPlanToExercises(sourcePlan);
         var targetSessionPlan = cloneSessionPlan(sourcePlan, targetKey);
         var targetPayload = Object.assign({}, sourcePayload, {
@@ -9089,6 +9814,27 @@
     }
   }
 
+  function autoSaveTemplateBuilderDraftState() {
+    if (!state.isTemplateBuilder) {
+      return;
+    }
+
+    saveExercisesForDay(true);
+
+    Object.keys(state.sessionPlans || {}).forEach(function (slotKey) {
+      if (!/^w\d+d\d+$/i.test(slotKey)) {
+        return;
+      }
+
+      var slotPlan = state.sessionPlans[slotKey];
+      if (!slotPlan) {
+        return;
+      }
+
+      persistSessionPlanForSlot(slotKey, slotPlan);
+    });
+  }
+
   function syncScheduledSessionStatusForCurrentDay() {
     if (
       !state.client ||
@@ -9247,6 +9993,41 @@
       })
       .catch(function (error) {
         setStatus(error && error.message ? error.message : "Failed to save template.", "error");
+      });
+  }
+
+  function saveTemplateProgressInPlace(button) {
+    var saveButton = button || null;
+    var originalLabel = saveButton ? saveButton.textContent : "";
+    var saveData = buildTemplateSaveData({
+      promptForName: false,
+      showErrors: true
+    });
+
+    if (!saveData) {
+      return;
+    }
+
+    if (saveButton) {
+      saveButton.disabled = true;
+      saveButton.textContent = "Saving...";
+    }
+
+    setStatus("Saving template progress...", "info");
+
+    saveTemplateToLibrary(saveData)
+      .then(function () {
+        setProgramTitleFromQuery();
+        setStatus("Progress saved.", "success");
+      })
+      .catch(function (error) {
+        setStatus(error && error.message ? error.message : "Failed to save template.", "error");
+      })
+      .finally(function () {
+        if (saveButton) {
+          saveButton.disabled = false;
+          saveButton.textContent = originalLabel || "Save Progress";
+        }
       });
   }
 
@@ -11792,11 +12573,24 @@
   }
 
   function getExercisesForPrintForDay(slotKey) {
+    var liveSessionPlan = state.sessionPlans && state.sessionPlans[slotKey]
+      ? normalizeSessionPlan(state.sessionPlans[slotKey], slotKey)
+      : null;
     var payload = readFromStorage(state.storagePrefix + slotKey);
     var storedExercises = payload && Array.isArray(payload.exercises) ? cloneExercises(payload.exercises) : null;
     var assignedExercises = state.assignedTemplateDays && Array.isArray(state.assignedTemplateDays[slotKey])
       ? cloneExercises(state.assignedTemplateDays[slotKey])
       : null;
+
+    if (state.isTemplateBuilder || state.isCoachAssignedProgramEdit) {
+      if (liveSessionPlan) {
+        return normalizeExercisesArray(convertSessionPlanToExercises(liveSessionPlan));
+      }
+
+      if (slotKey === state.day && Array.isArray(state.exercises) && state.exercises.length) {
+        return normalizeExercisesArray(state.exercises);
+      }
+    }
 
     if (state.isAthleteLockedView && assignedExercises) {
       var merged = storedExercises
@@ -11986,6 +12780,51 @@
     setInputValue("[data-template-framework-wave-heading]", meta.framework_wave_heading);
     setInputValue("[data-template-framework-wave-rows]", meta.framework_wave_rows_text);
     setInputValue("[data-template-framework-wave-footer]", meta.framework_wave_footer);
+    setInputValue("[data-template-yearly-athlete-name]", meta.yearly_athlete_name);
+    setInputValue("[data-template-yearly-program-year]", meta.yearly_program_year);
+    setInputValue("[data-template-yearly-primary-sport]", meta.yearly_primary_sport);
+    setInputValue("[data-template-yearly-secondary-sports]", meta.yearly_secondary_sports);
+    setInputValue("[data-template-yearly-coach-provider]", meta.yearly_coach_provider);
+    setInputValue("[data-template-yearly-plan-start-date]", meta.yearly_plan_start_date);
+    setInputValue("[data-template-yearly-training-age]", meta.yearly_training_age);
+    setInputValue("[data-template-yearly-current-weekly-volume]", meta.yearly_current_weekly_volume);
+    setInputValue("[data-template-yearly-current-strength-frequency]", meta.yearly_current_strength_frequency);
+    setInputValue("[data-template-yearly-current-endurance-frequency]", meta.yearly_current_endurance_frequency);
+    setInputValue("[data-template-yearly-available-training-days]", meta.yearly_available_training_days);
+    setInputValue("[data-template-yearly-typical-session-duration]", meta.yearly_typical_session_duration);
+    setInputValue("[data-template-yearly-relevant-injury-history]", meta.yearly_relevant_injury_history);
+    setInputValue("[data-template-yearly-equipment-access]", meta.yearly_equipment_access);
+    setInputValue("[data-template-yearly-travel-work-constraints]", meta.yearly_travel_work_constraints);
+    setInputValue("[data-template-yearly-preferred-recovery-day]", meta.yearly_preferred_recovery_day);
+    setInputValue("[data-template-yearly-description]", meta.yearly_description);
+    setInputValue("[data-template-yearly-assumption]", meta.yearly_assumption);
+    setInputValue("[data-template-yearly-tagline]", meta.yearly_tagline);
+    setInputValue("[data-template-yearly-progression-rule]", meta.yearly_progression_rule);
+    setInputValue("[data-template-yearly-concurrent-rule]", meta.yearly_concurrent_rule);
+    setInputValue("[data-template-yearly-annual-goals-rows]", meta.yearly_annual_goals_rows_text);
+    setInputValue("[data-template-yearly-programming-philosophy]", meta.yearly_programming_philosophy);
+    setInputValue("[data-template-yearly-calendar-rows]", meta.yearly_calendar_rows_text);
+    setInputValue("[data-template-yearly-phase-map-rows]", meta.yearly_phase_map_rows_text);
+    setInputValue("[data-template-yearly-transition-rows]", meta.yearly_transition_rows_text);
+    setInputValue("[data-template-yearly-testing-rows]", meta.yearly_testing_rows_text);
+    setInputValue("[data-template-yearly-month-overview-rows]", meta.yearly_month_overview_rows_text);
+    setInputValue("[data-template-yearly-month-priority-rows]", meta.yearly_month_priority_rows_text);
+    setInputValue("[data-template-yearly-month-target-rows]", meta.yearly_month_target_rows_text);
+    setInputValue("[data-template-yearly-month-week-rows]", meta.yearly_month_week_rows_text);
+    setInputValue("[data-template-yearly-month-review-rows]", meta.yearly_month_review_rows_text);
+    setInputValue("[data-template-yearly-calendar-interpretation]", meta.yearly_calendar_interpretation);
+    setInputValue("[data-template-yearly-half-year-review-rows]", meta.yearly_half_year_review_rows_text);
+    setInputValue("[data-template-yearly-end-year-review-rows]", meta.yearly_end_year_review_rows_text);
+    setInputValue("[data-template-yearly-capability-matrix-rows]", meta.yearly_capability_matrix_rows_text);
+    setInputValue("[data-template-yearly-monitoring-rows]", meta.yearly_monitoring_rows_text);
+    setInputValue("[data-template-yearly-adjustment-order]", meta.yearly_adjustment_order);
+    setInputValue("[data-template-yearly-default-week-rows]", meta.yearly_default_week_rows_text);
+    setInputValue("[data-template-yearly-strength-framework-rows]", meta.yearly_strength_framework_rows_text);
+    setInputValue("[data-template-yearly-annual-review-goal-rows]", meta.yearly_annual_review_goal_rows_text);
+    setInputValue("[data-template-yearly-annual-review-lessons-rows]", meta.yearly_annual_review_lessons_rows_text);
+    setInputValue("[data-template-yearly-next-year-start-rows]", meta.yearly_next_year_start_rows_text);
+    setInputValue("[data-template-yearly-coach-athlete-summary]", meta.yearly_coach_athlete_summary);
+    setInputValue("[data-template-yearly-planning-notes-rows]", meta.yearly_planning_notes_rows_text);
     setInputValue("[data-template-peak-date]", meta.peak_date);
     setInputValue("[data-template-primary-goal]", meta.primary_goal);
     setInputValue("[data-template-secondary-goal]", meta.secondary_goal);
@@ -11995,6 +12834,16 @@
     setInputValue("[data-template-mobility-days]", String(meta.mobility_days_per_week));
     setInputValue("[data-template-deload-frequency]", meta.deload_frequency);
     setInputValue("[data-template-tags]", (meta.tags || []).join(", "));
+    updateYearlyTemplateContentVisibility(meta.program_type);
+  }
+
+  function updateYearlyTemplateContentVisibility(programType) {
+    var yearlySection = document.querySelector("[data-template-yearly-content]");
+    if (!yearlySection) {
+      return;
+    }
+
+    yearlySection.hidden = String(programType || "").trim().toLowerCase() !== "yearly";
   }
 
   function getStructuredEditorSchema(fieldName) {
@@ -12022,7 +12871,7 @@
       return [];
     }
 
-    return parseLines(cleanText(textValue)).map(function (line) {
+    var rows = parseLines(cleanText(textValue)).map(function (line) {
       var parts = String(line || "").split("|");
       var row = {};
       schema.columns.forEach(function (column, index) {
@@ -12036,6 +12885,12 @@
         return !!cleanText(row[column.key]);
       });
     });
+
+    if (fieldName === "general_weekly_structure_text") {
+      return normalizeGeneralWeeklyStructureRows(rows);
+    }
+
+    return rows;
   }
 
   function serializeStructuredEditorRows(fieldName, rows) {
@@ -12044,7 +12899,12 @@
       return "";
     }
 
-    return (Array.isArray(rows) ? rows : []).map(function (row) {
+    var safeRows = Array.isArray(rows) ? rows : [];
+    if (fieldName === "general_weekly_structure_text") {
+      safeRows = normalizeGeneralWeeklyStructureRows(safeRows);
+    }
+
+    return safeRows.map(function (row) {
       var parts = schema.columns.map(function (column) {
         return cleanText(row && row[column.key]);
       });
@@ -12105,6 +12965,53 @@
     return attrs.join("");
   }
 
+  function getGeneralWeeklyStructureDayLabels() {
+    return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  }
+
+  function normalizeGeneralWeeklyStructureRows(rows) {
+    var dayLabels = getGeneralWeeklyStructureDayLabels();
+    var byDay = {};
+    var extras = [];
+
+    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+      var item = row && typeof row === "object" ? row : {};
+      var dayValue = cleanText(item.day).toLowerCase();
+      var normalized = {
+        day: "",
+        focus: cleanText(item.focus),
+        notes: cleanText(item.notes)
+      };
+
+      if (dayValue && dayLabels.some(function (label) { return label.toLowerCase() === dayValue; })) {
+        if (!byDay[dayValue]) {
+          byDay[dayValue] = normalized;
+        }
+        return;
+      }
+
+      extras.push(normalized);
+    });
+
+    var hasNamedWeekday = dayLabels.some(function (dayLabel) {
+      return !!byDay[dayLabel.toLowerCase()];
+    });
+
+    return dayLabels.map(function (dayLabel) {
+      var key = dayLabel.toLowerCase();
+      var matched = byDay[key] || (!hasNamedWeekday ? extras.shift() : null) || {};
+      return {
+        day: dayLabel,
+        focus: cleanText(matched.focus),
+        notes: cleanText(matched.notes)
+      };
+    });
+  }
+
+  function isLockedWeeklyStructureStructuredField(fieldName) {
+    return String(fieldName || "").trim() === "general_weekly_structure_text";
+  }
+
   function buildStructuredEditorRowHtml(scope, row, rowIndex) {
     var schema = getStructuredEditorSchema(scope.fieldName);
     if (!schema) {
@@ -12112,17 +13019,19 @@
     }
 
     var scopeAttrs = buildStructuredEditorScopeAttributes(scope);
+    var lockWeeklyDays = isLockedWeeklyStructureStructuredField(scope.fieldName);
     return [
       '<div class="program-builder-structured-editor-row" style="--structured-columns:' + String(schema.columns.length) + ';">',
       schema.columns.map(function (column) {
+        var readonlyAttr = lockWeeklyDays && column.key === "day" ? ' readonly aria-readonly="true"' : '';
         return [
           '<div class="program-builder-structured-editor-cell">',
-          '<input type="text" data-structured-cell="' + escapeAttribute(column.key) + '" data-structured-row-index="' + String(rowIndex) + '"' + scopeAttrs + ' value="' + escapeAttribute(row && row[column.key] || "") + '" placeholder="' + escapeAttribute(column.placeholder || column.label) + '" />',
+          '<input type="text" data-structured-cell="' + escapeAttribute(column.key) + '" data-structured-row-index="' + String(rowIndex) + '"' + scopeAttrs + ' value="' + escapeAttribute(row && row[column.key] || "") + '" placeholder="' + escapeAttribute(column.placeholder || column.label) + '"' + readonlyAttr + ' />',
           '</div>'
         ].join('');
       }).join(''),
       '<div class="program-builder-structured-editor-actions">',
-      '<button type="button" class="btn admin-btn-small" data-structured-remove-row="' + String(rowIndex) + '"' + scopeAttrs + '>Remove</button>',
+      (lockWeeklyDays ? '' : '<button type="button" class="btn admin-btn-small" data-structured-remove-row="' + String(rowIndex) + '"' + scopeAttrs + '>Remove</button>'),
       '</div>',
       '</div>'
     ].join('');
@@ -12137,6 +13046,10 @@
 
     var scopeAttrs = buildStructuredEditorScopeAttributes(scope);
     var safeRows = Array.isArray(rows) ? rows : [];
+    var lockWeeklyDays = isLockedWeeklyStructureStructuredField(scope.fieldName);
+    if (lockWeeklyDays) {
+      safeRows = normalizeGeneralWeeklyStructureRows(safeRows);
+    }
     container.innerHTML = [
       '<div class="program-builder-structured-editor-head" style="--structured-columns:' + String(schema.columns.length) + ';">',
       schema.columns.map(function (column) {
@@ -12150,7 +13063,7 @@
           }).join('')
         : '<p class="program-builder-structured-editor-empty">' + escapeHtml(schema.emptyMessage || 'No rows added yet.') + '</p>',
       '<div class="program-builder-structured-editor-actions">',
-      '<button type="button" class="btn admin-btn-small" data-structured-add-row="1"' + scopeAttrs + '>' + escapeHtml(schema.addLabel || 'Add Row') + '</button>',
+      (lockWeeklyDays ? '' : '<button type="button" class="btn admin-btn-small" data-structured-add-row="1"' + scopeAttrs + '>' + escapeHtml(schema.addLabel || 'Add Row') + '</button>'),
       '</div>'
     ].join('');
   }
@@ -12197,6 +13110,10 @@
     }
 
     var rows = collectStructuredEditorRows(container);
+    if (isLockedWeeklyStructureStructuredField(scope.fieldName)) {
+      rows = normalizeGeneralWeeklyStructureRows(rows);
+      renderStructuredEditorContainer(container, rows);
+    }
     var serialized = serializeStructuredEditorRows(scope.fieldName, rows);
     var textarea = getStructuredEditorTextarea(scope);
     if (textarea) {
@@ -12684,7 +13601,7 @@
       4: [1, 2, 4, 6],
       5: [1, 2, 3, 5, 6],
       6: [1, 2, 3, 4, 5, 6],
-      7: [0, 1, 2, 3, 4, 5, 6]
+      7: [1, 2, 3, 4, 5, 6, 0]
     };
     var byIndex = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     var pattern = patterns[total] || patterns[3];
@@ -12715,6 +13632,7 @@
     }
 
     state.programMeta = normalizeProgramMeta(meta, state.structure);
+    updateYearlyTemplateContentVisibility(state.programMeta && state.programMeta.program_type);
     if (field === 'program_type' || field === 'sport_focus') {
       state.templateFocus = deriveTemplateFocusFromMeta(state.programMeta, state.templateFocus);
       state.programPhases = normalizeProgramPhases(state.programPhases, state.structure.weeks, state.programMeta.program_type);
@@ -13026,6 +13944,10 @@
       return 'hybrid';
     }
 
+    if (programType === 'yearly') {
+      return 'hybrid';
+    }
+
     return normalizeTemplateFocus(fallbackFocus);
   }
 
@@ -13125,6 +14047,51 @@
       framework_wave_heading: String(source.framework_wave_heading || "").trim(),
       framework_wave_rows_text: String(source.framework_wave_rows_text || "").trim(),
       framework_wave_footer: String(source.framework_wave_footer || "").trim(),
+      yearly_athlete_name: String(source.yearly_athlete_name || "").trim(),
+      yearly_program_year: String(source.yearly_program_year || "").trim(),
+      yearly_primary_sport: String(source.yearly_primary_sport || "").trim(),
+      yearly_secondary_sports: String(source.yearly_secondary_sports || "").trim(),
+      yearly_coach_provider: String(source.yearly_coach_provider || "").trim(),
+      yearly_plan_start_date: String(source.yearly_plan_start_date || "").trim(),
+      yearly_training_age: String(source.yearly_training_age || "").trim(),
+      yearly_current_weekly_volume: String(source.yearly_current_weekly_volume || "").trim(),
+      yearly_current_strength_frequency: String(source.yearly_current_strength_frequency || "").trim(),
+      yearly_current_endurance_frequency: String(source.yearly_current_endurance_frequency || "").trim(),
+      yearly_available_training_days: String(source.yearly_available_training_days || "").trim(),
+      yearly_typical_session_duration: String(source.yearly_typical_session_duration || "").trim(),
+      yearly_relevant_injury_history: String(source.yearly_relevant_injury_history || "").trim(),
+      yearly_equipment_access: String(source.yearly_equipment_access || "").trim(),
+      yearly_travel_work_constraints: String(source.yearly_travel_work_constraints || "").trim(),
+      yearly_preferred_recovery_day: String(source.yearly_preferred_recovery_day || "").trim(),
+      yearly_description: String(source.yearly_description || "").trim(),
+      yearly_assumption: String(source.yearly_assumption || "").trim(),
+      yearly_tagline: String(source.yearly_tagline || "").trim(),
+      yearly_progression_rule: String(source.yearly_progression_rule || "").trim(),
+      yearly_concurrent_rule: String(source.yearly_concurrent_rule || "").trim(),
+      yearly_annual_goals_rows_text: String(source.yearly_annual_goals_rows_text || "").trim(),
+      yearly_programming_philosophy: String(source.yearly_programming_philosophy || "").trim(),
+      yearly_calendar_rows_text: String(source.yearly_calendar_rows_text || "").trim(),
+      yearly_phase_map_rows_text: String(source.yearly_phase_map_rows_text || "").trim(),
+      yearly_transition_rows_text: String(source.yearly_transition_rows_text || "").trim(),
+      yearly_testing_rows_text: String(source.yearly_testing_rows_text || "").trim(),
+      yearly_month_overview_rows_text: String(source.yearly_month_overview_rows_text || "").trim(),
+      yearly_month_priority_rows_text: String(source.yearly_month_priority_rows_text || "").trim(),
+      yearly_month_target_rows_text: String(source.yearly_month_target_rows_text || "").trim(),
+      yearly_month_week_rows_text: String(source.yearly_month_week_rows_text || "").trim(),
+      yearly_month_review_rows_text: String(source.yearly_month_review_rows_text || "").trim(),
+      yearly_calendar_interpretation: String(source.yearly_calendar_interpretation || "").trim(),
+      yearly_half_year_review_rows_text: String(source.yearly_half_year_review_rows_text || "").trim(),
+      yearly_end_year_review_rows_text: String(source.yearly_end_year_review_rows_text || "").trim(),
+      yearly_capability_matrix_rows_text: String(source.yearly_capability_matrix_rows_text || "").trim(),
+      yearly_monitoring_rows_text: String(source.yearly_monitoring_rows_text || "").trim(),
+      yearly_adjustment_order: String(source.yearly_adjustment_order || "").trim(),
+      yearly_default_week_rows_text: String(source.yearly_default_week_rows_text || "").trim(),
+      yearly_strength_framework_rows_text: String(source.yearly_strength_framework_rows_text || "").trim(),
+      yearly_annual_review_goal_rows_text: String(source.yearly_annual_review_goal_rows_text || "").trim(),
+      yearly_annual_review_lessons_rows_text: String(source.yearly_annual_review_lessons_rows_text || "").trim(),
+      yearly_next_year_start_rows_text: String(source.yearly_next_year_start_rows_text || "").trim(),
+      yearly_coach_athlete_summary: String(source.yearly_coach_athlete_summary || "").trim(),
+      yearly_planning_notes_rows_text: String(source.yearly_planning_notes_rows_text || "").trim(),
       estimated_start_date: isIsoDate(source.estimated_start_date) ? String(source.estimated_start_date) : "",
       primary_goal: String(source.primary_goal || "").trim(),
       secondary_goal: String(source.secondary_goal || "").trim(),
@@ -13216,11 +14183,33 @@
       phase.mobility_days_per_week = phase.skill_days_per_week;
     });
 
+    normalized = alignProgramPhasesSequentially(normalized, weeks);
+
     if (!normalized.length) {
       return buildDefaultProgramPhases(weeks, normalizeProgramType(programType));
     }
 
     return normalized;
+  }
+
+  function alignProgramPhasesSequentially(phases, totalWeeks) {
+    var source = Array.isArray(phases) ? phases : [];
+    if (!source.length) {
+      return source;
+    }
+
+    var cursor = 1;
+    return source.map(function (phase) {
+      var item = phase && typeof phase === 'object' ? Object.assign({}, phase) : {};
+      var start = clampNumber(parseInt(item.start_week, 10), 1, totalWeeks, cursor);
+      var end = clampNumber(parseInt(item.end_week, 10), start, totalWeeks, start);
+      var duration = Math.max(1, end - start + 1);
+
+      item.start_week = clampNumber(cursor, 1, totalWeeks, 1);
+      item.end_week = clampNumber(item.start_week + duration - 1, item.start_week, totalWeeks, item.start_week);
+      cursor = item.end_week + 1;
+      return item;
+    });
   }
 
   function normalizeWeeklyStructure(weeklyStructure, workoutsPerWeek, focus, programType) {
@@ -15548,6 +16537,18 @@
               exerciseIdx +
               '" aria-label="Open coach note" title="Coach Note"><span class="exercise-quick-glyph exercise-quick-glyph-note" aria-hidden="true"></span><span class="sr-only">Open coach note</span></button></div>')
             : "") +
+            '<div class="exercise-coaching-notes">' +
+            '<label class="exercise-coaching-notes-label">' +
+            '<span>Coaching Notes</span>' +
+            (state.isAthleteLockedView
+              ? '<div class="exercise-coaching-notes-readonly">' + escapeHtml(String(exercise.notes || "")) + '</div>'
+              : '<textarea class="exercise-coaching-notes-input" data-field="exercise_notes" data-exercise="' +
+                exerciseIdx +
+                '" placeholder="Add coach cues, regressions, or reminders for this exercise">' +
+                escapeHtml(String(exercise.notes || "")) +
+                '</textarea>') +
+            '</label>' +
+            '</div>' +
           actionsHtml +
           '</div></td>';
       }
@@ -15703,7 +16704,7 @@
   }
 
   function bindSetInputListeners(container) {
-    container.querySelectorAll('input[type="text"], input[type="number"]').forEach(function (input) {
+    container.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(function (input) {
       if (!input.disabled) {
         input.addEventListener("input", onSetInput);
         input.addEventListener("change", onSetInput);
@@ -15904,6 +16905,16 @@
     var field = input.getAttribute("data-field");
     var exerciseIdx = parseInt(input.getAttribute("data-exercise"), 10);
     var setIdx = parseInt(input.getAttribute("data-set"), 10);
+
+    if (field === "exercise_notes") {
+      if (!Number.isFinite(exerciseIdx) || !state.exercises[exerciseIdx] || state.isAthleteLockedView) {
+        return;
+      }
+
+      state.exercises[exerciseIdx].notes = input.value;
+      renderWorkoutWalkthrough();
+      return;
+    }
 
     if (!field || isNaN(exerciseIdx) || isNaN(setIdx)) {
       return;

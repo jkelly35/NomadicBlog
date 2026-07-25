@@ -303,7 +303,7 @@
       }
     });
 
-    document.addEventListener("input", function (event) {
+    document.addEventListener("change", function (event) {
       if (event && event.target && event.target.closest && event.target.closest("[data-block-single-fields]")) {
         syncSingleExerciseFromInputs();
         return;
@@ -1770,7 +1770,7 @@
       }
     });
 
-    document.addEventListener("input", function (event) {
+    document.addEventListener("change", function (event) {
       var exerciseItem = event.target && event.target.closest && event.target.closest("[data-block-exercise-item]");
       if (!exerciseItem) {
         return;
